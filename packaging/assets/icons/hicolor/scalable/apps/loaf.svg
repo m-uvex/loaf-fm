@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="#282a2b"/>
+  <!-- Loaf Bread Symbol -->
+  <path fill="#cfc6ab" d="M128 200 C128 140, 180 120, 256 120 C332 120, 384 140, 384 200 C400 240, 400 320, 376 350 C360 370, 330 380, 256 380 C182 380, 152 370, 136 350 C112 320, 112 240, 128 200 Z" opacity="0.95"/>
+  <path stroke="#282a2b" stroke-width="14" stroke-linecap="round" fill="none" d="M190 200 C210 230, 215 280, 205 310 M256 190 C265 230, 265 280, 256 315 M322 200 C302 230, 297 280, 307 310"/>
+</svg>

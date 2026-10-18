@@ -1,0 +1,12 @@
+Package: loaf
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.31), libgl1, libglvnd0
+Recommends: qt6-base-dev | libqt6gui6, qt6-declarative-dev | libqt6qml6, qt6-wayland
+Maintainer: m_uvex <m_uvex@localhost>
+Homepage: https://github.com/m-uvex/loaf
+Description: Material 3 Expressive File Manager
+ Loaf is a modern, fast file manager built with Qt6 Quick and Rust,
+ featuring Material 3 Expressive design, spring animations, and native system integration.

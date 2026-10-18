@@ -1,0 +1,16 @@
+pkgname = loaf
+pkgbase = loaf
+pkgver = 0.1.0-1
+pkgdesc = Material 3 Expressive File Manager built with Qt6 Quick and Rust
+url = https://github.com/m-uvex/loaf
+builddate = 1760754000
+packager = m_uvex <m_uvex@localhost>
+size = 6200000
+arch = x86_64
+license = MIT
+depend = glibc
+depend = libglvnd
+depend = qt6-base
+depend = qt6-declarative
+depend = qt6-svg
+depend = qt6-wayland

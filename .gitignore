@@ -1,0 +1,14 @@
+/target/
+result
+.direnv/
+.idea/
+.opencode/
+.qmlls.ini
+
+# Packaging build intermediates
+packaging/bin/
+packaging/deb/build/
+packaging/arch/build/
+packaging/tarball/
+packaging/dist/Loaf.AppDir/
+packaging/dist/*.AppImage

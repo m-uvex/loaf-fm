@@ -1,0 +1,18 @@
+[Desktop Entry]
+Name=Loaf
+Comment=Material 3 Expressive File Manager
+GenericName=File Manager
+Exec=loaf %U
+Icon=loaf
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Utility;FileManager;Core;
+MimeType=inode/directory;
+Keywords=files;folders;explorer;browser;manager;loaf;
+Actions=NewWindow;
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec=loaf
+Icon=loaf

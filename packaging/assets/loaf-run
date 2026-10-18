@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# If Qt plugins/QML exist in typical distro locations, set them if not already set
+if [ -z "$QT_PLUGIN_PATH" ]; then
+    for p in /usr/lib/qt6/plugins /usr/lib64/qt6/plugins /usr/lib/x86_64-linux-gnu/qt6/plugins; do
+        if [ -d "$p" ]; then
+            export QT_PLUGIN_PATH="$p"
+            break
+        fi
+    done
+fi
+
+if [ -z "$QML2_IMPORT_PATH" ]; then
+    for p in /usr/lib/qt6/qml /usr/lib64/qt6/qml /usr/lib/x86_64-linux-gnu/qt6/qml; do
+        if [ -d "$p" ]; then
+            export QML2_IMPORT_PATH="$p"
+            break
+        fi
+    done
+fi
+
+exec "$DIR/bin/loaf" "$@"

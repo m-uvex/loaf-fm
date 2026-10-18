@@ -1,0 +1,29 @@
+# Maintainer: m_uvex <m_uvex@localhost>
+pkgname=loaf
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Material 3 Expressive File Manager built with Qt6 Quick and Rust"
+arch=('x86_64')
+url="https://github.com/m-uvex/loaf"
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'glibc')
+makedepends=('cargo' 'rust' 'cmake' 'ninja' 'pkgconf')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    cargo build --release --locked
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 "target/release/loaf" "$pkgdir/usr/bin/loaf"
+    install -Dm644 "packaging/assets/loaf.desktop" "$pkgdir/usr/share/applications/loaf.desktop"
+    for sz in 16 32 48 64 128 256 512; do
+        install -Dm644 "packaging/assets/icons/hicolor/${sz}x${sz}/apps/loaf.png" \
+            "$pkgdir/usr/share/icons/hicolor/${sz}x${sz}/apps/loaf.png"
+    done
+    install -Dm644 "packaging/assets/icons/hicolor/scalable/apps/loaf.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/loaf.svg"
+}
