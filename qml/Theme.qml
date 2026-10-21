@@ -14,6 +14,8 @@ Item {
     property bool showExperimentalIcons: false
     property bool showAdvancedArchives: false
     property bool experimentalPcCustomization: false
+    property int gridZoomLevel: 2 // 0: Tiny (70%) .. 2: Normal (100%) .. 12: Huge (800%)
+    property int listZoomLevel: 2
 
     FontLoader { id: fontReg; source: "qrc:/loaf/fonts/Phosphor.ttf" }
     FontLoader { id: fontBold; source: "qrc:/loaf/fonts/Phosphor-Bold.ttf" }
@@ -439,6 +441,10 @@ Item {
         if (value.length > 0) showAdvancedArchives = (value === "true");
         value = readSetting("experimentalPcCustomization");
         if (value.length > 0) experimentalPcCustomization = (value === "true");
+        value = readSetting("gridZoomLevel");
+        if (value.length > 0) gridZoomLevel = Math.max(0, Math.min(9, parseInt(value, 10) || 2));
+        value = readSetting("listZoomLevel");
+        if (value.length > 0) listZoomLevel = Math.max(0, Math.min(9, parseInt(value, 10) || 2));
     }
 
     Component.onCompleted: loadSettings()
@@ -453,4 +459,6 @@ Item {
     onShowExperimentalIconsChanged: writeSetting("showExperimentalIcons", showExperimentalIcons)
     onShowAdvancedArchivesChanged: writeSetting("showAdvancedArchives", showAdvancedArchives)
     onExperimentalPcCustomizationChanged: writeSetting("experimentalPcCustomization", experimentalPcCustomization)
+    onGridZoomLevelChanged: writeSetting("gridZoomLevel", gridZoomLevel)
+    onListZoomLevelChanged: writeSetting("listZoomLevel", listZoomLevel)
 }

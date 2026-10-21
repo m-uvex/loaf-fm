@@ -464,7 +464,7 @@ Item {
                                     radius: theme.radiusL
                                     color: theme.surfaceContainer
                                     opacity: placeMouse.containsMouse ? 1.0 : 0.85
-                                    scale: placeMouse.pressed ? 0.96 : (placeMouse.containsMouse ? 1.02 : 1.0)
+                                    scale: placeMouse.pressed ? 0.96 : 1.0
                                     Behavior on opacity { NumberAnimation { duration: theme.durationFast } }
                                     Behavior on scale { SpringAnimation { spring: 3.5; damping: 0.32 } }
 

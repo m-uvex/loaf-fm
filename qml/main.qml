@@ -23,6 +23,47 @@ ApplicationWindow {
     property int currentPlaceIndex: 1    // last clicked place row (pill position when in files view)
     property bool isEditingPath: false
 
+    // Item zoom / size control properties and functions
+    readonly property int maxZoomLevel: 12
+    readonly property int currentZoomLevel: engine.view_mode === "list" ? theme.listZoomLevel : theme.gridZoomLevel
+    readonly property int currentZoomPercent: {
+        var percents = [70, 85, 100, 130, 160, 200, 260, 330, 400, 500, 600, 700, 800];
+        return percents[currentZoomLevel] !== undefined ? percents[currentZoomLevel] : 100;
+    }
+    readonly property bool canZoomIn: currentZoomLevel < maxZoomLevel
+    readonly property bool canZoomOut: currentZoomLevel > 0
+    readonly property bool canZoomReset: currentZoomLevel !== 2
+
+    function zoomIn() {
+        if (activeView !== "files") return;
+        if (engine.view_mode === "list") {
+            if (theme.listZoomLevel < maxZoomLevel) theme.listZoomLevel++;
+        } else {
+            if (theme.gridZoomLevel < maxZoomLevel) theme.gridZoomLevel++;
+        }
+        if (typeof zoomHud !== "undefined" && zoomHud) zoomHud.triggerHud();
+    }
+
+    function zoomOut() {
+        if (activeView !== "files") return;
+        if (engine.view_mode === "list") {
+            if (theme.listZoomLevel > 0) theme.listZoomLevel--;
+        } else {
+            if (theme.gridZoomLevel > 0) theme.gridZoomLevel--;
+        }
+        if (typeof zoomHud !== "undefined" && zoomHud) zoomHud.triggerHud();
+    }
+
+    function zoomReset() {
+        if (activeView !== "files") return;
+        if (engine.view_mode === "list") {
+            theme.listZoomLevel = 2;
+        } else {
+            theme.gridZoomLevel = 2;
+        }
+        if (typeof zoomHud !== "undefined" && zoomHud) zoomHud.triggerHud();
+    }
+
     // Views that show the back button and aren't the file grid (back returns to files)
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
 
@@ -108,9 +149,9 @@ ApplicationWindow {
 
     // Responsive list-column visibility: fixed columns drop out as the window
     // narrows so nothing overlaps at 760px.
-    readonly property bool listShowDate: width >= 820
-    readonly property bool listShowSize: width >= 900
-    readonly property bool listShowType: width >= 980
+    readonly property bool listShowDate: width >= 680
+    readonly property bool listShowSize: width >= 750
+    readonly property bool listShowType: width >= 880
 
     // True while any modal dialog is open (arrow keys / shortcuts must not fire).
     readonly property bool anyModalOpen: inputModal.visible || propsModal.visible
@@ -138,6 +179,21 @@ ApplicationWindow {
     Shortcut { sequence: "Alt+Right"; enabled: engine.can_go_forward; onActivated: engine.go_forward() }
     Shortcut { sequence: "Alt+Up"; onActivated: engine.navigate_up() }
     Shortcut { sequence: "Backspace"; enabled: window.gridKeyboardReady && engine.can_go_back; onActivated: engine.go_back() }
+    Shortcut {
+        sequences: ["Ctrl+=", "Ctrl++", StandardKey.ZoomIn]
+        enabled: window.gridKeyboardReady
+        onActivated: window.zoomIn()
+    }
+    Shortcut {
+        sequences: ["Ctrl+-", "Ctrl+_", StandardKey.ZoomOut]
+        enabled: window.gridKeyboardReady
+        onActivated: window.zoomOut()
+    }
+    Shortcut {
+        sequences: ["Ctrl+0", StandardKey.ZoomReset]
+        enabled: window.gridKeyboardReady
+        onActivated: window.zoomReset()
+    }
     // NOTE: Return / Enter are handled in globalKeyHandler below (not as a
     // Shortcut) so they are never swallowed from a focused text field.
 
@@ -202,6 +258,25 @@ ApplicationWindow {
                     gridContainer.openSelected();
                     event.accepted = true;
                     return;
+                }
+
+                if (event.modifiers & Qt.ControlModifier) {
+                    var isPlus = (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === 0x2b || event.key === 0x3d || event.key === 0x01000056 || event.text === "=" || event.text === "+");
+                    var isMinus = (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore || event.key === 0x2d || event.key === 0x01000057 || event.text === "-" || event.text === "\u001f" || event.text === "\u002d");
+                    var isZero = (event.key === Qt.Key_0 || event.key === 0x30 || event.text === "0");
+                    if (isPlus) {
+                        window.zoomIn();
+                        event.accepted = true;
+                        return;
+                    } else if (isMinus) {
+                        window.zoomOut();
+                        event.accepted = true;
+                        return;
+                    } else if (isZero) {
+                        window.zoomReset();
+                        event.accepted = true;
+                        return;
+                    }
                 }
             }
 
@@ -2181,6 +2256,31 @@ ApplicationWindow {
                             }
                         }
 
+                        // Touchpad / touch pinch to zoom in and out
+                        PinchHandler {
+                            id: pinchZoomHandler
+                            target: null
+                            property real lastPinchScale: 1.0
+
+                            onActiveChanged: {
+                                if (active) {
+                                    lastPinchScale = 1.0;
+                                }
+                            }
+
+                            onActiveScaleChanged: {
+                                if (!active) return;
+                                var threshold = 0.10;
+                                if (activeScale - lastPinchScale >= threshold) {
+                                    window.zoomIn();
+                                    lastPinchScale = activeScale;
+                                } else if (lastPinchScale - activeScale >= threshold) {
+                                    window.zoomOut();
+                                    lastPinchScale = activeScale;
+                                }
+                            }
+                        }
+
                         // Drop target: current directory (for external drops onto empty space)
                         DropArea {
                             id: gridDropArea
@@ -2243,8 +2343,25 @@ ApplicationWindow {
                         GridView {
                             id: filesGridView
                             anchors.fill: parent
-                            cellWidth: 124
-                            cellHeight: 114
+
+                            readonly property var gridWidths: [84, 100, 120, 150, 186, 236, 300, 376, 460, 560, 670, 780, 890]
+                            readonly property var gridHeights: [96, 112, 134, 166, 204, 256, 324, 404, 492, 596, 710, 824, 938]
+                            readonly property var gridIconBoxSizes: [64, 76, 92, 116, 146, 186, 238, 300, 370, 454, 546, 638, 730]
+                            readonly property var gridPhosphorSizes: [74, 88, 106, 134, 168, 214, 274, 346, 426, 524, 630, 736, 842]
+                            readonly property var gridSystemIconSizes: [60, 72, 88, 112, 140, 180, 230, 290, 360, 440, 530, 620, 710]
+                            readonly property var gridThumbnailSizes: [80, 96, 128, 160, 200, 256, 320, 400, 500, 600, 720, 840, 960]
+                            readonly property var gridFontSizes: [10, 10.5, 11, 11.5, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+                            readonly property var gridTextHeights: [20, 22, 24, 26, 28, 32, 36, 40, 44, 48, 52, 56, 60]
+                            readonly property var gridBadgeSizes: [14, 16, 18, 22, 26, 32, 38, 44, 50, 56, 64, 72, 80]
+                            readonly property var gridBadgeIconSizes: [9, 10, 11, 14, 16, 20, 24, 28, 32, 36, 42, 48, 54]
+                            readonly property var gridPaddings: [5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24]
+                            readonly property var gridSpacings: [2, 3, 4, 4, 5, 5, 6, 6, 8, 8, 10, 10, 12]
+
+                            cellWidth: gridWidths[theme.gridZoomLevel] !== undefined ? gridWidths[theme.gridZoomLevel] : 120
+                            cellHeight: gridHeights[theme.gridZoomLevel] !== undefined ? gridHeights[theme.gridZoomLevel] : 134
+                            Behavior on cellWidth { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                            Behavior on cellHeight { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
                             clip: true
                             z: engine.view_mode === "grid" ? 2 : 1
                             // Cross-fade grid <-> list instead of an instant swap.
@@ -2295,6 +2412,14 @@ ApplicationWindow {
                                 id: gridWheelHandler
                                 target: null
                                 onWheel: function(event) {
+                                    if (event.modifiers & Qt.ControlModifier) {
+                                        if (event.angleDelta.y > 0) {
+                                            window.zoomIn();
+                                        } else if (event.angleDelta.y < 0) {
+                                            window.zoomOut();
+                                        }
+                                        return;
+                                    }
                                     var delta = event.angleDelta.y;
                                     var step = 80;
                                     var newY = filesGridView.contentY - (delta > 0 ? step : -step);
@@ -2540,6 +2665,27 @@ ApplicationWindow {
                                 event.accepted = true;
                             }
 
+                            Keys.onPressed: function(event) {
+                                if (event.modifiers & Qt.ControlModifier) {
+                                    var isPlus = (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === 0x2b || event.key === 0x3d || event.key === 0x01000056 || event.text === "=" || event.text === "+");
+                                    var isMinus = (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore || event.key === 0x2d || event.key === 0x01000057 || event.text === "-" || event.text === "\u001f" || event.text === "\u002d");
+                                    var isZero = (event.key === Qt.Key_0 || event.key === 0x30 || event.text === "0");
+                                    if (isPlus) {
+                                        window.zoomIn();
+                                        event.accepted = true;
+                                        return;
+                                    } else if (isMinus) {
+                                        window.zoomOut();
+                                        event.accepted = true;
+                                        return;
+                                    } else if (isZero) {
+                                        window.zoomReset();
+                                        event.accepted = true;
+                                        return;
+                                    }
+                                }
+                            }
+
                             model: gridContainer.displayedItems
 
                             delegate: Item {
@@ -2645,10 +2791,10 @@ ApplicationWindow {
                                 Rectangle {
                                     id: cardHighlight
                                     anchors.fill: parent
-                                    anchors.topMargin: 4
-                                    anchors.bottomMargin: 4
-                                    anchors.leftMargin: fileCardDelegate.hasLeft ? -4 : 4
-                                    anchors.rightMargin: fileCardDelegate.hasRight ? -4 : 4
+                                    anchors.topMargin: 2
+                                    anchors.bottomMargin: 2
+                                    anchors.leftMargin: fileCardDelegate.hasLeft ? -2 : 2
+                                    anchors.rightMargin: fileCardDelegate.hasRight ? -2 : 2
 
                                     radius: theme.radiusL
                                     color: fileCardDelegate.isDropTarget
@@ -2687,22 +2833,24 @@ ApplicationWindow {
                                     }
                                 }
 
-                                scale: !entered ? 0.82
-                                    : (cardMouseArea.pressed ? 0.94 : ((cardMouseArea.containsMouse && !fileCardDelegate.hasLeft && !fileCardDelegate.hasRight) ? 1.03 : 1.0))
+                                scale: !entered ? 0.82 : (cardMouseArea.pressed ? 0.96 : 1.0)
                                 Behavior on scale { SpringAnimation { spring: 3.5; damping: 0.3 } }
 
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 6
+                                    anchors.margins: filesGridView.gridPaddings[theme.gridZoomLevel] !== undefined ? filesGridView.gridPaddings[theme.gridZoomLevel] : 7
+                                    spacing: filesGridView.gridSpacings[theme.gridZoomLevel] !== undefined ? filesGridView.gridSpacings[theme.gridZoomLevel] : 4
                                     z: 1
 
-                                    Item { Layout.fillHeight: true }
-
                                     Item {
+                                        id: iconContainer
                                         Layout.alignment: Qt.AlignHCenter
-                                        Layout.preferredWidth: 46
-                                        Layout.preferredHeight: 46
+                                        width: filesGridView.gridIconBoxSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridIconBoxSizes[theme.gridZoomLevel] : 92
+                                        height: width
+                                        implicitWidth: width
+                                        implicitHeight: height
+                                        Layout.preferredWidth: width
+                                        Layout.preferredHeight: height
 
                                         LoafIcon {
                                             visible: !fileCardDelegate.hasThumbnail && (theme.iconSource === "phosphor")
@@ -2710,7 +2858,7 @@ ApplicationWindow {
                                             name: fileCardDelegate.isCutItem
                                                 ? (fileCardDelegate.item.is_dir ? "folder-dashed" : "file-dashed")
                                                 : (fileCardDelegate.item.icon || (fileCardDelegate.item.is_dir ? "folder" : "file"))
-                                            size: 42
+                                            size: filesGridView.gridPhosphorSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridPhosphorSizes[theme.gridZoomLevel] : 106
                                             color: fileCardDelegate.isSelected
                                                 ? theme.secondaryContainerFg
                                                 : (fileCardDelegate.item.is_dir ? theme.primary : theme.textMain)
@@ -2719,9 +2867,9 @@ ApplicationWindow {
                                         // Symlink badge indicator
                                         Rectangle {
                                             visible: fileCardDelegate.item.is_symlink
-                                            width: 14
-                                            height: 14
-                                            radius: 7
+                                            width: filesGridView.gridBadgeSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridBadgeSizes[theme.gridZoomLevel] : 18
+                                            height: width
+                                            radius: width / 2
                                             color: theme.surfaceContainer
                                             border.color: theme.outlineVariant
                                             border.width: 1
@@ -2732,7 +2880,7 @@ ApplicationWindow {
                                             LoafIcon {
                                                 anchors.centerIn: parent
                                                 name: "arrow-square-out"
-                                                size: 9
+                                                size: filesGridView.gridBadgeIconSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridBadgeIconSizes[theme.gridZoomLevel] : 11
                                                 color: theme.primary
                                             }
                                         }
@@ -2741,10 +2889,10 @@ ApplicationWindow {
                                             visible: !fileCardDelegate.hasThumbnail && (theme.iconSource === "system")
                                             anchors.centerIn: parent
                                             source: fileCardDelegate.item.icon_path
-                                            width: 44
-                                            height: 44
-                                            sourceSize.width: 64
-                                            sourceSize.height: 64
+                                            width: filesGridView.gridSystemIconSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridSystemIconSizes[theme.gridZoomLevel] : 88
+                                            height: width
+                                            sourceSize.width: filesGridView.gridThumbnailSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridThumbnailSizes[theme.gridZoomLevel] : 128
+                                            sourceSize.height: sourceSize.width
                                             fillMode: Image.PreserveAspectFit
                                             smooth: true
                                             mipmap: true
@@ -2783,8 +2931,8 @@ ApplicationWindow {
                                                 anchors.fill: parent
                                                 source: fileCardDelegate.thumbSource
                                                 fillMode: Image.PreserveAspectCrop
-                                                sourceSize.width: 96
-                                                sourceSize.height: 96
+                                                sourceSize.width: filesGridView.gridThumbnailSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridThumbnailSizes[theme.gridZoomLevel] : 96
+                                                sourceSize.height: sourceSize.width
                                                 asynchronous: false
                                                 cache: true
                                                 smooth: true
@@ -2810,13 +2958,13 @@ ApplicationWindow {
 
                                     Text {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 28
+                                        Layout.preferredHeight: filesGridView.gridTextHeights[theme.gridZoomLevel] !== undefined ? filesGridView.gridTextHeights[theme.gridZoomLevel] : 24
                                         // If search everywhere, show disambiguated display_name (e.g. Projects/Pictures)
                                         text: engine.is_searching_everywhere
                                             ? (fileCardDelegate.item.display_name || fileCardDelegate.item.name)
                                             : fileCardDelegate.item.name
                                         color: fileCardDelegate.isSelected ? theme.secondaryContainerFg : theme.textMain
-                                        font.pixelSize: 11
+                                        font.pixelSize: filesGridView.gridFontSizes[theme.gridZoomLevel] !== undefined ? filesGridView.gridFontSizes[theme.gridZoomLevel] : 11
                                         font.bold: fileCardDelegate.item.is_dir || fileCardDelegate.isSelected
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignTop
@@ -2824,8 +2972,6 @@ ApplicationWindow {
                                         maximumLineCount: 2
                                         elide: Text.ElideMiddle
                                     }
-
-                                    Item { Layout.fillHeight: true }
                                 }
 
                                 MouseArea {
@@ -2932,16 +3078,16 @@ ApplicationWindow {
                             anchors.top: parent.top
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            height: 32
+                            height: Math.max(30, Math.min(42, 28 + theme.listZoomLevel))
                             radius: theme.radiusM
                             color: theme.surfaceContainer
                             z: 2
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 16
-                                anchors.rightMargin: 16
-                                spacing: 12
+                                anchors.leftMargin: filesListView.rowLeftMargin
+                                anchors.rightMargin: filesListView.rowRightMargin + 12
+                                spacing: filesListView.colSpacing
 
                                 // Name Column
                                 Item {
@@ -2951,17 +3097,26 @@ ApplicationWindow {
 
                                     RowLayout {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 6
+                                        spacing: Math.max(8, Math.min(16, 6 + theme.listZoomLevel))
+
+                                        // Gutter matching the icon box so "Name" aligns perfectly with file names
+                                        Item {
+                                            width: filesListView.listIconBoxSizes[theme.listZoomLevel] !== undefined ? filesListView.listIconBoxSizes[theme.listZoomLevel] : 26
+                                            height: 1
+                                            implicitWidth: width
+                                            Layout.preferredWidth: width
+                                        }
+
                                         Text {
                                             text: "Name"
                                             color: engine.sort_by === "name" ? theme.primary : theme.textMuted
-                                            font.pixelSize: 11
+                                            font.pixelSize: Math.max(11, Math.min(13, 10.5 + theme.listZoomLevel * 0.2))
                                             font.bold: true
                                         }
                                         LoafIcon {
                                             visible: engine.sort_by === "name"
                                             name: engine.sort_ascending ? "sort-ascending" : "sort-descending"
-                                            size: 13
+                                            size: Math.max(12, Math.min(14, 11.5 + theme.listZoomLevel * 0.2))
                                             color: theme.primary
                                         }
                                     }
@@ -2982,8 +3137,9 @@ ApplicationWindow {
                                 // Date Modified Column
                                 Item {
                                     visible: window.listShowDate
-                                    Layout.preferredWidth: 150
-                                    Layout.minimumWidth: 96
+                                    Layout.preferredWidth: filesListView.colDateWidth
+                                    Layout.minimumWidth: filesListView.colDateWidth
+                                    Layout.maximumWidth: filesListView.colDateWidth
                                     Layout.fillHeight: true
 
                                     RowLayout {
@@ -2992,13 +3148,13 @@ ApplicationWindow {
                                         Text {
                                             text: "Date Modified"
                                             color: engine.sort_by === "modified" ? theme.primary : theme.textMuted
-                                            font.pixelSize: 11
+                                            font.pixelSize: Math.max(11, Math.min(13, 10.5 + theme.listZoomLevel * 0.2))
                                             font.bold: true
                                         }
                                         LoafIcon {
                                             visible: engine.sort_by === "modified"
                                             name: engine.sort_ascending ? "sort-ascending" : "sort-descending"
-                                            size: 13
+                                            size: Math.max(12, Math.min(14, 11.5 + theme.listZoomLevel * 0.2))
                                             color: theme.primary
                                         }
                                     }
@@ -3019,8 +3175,9 @@ ApplicationWindow {
                                 // Type Column
                                 Item {
                                     visible: window.listShowType
-                                    Layout.preferredWidth: 100
-                                    Layout.minimumWidth: 70
+                                    Layout.preferredWidth: filesListView.colTypeWidth
+                                    Layout.minimumWidth: filesListView.colTypeWidth
+                                    Layout.maximumWidth: filesListView.colTypeWidth
                                     Layout.fillHeight: true
 
                                     RowLayout {
@@ -3029,13 +3186,13 @@ ApplicationWindow {
                                         Text {
                                             text: "Type"
                                             color: engine.sort_by === "type" ? theme.primary : theme.textMuted
-                                            font.pixelSize: 11
+                                            font.pixelSize: Math.max(11, Math.min(13, 10.5 + theme.listZoomLevel * 0.2))
                                             font.bold: true
                                         }
                                         LoafIcon {
                                             visible: engine.sort_by === "type"
                                             name: engine.sort_ascending ? "sort-ascending" : "sort-descending"
-                                            size: 13
+                                            size: Math.max(12, Math.min(14, 11.5 + theme.listZoomLevel * 0.2))
                                             color: theme.primary
                                         }
                                     }
@@ -3056,23 +3213,25 @@ ApplicationWindow {
                                 // Size Column
                                 Item {
                                     visible: window.listShowSize
-                                    Layout.preferredWidth: 80
-                                    Layout.minimumWidth: 60
+                                    Layout.preferredWidth: filesListView.colSizeWidth
+                                    Layout.minimumWidth: filesListView.colSizeWidth
+                                    Layout.maximumWidth: filesListView.colSizeWidth
                                     Layout.fillHeight: true
 
                                     RowLayout {
                                         anchors.verticalCenter: parent.verticalCenter
+                                        anchors.right: parent.right
                                         spacing: 6
                                         Text {
                                             text: "Size"
                                             color: engine.sort_by === "size" ? theme.primary : theme.textMuted
-                                            font.pixelSize: 11
+                                            font.pixelSize: Math.max(11, Math.min(13, 10.5 + theme.listZoomLevel * 0.2))
                                             font.bold: true
                                         }
                                         LoafIcon {
                                             visible: engine.sort_by === "size"
                                             name: engine.sort_ascending ? "sort-ascending" : "sort-descending"
-                                            size: 13
+                                            size: Math.max(12, Math.min(14, 11.5 + theme.listZoomLevel * 0.2))
                                             color: theme.primary
                                         }
                                     }
@@ -3095,12 +3254,38 @@ ApplicationWindow {
                         // Detailed List View
                         ListView {
                             id: filesListView
+
+                            readonly property int rowLeftMargin: 12
+                            readonly property int rowRightMargin: 12
+                            readonly property int colSpacing: 12
+
+                            readonly property var listDateWidths: [130, 140, 150, 160, 170, 180, 195, 210, 225, 240, 255, 270, 285]
+                            readonly property var listTypeWidths: [85, 92, 100, 108, 116, 125, 135, 145, 155, 165, 175, 185, 195]
+                            readonly property var listSizeWidths: [70, 75, 80, 86, 92, 98, 105, 112, 120, 128, 136, 144, 152]
+
+                            readonly property int colDateWidth: listDateWidths[theme.listZoomLevel] !== undefined ? listDateWidths[theme.listZoomLevel] : 150
+                            readonly property int colTypeWidth: listTypeWidths[theme.listZoomLevel] !== undefined ? listTypeWidths[theme.listZoomLevel] : 100
+                            readonly property int colSizeWidth: listSizeWidths[theme.listZoomLevel] !== undefined ? listSizeWidths[theme.listZoomLevel] : 80
+
+                            readonly property var listRowHeights: [26, 30, 36, 42, 48, 56, 64, 74, 84, 96, 108, 120, 134]
+                            readonly property var listIconBoxSizes: [18, 22, 26, 32, 38, 44, 52, 60, 68, 78, 88, 98, 108]
+                            readonly property var listPhosphorSizes: [22, 26, 32, 38, 46, 54, 64, 74, 84, 96, 108, 120, 132]
+                            readonly property var listSystemIconSizes: [18, 22, 26, 32, 38, 44, 52, 60, 68, 78, 88, 98, 108]
+                            readonly property var listThumbnailSizes: [36, 44, 52, 64, 76, 88, 104, 120, 136, 156, 176, 196, 216]
+                            readonly property var listNameFontSizes: [11, 11.5, 12, 13, 13.5, 14, 15, 15.5, 16, 17, 18, 19, 20]
+                            readonly property var listDetailFontSizes: [10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5, 16]
+                            readonly property var listBadgeSizes: [8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+                            readonly property var listBadgeIconSizes: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18]
+
+                            property int rowHeight: listRowHeights[theme.listZoomLevel] !== undefined ? listRowHeights[theme.listZoomLevel] : 36
+                            Behavior on rowHeight { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
                             anchors.top: listHeaderRow.shown ? listHeaderRow.bottom : parent.top
                             anchors.topMargin: listHeaderRow.shown ? 6 : 0
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            spacing: 3
+                            spacing: Math.max(2, Math.min(6, 2 + Math.floor(theme.listZoomLevel * 0.4)))
                             clip: true
                             z: engine.view_mode === "list" ? 2 : 1
                             // Cross-fade grid <-> list instead of an instant swap.
@@ -3129,6 +3314,14 @@ ApplicationWindow {
                                 id: listWheelHandler
                                 target: null
                                 onWheel: function(event) {
+                                    if (event.modifiers & Qt.ControlModifier) {
+                                        if (event.angleDelta.y > 0) {
+                                            window.zoomIn();
+                                        } else if (event.angleDelta.y < 0) {
+                                            window.zoomOut();
+                                        }
+                                        return;
+                                    }
                                     var delta = event.angleDelta.y;
                                     var step = 80;
                                     var newY = filesListView.contentY - (delta > 0 ? step : -step);
@@ -3156,12 +3349,33 @@ ApplicationWindow {
                                 event.accepted = true;
                             }
 
+                            Keys.onPressed: function(event) {
+                                if (event.modifiers & Qt.ControlModifier) {
+                                    var isPlus = (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === 0x2b || event.key === 0x3d || event.key === 0x01000056 || event.text === "=" || event.text === "+");
+                                    var isMinus = (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore || event.key === 0x2d || event.key === 0x01000057 || event.text === "-" || event.text === "\u001f" || event.text === "\u002d");
+                                    var isZero = (event.key === Qt.Key_0 || event.key === 0x30 || event.text === "0");
+                                    if (isPlus) {
+                                        window.zoomIn();
+                                        event.accepted = true;
+                                        return;
+                                    } else if (isMinus) {
+                                        window.zoomOut();
+                                        event.accepted = true;
+                                        return;
+                                    } else if (isZero) {
+                                        window.zoomReset();
+                                        event.accepted = true;
+                                        return;
+                                    }
+                                }
+                            }
+
                             model: filesGridView.model
 
                             delegate: Item {
                                 id: listRowDelegate
                                 width: filesListView.width
-                                height: 38
+                                height: filesListView.rowHeight
 
                                 readonly property var item: modelData
                                 readonly property bool isSelected: !engine.is_searching_everywhere && !!gridContainer.selectedIndices[index]
@@ -3205,18 +3419,25 @@ ApplicationWindow {
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    spacing: 12
+                                    anchors.leftMargin: filesListView.rowLeftMargin
+                                    anchors.rightMargin: filesListView.rowRightMargin + 12
+                                    spacing: filesListView.colSpacing
 
                                     // Name Column
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 10
+                                        Layout.minimumWidth: 100
+                                        Layout.alignment: Qt.AlignVCenter
+                                        spacing: Math.max(8, Math.min(16, 6 + theme.listZoomLevel))
 
                                         Item {
-                                            width: 22
-                                            height: 22
+                                            id: listIconBox
+                                            width: filesListView.listIconBoxSizes[theme.listZoomLevel] !== undefined ? filesListView.listIconBoxSizes[theme.listZoomLevel] : 26
+                                            height: width
+                                            implicitWidth: width
+                                            implicitHeight: height
+                                            Layout.preferredWidth: width
+                                            Layout.preferredHeight: height
                                             Layout.alignment: Qt.AlignVCenter
 
                                             LoafIcon {
@@ -3225,16 +3446,16 @@ ApplicationWindow {
                                                 name: listRowDelegate.isCutItem
                                                     ? (listRowDelegate.item.is_dir ? "folder-dashed" : "file-dashed")
                                                     : (listRowDelegate.item.icon || (listRowDelegate.item.is_dir ? "folder" : "file"))
-                                                size: 18
+                                                size: listIconBox.width
                                                 color: listRowDelegate.isSelected ? theme.secondaryContainerFg : (listRowDelegate.item.is_dir ? theme.primary : theme.textMain)
                                             }
 
                                             // Small symlink badge indicator
                                             Rectangle {
                                                 visible: listRowDelegate.item.is_symlink
-                                                width: 10
-                                                height: 10
-                                                radius: 5
+                                                width: filesListView.listBadgeSizes[theme.listZoomLevel] !== undefined ? filesListView.listBadgeSizes[theme.listZoomLevel] : 10
+                                                height: width
+                                                radius: width / 2
                                                 color: theme.surfaceContainer
                                                 border.color: theme.outlineVariant
                                                 border.width: 1
@@ -3244,7 +3465,7 @@ ApplicationWindow {
                                                 LoafIcon {
                                                     anchors.centerIn: parent
                                                     name: "arrow-square-out"
-                                                    size: 7
+                                                    size: filesListView.listBadgeIconSizes[theme.listZoomLevel] !== undefined ? filesListView.listBadgeIconSizes[theme.listZoomLevel] : 7
                                                     color: theme.primary
                                                 }
                                             }
@@ -3253,10 +3474,10 @@ ApplicationWindow {
                                                 visible: !listRowDelegate.hasThumbnail && theme.iconSource === "system"
                                                 anchors.centerIn: parent
                                                 source: listRowDelegate.item.icon_path ? (listRowDelegate.item.icon_path.indexOf("file://") === 0 ? listRowDelegate.item.icon_path : ("file://" + listRowDelegate.item.icon_path)) : ""
-                                                width: 18
-                                                height: 18
-                                                sourceSize.width: 36
-                                                sourceSize.height: 36
+                                                width: listIconBox.width
+                                                height: width
+                                                sourceSize.width: filesListView.listThumbnailSizes[theme.listZoomLevel] !== undefined ? filesListView.listThumbnailSizes[theme.listZoomLevel] : 52
+                                                sourceSize.height: sourceSize.width
                                                 fillMode: Image.PreserveAspectFit
                                             }
 
@@ -3264,7 +3485,7 @@ ApplicationWindow {
                                             Rectangle {
                                                 anchors.fill: parent
                                                 visible: listRowDelegate.hasThumbnail
-                                                radius: 6
+                                                radius: Math.max(4, Math.min(10, 4 + theme.listZoomLevel * 0.5))
                                                 color: theme.surfaceContainerHigh
                                                 clip: true
 
@@ -3273,8 +3494,8 @@ ApplicationWindow {
                                                     anchors.fill: parent
                                                     source: listRowDelegate.thumbSource
                                                     fillMode: Image.PreserveAspectCrop
-                                                    sourceSize.width: 44
-                                                    sourceSize.height: 44
+                                                    sourceSize.width: filesListView.listThumbnailSizes[theme.listZoomLevel] !== undefined ? filesListView.listThumbnailSizes[theme.listZoomLevel] : 52
+                                                    sourceSize.height: sourceSize.width
                                                     asynchronous: true
                                                     cache: true
                                                     smooth: true
@@ -3283,7 +3504,7 @@ ApplicationWindow {
 
                                                 Rectangle {
                                                     anchors.fill: parent
-                                                    radius: 6
+                                                    radius: parent.radius
                                                     color: "transparent"
                                                     border.color: theme.outlineVariant
                                                     border.width: 1
@@ -3294,9 +3515,10 @@ ApplicationWindow {
 
                                         Text {
                                             Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
                                             text: listRowDelegate.item.name
                                             color: listRowDelegate.isSelected ? theme.secondaryContainerFg : theme.textMain
-                                            font.pixelSize: 13
+                                            font.pixelSize: filesListView.listNameFontSizes[theme.listZoomLevel] !== undefined ? filesListView.listNameFontSizes[theme.listZoomLevel] : 12
                                             font.bold: listRowDelegate.item.is_dir || listRowDelegate.isSelected
                                             elide: Text.ElideMiddle
                                         }
@@ -3305,33 +3527,40 @@ ApplicationWindow {
                                     // Date Column
                                     Text {
                                         visible: window.listShowDate
-                                        Layout.preferredWidth: 150
-                                        Layout.minimumWidth: 96
+                                        Layout.preferredWidth: filesListView.colDateWidth
+                                        Layout.minimumWidth: filesListView.colDateWidth
+                                        Layout.maximumWidth: filesListView.colDateWidth
+                                        Layout.alignment: Qt.AlignVCenter
                                         text: listRowDelegate.item.modified_str || "-"
                                         color: listRowDelegate.isSelected ? theme.secondaryContainerFg : theme.textMuted
-                                        font.pixelSize: 11
+                                        font.pixelSize: filesListView.listDetailFontSizes[theme.listZoomLevel] !== undefined ? filesListView.listDetailFontSizes[theme.listZoomLevel] : 11
                                         elide: Text.ElideRight
                                     }
 
                                     // Type Column
                                     Text {
                                         visible: window.listShowType
-                                        Layout.preferredWidth: 100
-                                        Layout.minimumWidth: 70
+                                        Layout.preferredWidth: filesListView.colTypeWidth
+                                        Layout.minimumWidth: filesListView.colTypeWidth
+                                        Layout.maximumWidth: filesListView.colTypeWidth
+                                        Layout.alignment: Qt.AlignVCenter
                                         text: listRowDelegate.item.category || "-"
                                         color: listRowDelegate.isSelected ? theme.secondaryContainerFg : theme.outline
-                                        font.pixelSize: 11
+                                        font.pixelSize: filesListView.listDetailFontSizes[theme.listZoomLevel] !== undefined ? filesListView.listDetailFontSizes[theme.listZoomLevel] : 11
                                         elide: Text.ElideRight
                                     }
 
                                     // Size Column
                                     Text {
                                         visible: window.listShowSize
-                                        Layout.preferredWidth: 80
-                                        Layout.minimumWidth: 60
+                                        Layout.preferredWidth: filesListView.colSizeWidth
+                                        Layout.minimumWidth: filesListView.colSizeWidth
+                                        Layout.maximumWidth: filesListView.colSizeWidth
+                                        Layout.alignment: Qt.AlignVCenter
                                         text: listRowDelegate.item.size_str || "-"
                                         color: listRowDelegate.isSelected ? theme.secondaryContainerFg : theme.textMuted
-                                        font.pixelSize: 11
+                                        font.pixelSize: filesListView.listDetailFontSizes[theme.listZoomLevel] !== undefined ? filesListView.listDetailFontSizes[theme.listZoomLevel] : 11
+                                        horizontalAlignment: Text.AlignRight
                                         elide: Text.ElideRight
                                     }
                                 }
@@ -3461,6 +3690,63 @@ ApplicationWindow {
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // Floating Zoom Indicator (HUD)
+                        Rectangle {
+                            id: zoomHud
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 24
+                            z: 200
+                            height: 36
+                            width: zoomHudRow.implicitWidth + 28
+                            radius: theme.radiusFull
+                            color: theme.surfaceContainerHighest
+                            border.color: theme.outlineVariant
+                            border.width: 1
+                            opacity: 0.0
+                            visible: opacity > 0.001
+
+                            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                            Timer {
+                                id: zoomHudTimer
+                                interval: 1300
+                                repeat: false
+                                onTriggered: zoomHud.opacity = 0.0
+                            }
+
+                            function triggerHud() {
+                                zoomHud.opacity = 1.0;
+                                zoomHudTimer.restart();
+                            }
+
+                            RowLayout {
+                                id: zoomHudRow
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                LoafIcon {
+                                    name: "magnifying-glass"
+                                    size: 15
+                                    color: theme.primary
+                                }
+
+                                Text {
+                                    text: window.currentZoomPercent + "%"
+                                    color: theme.textMain
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+
+                                Text {
+                                    visible: window.currentZoomLevel === 2
+                                    text: "(Default)"
+                                    color: theme.textMuted
+                                    font.pixelSize: 11
                                 }
                             }
                         }
@@ -4032,6 +4318,62 @@ ApplicationWindow {
             ]
             value: engine.view_mode
             onSelected: function(v) { engine.view_mode = v; viewMenuPopup.close(); }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            Layout.topMargin: 4
+            Layout.bottomMargin: 4
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            color: theme.separator
+        }
+
+        Text {
+            Layout.leftMargin: 6
+            text: "ITEM SIZE"
+            color: theme.textMuted
+            font.pixelSize: 10
+            font.bold: true
+            font.letterSpacing: 0.8
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            spacing: 8
+
+            LoafButton {
+                icon: "minus"
+                variant: "tonal"
+                enabled: window.canZoomOut
+                onClicked: window.zoomOut()
+            }
+
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: window.currentZoomPercent + "%"
+                color: theme.textMain
+                font.pixelSize: 12
+                font.bold: true
+            }
+
+            LoafButton {
+                icon: "plus"
+                variant: "tonal"
+                enabled: window.canZoomIn
+                onClicked: window.zoomIn()
+            }
+
+            LoafButton {
+                icon: "arrow-counter-clockwise"
+                variant: "tonal"
+                enabled: window.canZoomReset
+                onClicked: window.zoomReset()
+            }
         }
 
         Rectangle {

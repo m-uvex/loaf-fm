@@ -26,7 +26,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [ ] **IDE-Like File Tree View**: Integrated inline file tree directory view directly inside the main workspace.
 - [ ] **Grouping in Directory View**: Group items by criteria such as modification date, size, or type.
 - [ ] **Starred / Pinned Files**: Star any file to pin it to a dedicated Starred section at the top of the directory view.
-- [ ] **View Size Control**: Adjustable view size/zoom via view menu or `Ctrl + Scroll` wheel.
+- [x] **View Size Control**: Adjustable view size/zoom via view menu, `Ctrl + Scroll` wheel, and `Ctrl + +/-`.
 
 ---
 
