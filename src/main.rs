@@ -1,4 +1,5 @@
 pub mod bridge;
+pub mod fs;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 

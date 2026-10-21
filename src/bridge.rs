@@ -1096,24 +1096,14 @@ fn compress_cpio(archive: &Path, names: &[String], parent: &Path) -> bool {
 
 fn copy_recursive(src: &Path, dst: &Path) -> bool {
     if src.is_dir() {
-        std::process::Command::new("cp")
-            .arg("-r")
-            .arg(src)
-            .arg(dst)
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
+        crate::fs::copy_dir_recursive(src, dst).is_ok()
     } else {
         fs::copy(src, dst).is_ok()
     }
 }
 
 fn remove_path(path: &Path) -> bool {
-    if path.is_dir() {
-        fs::remove_dir_all(path).is_ok()
-    } else {
-        fs::remove_file(path).is_ok()
-    }
+    crate::fs::remove_entry(path).is_ok()
 }
 
 /// Falls back to the system trash CLI when the in-process trash fails, then
@@ -1354,53 +1344,8 @@ fn format_unix_date(ts: u64) -> String {
     format!("{} {}, {}", month_names[m], d + 1, y)
 }
 
-fn format_modified_time(meta: &fs::Metadata) -> (u64, String) {
-    if let Ok(mtime) = meta.modified() {
-        let ts = mtime.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        let elapsed = mtime.elapsed().map(|e| e.as_secs()).unwrap_or(0);
-        let s = if elapsed < 60 {
-            "Just now".to_string()
-        } else if elapsed < 3600 {
-            format!("{}m ago", elapsed / 60)
-        } else if elapsed < 86400 {
-            format!("{}h ago", elapsed / 3600)
-        } else if elapsed < 86400 * 7 {
-            format!("{}d ago", elapsed / 86400)
-        } else {
-            format_unix_date(ts)
-        };
-        (ts, s)
-    } else {
-        (0, "-".to_string())
-    }
-}
-
 fn get_unique_name(dest: &Path, name: &str) -> PathBuf {
-    let mut target = dest.join(name);
-    if !target.exists() {
-        return target;
-    }
-    let p = Path::new(name);
-    let is_tar_gz = name.ends_with(".tar.gz");
-    let (stem, ext) = if is_tar_gz {
-        let s = name.strip_suffix(".tar.gz").unwrap_or(name);
-        (s, ".tar.gz")
-    } else {
-        let s = p.file_stem().and_then(|s| s.to_str()).unwrap_or(name);
-        let _e = p.extension().and_then(|e| e.to_str()).map(|e| format!(".{}", e)).unwrap_or_default();
-        (s, "")
-    };
-    let ext_str = if is_tar_gz { ext.to_string() } else { p.extension().and_then(|e| e.to_str()).map(|e| format!(".{}", e)).unwrap_or_default() };
-
-    let mut count = 1;
-    loop {
-        let new_name = format!("{} ({}){}", stem, count, ext_str);
-        target = dest.join(&new_name);
-        if !target.exists() {
-            return target;
-        }
-        count += 1;
-    }
+    crate::fs::generate_unique_path(dest, name)
 }
 
 fn is_archive_path(path: &Path) -> bool {
@@ -2059,6 +2004,28 @@ fn build_breadcrumbs(target_path: &Path, forward_target: Option<&str>) -> Vec<Br
     crumbs
 }
 
+fn format_timestamp_relative(ts: u64) -> String {
+    if ts == 0 {
+        return "-".to_string();
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let elapsed = now.saturating_sub(ts);
+    if elapsed < 60 {
+        "Just now".to_string()
+    } else if elapsed < 3600 {
+        format!("{}m ago", elapsed / 60)
+    } else if elapsed < 86400 {
+        format!("{}h ago", elapsed / 3600)
+    } else if elapsed < 86400 * 7 {
+        format!("{}d ago", elapsed / 86400)
+    } else {
+        format_unix_date(ts)
+    }
+}
+
 fn scan_directory(
     dir_path: &Path,
     show_hidden: bool,
@@ -2066,89 +2033,58 @@ fn scan_directory(
     sort_ascending: bool,
     folder_position: &str,
 ) -> Vec<FileItem> {
-    let mut items = Vec::new();
+    let options = crate::fs::ScanOptions {
+        show_hidden,
+        sort: crate::fs::SortOptions {
+            field: crate::fs::SortField::parse(sort_by),
+            direction: if sort_ascending {
+                crate::fs::SortDirection::Ascending
+            } else {
+                crate::fs::SortDirection::Descending
+            },
+            folder_position: crate::fs::FolderPosition::parse(folder_position),
+        },
+    };
 
-    if let Ok(entries) = fs::read_dir(dir_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = match entry.file_name().into_string() {
-                Ok(n) => n,
-                Err(_) => continue,
-            };
+    let entries = match crate::fs::scan_directory(dir_path, &options) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
 
-            if !show_hidden && name.starts_with('.') {
-                continue;
-            }
-
-            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-            let is_symlink = path.is_symlink();
-            let (icon, category) = icon_for_file(&path, is_dir);
-            let sys_icon_name = system_icon_for_file(&path, is_dir);
+    entries
+        .into_iter()
+        .map(|entry| {
+            let (icon, category) = icon_for_file(&entry.path, entry.is_dir);
+            let sys_icon_name = system_icon_for_file(&entry.path, entry.is_dir);
             let icon_path = resolve_system_icon(sys_icon_name);
-            let thumbnail = if is_dir {
+            let thumbnail = if entry.is_dir {
                 String::new()
             } else {
-                resolve_thumbnail_url(&path, false)
+                resolve_thumbnail_url(&entry.path, false)
             };
 
-            let (size, size_str, modified, modified_str) = if let Ok(meta) = entry.metadata() {
-                let sz = if is_dir { 0 } else { meta.len() };
-                let sz_str = if is_dir {
-                    "-".to_string()
-                } else {
-                    format_size(sz)
-                };
-                let (ts, m_str) = format_modified_time(&meta);
-                (sz, sz_str, ts, m_str)
+            let size_str = if entry.is_dir {
+                "-".to_string()
             } else {
-                (0, "-".to_string(), 0, "-".to_string())
+                format_size(entry.size_bytes)
             };
+            let modified_str = format_timestamp_relative(entry.modified_timestamp);
 
-            items.push(FileItem {
-                name,
-                is_dir,
-                is_symlink,
+            FileItem {
+                name: entry.name,
+                is_dir: entry.is_dir,
+                is_symlink: entry.is_symlink,
                 icon: icon.to_string(),
                 icon_path,
                 thumbnail,
                 category: category.to_string(),
-                size,
+                size: entry.size_bytes,
                 size_str,
-                modified,
+                modified: entry.modified_timestamp,
                 modified_str,
-            });
-        }
-    }
-
-    items.sort_by(|a, b| {
-        match folder_position {
-            "last" => {
-                if a.is_dir != b.is_dir {
-                    return a.is_dir.cmp(&b.is_dir);
-                }
             }
-            "mixed" => {}
-            _ => {
-                // "first" is default
-                if a.is_dir != b.is_dir {
-                    return b.is_dir.cmp(&a.is_dir);
-                }
-            }
-        }
-        let ord = match sort_by {
-            "size" => a.size.cmp(&b.size).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
-            "modified" => a.modified.cmp(&b.modified).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
-            "type" => a.category.cmp(&b.category).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        };
-        if sort_ascending {
-            ord
-        } else {
-            ord.reverse()
-        }
-    });
-
-    items
+        })
+        .collect()
 }
 
 fn execute_search_everywhere(query_str: &str, show_hidden: bool, disambiguate_duplicates: bool) -> Vec<SearchResultItem> {
@@ -2625,8 +2561,10 @@ impl qobject::LoafEngine {
     }
 
     pub fn create_folder(mut self: Pin<&mut Self>, dir: &QString, name: &QString) {
-        let target = Path::new(&dir.to_string()).join(name.to_string());
-        if fs::create_dir_all(&target).is_ok() {
+        let dir_str = dir.to_string();
+        let dir_path = Path::new(&dir_str);
+        let name_str = name.to_string();
+        if let Ok(target) = crate::fs::create_dir(dir_path, &name_str) {
             self.as_mut().record_undo(UndoAction::Create {
                 path: target.to_string_lossy().to_string(),
                 is_dir: true,
@@ -2636,8 +2574,10 @@ impl qobject::LoafEngine {
     }
 
     pub fn create_file(mut self: Pin<&mut Self>, dir: &QString, name: &QString) {
-        let target = Path::new(&dir.to_string()).join(name.to_string());
-        if fs::File::create(&target).is_ok() {
+        let dir_str = dir.to_string();
+        let dir_path = Path::new(&dir_str);
+        let name_str = name.to_string();
+        if let Ok(target) = crate::fs::create_file(dir_path, &name_str) {
             self.as_mut().record_undo(UndoAction::Create {
                 path: target.to_string_lossy().to_string(),
                 is_dir: false,
@@ -2648,14 +2588,13 @@ impl qobject::LoafEngine {
 
     pub fn rename_item(mut self: Pin<&mut Self>, dir: &QString, old_name: &QString, new_name: &QString) {
         let dir_str = dir.to_string();
-        let base = Path::new(&dir_str);
-        let src = base.join(old_name.to_string());
-        let dst = base.join(new_name.to_string());
-        if fs::rename(&src, &dst).is_ok() {
+        let old_str = old_name.to_string();
+        let new_str = new_name.to_string();
+        if crate::fs::rename_entry(Path::new(&dir_str), &old_str, &new_str).is_ok() {
             self.as_mut().record_undo(UndoAction::Rename {
                 dir: dir_str,
-                old_name: old_name.to_string(),
-                new_name: new_name.to_string(),
+                old_name: old_str,
+                new_name: new_str,
             });
         }
         self.refresh();
