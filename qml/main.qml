@@ -26,6 +26,22 @@ ApplicationWindow {
     // Views that show the back button and aren't the file grid (back returns to files)
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
 
+    function loadLayoutPrefs() {
+        var v = engine.get_setting("viewMode");
+        if (v === "grid" || v === "list")
+            engine.view_mode = v;
+        var s = engine.get_setting("sidebarExpanded");
+        if (s.length > 0)
+            sidebarExpanded = (s === "true");
+    }
+
+    Component.onCompleted: loadLayoutPrefs()
+    onSidebarExpandedChanged: engine.set_setting("sidebarExpanded", String(sidebarExpanded))
+    Connections {
+        target: engine
+        function onView_modeChanged() { engine.set_setting("viewMode", engine.view_mode) }
+    }
+
     // Return to the file grid, restoring the nav pill to the last place row.
     // placeIdx >= 0 also updates which place is considered active (e.g. PCView jumps).
     function showFiles(placeIdx) {
