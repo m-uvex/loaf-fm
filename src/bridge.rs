@@ -2533,7 +2533,8 @@ impl qobject::LoafEngine {
         clear_stack(&REDO_STACK);
 
         self.as_mut().sync_undo_flags();
-        self.load_trash();
+        self.as_mut().load_trash();
+        self.refresh();
     }
 
     /// Restores a single item from the trash by following its `.trashinfo` entry.
