@@ -15,7 +15,8 @@ ApplicationWindow {
         ? ("Settings - " + (settingsView ? (settingsView.activeTab === 0 ? "Interface" : (settingsView.activeTab === 1 ? "Behavior" : (settingsView.activeTab === 2 ? "Experimental" : "About Loaf"))) : "Settings"))
         : activeView === "pc" ? (engine.hostname || "This PC")
         : (engine.is_searching_everywhere ? "Searching Everywhere" : engine.current_dir_name))
-    color: theme.background
+    color: Qt.rgba(theme.background.r, theme.background.g, theme.background.b, theme.windowOpacity)
+    opacity: theme.windowOpacity
 
     Component.onCompleted: {
         var w = parseInt(theme.readSetting("windowWidth"));

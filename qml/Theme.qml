@@ -17,6 +17,7 @@ Item {
     property string contextMenuMode: "full" // "full", "minimal", "custom"
     property var disabledMenuItems: ({})
     property bool hideTrashWhenEmpty: true
+    property real windowOpacity: 1.0
 
     // ---- performance / accessibility ---------------------------------------
     // "auto" turns low-power mode on when Qt renders without a GPU.
@@ -2101,6 +2102,11 @@ Item {
         }
         value = readSetting("hideTrashWhenEmpty");
         if (value.length > 0) hideTrashWhenEmpty = (value === "true");
+        value = readSetting("windowOpacity");
+        if (value.length > 0) {
+            var v = parseFloat(value);
+            if (!isNaN(v) && v >= 0.4 && v <= 1.0) windowOpacity = v;
+        }
         loaded = true;
     }
 
@@ -2132,4 +2138,5 @@ Item {
     onContextMenuModeChanged: writeSetting("contextMenuMode", contextMenuMode)
     onDisabledMenuItemsChanged: writeSetting("disabledMenuItems", JSON.stringify(disabledMenuItems))
     onHideTrashWhenEmptyChanged: writeSetting("hideTrashWhenEmpty", hideTrashWhenEmpty)
+    onWindowOpacityChanged: writeSetting("windowOpacity", windowOpacity)
 }

@@ -23,7 +23,7 @@ Item {
     }
 
     readonly property bool card1Match: matchesQuery("theme appearance light dark auto mode color scheme")
-    readonly property bool card2Match: matchesQuery("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing")
+    readonly property bool card2Match: matchesQuery("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine everforest breeze amber lavender violet ricing")
     readonly property bool card3Match: matchesQuery("top left brand loaf logo badge show hide")
     readonly property bool card4Match: matchesQuery("icon style vector phosphor system adwaita desktop theme")
     readonly property bool card5Match: matchesQuery("phosphor weight variant thin light regular bold fill duotone stroke thickness")
@@ -43,7 +43,8 @@ Item {
     readonly property bool card17Match: matchesQuery("click rename inline single click")
     readonly property bool card18Match: matchesQuery("search file contents text inside")
 
-    readonly property int interfaceMatches: (card1Match ? 1 : 0) + (card2Match ? 1 : 0) + (card3Match ? 1 : 0) + (card4Match ? 1 : 0) + (card5Match ? 1 : 0)
+    readonly property bool card5bMatch: matchesQuery("background opacity transparent window alpha")
+    readonly property int interfaceMatches: (card1Match ? 1 : 0) + (card2Match ? 1 : 0) + (card3Match ? 1 : 0) + (card4Match ? 1 : 0) + (card5Match ? 1 : 0) + (card5bMatch ? 1 : 0)
     readonly property int behaviorMatches: (card6Match ? 1 : 0) + (card7Match ? 1 : 0) + (card8Match ? 1 : 0) + (card9Match ? 1 : 0)
         + (card16Match ? 1 : 0) + (card17Match ? 1 : 0) + (card18Match ? 1 : 0)
     readonly property int accessibilityMatches: (card13Match ? 1 : 0) + (card14Match ? 1 : 0) + (card15Match ? 1 : 0)
@@ -809,8 +810,61 @@ Item {
                             }
                         }
 
-                        // Show Hidden Files
+                        // Background Opacity
                         Rectangle {
+                            visible: settingsView.searchQuery.length === 0 || settingsView.card5bMatch
+                            Layout.fillWidth: true
+                            implicitHeight: opacityCol.implicitHeight + 32
+                            radius: theme.radiusL
+                            color: theme.surfaceContainer
+                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
+
+                            ColumnLayout {
+                                id: opacityCol
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    ColumnLayout {
+                                        spacing: 3
+                                        Layout.fillWidth: true
+                                        Text { text: qsTr("Background Opacity"); color: theme.textMain; font.pixelSize: theme.fs(14); font.bold: true }
+                                        Text { text: qsTr("Make the window translucent for a transparent rice look"); color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                                    }
+
+                                    Text {
+                                        text: Math.round(theme.windowOpacity * 100) + "%"
+                                        color: theme.textMuted
+                                        font.pixelSize: theme.fs(11)
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Text { text: "40%"; color: theme.textMuted; font.pixelSize: theme.fs(10) }
+
+                                    Slider {
+                                        Layout.fillWidth: true
+                                        from: 0.4
+                                        to: 1.0
+                                        stepSize: 0.01
+                                        value: theme.windowOpacity
+                                        onMoved: theme.windowOpacity = value
+                                    }
+
+                                    Text { text: "100%"; color: theme.textMuted; font.pixelSize: theme.fs(10) }
+                                }
+                            }
+                        }
+
+                    ColumnLayout {
                             visible: settingsView.searchQuery.length === 0 || settingsView.card8Match
                             Layout.fillWidth: true
                             implicitHeight: hiddenRow.implicitHeight + 32
