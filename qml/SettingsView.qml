@@ -460,7 +460,9 @@ Item {
                                             { id: "nord", label: qsTr("Nord") },
                                             { id: "tokyonight", label: qsTr("Tokyo Night") },
                                             { id: "gruvbox", label: qsTr("Gruvbox") },
-                                            { id: "rosepine", label: qsTr("Rosé Pine") }
+                                            { id: "rosepine", label: qsTr("Rosé Pine") },
+                                            { id: "everforest", label: qsTr("Everforest") },
+                                            { id: "breeze", label: qsTr("Breeze") }
                                         ]
 
                                         delegate: Item {

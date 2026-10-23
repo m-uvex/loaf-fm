@@ -5,7 +5,7 @@ Item {
     visible: false
 
     property string themeMode: "auto" // "auto", "light", "dark"
-    property string accentName: "wallpaper" // "wallpaper", "lavender", "amber", "catppuccin", "nord", "tokyonight", "gruvbox", "rosepine"
+    property string accentName: "wallpaper" // "wallpaper", "lavender", "amber", "catppuccin", "nord", "tokyonight", "gruvbox", "rosepine", "everforest", "breeze"
     property string iconSource: "phosphor" // "phosphor" or "system"
     property string phosphorWeight: "regular" // "regular", "bold", "fill", "duotone", "light", "thin"
     property string dragAction: "select" // "select" (selection box) or "scroll" (pan view)
@@ -386,6 +386,82 @@ Item {
             lightTextMuted: "#797593",
             lightOutline: "#8a8597",
             lightOutlineVariant: "#dfdad9"
+        },
+
+        "everforest": {
+            darkBg: "#2d353b",
+            darkSurfaceLowest: "#272e33",
+            darkSurfaceLow: "#2f383e",
+            darkSurface: "#343f44",
+            darkSurfaceHigh: "#3d484d",
+            darkSurfaceHighest: "#475258",
+            darkPrimary: "#a7c080",
+            darkFg: "#2d353b",
+            darkContainer: "#3a515d",
+            darkContainerFg: "#d3c6aa",
+            darkSecondaryContainer: "#543a48",
+            darkSecondaryContainerFg: "#d699b6",
+            darkTertiaryContainer: "#4d4f43",
+            darkTextMain: "#d3c6aa",
+            darkTextMuted: "#9da9a0",
+            darkOutline: "#859289",
+            darkOutlineVariant: "#475258",
+
+            lightBg: "#fdf6e3",
+            lightSurfaceLowest: "#fffbef",
+            lightSurfaceLow: "#f8f5e4",
+            lightSurface: "#fdf6e3",
+            lightSurfaceHigh: "#f0ead9",
+            lightSurfaceHighest: "#e6e2cc",
+            lightPrimary: "#8da101",
+            lightFg: "#ffffff",
+            lightContainer: "#efebd4",
+            lightContainerFg: "#5c6a72",
+            lightSecondaryContainer: "#f4e5d6",
+            lightSecondaryContainerFg: "#df69ba",
+            lightTertiaryContainer: "#f0e4c2",
+            lightTextMain: "#5c6a72",
+            lightTextMuted: "#708089",
+            lightOutline: "#9da9a0",
+            lightOutlineVariant: "#e6e2cc"
+        },
+
+        "breeze": {
+            darkBg: "#232629",
+            darkSurfaceLowest: "#1d2023",
+            darkSurfaceLow: "#202327",
+            darkSurface: "#232629",
+            darkSurfaceHigh: "#2a2e32",
+            darkSurfaceHighest: "#31363b",
+            darkPrimary: "#3daee9",
+            darkFg: "#232629",
+            darkContainer: "#3daee9",
+            darkContainerFg: "#fcfcfc",
+            darkSecondaryContainer: "#2f4f5c",
+            darkSecondaryContainerFg: "#fcfcfc",
+            darkTertiaryContainer: "#3c3c3c",
+            darkTextMain: "#fcfcfc",
+            darkTextMuted: "#bdc3c7",
+            darkOutline: "#6c7a89",
+            darkOutlineVariant: "#31363b",
+
+            lightBg: "#eff0f1",
+            lightSurfaceLowest: "#ffffff",
+            lightSurfaceLow: "#f7f7f7",
+            lightSurface: "#eff0f1",
+            lightSurfaceHigh: "#e3e5e7",
+            lightSurfaceHighest: "#d6d9dc",
+            lightPrimary: "#3daee9",
+            lightFg: "#ffffff",
+            lightContainer: "#3daee9",
+            lightContainerFg: "#fcfcfc",
+            lightSecondaryContainer: "#dff3fd",
+            lightSecondaryContainerFg: "#1d99f3",
+            lightTertiaryContainer: "#e8e8e8",
+            lightTextMain: "#232629",
+            lightTextMuted: "#7f8c8d",
+            lightOutline: "#a1a9b1",
+            lightOutlineVariant: "#d6d9dc"
         }
     })
 
