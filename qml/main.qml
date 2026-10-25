@@ -48,6 +48,7 @@ ApplicationWindow {
     readonly property bool anyModalOpen: inputModal.visible || propsDialog.visible || conflictDialog.visible
         || passwordModal.visible || quickLook.visible || commandModal.visible || batchRename.visible
         || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
+        || smbDialog.visible
         || window.isEditingPath
     readonly property bool gridKeyboardReady: activeView === "files" && !searchInput.activeFocus
         && !pathInput.activeFocus && !anyModalOpen && !!activePane && activePane.renamingPath === ""
@@ -55,6 +56,23 @@ ApplicationWindow {
 
     function toast(kind, text) {
         toastItem.show(kind, text);
+    }
+
+    function openSmbEditor(profile) {
+        var p = profile || {};
+        smbDialog.editingId = p.profile_id || p.id || "";
+        smbNameField.text = p.name || p.label || "";
+        smbServerField.text = p.server || "";
+        smbShareField.text = p.share || "";
+        smbUserField.text = p.username || "";
+        smbDomainField.text = p.domain || "";
+        smbDialog.open();
+    }
+
+    function removeSmbShare(id, label) {
+        confirmDialog.ask(qsTr("Remove “%1”?").arg(label || qsTr("this share")),
+            qsTr("Any password Loaf saved will also be removed from the keyring."),
+            qsTr("Remove"), function() { core.remove_smb_profile(id); });
     }
 
     function systemIcon(name) {
@@ -714,6 +732,11 @@ ApplicationWindow {
             }
         }
         onPassword_required: function(json) { passwordModal.openFor(JSON.parse(json)); }
+        onSmb_mounted: function(profileId, path) {
+            window.showFiles();
+            searchInput.text = "";
+            engine.set_path(path);
+        }
         onShare_link_ready: function(shareId, url) {
             native.setClipboardText(url);
             window.toast("info", qsTr("Share link copied to clipboard!"));
@@ -756,13 +779,13 @@ ApplicationWindow {
 
     // The settings tab is part of the URL: settings://behavior and friends.
     function settingsUrl() {
-        var slugs = ["interface", "behavior", "accessibility", "experimental", "about", "share"];
+        var slugs = ["interface", "behavior", "accessibility", "experimental", "about", "share", "network"];
         return "settings://" + (slugs[settingsView.activeTab] || slugs[0]);
     }
 
     function settingsTabName() {
         var names = [qsTr("Interface"), qsTr("Behavior"), qsTr("Accessibility"),
-                     qsTr("Experimental"), qsTr("About Loaf"), qsTr("Share")];
+                     qsTr("Experimental"), qsTr("About Loaf"), qsTr("Share"), qsTr("Network")];
         return names[settingsView.activeTab] || names[0];
     }
 
@@ -793,6 +816,7 @@ ApplicationWindow {
             else if (raw === "settings://experimental") settingsView.activeTab = 3;
             else if (raw === "settings://about") settingsView.activeTab = 4;
             else if (raw === "settings://share") settingsView.activeTab = 5;
+            else if (raw === "settings://network") settingsView.activeTab = 6;
             else settingsView.activeTab = 0;
         } else {
             showFiles();
@@ -1344,6 +1368,19 @@ ApplicationWindow {
                             return;
                         }
                         window.openPc();
+                        return;
+                    }
+                    if (place.kind === "smb") {
+                        if (inNewTab && place.connected && place.path) {
+                            window.newTab(place.path);
+                            return;
+                        }
+                        window.showFiles();
+                        searchInput.text = "";
+                        if (place.connected && place.path)
+                            engine.set_path(place.path);
+                        else
+                            core.connect_smb(place.profile_id, "", false);
                         return;
                     }
                     if (inNewTab && place.path) {
@@ -2176,6 +2213,11 @@ ApplicationWindow {
                     icon: "sliders-horizontal",
                     separatorBefore: true,
                     action: function() { customizePlaces.open(); }
+                },
+                {
+                    text: qsTr("Add SMB Share…"),
+                    icon: "network",
+                    action: function() { window.openSmbEditor({}); }
                 }
             ];
             openAt(px, py);
@@ -2371,6 +2413,22 @@ ApplicationWindow {
             var all = JSON.parse(core.all_places_json() || "[]");
             var idx = all.findIndex(function(p) { return p.id === place.id; });
             var m = [];
+            if (place.kind === "smb") {
+                if (place.path && place.connected)
+                    m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
+                if (!place.connected)
+                    m.push({ text: qsTr("Connect"), icon: "plug", action: function() { core.connect_smb(place.profile_id, "", false); } });
+                if (place.connected)
+                    m.push({ text: qsTr("Disconnect"), icon: "plug-slash", action: function() { core.disconnect_smb(place.profile_id); } });
+                m.push({ text: qsTr("Edit Share…"), icon: "pencil-simple", separatorBefore: true, action: function() { window.openSmbEditor(place); } });
+                m.push({ text: qsTr("Remove Share"), icon: "x", danger: true, action: function() { window.removeSmbShare(place.profile_id, place.name); } });
+                m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
+                m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
+                m.push({ text: qsTr("Add SMB Share…"), icon: "plus", separatorBefore: true, action: function() { window.openSmbEditor({}); } });
+                model = m;
+                openAt(x, y);
+                return;
+            }
             if (place.path && place.path.indexOf("/") === 0)
                 m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
             if (place.kind === "trash")
@@ -2533,7 +2591,7 @@ ApplicationWindow {
         id: passwordModal
         dialogWidth: 400
         property var request: ({})
-        title: request.kind === "luks" ? qsTr("Unlock Drive") : (request.kind === "compress" ? qsTr("Encrypted Archive") : qsTr("Password Required"))
+        title: request.kind === "luks" ? qsTr("Unlock Drive") : (request.kind === "compress" ? qsTr("Encrypted Archive") : (request.kind === "smb" ? qsTr("Connect to SMB Share") : qsTr("Password Required")))
 
         function openFor(req) {
             request = req;
@@ -2561,6 +2619,23 @@ ApplicationWindow {
                 core.extract(r.archive, r.into_subfolder, pw);
             else if (r.kind === "luks")
                 core.unlock_drive(r.device, pw, rememberBox.checked);
+            else if (r.kind === "smb")
+                core.connect_smb(r.id, pw, rememberBox.checked);
+        }
+
+        function promptText() {
+            var r = request;
+            if (r.error)
+                return qsTr("Wrong password, try again.");
+            if (r.kind === "luks")
+                return qsTr("Enter the passphrase for %1").arg(r.device || "");
+            if (r.kind === "smb") {
+                var user = r.username ? r.username + "@" : "";
+                return qsTr("Enter the password for %1").arg(user + (r.server || ""));
+            }
+            if (r.kind === "compress")
+                return qsTr("Set a password to protect the archive");
+            return qsTr("“%1” is encrypted").arg((r.archive || "").split("/").pop());
         }
 
         Text {
@@ -2568,10 +2643,7 @@ ApplicationWindow {
             wrapMode: Text.Wrap
             color: passwordModal.request.error ? theme.danger : theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: passwordModal.request.error ? qsTr("Wrong password, try again.")
-                : (passwordModal.request.kind === "luks" ? qsTr("Enter the passphrase for %1").arg(passwordModal.request.device || "")
-                : (passwordModal.request.kind === "compress" ? qsTr("Set a password to protect the archive")
-                : qsTr("“%1” is encrypted").arg((passwordModal.request.archive || "").split("/").pop())))
+            text: passwordModal.promptText()
         }
         LoafTextField {
             id: pwField
@@ -2598,14 +2670,70 @@ ApplicationWindow {
         }
         LoafCheckBox {
             id: rememberBox
-            visible: passwordModal.request.kind === "luks"
+            visible: passwordModal.request.kind === "luks" || passwordModal.request.kind === "smb"
             text: qsTr("Remember in the keyring")
         }
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
             LoafButton { text: qsTr("Cancel"); variant: "text"; onClicked: passwordModal.close() }
-            LoafButton { text: passwordModal.request.kind === "compress" ? qsTr("Create") : qsTr("Unlock"); variant: "filled"; enabled: passwordModal.canAccept; onClicked: passwordModal.accept() }
+            LoafButton { text: passwordModal.request.kind === "compress" ? qsTr("Create") : (passwordModal.request.kind === "smb" ? qsTr("Connect") : qsTr("Unlock")); variant: "filled"; enabled: passwordModal.canAccept; onClicked: passwordModal.accept() }
+        }
+    }
+    LoafDialog {
+        id: smbDialog
+        dialogWidth: 460
+        property string editingId: ""
+        title: editingId.length > 0 ? qsTr("Edit SMB Share") : qsTr("Add SMB Share")
+
+        Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: theme.textMuted
+            font.pixelSize: theme.fs(12)
+            text: qsTr("Connect to a Windows, Samba or NAS share with your username and password.")
+        }
+        Text { text: qsTr("Display name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: smbNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: qsTr("Studio NAS") }
+        Text { text: qsTr("Server"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: smbServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "192.168.1.20" }
+        Text { text: qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: smbShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "media" }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text { text: qsTr("Username (optional)"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+                LoafTextField { id: smbUserField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "alice" }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text { text: qsTr("Domain (optional)"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+                LoafTextField { id: smbDomainField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "WORKGROUP" }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Item { Layout.fillWidth: true }
+            LoafButton { text: qsTr("Cancel"); variant: "text"; onClicked: smbDialog.close() }
+            LoafButton {
+                text: smbDialog.editingId.length > 0 ? qsTr("Save") : qsTr("Add")
+                variant: "filled"
+                enabled: smbServerField.text.trim().length > 0 && smbShareField.text.trim().length > 0
+                onClicked: {
+                    var id = core.save_smb_profile(smbDialog.editingId, smbNameField.text, smbServerField.text, smbShareField.text, smbUserField.text, smbDomainField.text);
+                    if (id.length === 0) {
+                        window.toast("error", qsTr("A server and share are required"));
+                        return;
+                    }
+                    smbDialog.editingId = id;
+                    smbDialog.close();
+                    window.toast("info", qsTr("SMB share saved"));
+                }
+            }
         }
     }
     LoafDialog {

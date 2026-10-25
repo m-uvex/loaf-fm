@@ -43,6 +43,7 @@ Item {
     readonly property bool card18Match: matchesQuery("search file contents text inside")
     readonly property bool card19Match: matchesQuery("experimental share via link cloudflare tunnel p2p host local send")
     readonly property bool card20Match: matchesQuery("share settings link compression password expiration throttle active shares cloudflare tunnel")
+    readonly property bool card21Match: matchesQuery("network smb samba nas share server mount connect remote windows keyring")
 
     readonly property int interfaceMatches: (card1Match ? 1 : 0) + (card2Match ? 1 : 0) + (card4Match ? 1 : 0) + (card5Match ? 1 : 0)
     readonly property int behaviorMatches: (card6Match ? 1 : 0) + (card7Match ? 1 : 0) + (card8Match ? 1 : 0) + (card9Match ? 1 : 0)
@@ -50,14 +51,15 @@ Item {
     readonly property int accessibilityMatches: (card13Match ? 1 : 0) + (card14Match ? 1 : 0) + (card15Match ? 1 : 0)
     readonly property int experimentalMatches: (card10Match ? 1 : 0) + (card12Match ? 1 : 0) + (card19Match ? 1 : 0)
     readonly property int shareMatches: theme.shareViaLinkEnabled && card20Match ? 1 : 0
+    readonly property int networkMatches: (card21Match ? 1 : 0)
     readonly property int aboutMatches: (card11Match ? 1 : 0)
-    readonly property int totalMatches: interfaceMatches + behaviorMatches + accessibilityMatches + experimentalMatches + shareMatches + aboutMatches
+    readonly property int totalMatches: interfaceMatches + behaviorMatches + accessibilityMatches + experimentalMatches + shareMatches + networkMatches + aboutMatches
 
     // Space still claimed above `panel` by panels that are painted while fading
     // out. Overlapping the incoming tab with the outgoing one lets the switch
     // cross-fade instead of dropping the outgoing panel in one frame.
     function fadeOverlapAbove(panel) {
-        var panels = [tabInterface, tabBehavior, tabAccessibility, tabExperimental, tabShare, tabAbout];
+        var panels = [tabInterface, tabBehavior, tabAccessibility, tabExperimental, tabShare, tabNetwork, tabAbout];
         var overlap = 0;
         for (var i = 0; i < panels.length; i++) {
             var p = panels[i];
@@ -119,6 +121,7 @@ Item {
                                     (tabId === "accessibility" && settingsView.activeTab === 2) ||
                                     (tabId === "experimental" && settingsView.activeTab === 3) ||
                                     (tabId === "share" && settingsView.activeTab === 5) ||
+                                    (tabId === "network" && settingsView.activeTab === 6) ||
                                     (tabId === "about" && settingsView.activeTab === 4)) {
                                     targetIdx = i;
                                     break;
@@ -143,6 +146,7 @@ Item {
                             if (theme.shareViaLinkEnabled) {
                                 tabs.push({ id: "share", name: "Share", iconName: "share-network" });
                             }
+                            tabs.push({ id: "network", name: "Network", iconName: "network" });
                             tabs.push({ id: "about", name: "About Loaf", iconName: "bread" });
                             return tabs;
                         }
@@ -159,6 +163,7 @@ Item {
                                 if (currentTabId === "accessibility") return settingsView.activeTab === 2;
                                 if (currentTabId === "experimental") return settingsView.activeTab === 3;
                                 if (currentTabId === "share") return settingsView.activeTab === 5;
+                                if (currentTabId === "network") return settingsView.activeTab === 6;
                                 if (currentTabId === "about") return settingsView.activeTab === 4;
                                 return false;
                             }
@@ -209,6 +214,7 @@ Item {
                                     else if (tabId === "accessibility") settingsView.activeTab = 2;
                                     else if (tabId === "experimental") settingsView.activeTab = 3;
                                     else if (tabId === "share") settingsView.activeTab = 5;
+                                    else if (tabId === "network") settingsView.activeTab = 6;
                                     else if (tabId === "about") settingsView.activeTab = 4;
                                 }
                             }
@@ -242,7 +248,7 @@ Item {
                     Text {
                         text: settingsView.searchQuery.length > 0
                             ? "Settings"
-                            : (settingsView.activeTab === 0 ? "Interface" : (settingsView.activeTab === 1 ? "Behavior" : (settingsView.activeTab === 2 ? "Accessibility" : (settingsView.activeTab === 3 ? "Experimental" : (settingsView.activeTab === 5 ? "Share via Link" : "About Loaf")))))
+                            : (settingsView.activeTab === 0 ? "Interface" : (settingsView.activeTab === 1 ? "Behavior" : (settingsView.activeTab === 2 ? "Accessibility" : (settingsView.activeTab === 3 ? "Experimental" : (settingsView.activeTab === 5 ? "Share via Link" : (settingsView.activeTab === 6 ? "Network" : "About Loaf"))))))
                         color: theme.textMain
                         font.pixelSize: theme.fs(26)
                         font.bold: true
@@ -1524,6 +1530,139 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                    ColumnLayout {
+                        id: tabNetwork
+                        Layout.fillWidth: true
+                        spacing: 14
+
+                        readonly property var profiles: {
+                            try {
+                                return JSON.parse(core.smb_profiles_json || "[]");
+                            } catch (e) {
+                                return [];
+                            }
+                        }
+
+                        readonly property bool shown: settingsView.searchQuery.length > 0 ? (settingsView.networkMatches > 0) : (settingsView.activeTab === 6)
+                        readonly property real fadeOverlap: settingsView.fadeOverlapAbove(tabNetwork)
+                        property real slideOffset: shown ? 0 : 6
+
+                        Layout.topMargin: -fadeOverlap
+                        Layout.bottomMargin: fadeOverlap
+
+                        visible: shown || opacity > 0.001
+                        opacity: shown ? 1.0 : 0.0
+                        enabled: shown
+
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        Behavior on slideOffset { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        transform: Translate { y: tabNetwork.slideOffset }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            spacing: 10
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                text: qsTr("Saved SMB Shares")
+                                color: theme.textMain
+                                font.pixelSize: theme.fs(15)
+                                font.bold: true
+                            }
+                            LoafButton {
+                                text: qsTr("Add Share")
+                                icon: "plus"
+                                variant: "filled"
+                                onClicked: window.openSmbEditor({})
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            visible: tabNetwork.profiles.length === 0
+                            wrapMode: Text.Wrap
+                            color: theme.textMuted
+                            font.pixelSize: theme.fs(12)
+                            text: qsTr("No shares saved yet. Add a server and share, then connect with your username and password. Connected shares appear in the sidebar and open like local folders.")
+                        }
+
+                        Repeater {
+                            model: tabNetwork.profiles
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                implicitHeight: shareRow.implicitHeight + 28
+                                radius: theme.radiusL
+                                color: theme.surfaceContainer
+
+                                RowLayout {
+                                    id: shareRow
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 12
+                                    LoafIcon {
+                                        name: modelData.connected ? "network" : "plug"
+                                        size: 20
+                                        color: modelData.connected ? theme.primary : theme.textMuted
+                                    }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        spacing: 2
+                                        Text {
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            text: modelData.label
+                                            color: theme.textMain
+                                            font.pixelSize: theme.fs(13)
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            text: (modelData.username ? modelData.username + "@" : "") + modelData.server + (modelData.share ? "/" + modelData.share : "")
+                                            color: theme.textMuted
+                                            font.pixelSize: theme.fs(11)
+                                            elide: Text.ElideMiddle
+                                        }
+                                    }
+                                    LoafButton {
+                                        text: modelData.connected ? qsTr("Disconnect") : qsTr("Connect")
+                                        icon: modelData.connected ? "plug-slash" : "plug"
+                                        variant: modelData.connected ? "tonal" : "filled"
+                                        onClicked: {
+                                            if (modelData.connected)
+                                                core.disconnect_smb(modelData.id);
+                                            else
+                                                core.connect_smb(modelData.id, "", false);
+                                        }
+                                    }
+                                    LoafButton {
+                                        icon: "pencil-simple"
+                                        variant: "ghost"
+                                        Accessible.name: qsTr("Edit share")
+                                        onClicked: window.openSmbEditor(modelData)
+                                    }
+                                    LoafButton {
+                                        icon: "trash"
+                                        variant: "ghost"
+                                        Accessible.name: qsTr("Remove share")
+                                        onClicked: window.removeSmbShare(modelData.id, modelData.label)
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingCard {
+                            title: qsTr("SMB support")
+                            subtitle: qsTr("Shares are mounted with GVfs; passwords can be saved in the system keyring")
                         }
                     }
                     ColumnLayout {

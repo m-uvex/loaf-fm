@@ -99,9 +99,9 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Network, Cloud & Remote Storage
-- [ ] **Named SMB Profile Manager**: Friendly aliases for SMB connections.
+- [x] **Named SMB Profile Manager**: Friendly aliases for SMB connections.
 - [ ] **Remote Protocols & Cloud Services**: SFTP, FTP, WebDAV, Google Drive, and Microsoft OneDrive mounting support.
-- [~] **Keyring Integration**: Secure password storage in system keyring for SMB and encrypted volumes. (Encrypted drives via `secret-tool`; SMB not yet.)
+- [x] **Keyring Integration**: Secure password storage in system keyring for SMB and encrypted volumes.
 
 ---
 

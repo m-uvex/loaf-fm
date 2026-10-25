@@ -248,8 +248,8 @@ Rectangle {
                 label: modelData.name
                 showLabel: rail.expanded
                 selected: rail.activeId === modelData.id
-                dimmed: modelData.missing === true
-                dropPath: (modelData.kind === "place" || modelData.kind === "bookmark") ? modelData.path : ""
+                dimmed: modelData.missing === true || (modelData.kind === "smb" && modelData.connected !== true)
+                dropPath: (modelData.kind === "place" || modelData.kind === "bookmark" || (modelData.kind === "smb" && modelData.connected === true)) ? modelData.path : ""
                 accessibleName: modelData.name
                 onClicked: rail.placeClicked(modelData, false)
                 onMiddleClicked: rail.placeClicked(modelData, true)

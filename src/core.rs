@@ -24,6 +24,7 @@ pub mod qobject {
         #[qproperty(QString, drives_json)]
         #[qproperty(QString, frequent_dirs_json)]
         #[qproperty(QString, places_json)]
+        #[qproperty(QString, smb_profiles_json)]
         #[qproperty(QString, operations_json)]
         #[qproperty(bool, busy)]
         #[qproperty(bool, can_undo)]
@@ -50,6 +51,8 @@ pub mod qobject {
         fn dir_size_ready(self: Pin<&mut LoafCore>, key: QString, info_json: QString);
         #[qsignal]
         fn starred_changed(self: Pin<&mut LoafCore>);
+        #[qsignal]
+        fn smb_mounted(self: Pin<&mut LoafCore>, profile_id: QString, path: QString);
         #[qsignal]
         fn share_link_ready(self: Pin<&mut LoafCore>, share_id: QString, url: QString);
         #[qsignal]
@@ -121,6 +124,24 @@ pub mod qobject {
         fn lock_drive(self: Pin<&mut LoafCore>, device: &QString);
         #[qinvokable]
         fn rename_drive(self: Pin<&mut LoafCore>, device: &QString, name: &QString);
+        #[qinvokable]
+        fn load_smb_profiles(self: Pin<&mut LoafCore>);
+        #[qinvokable]
+        fn save_smb_profile(
+            self: Pin<&mut LoafCore>,
+            id: &QString,
+            name: &QString,
+            server: &QString,
+            share: &QString,
+            username: &QString,
+            domain: &QString,
+        ) -> QString;
+        #[qinvokable]
+        fn remove_smb_profile(self: Pin<&mut LoafCore>, id: &QString);
+        #[qinvokable]
+        fn connect_smb(self: Pin<&mut LoafCore>, id: &QString, password: &QString, remember: bool);
+        #[qinvokable]
+        fn disconnect_smb(self: Pin<&mut LoafCore>, id: &QString);
         #[qinvokable]
         fn open_item(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
@@ -217,7 +238,7 @@ pub mod qobject {
 use crate::archive::{self, ArchiveError};
 use crate::fsops::{self, Monitor};
 use crate::share;
-use crate::{apps, drives, icons, info, native, state, theme, trash, util, watcher, xdg};
+use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, watcher, xdg};
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -314,6 +335,7 @@ pub struct CoreRust {
     drives_json: QString,
     frequent_dirs_json: QString,
     places_json: QString,
+    smb_profiles_json: QString,
     operations_json: QString,
     busy: bool,
     can_undo: bool,
@@ -347,6 +369,7 @@ impl Default for CoreRust {
             drives_json: QString::from("[]"),
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
+            smb_profiles_json: QString::from("[]"),
             operations_json: QString::from("[]"),
             busy: false,
             can_undo: false,
@@ -494,6 +517,23 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             "icon": "folder-simple",
             "system_icon": "folder-symbolic",
             "missing": !exists,
+        }));
+    }
+    for p in smb::profiles() {
+        let state = smb::state_for(&p);
+        items.push(serde_json::json!({
+            "id": format!("smb:{}", p.id),
+            "kind": "smb",
+            "name": state.label,
+            "path": state.path,
+            "icon": "network",
+            "system_icon": "folder-remote-symbolic",
+            "profile_id": p.id,
+            "server": p.server,
+            "share": p.share,
+            "username": p.username,
+            "domain": p.domain,
+            "connected": state.connected,
         }));
     }
     items.push(serde_json::json!({"id": "trash", "kind": "trash", "name": "Trash", "path": "trash:///", "icon": "trash", "system_icon": "user-trash-symbolic"}));
@@ -963,6 +1003,205 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let name = name.to_string();
         self.drive_job(format!("Renaming {}", dev), move || drives::set_label(&dev, &name).map(|_| String::new()));
+    }
+
+    fn refresh_smb(mut self: Pin<&mut Self>) {
+        self.as_mut().load_smb_profiles();
+        self.as_mut().load_places();
+    }
+
+    pub fn load_smb_profiles(mut self: Pin<&mut Self>) {
+        let json = smb::list_json();
+        if self.smb_profiles_json().to_string() != json {
+            self.as_mut().set_smb_profiles_json(q(&json));
+        }
+    }
+
+    pub fn save_smb_profile(
+        mut self: Pin<&mut Self>,
+        id: &QString,
+        name: &QString,
+        server: &QString,
+        share: &QString,
+        username: &QString,
+        domain: &QString,
+    ) -> QString {
+        let server = server.to_string();
+        let server = server.trim();
+        let share_text = share.to_string();
+        let share_text = share_text.trim().trim_matches('/');
+        let share_text = share_text.split('/').next().unwrap_or("").trim();
+        if server.is_empty() || share_text.is_empty() {
+            return QString::default();
+        }
+        let current = id.to_string();
+        let profile_id = if current.trim().is_empty() { smb::new_id() } else { current };
+        let name = name.to_string();
+        let username = username.to_string();
+        let domain = domain.to_string();
+        let mut list = smb::profiles();
+        let previous = list.iter().find(|p| p.id == profile_id).cloned();
+        let mut profile = smb::Profile {
+            id: profile_id.clone(),
+            name: name.trim().to_string(),
+            server: server.to_string(),
+            share: share_text.to_string(),
+            username: username.trim().to_string(),
+            domain: domain.trim().to_string(),
+            remember: previous.as_ref().map(|p| p.remember).unwrap_or(false),
+        };
+        let identity_changed = previous.as_ref().map(|old| {
+            old.server != profile.server
+                || old.username != profile.username
+                || old.domain != profile.domain
+        }).unwrap_or(false);
+        if identity_changed {
+            profile.remember = false;
+            if let Some(old) = previous.as_ref() {
+                if old.remember {
+                    smb::clear_password(old);
+                }
+            }
+        }
+        let reconnect = previous.as_ref().map(|old| {
+            (identity_changed || old.share != profile.share)
+                && smb::connected_path(old).is_some()
+        }).unwrap_or(false);
+        if let Some(existing) = list.iter_mut().find(|p| p.id == profile_id) {
+            *existing = profile;
+        } else {
+            list.push(profile);
+        }
+        smb::save(&list);
+        self.as_mut().refresh_smb();
+        if reconnect {
+            if let Some(old) = previous {
+                let thread = self.qt_thread();
+                self.spawn_op("smb", format!("Disconnecting from {}", old.label()), move |_op| {
+                    match smb::unmount(&old) {
+                        Ok(()) => {
+                            let _ = thread.queue(|mut core| core.as_mut().refresh_smb());
+                            Outcome::ok(String::new())
+                        }
+                        Err(e) => Outcome::err(e),
+                    }
+                });
+            }
+        }
+        q(&profile_id)
+    }
+
+    pub fn remove_smb_profile(mut self: Pin<&mut Self>, id: &QString) {
+        let profile_id = id.to_string();
+        let mut list = smb::profiles();
+        let profile = list.iter().find(|p| p.id == profile_id).cloned();
+        list.retain(|p| p.id != profile_id);
+        smb::save(&list);
+        if let Some(profile) = profile {
+            if profile.remember {
+                smb::clear_password(&profile);
+            }
+            self.as_mut().refresh_smb();
+            if smb::connected_path(&profile).is_some() {
+                let thread = self.qt_thread();
+                self.spawn_op("smb", format!("Disconnecting from {}", profile.label()), move |_op| {
+                    match smb::unmount(&profile) {
+                        Ok(()) => {
+                            let _ = thread.queue(|mut core| core.as_mut().refresh_smb());
+                            Outcome::ok(String::new())
+                        }
+                        Err(e) => Outcome::err(e),
+                    }
+                });
+            }
+        } else {
+            self.as_mut().refresh_smb();
+        }
+    }
+
+    pub fn connect_smb(mut self: Pin<&mut Self>, id: &QString, password: &QString, remember: bool) {
+        let profile_id = id.to_string();
+        let Some(profile) = smb::profiles().into_iter().find(|p| p.id == profile_id) else {
+            self.as_mut().notify(q("error"), q("That SMB share no longer exists"));
+            return;
+        };
+        let typed = password.to_string();
+        let entered = !typed.is_empty();
+        let mut pass = typed;
+        if pass.is_empty() {
+            pass = smb::saved_password(&profile);
+        }
+        if pass.is_empty() && !profile.username.trim().is_empty() {
+            let request = serde_json::json!({
+                "kind": "smb",
+                "id": profile.id,
+                "name": profile.label(),
+                "server": profile.server,
+                "share": profile.share,
+                "username": profile.username,
+            });
+            self.as_mut().password_required(q(&request.to_string()));
+            return;
+        }
+        if entered && !smb::store_password(&profile, &pass) {
+            self.as_mut().notify(q("error"), q("Could not save the password in the system keyring"));
+            return;
+        }
+        if entered {
+            smb::set_remember(&profile_id, remember);
+        }
+        let temporary = entered && !remember;
+        let label = profile.label();
+        let thread = self.qt_thread();
+        self.spawn_op("smb", format!("Connecting to {}", label), move |_op| {
+            let result = smb::mount(&profile);
+            if temporary {
+                smb::clear_password(&profile);
+            }
+            match result {
+                Ok(path) => {
+                    let id = profile.id.clone();
+                    let mounted = path.clone();
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().refresh_smb();
+                        core.as_mut().smb_mounted(q(&id), q(&mounted));
+                    });
+                    Outcome::ok(format!("Connected to {}", profile.label()))
+                }
+                Err(e) => {
+                    if e.needs_password && !profile.username.trim().is_empty() {
+                        let request = serde_json::json!({
+                            "kind": "smb",
+                            "id": profile.id,
+                            "name": profile.label(),
+                            "server": profile.server,
+                            "share": profile.share,
+                            "username": profile.username,
+                            "error": true,
+                        });
+                        let _ = thread.queue(move |mut core| {
+                            core.as_mut().password_required(q(&request.to_string()));
+                        });
+                    }
+                    Outcome::err(e.message)
+                }
+            }
+        });
+    }
+
+    pub fn disconnect_smb(self: Pin<&mut Self>, id: &QString) {
+        let profile_id = id.to_string();
+        let Some(profile) = smb::profiles().into_iter().find(|p| p.id == profile_id) else { return };
+        let thread = self.qt_thread();
+        self.spawn_op("smb", format!("Disconnecting from {}", profile.label()), move |_op| {
+            match smb::unmount(&profile) {
+                Ok(()) => {
+                    let _ = thread.queue(|mut core| core.as_mut().refresh_smb());
+                    Outcome::ok(String::new())
+                }
+                Err(e) => Outcome::err(e),
+            }
+        });
     }
     pub fn open_item(mut self: Pin<&mut Self>, path: &QString) {
         let p = path.to_string();
@@ -2182,6 +2421,7 @@ impl cxx_qt::Initialize for qobject::LoafCore {
     fn initialize(mut self: Pin<&mut Self>) {
         self.as_mut().refresh_system_theme();
         self.as_mut().load_places();
+        self.as_mut().load_smb_profiles();
         self.as_mut().refresh_frequent_dirs();
         self.as_mut().update_trash_empty();
         // Warm the application cache off the UI thread.
