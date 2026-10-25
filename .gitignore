@@ -1,29 +1,29 @@
+# Build outputs & environments
 /target/
 result
 .direnv/
+tmp/
+
+# Editors
+.vscode/
 .idea/
 .opencode/
 .qmlls.ini
 
-# Packaging build outputs & intermediates
+# Packaging artifacts
 packaging/bin/
-packaging/deb/build/
-packaging/arch/build/
+packaging/*/build/
 packaging/tarball/
 packaging/dist/Loaf.AppDir/
+packaging/dist/loaf-*
 packaging/dist/*.AppImage
 packaging/dist/*.tar.gz
 packaging/dist/*.pkg.tar.*
 packaging/dist/*.rpm
 packaging/dist/*.deb
-packaging/dist/loaf-v*
-packaging/dist/loaf-*
 
-# Showcase & media tools
+# Media showcase
 assets/showcase/
-assets/showcase/node_modules
-assets/showcase/out
 showcase/
 
-# Site development
 index.html

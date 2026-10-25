@@ -59,25 +59,6 @@ The easiest way to install Loaf is through our interactive management script:
 curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash
 ```
 
-The script detects your distribution and architecture, then walks you through an
-arrow-key menu to **Try** Loaf ephemerally, **Install**, **Update**, or **Uninstall** it.
-
-On Debian/Ubuntu, Arch, Fedora/RHEL and openSUSE it installs the **native package**
-(`.deb`, `.pkg.tar.zst`, `.rpm`) through your package manager, so Qt and the other
-runtime dependencies are resolved automatically. On any other distribution it falls
-back to a **universal tarball** in `~/.local` (or `/usr/local` with `sudo`). It
-installs the latest stable release by default, and can also target a specific
-release tag or build the latest development commit from source. On **NixOS** it
-prints instructions to follow the manual Nix route below instead, since NixOS
-manages packages declaratively.
-
-You can also pass a command directly for scripting:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash -s -- install
-# also: try, update, uninstall
-```
-
 ---
 
 ## Alternative Manual Installation Methods
