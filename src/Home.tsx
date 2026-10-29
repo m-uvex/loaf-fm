@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 const repo = "https://github.com/m-uvex/loaf-fm";
-const devRepo = `${repo}/tree/dev`;
 const installCommand = "curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash";
 
 const features = [
@@ -119,7 +118,7 @@ export default function Home() {
           <nav id="primary-navigation" className={`primary-nav${menuOpen ? " is-open" : ""}`} aria-label="Main navigation">
             <a href="#features" onClick={closeMenu}>The good bits</a>
             <a href="#install" onClick={closeMenu}>Installation</a>
-            <a className="nav-cta" href={devRepo} target="_blank" rel="noreferrer" onClick={closeMenu}>
+            <a className="nav-cta" href={repo} target="_blank" rel="noreferrer" onClick={closeMenu}>
               Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
             </a>
           </nav>
@@ -133,7 +132,7 @@ export default function Home() {
             <p className="hero-description">Meet Loaf: A fast, good looking and feature-stuffed file manager with no compromises</p>
             <div className="hero-actions">
               <a className="button button-primary" href="#install">Find your way in <ArrowRight size={18} aria-hidden="true" /></a>
-              <a className="button button-quiet" href={devRepo} target="_blank" rel="noreferrer">Take a peek at the code <ArrowUpRight size={16} aria-hidden="true" /></a>
+              <a className="button button-quiet" href={repo} target="_blank" rel="noreferrer">Take a peek at the code <ArrowUpRight size={16} aria-hidden="true" /></a>
             </div>
           </div>
 
@@ -204,7 +203,7 @@ export default function Home() {
               <button className={`copy-button${copied ? " is-copied" : ""}`} type="button" onClick={copyCommand} aria-label={copied ? "Installer command copied" : "Copy installer command"}>
                 {copied ? <Check size={17} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{copied ? "Copied" : "Copy command"}
               </button>
-              <a className="install-docs" href={`${repo}/blob/dev/README.md#installation`} target="_blank" rel="noreferrer">All install options <ArrowUpRight size={15} aria-hidden="true" /></a>
+              <a className="install-docs" href={`${repo}#installation`} target="_blank" rel="noreferrer">All install options <ArrowUpRight size={15} aria-hidden="true" /></a>
             </div>
             <p className="copy-status" aria-live="polite">{copied ? "Ready when you are." : copyError ? "Select the command above to copy it." : "Paste into a terminal, then choose Try or Install."}</p>
           </div>
@@ -216,9 +215,9 @@ export default function Home() {
           <a className="brand footer-brand" href="#top"><BreadMark /><span>Loaf</span></a>
           <p>Toasted to perfection</p>
           <div className="footer-links">
-            <a href={devRepo} target="_blank" rel="noreferrer">Source: dev branch <ArrowUpRight size={14} aria-hidden="true" /></a>
-            <a href={`${repo}/blob/dev/LICENSE`} target="_blank" rel="noreferrer">MIT License</a>
-            <a href={`${repo}/blob/dev/CONTRIBUTING.md`} target="_blank" rel="noreferrer">Contribute</a>
+            <a href={repo} target="_blank" rel="noreferrer">GitHub <ArrowUpRight size={14} aria-hidden="true" /></a>
+            <a href={`${repo}/blob/main/LICENSE`} target="_blank" rel="noreferrer">MIT License</a>
+            <a href={`${repo}/blob/main/CONTRIBUTING.md`} target="_blank" rel="noreferrer">Contribute</a>
           </div>
           <a className="back-top" href="#top" aria-label="Back to top"><ArrowDown size={16} className="back-top-arrow" /></a>
         </div>
