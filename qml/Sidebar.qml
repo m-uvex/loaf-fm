@@ -12,10 +12,14 @@ Rectangle {
     property bool expanded: false
     // Id of the highlighted entry ("pc", "settings", "home", "bookmark:/x", ...).
     property string activeId: ""
+    property var focusedButton: null
+    readonly property bool keyboardHasFocus: focusedButton !== null && focusedButton.activeFocus
 
     signal placeClicked(var place, bool newTab)
+    signal driveClicked(var drive, bool newTab)
     signal settingsClicked()
     signal placeMenuRequested(var place, real x, real y)
+    signal driveMenuRequested(var drive, real x, real y)
     signal sidebarMenuRequested(real x, real y)
 
     readonly property var places: {
@@ -25,6 +29,24 @@ Rectangle {
             return [];
         }
     }
+
+    readonly property var drives: {
+        try {
+            return JSON.parse(core.drives_json || "[]");
+        } catch (e) {
+            return [];
+        }
+    }
+
+    readonly property var entries: places.filter(function(p) { return p.id !== "trash"; }).concat(
+        drives.map(function(d) {
+            var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
+            var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
+            return { id: "device:" + d.device, kind: "device", name: d.name,
+                icon: iconName,
+                system_icon: sysIcon,
+                path: d.mount_point, drive: d };
+        }))
 
     readonly property var trashPlace: {
         for (var i = 0; i < places.length; ++i) {
@@ -104,8 +126,8 @@ Rectangle {
         for (var i = 0; i < filtered.length; ++i) {
             if (filtered[i].id === rail.activeId) {
                 var it = placeList.itemAtIndex(i);
-                if (it) {
-                    var p = it.mapToItem(rail, 0, 0);
+                if (it && it.y >= placeList.contentY && it.y + it.height <= placeList.contentY + placeList.height) {
+                    var p = it.button.mapToItem(rail, 0, 0);
                     selectionHighlight.targetY = p.y;
                     return;
                 }
@@ -117,6 +139,7 @@ Rectangle {
     onActiveIdChanged: Qt.callLater(updateHighlight)
     onShowTrashChanged: Qt.callLater(updateHighlight)
     onExpandedChanged: Qt.callLater(updateHighlight)
+    onDrivesChanged: Qt.callLater(updateHighlight)
 
     ColumnLayout {
         anchors.fill: parent
@@ -234,39 +257,60 @@ Rectangle {
             clip: true
             spacing: 6
             boundsBehavior: Flickable.StopAtBounds
-            model: rail.places.filter(function(p) { return p.id !== "trash"; })
+            model: rail.entries
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
 
-            onContentYChanged: rail.updateHighlight()
+            onContentYChanged: Qt.callLater(rail.updateHighlight)
             onCountChanged: Qt.callLater(rail.updateHighlight)
             Component.onCompleted: Qt.callLater(rail.updateHighlight)
 
-            delegate: RailButton {
+            delegate: Item {
+                id: entry
                 width: placeList.width
                 required property var modelData
                 required property int index
-                iconName: modelData.icon
-                systemIcon: modelData.system_icon
-                label: modelData.name
-                showLabel: rail.expanded
-                selected: rail.activeId === modelData.id
-                dimmed: modelData.missing === true || (modelData.kind === "smb" && modelData.connected !== true)
-                dropPath: (modelData.kind === "place" || modelData.kind === "bookmark" || (modelData.kind === "smb" && modelData.connected === true)) ? modelData.path : ""
-                accessibleName: modelData.name
-                onClicked: rail.placeClicked(modelData, false)
-                onMiddleClicked: rail.placeClicked(modelData, true)
-                onMenuRequested: function(x, y) { rail.placeMenuRequested(modelData, x, y); }
-                onFilesDropped: function(paths, asCopy, d) {
-                    if (dragManager.isRmb) {
-                        var pt = mapToItem(window.contentItem, d.x, d.y);
-                        rmbDropMenu.showAt(pt.x, pt.y, paths, modelData.kind === "trash" ? "trash" : dropPath);
-                    } else if (modelData.kind === "trash") {
-                        core.trash_items(JSON.stringify(paths));
-                    } else if (dropPath.length > 0) {
-                        window.handleDrop(paths, dropPath, asCopy);
+                readonly property bool isDevice: modelData.kind === "device"
+                readonly property real headerHeight: isDevice && (index === 0 || placeList.model[index - 1].kind !== "device")
+                    ? 12 : 0
+                property alias button: entryButton
+                height: 44 + headerHeight
+                Rectangle {
+                    visible: entry.headerHeight > 0
+                    x: 12; width: parent.width - 24; height: 1
+                    color: theme.separator; opacity: 0.35
+                }
+                RailButton {
+                    id: entryButton
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    iconName: entry.modelData.icon
+                    systemIcon: entry.modelData.system_icon
+                    label: entry.modelData.name
+                    showLabel: rail.expanded
+                    selected: rail.activeId === entry.modelData.id
+                    dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted)
+                        : entry.modelData.missing === true || (entry.modelData.kind === "smb" && entry.modelData.connected !== true)
+                    dropPath: entry.isDevice ? (entry.modelData.drive.is_mounted ? entry.modelData.path : "")
+                        : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || (entry.modelData.kind === "smb" && entry.modelData.connected === true)) ? entry.modelData.path : "")
+                    accessibleName: label + (entry.isDevice && entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted ? " (" + qsTr("unmounted") + ")" : "")
+                    onActiveFocusChanged: if (activeFocus) placeList.positionViewAtIndex(entry.index, ListView.Contain)
+                    onClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, false) : rail.placeClicked(entry.modelData, false)
+                    onMiddleClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, true) : rail.placeClicked(entry.modelData, true)
+                    onMenuRequested: function(x, y) {
+                        if (entry.isDevice) rail.driveMenuRequested(entry.modelData.drive, x, y);
+                        else rail.placeMenuRequested(entry.modelData, x, y);
+                    }
+                    onFilesDropped: function(paths, asCopy, d) {
+                        if (dropPath.length > 0) {
+                            if (dragManager.isRmb) {
+                                var pt = mapToItem(window.contentItem, d.x, d.y);
+                                rmbDropMenu.showAt(pt.x, pt.y, paths, dropPath);
+                            } else {
+                                window.handleDrop(paths, dropPath, asCopy);
+                            }
+                        }
                     }
                 }
-                acceptsTrashDrop: modelData.kind === "trash"
             }
 
             // Drop a folder on the empty part of the rail to bookmark it.
@@ -372,6 +416,16 @@ Rectangle {
         height: 44
         scale: mouse.pressed ? 0.95 : (mouse.containsMouse ? 1.02 : 1.0)
         Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+        activeFocusOnTab: true
+        onActiveFocusChanged: {
+            if (activeFocus)
+                rail.focusedButton = btn;
+            else if (rail.focusedButton === btn)
+                rail.focusedButton = null;
+        }
+        Keys.onReturnPressed: btn.clicked()
+        Keys.onEnterPressed: btn.clicked()
+        Keys.onSpacePressed: btn.clicked()
         Accessible.role: Accessible.Button
         Accessible.name: accessibleName
         Accessible.onPressAction: btn.clicked()
@@ -385,7 +439,7 @@ Rectangle {
             radius: 22
             color: btn.dropHover ? theme.primaryContainer
                 : (mouse.containsMouse && !btn.selected ? theme.hoverOverlay : "transparent")
-            border.width: btn.dropHover ? 2 : 0
+            border.width: btn.dropHover || btn.activeFocus ? 2 : 0
             border.color: theme.primary
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
             Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }

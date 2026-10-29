@@ -6,6 +6,8 @@ pub mod fsops;
 pub mod icons;
 pub mod info;
 pub mod listing;
+pub mod mtp;
+pub mod mtp_ops;
 pub mod native;
 pub mod pane;
 pub mod search;
@@ -24,7 +26,7 @@ const HELP: &str = "Loaf - a Material 3 file manager
 
 Usage: loaf [OPTIONS] [PATH...]
 
-Opens each PATH (a folder, a file to show in its folder, or a file:// URI)
+Opens each PATH (a folder, a file to show in its folder, or a file:// URI or Loaf MTP address)
 in a tab. Without --new-window the paths are handed to a running Loaf.
 
 Options:
@@ -70,7 +72,7 @@ fn parse_args() -> Result<Args, String> {
         .paths
         .into_iter()
         .map(|p| {
-            if p.starts_with("file://") || p.starts_with('/') {
+            if p.starts_with("file://") || p.starts_with("mtp://") || p.starts_with('/') {
                 p
             } else {
                 cwd.join(p).to_string_lossy().to_string()

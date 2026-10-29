@@ -44,6 +44,8 @@ pub mod qobject {
         fn notify(self: Pin<&mut LoafCore>, kind: QString, text: QString);
         #[qsignal]
         fn operation_finished(self: Pin<&mut LoafCore>, kind: QString, ok: bool, result_json: QString);
+        #[qsignal]
+        fn mtp_preview_ready(self: Pin<&mut LoafCore>, path: QString);
         /// An archive or encrypted drive needs a password: {kind, ...}.
         #[qsignal]
         fn password_required(self: Pin<&mut LoafCore>, request_json: QString);
@@ -176,6 +178,8 @@ pub mod qobject {
         fn open_uri(self: Pin<&mut LoafCore>, uri: &QString);
         #[qinvokable]
         fn quick_look(self: &LoafCore, path: &QString) -> QString;
+        #[qinvokable]
+        fn preview_mtp(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
         fn get_item_info(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -359,6 +363,7 @@ pub struct CoreRust {
     /// An undo or redo is running; further requests wait for it.
     history_running: bool,
     drives: Vec<drives::Drive>,
+    drive_generation: Arc<AtomicU64>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
     color_watcher: Option<watcher::DirWatcher>,
@@ -391,6 +396,7 @@ impl Default for CoreRust {
             redo_stack: Vec::new(),
             history_running: false,
             drives: Vec::new(),
+            drive_generation: Arc::new(AtomicU64::new(0)),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
             color_watcher: None,
@@ -406,7 +412,7 @@ fn parse_paths(json: &QString) -> Vec<PathBuf> {
     serde_json::from_str::<Vec<String>>(&json.to_string())
         .unwrap_or_default()
         .into_iter()
-        .filter(|s| !s.is_empty())
+        .filter(|s| Path::new(s).is_absolute())
         .map(PathBuf::from)
         .collect()
 }
@@ -955,9 +961,14 @@ impl qobject::LoafCore {
     }
     pub fn load_drives(self: Pin<&mut Self>) {
         let thread = self.qt_thread();
+        let generation = self.drive_generation.clone();
+        let requested = generation.fetch_add(1, Ordering::Relaxed) + 1;
         std::thread::spawn(move || {
             let list = drives::list();
             let _ = thread.queue(move |mut core| {
+                if generation.load(Ordering::Relaxed) != requested {
+                    return;
+                }
                 let json = serde_json::to_string(&list).unwrap_or_else(|_| "[]".into());
                 core.as_mut().rust_mut().drives = list;
                 if core.drives_json().to_string() != json {
@@ -967,19 +978,37 @@ impl qobject::LoafCore {
         });
     }
 
-    fn drive_job<F>(self: Pin<&mut Self>, title: String, work: F)
+    fn drive_job<F>(self: Pin<&mut Self>, title: String, device: String, work: F)
     where
-        F: FnOnce() -> Result<String, String> + Send + 'static,
+        F: FnOnce() -> Result<serde_json::Value, (String, serde_json::Value)> + Send + 'static,
     {
         self.spawn_op("drive", title, move |_op| match work() {
-            Ok(msg) => {
+            Ok(val) => {
+                let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("").to_string();
+                let mut res = val;
+                if let Some(obj) = res.as_object_mut() {
+                    obj.insert("reload_drives".to_string(), serde_json::Value::Bool(true));
+                    if !obj.contains_key("device") && !device.is_empty() {
+                        obj.insert("device".to_string(), serde_json::Value::String(device));
+                    }
+                } else {
+                    res = serde_json::json!({"reload_drives": true, "device": device});
+                }
                 let mut o = Outcome::ok(msg);
-                o.result = serde_json::json!({"reload_drives": true});
+                o.result = res;
                 o
             }
-            Err(e) => {
+            Err((e, mut res)) => {
+                if let Some(obj) = res.as_object_mut() {
+                    obj.insert("reload_drives".to_string(), serde_json::Value::Bool(true));
+                    if !obj.contains_key("device") && !device.is_empty() {
+                        obj.insert("device".to_string(), serde_json::Value::String(device));
+                    }
+                } else {
+                    res = serde_json::json!({"reload_drives": true, "device": device});
+                }
                 let mut o = Outcome::err(e);
-                o.result = serde_json::json!({"reload_drives": true});
+                o.result = res;
                 o
             }
         });
@@ -987,19 +1016,55 @@ impl qobject::LoafCore {
 
     pub fn mount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
-        self.drive_job(format!("Mounting {}", dev), move || drives::mount(&dev).map(|_| String::new()));
+        let dev_clone = dev.clone();
+        self.drive_job(format!("Mounting {}", dev), dev, move || {
+            match drives::mount(&dev_clone) {
+                Ok(path) => Ok(serde_json::json!({
+                    "action": "mount",
+                    "device": dev_clone,
+                    "mount_point": path
+                })),
+                Err(e) => Err((e, serde_json::json!({
+                    "action": "mount",
+                    "device": dev_clone
+                }))),
+            }
+        });
     }
 
     pub fn unmount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
-        self.drive_job(format!("Unmounting {}", dev), move || drives::unmount(&dev).map(|_| String::new()));
+        let dev_clone = dev.clone();
+        self.drive_job(format!("Unmounting {}", dev), dev, move || {
+            match drives::unmount(&dev_clone) {
+                Ok(_) => Ok(serde_json::json!({
+                    "action": "unmount",
+                    "device": dev_clone
+                })),
+                Err(e) => Err((e, serde_json::json!({
+                    "action": "unmount",
+                    "device": dev_clone
+                }))),
+            }
+        });
     }
 
     pub fn eject_drive(self: Pin<&mut Self>, disk: &QString) {
         let disk = disk.to_string();
+        let disk_clone = disk.clone();
         let snapshot = self.drives.clone();
-        self.drive_job(format!("Ejecting {}", disk), move || {
-            drives::eject(&disk, &snapshot).map(|_| "It is now safe to remove the drive".to_string())
+        self.drive_job(format!("Ejecting {}", disk), disk, move || {
+            match drives::eject(&disk_clone, &snapshot) {
+                Ok(_) => Ok(serde_json::json!({
+                    "action": "eject",
+                    "disk": disk_clone,
+                    "message": "It is now safe to remove the drive"
+                })),
+                Err(e) => Err((e, serde_json::json!({
+                    "action": "eject",
+                    "disk": disk_clone
+                }))),
+            }
         });
     }
 
@@ -1014,33 +1079,72 @@ impl qobject::LoafCore {
             }
         }
         let thread = self.qt_thread();
-        self.drive_job(format!("Unlocking {}", dev.clone()), move || match drives::unlock(&dev, &pass) {
+        let dev_clone = dev.clone();
+        self.drive_job(format!("Unlocking {}", dev.clone()), dev, move || match drives::unlock(&dev_clone, &pass) {
             Ok(clear) => {
                 if remember {
-                    secret_store(&format!("luks:{}", dev), &format!("Loaf: encrypted drive {}", dev), &pass);
+                    secret_store(&format!("luks:{}", dev_clone), &format!("Loaf: encrypted drive {}", dev_clone), &pass);
                 }
-                let _ = drives::mount(&clear);
-                Ok(String::new())
+                match drives::mount(&clear) {
+                    Ok(mount_point) => Ok(serde_json::json!({
+                        "action": "unlock",
+                        "device": dev_clone,
+                        "clear_device": clear,
+                        "mount_point": mount_point
+                    })),
+                    Err(mount_err) => Err((mount_err, serde_json::json!({
+                        "action": "unlock",
+                        "device": dev_clone,
+                        "clear_device": clear
+                    }))),
+                }
             }
             Err(e) => {
-                let dev2 = dev.clone();
+                let dev2 = dev_clone.clone();
                 let _ = thread.queue(move |mut core| {
                     core.as_mut().password_required(q(&serde_json::json!({"kind": "luks", "device": dev2, "error": true}).to_string()));
                 });
-                Err(e)
+                Err((e, serde_json::json!({
+                    "action": "unlock",
+                    "device": dev_clone
+                })))
             }
         });
     }
 
     pub fn lock_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
-        self.drive_job(format!("Locking {}", dev), move || drives::lock(&dev).map(|_| String::new()));
+        let dev_clone = dev.clone();
+        self.drive_job(format!("Locking {}", dev), dev, move || {
+            match drives::lock(&dev_clone) {
+                Ok(_) => Ok(serde_json::json!({
+                    "action": "lock",
+                    "device": dev_clone
+                })),
+                Err(e) => Err((e, serde_json::json!({
+                    "action": "lock",
+                    "device": dev_clone
+                }))),
+            }
+        });
     }
 
     pub fn rename_drive(self: Pin<&mut Self>, device: &QString, name: &QString) {
         let dev = device.to_string();
+        let dev_clone = dev.clone();
         let name = name.to_string();
-        self.drive_job(format!("Renaming {}", dev), move || drives::set_label(&dev, &name).map(|_| String::new()));
+        self.drive_job(format!("Renaming {}", dev), dev, move || {
+            match drives::set_label(&dev_clone, &name) {
+                Ok(_) => Ok(serde_json::json!({
+                    "action": "rename",
+                    "device": dev_clone
+                })),
+                Err(e) => Err((e, serde_json::json!({
+                    "action": "rename",
+                    "device": dev_clone
+                }))),
+            }
+        });
     }
 
     fn refresh_smb(mut self: Pin<&mut Self>) {
@@ -1243,6 +1347,20 @@ impl qobject::LoafCore {
     }
     pub fn open_item(mut self: Pin<&mut Self>, path: &QString) {
         let p = path.to_string();
+        if p.starts_with("mtp:") {
+            let thread = self.qt_thread();
+            self.spawn_op("open", "Downloading phone file".to_string(), move |op| {
+                match crate::mtp_ops::local_copy(&p, op) {
+                    Ok(local) => {
+                        let path = local.to_string_lossy().to_string();
+                        let _ = thread.queue(move |core| core.open_item(&q(&path)));
+                        Outcome::ok("Opened a downloaded copy. Copy changes back to update the phone.")
+                    }
+                    Err(error) => Outcome::err(error),
+                }
+            });
+            return;
+        }
         if p.starts_with(crate::pane::ARCHIVE_SCHEME) {
             return self.open_archive_member(p);
         }
@@ -1499,6 +1617,21 @@ impl qobject::LoafCore {
             self.as_mut().notify(q("error"), q(&format!("No application can open “{}”", u)));
         }
     }
+    pub fn preview_mtp(self: Pin<&mut Self>, path: &QString) {
+        let path = path.to_string();
+        let thread = self.qt_thread();
+        self.spawn_op("preview", "Downloading phone preview".to_string(), move |op| {
+            match crate::mtp_ops::local_copy(&path, op) {
+                Ok(local) => {
+                    let path = local.to_string_lossy().to_string();
+                    let _ = thread.queue(move |mut core| core.as_mut().mtp_preview_ready(q(&path)));
+                    Outcome::ok("")
+                }
+                Err(error) => Outcome::err(error),
+            }
+        });
+    }
+
     pub fn quick_look(&self, path: &QString) -> QString {
         q(&serde_json::to_string(&info::quick_look(Path::new(&path.to_string()))).unwrap_or_else(|_| "{}".into()))
     }
@@ -1559,6 +1692,11 @@ impl qobject::LoafCore {
         q(&secret_get(&key.to_string()))
     }
     pub fn check_conflicts(&self, paths_json: &QString, dest: &QString) -> QString {
+        // MTP conflicts are resolved on the transfer worker, never by blocking the GUI.
+        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        if dest.to_string().starts_with("mtp:") || locations.iter().any(|path| path.starts_with("mtp:")) {
+            return q("[]");
+        }
         let dest = PathBuf::from(dest.to_string());
         let mut out = Vec::new();
         for src in parse_paths(paths_json) {
@@ -1586,6 +1724,21 @@ impl qobject::LoafCore {
     }
 
     pub fn transfer(self: Pin<&mut Self>, paths_json: &QString, dest: &QString, mode: &QString, resolution: &QString) {
+        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        let target = dest.to_string();
+        if target.starts_with("mtp:") || locations.iter().any(|path| path.starts_with("mtp:")) {
+            let mode = mode.to_string();
+            self.spawn_op("mtp-transfer", "Transferring phone files".to_string(), move |op| {
+                let result = crate::mtp_ops::transfer(&locations, &target, &mode, op);
+                let mut outcome = match &result {
+                    Ok(_) => Outcome::ok("Phone transfer complete"),
+                    Err(error) => Outcome::err(error),
+                };
+                outcome.result = serde_json::json!({"mtp": true, "created": result.ok().unwrap_or_default(), "sources": locations, "mode": mode});
+                outcome
+            });
+            return;
+        }
         let sources = parse_paths(paths_json);
         let dest = PathBuf::from(dest.to_string());
         let mode = mode.to_string();
@@ -1604,7 +1757,12 @@ impl qobject::LoafCore {
         self.spawn_op(&kind, title, move |op| run_transfer(op, sources, dest, &mode, &res));
     }
 
-    pub fn trash_items(self: Pin<&mut Self>, paths_json: &QString) {
+    pub fn trash_items(mut self: Pin<&mut Self>, paths_json: &QString) {
+        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        if locations.iter().any(|path| path.starts_with("mtp:")) {
+            self.as_mut().notify(q("error"), q("Phone files have no trash. Use Delete Permanently."));
+            return;
+        }
         let paths = parse_paths(paths_json);
         if paths.is_empty() {
             return;
@@ -1649,6 +1807,18 @@ impl qobject::LoafCore {
     }
 
     pub fn delete_items(self: Pin<&mut Self>, paths_json: &QString) {
+        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        if locations.iter().any(|path| path.starts_with("mtp:")) {
+            self.spawn_op("mtp-delete", "Deleting phone files".to_string(), move |op| {
+                let mut outcome = match crate::mtp_ops::remove(&locations, op) {
+                    Ok(()) => Outcome::ok("Phone files deleted"),
+                    Err(error) => Outcome::err(error),
+                };
+                outcome.result = serde_json::json!({"mtp": true});
+                outcome
+            });
+            return;
+        }
         let paths = parse_paths(paths_json);
         if paths.is_empty() {
             return;
@@ -1836,6 +2006,33 @@ impl qobject::LoafCore {
                 return QString::default();
             }
         };
+        if dir.to_string().starts_with("mtp:") {
+            let parent = dir.to_string();
+            self.spawn_op("mtp-create", format!("Creating {} on phone", name), move |op| {
+                let result = if is_dir {
+                    crate::mtp_ops::mkdir(&parent, &name).map(|path| vec![path])
+                } else {
+                    // Use a private, uniquely created staging directory for an empty file upload.
+                    let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+                    let stage = std::env::temp_dir().join(format!("loaf-mtp-empty-{}-{}", std::process::id(), unique));
+                    let mut owned = false;
+                    let result = (|| -> Result<Vec<String>, String> {
+                        use std::os::unix::fs::DirBuilderExt;
+                        std::fs::DirBuilder::new().mode(0o700).create(&stage).map_err(|e| e.to_string())?;
+                        owned = true;
+                        let local = stage.join(&name);
+                        std::fs::OpenOptions::new().write(true).create_new(true).open(&local).map_err(|e| e.to_string())?;
+                        crate::mtp_ops::transfer(&[local.to_string_lossy().to_string()], &parent, "copy", op)
+                    })();
+                    if owned { let _ = std::fs::remove_dir_all(&stage); }
+                    result
+                };
+                let mut outcome = match &result { Ok(_) => Outcome::ok("Created on phone"), Err(error) => Outcome::err(error) };
+                outcome.result = serde_json::json!({"mtp": true, "created": result.ok().unwrap_or_default()});
+                outcome
+            });
+            return QString::default();
+        }
         let target = PathBuf::from(dir.to_string()).join(&name);
         if std::fs::symlink_metadata(&target).is_ok() {
             self.as_mut().notify(q("error"), q(&format!("“{}” already exists", name)));
@@ -1887,6 +2084,17 @@ impl qobject::LoafCore {
     }
 
     pub fn rename_item(mut self: Pin<&mut Self>, path: &QString, new_name: &QString) -> QString {
+        if path.to_string().starts_with("mtp:") {
+            let name = match validate_name(&new_name.to_string()) { Ok(name) => name, Err(error) => return q(&error) };
+            let source = path.to_string();
+            self.spawn_op("mtp-rename", "Renaming phone item".to_string(), move |_op| {
+                let result = crate::mtp_ops::rename(&source, &name);
+                let mut outcome = match &result { Ok(_) => Outcome::ok("Renamed on phone"), Err(error) => Outcome::err(error) };
+                outcome.result = serde_json::json!({"mtp": true, "created": result.ok().into_iter().collect::<Vec<_>>()});
+                outcome
+            });
+            return QString::default();
+        }
         let from = PathBuf::from(path.to_string());
         let name = match validate_name(&new_name.to_string()) {
             Ok(n) => n,
@@ -2489,6 +2697,9 @@ impl cxx_qt::Initialize for qobject::LoafCore {
             let _ = t.queue(|core| core.load_drives());
         });
         self.as_mut().rust_mut().device_watcher = dw;
+        // Populate the sidebar on a fresh launch, before the first hotplug or
+        // mount-table event. Discovery runs off the GUI thread.
+        self.as_mut().load_drives();
         // Follow wallpaper palette changes without polling.
         let t2 = self.qt_thread();
         let cw = watcher::DirWatcher::new(move || {
@@ -2548,6 +2759,12 @@ impl cxx_qt::Initialize for qobject::LoafCore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_operations_accept_only_local_paths() {
+        let paths = parse_paths(&q(r#"["/tmp/local.txt", "mtp://2f74657374/Internal%20storage/file.txt", "relative.txt"]"#));
+        assert_eq!(paths, vec![PathBuf::from("/tmp/local.txt")]);
+    }
 
     #[test]
     fn network_bookmark_places() {

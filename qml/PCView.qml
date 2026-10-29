@@ -198,27 +198,15 @@ Item {
     // ---- drive actions -----------------------------------------------------
 
     function openDrive(d) {
-        if (pcView.isMounted(d)) {
-            window.showFiles();
-            engine.set_path(d.mount_point);
-        } else {
-            pcView.mountDrive(d);
-        }
+        window.openDrive(d, false);
     }
 
     function mountDrive(d) {
-        if (!d)
-            return;
-        if (d.is_locked)
-            core.unlock_drive(d.device, "", false); // keyring first, then asks
-        else
-            core.mount_drive(d.device);
+        window.mountDrive(d);
     }
 
     function unmountDrive(d) {
-        if (!d)
-            return;
-        core.unmount_drive(d.device);
+        window.unmountDrive(d);
     }
 
     // Folder shortcuts: the user's real (localized) folders, issue #21/#22.
@@ -245,23 +233,24 @@ Item {
     function driveMenuModel(d) {
         var mounted = pcView.isMounted(d);
         var external = d && d.is_external === true;
+        var isMtp = d && d.provider === "mtp";
         var items = [];
 
         items.push({
             "text": qsTr("Open"),
             "icon": "folder-open",
-            "enabled": mounted,
+            "enabled": mounted || isMtp,
             "action": function () { pcView.openDrive(d); }
         });
         if (!mounted) {
             items.push({
-                "text": qsTr("Mount"),
-                "icon": "download",
+                "text": isMtp ? qsTr("Browse") : qsTr("Mount"),
+                "icon": isMtp ? "plugs-connected" : "download",
                 "separatorBefore": true,
                 "action": function () { pcView.mountDrive(d); }
             });
         }
-        if (mounted) {
+        if (mounted && !isMtp) {
             items.push({
                 "text": qsTr("Unmount"),
                 "icon": "eject",
@@ -269,7 +258,7 @@ Item {
                 "action": function () { pcView.unmountDrive(d); }
             });
         }
-        if (external && d.disk) {
+        if (external && d.disk && !isMtp) {
             items.push({
                 "text": qsTr("Eject (Safely Remove)"),
                 "icon": "eject",
@@ -277,7 +266,7 @@ Item {
                 "action": function () { core.eject_drive(d.disk); }
             });
         }
-        if (d.is_encrypted && d.crypt_device) {
+        if (d.is_encrypted && d.crypt_device && !isMtp) {
             items.push({
                 "text": qsTr("Lock Encrypted Drive"),
                 "icon": "lock",
@@ -285,20 +274,12 @@ Item {
                 "action": function () { core.lock_drive(d.crypt_device); }
             });
         }
-        items.push({
-            "text": qsTr("Rename"),
-            "icon": "pencil-simple",
-            "separatorBefore": true,
-            "action": function () { pcView.requestRename(d); }
-        });
-        if (external) {
+        if (!isMtp) {
             items.push({
-                "text": qsTr("Eject"),
-                "icon": "eject",
-                "danger": true,
-                "enabled": mounted,
+                "text": qsTr("Rename"),
+                "icon": "pencil-simple",
                 "separatorBefore": true,
-                "action": function () { pcView.unmountDrive(d); }
+                "action": function () { pcView.requestRename(d); }
             });
         }
         return items;
