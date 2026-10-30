@@ -157,9 +157,49 @@ pub fn format_size(bytes: u64) -> String {
     format!("{:.1} {}", v, UNITS[i])
 }
 
+/// Filesystem type of the mount that holds `path`, from /proc/self/mounts text.
+fn fstype_in(path: &std::path::Path, mounts: &str) -> Option<String> {
+    let mut best: Option<(usize, String)> = None;
+    for line in mounts.lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(_), Some(mnt), Some(fstype)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let mnt = crate::trash::unescape_mount(mnt);
+        if path.starts_with(&mnt) && best.as_ref().map_or(true, |(len, _)| mnt.len() > *len) {
+            best = Some((mnt.len(), fstype.to_string()));
+        }
+    }
+    best.map(|(_, t)| t)
+}
+
+/// True for network and remote filesystems. A stat() there can hang for
+/// minutes when the server is gone, so callers on the UI thread skip it.
+pub fn on_network_fs(path: &std::path::Path) -> bool {
+    on_network_fs_in(path, &mount_table())
+}
+
+/// /proc/self/mounts, for checking many paths with on_network_fs_in().
+pub fn mount_table() -> String {
+    std::fs::read_to_string("/proc/self/mounts").unwrap_or_default()
+}
+
+pub fn on_network_fs_in(path: &std::path::Path, mounts: &str) -> bool {
+    fstype_in(path, mounts).is_some_and(|t| {
+        matches!(t.as_str(), "nfs" | "nfs4" | "cifs" | "smb3" | "smbfs" | "9p" | "davfs" | "ceph" | "glusterfs" | "afs" | "sshfs")
+            || (t.starts_with("fuse.") && !matches!(t.as_str(), "fuse.portal" | "fuse.gvfsd-fuse-local"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_the_mount_holding_a_path() {
+        let mounts = "/dev/nvme0n1p6 / ext4 rw 0 0\nsrv:/share /mnt/nas nfs4 rw 0 0\n//pc/x /mnt/smb\\040disk cifs rw 0 0\n";
+        assert_eq!(fstype_in(std::path::Path::new("/home/u"), mounts).as_deref(), Some("ext4"));
+        assert_eq!(fstype_in(std::path::Path::new("/mnt/nas/a/b"), mounts).as_deref(), Some("nfs4"));
+        assert_eq!(fstype_in(std::path::Path::new("/mnt/smb disk/f"), mounts).as_deref(), Some("cifs"));
+    }
 
     #[test]
     fn finds_sh() {

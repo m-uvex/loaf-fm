@@ -31,6 +31,11 @@ fn uid() -> u32 {
 }
 
 pub fn home_trash() -> PathBuf {
+    // Tests run in parallel; a per-process private trash means no test can
+    // ever reach the user's real trash, whatever the environment says.
+    if cfg!(test) {
+        return std::env::temp_dir().join(format!("loaf-test-trash-{}", std::process::id()));
+    }
     match std::env::var("XDG_DATA_HOME") {
         Ok(x) if !x.is_empty() => PathBuf::from(x).join("Trash"),
         _ => PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/share/Trash"),
@@ -424,11 +429,31 @@ fn empty_in(roots: &[PathBuf]) -> io::Result<()> {
         if !usable_trash(root) {
             continue;
         }
-        for sub in ["files", "info"] {
-            let Ok(rd) = fs::read_dir(root.join(sub)) else { continue };
+        // Delete each item first and its .trashinfo only afterwards: if the
+        // item can't be removed it stays listed instead of turning invisible.
+        if let Ok(rd) = fs::read_dir(root.join("files")) {
             for e in rd.flatten() {
-                if let Err(err) = crate::fsops::remove_tree(&e.path()) {
-                    first_err.get_or_insert(err);
+                match crate::fsops::remove_tree(&e.path()) {
+                    Ok(()) => {
+                        let mut info = e.file_name();
+                        info.push(".trashinfo");
+                        let _ = fs::remove_file(root.join("info").join(info));
+                    }
+                    Err(err) => {
+                        first_err.get_or_insert(err);
+                    }
+                }
+            }
+        }
+        // Records whose item is gone (orphans) can go.
+        if let Ok(rd) = fs::read_dir(root.join("info")) {
+            for e in rd.flatten() {
+                use std::os::unix::ffi::OsStrExt;
+                let name = e.file_name();
+                // Raw bytes: names need not be UTF-8.
+                let Some(item) = name.as_bytes().strip_suffix(b".trashinfo") else { continue };
+                if fs::symlink_metadata(root.join("files").join(std::ffi::OsStr::from_bytes(item))).is_err() {
+                    let _ = fs::remove_file(e.path());
                 }
             }
         }
@@ -505,6 +530,30 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
     }
 
+    // A failed delete must keep the item listed (and restorable), not leave
+    // an invisible file behind with its .trashinfo removed.
+    #[test]
+    fn empty_keeps_records_of_items_it_could_not_delete() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = sandbox("emptyfail");
+        let root = d.join("t");
+        fs::create_dir_all(root.join("files/locked/inner")).unwrap();
+        fs::write(root.join("files/locked/inner/f"), b"x").unwrap();
+        fs::write(root.join("files/gone.txt"), b"y").unwrap();
+        fs::create_dir_all(root.join("info")).unwrap();
+        fs::write(root.join("info/locked.trashinfo"), "[Trash Info]\nPath=/x/locked\n").unwrap();
+        fs::write(root.join("info/gone.txt.trashinfo"), "[Trash Info]\nPath=/x/gone.txt\n").unwrap();
+        fs::write(root.join("info/orphan.trashinfo"), "[Trash Info]\nPath=/x/orphan\n").unwrap();
+        fs::set_permissions(root.join("files/locked/inner"), fs::Permissions::from_mode(0o555)).unwrap();
+        let res = empty_in(&[root.clone()]);
+        fs::set_permissions(root.join("files/locked/inner"), fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(res.is_err());
+        assert!(root.join("info/locked.trashinfo").exists(), "record kept for what is still there");
+        assert!(!root.join("files/gone.txt").exists() && !root.join("info/gone.txt.trashinfo").exists());
+        assert!(!root.join("info/orphan.trashinfo").exists(), "orphan records are cleaned");
+        let _ = fs::remove_dir_all(&d);
+    }
+
     #[test]
     fn local_timestamp_shape() {
         let t = local_timestamp();
@@ -512,12 +561,10 @@ mod tests {
         assert_eq!(&t[10..11], "T");
     }
 
-    // Uses a private XDG_DATA_HOME on the same filesystem as the files.
+    // home_trash() is a private temp dir in tests, on the same filesystem.
     #[test]
     fn trash_restore_cycle_keeps_symlink_targets() {
         let d = sandbox("cycle");
-        std::env::set_var("XDG_DATA_HOME", d.join("data"));
-        fs::create_dir_all(d.join("data")).unwrap();
         fs::write(d.join("target.txt"), b"precious").unwrap();
         std::os::unix::fs::symlink(d.join("target.txt"), d.join("link")).unwrap();
 
@@ -541,9 +588,8 @@ mod tests {
         assert_ne!(a.trashed, b.trashed);
         let only_home = [home_trash()];
         assert!(list_in(&only_home).iter().any(|i| i.trashed == b.trashed));
-        empty_in(&only_home).unwrap();
-        assert!(fs::read_dir(home_trash().join("files")).unwrap().next().is_none());
-        std::env::remove_var("XDG_DATA_HOME");
+        let _ = restore(&a);
+        let _ = restore(&b);
         fs::remove_dir_all(&d).unwrap();
     }
 }

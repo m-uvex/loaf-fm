@@ -236,13 +236,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
     let single_path = &params.paths[0];
     let is_dir = single_path.is_dir();
 
-    let needs_archive = if !single {
-        true
-    } else if is_dir {
-        params.compress_folders
-    } else {
-        params.compress_files
-    };
+    let needs_archive = needs_archive(single, is_dir, &params);
 
     let (file_to_serve, serve_name, temp_file) = if needs_archive {
         let base = if single {
@@ -269,8 +263,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
             _ => "zip",
         };
 
-        let temp_dir = std::env::temp_dir().join(format!("loaf-share-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&temp_dir);
+        let temp_dir = private_share_dir().map_err(|e| format!("Could not prepare the share: {}", e))?;
         let archive_target = temp_dir.join(format!("{}.{}", base, ext));
 
         // Create the archive
@@ -475,12 +468,43 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
     Ok((share_id, direct_url))
 }
 
+/// Single items are served as-is unless compression is on for that kind;
+/// a password only protects an archive, so setting one always archives.
+fn needs_archive(single: bool, is_dir: bool, params: &CreateShareParams) -> bool {
+    let password_archive = !params.password.is_empty() && matches!(params.format.as_str(), "zip" | "7z");
+    !single || password_archive || if is_dir { params.compress_folders } else { params.compress_files }
+}
+
+/// Where share archives are built: a 0700 folder in the user's cache dir —
+/// on disk (the runtime dir is a small tmpfs; GB-sized shares would fail)
+/// and not world-writable /tmp, where another user could pre-create it.
+fn private_share_dir() -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+    let base = util::cache_home().join("loaf");
+    std::fs::create_dir_all(&base)?;
+    let dir = base.join(format!("share-{}", std::process::id()));
+    match std::fs::DirBuilder::new().mode(0o700).create(&dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(e) => return Err(e),
+    }
+    let m = std::fs::symlink_metadata(&dir)?;
+    if !m.is_dir() || m.uid() != unsafe { libc::getuid() } || m.mode() & 0o077 != 0 {
+        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "unsafe share folder"));
+    }
+    Ok(dir)
+}
+
+/// Random 64 bits for share ids and link tokens (anyone holding the link
+/// can download, so it must not be guessable from the time).
 fn rand_u64() -> u64 {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let pid = std::process::id() as u64;
-    now.as_nanos() as u64 ^ (pid << 32)
+    use std::io::Read;
+    let mut b = [0u8; 8];
+    if std::fs::File::open("/dev/urandom").and_then(|mut f| f.read_exact(&mut b)).is_ok() {
+        return u64::from_ne_bytes(b);
+    }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    now.as_nanos() as u64 ^ ((std::process::id() as u64) << 32)
 }
 
 fn run_file_server(
@@ -610,5 +634,39 @@ fn handle_http_client(
             }
             Err(_) => break,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn params(password: &str, format: &str) -> CreateShareParams {
+        CreateShareParams {
+            paths: vec![],
+            compress_folders: false,
+            compress_files: false,
+            format: format.into(),
+            password: password.into(),
+            expiration_hours: 0,
+            throttle_kbps: 0,
+        }
+    }
+
+    #[test]
+    fn a_password_always_protects_the_share() {
+        assert!(!needs_archive(true, false, &params("", "zip")), "plain single file is served as-is");
+        assert!(needs_archive(true, false, &params("secret", "zip")), "password must not be ignored");
+        assert!(needs_archive(true, true, &params("secret", "7z")));
+        assert!(needs_archive(false, false, &params("", "zip")), "several items are always archived");
+    }
+
+    #[test]
+    fn share_dir_is_private_and_tokens_differ() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = private_share_dir().unwrap();
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_ne!(rand_u64(), rand_u64());
+        let _ = std::fs::remove_dir(&dir);
     }
 }

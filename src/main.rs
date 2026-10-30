@@ -70,7 +70,7 @@ fn parse_args() -> Result<Args, String> {
         .paths
         .into_iter()
         .map(|p| {
-            if p.starts_with("file://") || p.starts_with('/') {
+            if p.starts_with("file://") || p.starts_with('/') || ["trash:", "recent:", "starred:"].iter().any(|s| p.starts_with(s)) {
                 p
             } else {
                 cwd.join(p).to_string_lossy().to_string()

@@ -25,7 +25,7 @@ class ThumbRunnable : public QObject, public QRunnable
 {
     Q_OBJECT
 public:
-    ThumbRunnable(const QByteArray &path, const QSize &requested, std::shared_ptr<std::atomic<bool>> cancelled);
+    ThumbRunnable(const QByteArray &path, const QSize &requested, bool tile, std::shared_ptr<std::atomic<bool>> cancelled);
     void run() override;
 
 Q_SIGNALS:
@@ -34,6 +34,7 @@ Q_SIGNALS:
 private:
     QByteArray m_path; // raw file name bytes
     QSize m_requested;
+    bool m_tile = false;
     std::shared_ptr<std::atomic<bool>> m_cancelled;
 };
 

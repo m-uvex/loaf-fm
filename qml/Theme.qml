@@ -61,6 +61,7 @@ Item {
     property string contextMenuMode: "full" // "full", "minimal", "custom"
     property var disabledMenuItems: ({})
     property bool hideTrashWhenEmpty: true
+    property string sidebarSize: "fit" // "fit", "comfortable", "compact"
     property string toolbarOperations: "auto" // "auto", "always", "hidden" -- back/forward buttons
     property bool showNewTabButton: true
     property bool showNewWindowButton: true
@@ -121,22 +122,13 @@ Item {
     property bool clickToRename: false
     property bool searchContents: false
 
-    FontLoader { id: fontReg; source: "qrc:/loaf/fonts/Phosphor.ttf" }
-    FontLoader { id: fontBold; source: "qrc:/loaf/fonts/Phosphor-Bold.ttf" }
-    FontLoader { id: fontFill; source: "qrc:/loaf/fonts/Phosphor-Fill.ttf" }
-    FontLoader { id: fontDuotone; source: "qrc:/loaf/fonts/Phosphor-Duotone.ttf" }
-    FontLoader { id: fontLight; source: "qrc:/loaf/fonts/Phosphor-Light.ttf" }
-    FontLoader { id: fontThin; source: "qrc:/loaf/fonts/Phosphor-Thin.ttf" }
+    // Only the weight in use is loaded (each file is ~0.5 MB; there are six).
+    readonly property string iconFontFile: ({ bold: "Phosphor-Bold", fill: "Phosphor-Fill", duotone: "Phosphor-Duotone",
+                                              light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
+    FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
 
     function getFontFamily() {
-        switch (phosphorWeight) {
-            case "bold": return (fontBold && fontBold.name) ? fontBold.name : "Phosphor-Bold";
-            case "fill": return (fontFill && fontFill.name) ? fontFill.name : "Phosphor-Fill";
-            case "duotone": return (fontDuotone && fontDuotone.name) ? fontDuotone.name : "Phosphor-Duotone";
-            case "light": return (fontLight && fontLight.name) ? fontLight.name : "Phosphor-Light";
-            case "thin": return (fontThin && fontThin.name) ? fontThin.name : "Phosphor-Thin";
-            default: return (fontReg && fontReg.name) ? fontReg.name : "Phosphor";
-        }
+        return iconFont.status === FontLoader.Ready ? iconFont.name : iconFontFile;
     }
 
     readonly property bool isDark: themeMode === "dark" ? true
@@ -2132,6 +2124,8 @@ Item {
         }
         value = readSetting("hideTrashWhenEmpty");
         if (value.length > 0) hideTrashWhenEmpty = (value === "true");
+        value = readSetting("sidebarSize");
+        if (value === "fit" || value === "comfortable" || value === "compact") sidebarSize = value;
         value = readSetting("toolbarOperations");
         if (value.length > 0) toolbarOperations = value;
         value = readSetting("showNewTabButton");
@@ -2191,6 +2185,7 @@ Item {
     onContextMenuModeChanged: writeSetting("contextMenuMode", contextMenuMode)
     onDisabledMenuItemsChanged: writeSetting("disabledMenuItems", JSON.stringify(disabledMenuItems))
     onHideTrashWhenEmptyChanged: writeSetting("hideTrashWhenEmpty", hideTrashWhenEmpty)
+    onSidebarSizeChanged: writeSetting("sidebarSize", sidebarSize)
     onToolbarOperationsChanged: writeSetting("toolbarOperations", toolbarOperations)
     onShowNewTabButtonChanged: writeSetting("showNewTabButton", showNewTabButton ? "true" : "false")
     onShowNewWindowButtonChanged: writeSetting("showNewWindowButton", showNewWindowButton ? "true" : "false")

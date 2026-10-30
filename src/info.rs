@@ -52,6 +52,25 @@ pub fn preview_language(ext: &str) -> &'static str {
 }
 
 /// Reads the head of a file; (text, truncated, looks_binary).
+/// Archive contents for Quick Look: (listing, truncated, note). Slow for
+/// large compressed archives; call from a worker thread.
+pub fn archive_preview(path: &Path) -> (String, bool, String) {
+    match archive::list(path, "") {
+        Ok(entries) => {
+            let total = entries.iter().filter(|e| !e.is_dir).count();
+            let mut lines: Vec<String> = entries
+                .iter()
+                .take(400)
+                .map(|e| if e.is_dir { format!("{}/", e.path) } else { format!("{}  ({})", e.path, util::format_size(e.size)) })
+                .collect();
+            lines.sort();
+            (lines.join("\n"), entries.len() > 400, format!("Archive · {} files", total))
+        }
+        Err(archive::ArchiveError::NeedPassword) => (String::new(), false, "Encrypted archive".into()),
+        Err(e) => (String::new(), false, e.to_string()),
+    }
+}
+
 pub fn read_head(path: &Path) -> (String, bool, bool) {
     let Ok(f) = fs::File::open(path) else { return (String::new(), false, false) };
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
@@ -106,23 +125,10 @@ pub fn quick_look(path: &Path) -> QuickLook {
         return q;
     }
     if archive::is_archive(path) {
+        // Listing may decompress the whole file (big .tar.gz): done later on a
+        // worker thread through archive_preview(), never here on the UI thread.
         q.kind = "archive".into();
-        match archive::list(path, "") {
-            Ok(entries) => {
-                let total = entries.iter().filter(|e| !e.is_dir).count();
-                let mut lines: Vec<String> = entries
-                    .iter()
-                    .take(400)
-                    .map(|e| if e.is_dir { format!("{}/", e.path) } else { format!("{}  ({})", e.path, util::format_size(e.size)) })
-                    .collect();
-                lines.sort();
-                q.text = lines.join("\n");
-                q.truncated = entries.len() > 400;
-                q.note = format!("Archive · {} files", total);
-            }
-            Err(archive::ArchiveError::NeedPassword) => q.note = "Encrypted archive".into(),
-            Err(e) => q.note = e.to_string(),
-        }
+        q.note = "Reading archive…".into();
         return q;
     }
     let (_, _, _, thumbable) = listing::classify(&name, false);

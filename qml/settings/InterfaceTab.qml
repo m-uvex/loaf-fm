@@ -26,7 +26,7 @@ ColumnLayout {
     readonly property bool matchIconStyle: matches("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze")
     readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
     readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
-    readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
+    readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal size fit window comfortable compact large small row height")
 
     readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
         + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0) + (matchMenus ? 1 : 0)
@@ -67,7 +67,9 @@ ColumnLayout {
             title: qsTr("Background opacity")
             subtitle: theme.lowPower
                 ? qsTr("Disabled in low-power mode")
-                : qsTr("Fades the window itself so the desktop shows through margins and gaps")
+                : (theme.backgroundOpacity < 0.999 && !nativeBridge.alphaBuffer
+                    ? qsTr("Restart Loaf to apply transparency")
+                    : qsTr("Fades the window itself so the desktop shows through margins and gaps"))
 
             LoafSlider {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
@@ -381,6 +383,25 @@ ColumnLayout {
                     variant: "tonal"
                     onClicked: if (typeof customizeContextMenuDialog !== "undefined") customizeContextMenuDialog.open()
                 }
+            }
+        }
+
+        SettingDivider {}
+
+        SettingRow {
+            icon: "rows"
+            title: qsTr("Sidebar size")
+            subtitle: qsTr("Fit shrinks rows so every place shows without scrolling; Comfortable and Compact keep a fixed size")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 300
+                options: [
+                    { value: "fit", label: qsTr("Fit to Window"), shortLabel: "Fit" },
+                    { value: "comfortable", label: qsTr("Comfortable"), shortLabel: "Big" },
+                    { value: "compact", label: qsTr("Compact"), shortLabel: "Small" }
+                ]
+                value: theme.sidebarSize
+                onSelected: function(v) { theme.sidebarSize = v; }
             }
         }
 

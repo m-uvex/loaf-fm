@@ -47,17 +47,6 @@ Item {
         root.opacity = 1.0;
     }
 
-    // Soft hover halo, revealed when the pointer is over the switch.
-    Rectangle {
-        anchors.fill: track
-        anchors.margins: -5
-        radius: theme.radiusFull
-        color: theme.primary
-        opacity: switchMouse.containsMouse ? (root.checked ? 0.16 : 0.09) : 0.0
-        visible: opacity > 0.01
-
-        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-    }
 
     RowLayout {
         anchors.fill: parent
@@ -77,6 +66,20 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredWidth: 46
             Layout.preferredHeight: 26
+            // Soft hover halo, revealed when the pointer is over the switch
+            // (a child drawn behind the track: anchors can't reach across the layout).
+            Rectangle {
+                z: -1
+                anchors.fill: parent
+                anchors.margins: -5
+                radius: theme.radiusFull
+                color: theme.primary
+                opacity: switchMouse.containsMouse ? (root.checked ? 0.16 : 0.09) : 0.0
+                visible: opacity > 0.01
+
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+            }
+
             radius: theme.radiusFull
             color: root.checked ? theme.primary : theme.surfaceContainerHighest
             border.width: root.checked ? 0 : 1

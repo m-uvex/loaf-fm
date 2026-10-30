@@ -461,9 +461,44 @@ pub fn set_starred(path: &Path, on: bool) -> std::io::Result<()> {
     util::write_atomic(&starred_file(), serde_json::to_string_pretty(&json).unwrap_or_default().as_bytes())
 }
 
+/// Starred paths after moving each `from` to `to` (items inside a moved
+/// folder follow it too).
+fn follow_moves(list: Vec<PathBuf>, pairs: &[(PathBuf, PathBuf)]) -> Vec<PathBuf> {
+    list.into_iter()
+        .map(|p| {
+            for (from, to) in pairs {
+                if let Ok(rest) = p.strip_prefix(from) {
+                    return if rest.as_os_str().is_empty() { to.clone() } else { to.join(rest) };
+                }
+            }
+            p
+        })
+        .collect()
+}
+
+/// Keeps stars on items that were moved or renamed.
+pub fn move_starred(pairs: &[(PathBuf, PathBuf)]) {
+    let list = starred();
+    let moved = follow_moves(list.clone(), pairs);
+    if moved != list {
+        let json: Vec<String> = moved.iter().map(|p| p.to_string_lossy().to_string()).collect();
+        let _ = util::write_atomic(&starred_file(), serde_json::to_string_pretty(&json).unwrap_or_default().as_bytes());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stars_follow_moved_items_and_folders() {
+        let list = vec![PathBuf::from("/a/x.txt"), PathBuf::from("/a/dir/in.txt"), PathBuf::from("/a/other")];
+        let pairs = vec![(PathBuf::from("/a/x.txt"), PathBuf::from("/b/x.txt")), (PathBuf::from("/a/dir"), PathBuf::from("/b/dir"))];
+        assert_eq!(
+            follow_moves(list, &pairs),
+            vec![PathBuf::from("/b/x.txt"), PathBuf::from("/b/dir/in.txt"), PathBuf::from("/a/other")]
+        );
+    }
 
     #[test]
     fn localized_user_dirs() {

@@ -54,7 +54,9 @@ pub fn is_image_ext(ext: &str) -> bool {
 }
 
 pub fn is_video_ext(ext: &str) -> bool {
-    matches!(ext, "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg" | "ogv" | "3gp" | "ts")
+    // Not "ts": far more often TypeScript than an MPEG-TS stream (those
+    // usually come as .m2ts/.mts from cameras).
+    matches!(ext, "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg" | "ogv" | "3gp" | "m2ts" | "mts")
 }
 
 pub fn is_audio_ext(ext: &str) -> bool {
@@ -228,6 +230,14 @@ pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
         "last" if a.is_dir != b.is_dir => return a.is_dir.cmp(&b.is_dir),
         _ if a.is_dir != b.is_dir => return b.is_dir.cmp(&a.is_dir),
         _ => {}
+    }
+    // By name, dot-names go after the others in their group (folders, then
+    // .folders, then files, then .files), as in Nautilus, in either direction.
+    if spec.key == "name" {
+        let (ha, hb) = (a.name.starts_with('.'), b.name.starts_with('.'));
+        if ha != hb {
+            return ha.cmp(&hb);
+        }
     }
     let by_name = || natural_cmp(&a.name, &b.name);
     let ord = match spec.key.as_str() {
@@ -468,6 +478,23 @@ mod tests {
         sort(&mut v, &SortSpec { key: "size".into(), ascending: false, folders: "last".into() });
         let names: Vec<_> = v.iter().map(|x| x.name.as_str()).collect();
         assert_eq!(names, vec!["a.txt", "b.txt", "Zdir", "adir"]);
+    }
+
+    #[test]
+    fn dot_names_sort_after_the_others_in_their_group() {
+        let mut v = vec![e(".git", true, 0), e("zeta", true, 0), e(".dotfile", false, 1), e("alpha.txt", false, 1), e("Alpha", true, 0)];
+        sort(&mut v, &SortSpec::default());
+        let names: Vec<_> = v.iter().map(|x| x.name.as_str()).collect();
+        assert_eq!(names, vec!["Alpha", "zeta", ".git", "alpha.txt", ".dotfile"]);
+        sort(&mut v, &SortSpec { key: "name".into(), ascending: false, folders: "first".into() });
+        let names: Vec<_> = v.iter().map(|x| x.name.as_str()).collect();
+        assert_eq!(names, vec!["zeta", "Alpha", ".git", "alpha.txt", ".dotfile"], "still last when reversed");
+    }
+
+    #[test]
+    fn typescript_is_code_not_video() {
+        assert_eq!(classify("app.ts", false).2, "code");
+        assert_eq!(classify("clip.m2ts", false).2, "video");
     }
 
     #[test]

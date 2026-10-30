@@ -197,22 +197,14 @@ Item {
 
     // ---- drive actions -----------------------------------------------------
 
+    // Shared with the sidebar (main.qml).
     function openDrive(d) {
-        if (pcView.isMounted(d)) {
-            window.showFiles();
-            engine.set_path(d.mount_point);
-        } else {
-            pcView.mountDrive(d);
-        }
+        window.openDrive(d, false);
     }
 
     function mountDrive(d) {
-        if (!d)
-            return;
-        if (d.is_locked)
-            core.unlock_drive(d.device, "", false); // keyring first, then asks
-        else
-            core.mount_drive(d.device);
+        if (d)
+            window.mountDrive(d);
     }
 
     function unmountDrive(d) {

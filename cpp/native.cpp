@@ -7,7 +7,12 @@
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QGuiApplication>
 #include <QLocale>
 #include <QMimeData>
@@ -41,6 +46,12 @@ static QStringList toLocalPaths(const QStringList &items)
     for (const QString &item : items) {
         if (item.isEmpty())
             continue;
+        // Loaf's own views (trash:///, recent:///, starred:///) pass through.
+        if (item.startsWith(QLatin1String("trash:")) || item.startsWith(QLatin1String("recent:"))
+            || item.startsWith(QLatin1String("starred:"))) {
+            out << item;
+            continue;
+        }
         const QUrl url = item.startsWith(QLatin1Char('/')) ? QUrl::fromLocalFile(item) : QUrl::fromUserInput(item);
         if (url.isLocalFile())
             out << QFileInfo(url.toLocalFile()).absoluteFilePath();
@@ -264,11 +275,34 @@ rust::String mime_comment_for(rust::Str mime)
     return toRust(db.mimeTypeForName(toQString(mime)).comment());
 }
 
+// True when the saved window opacity is below 1. Only then does the window
+// get an alpha channel: an opaque window lets the compositor skip blending
+// it every frame, which matters on integrated GPUs.
+static bool wantsAlphaBuffer()
+{
+    QString dir = qEnvironmentVariable("XDG_CONFIG_HOME");
+    if (dir.isEmpty())
+        dir = QDir::homePath() + QStringLiteral("/.config");
+    QFile f(dir + QStringLiteral("/loaf/config.json"));
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    const QJsonValue v = QJsonDocument::fromJson(f.readAll()).object().value(QStringLiteral("backgroundOpacity"));
+    bool ok = v.isDouble();
+    const double opacity = v.isString() ? v.toString().toDouble(&ok) : v.toDouble(1.0);
+    return ok && opacity < 0.999; // 0 (fully transparent) needs alpha too
+}
+
+static bool g_alphaBuffer = false;
+
+bool LoafNative::alphaBuffer() const
+{
+    return g_alphaBuffer;
+}
+
 void set_application_identity(rust::Str version)
 {
-    // Keep an alpha channel even when the window starts with a solid background;
-    // users can enable translucency later without recreating the window.
-    QQuickWindow::setDefaultAlphaBuffer(true);
+    g_alphaBuffer = wantsAlphaBuffer();
+    QQuickWindow::setDefaultAlphaBuffer(g_alphaBuffer);
     QCoreApplication::setApplicationVersion(toQString(version));
     QCoreApplication::setApplicationName(QStringLiteral("loaf"));
     QCoreApplication::setOrganizationName(QStringLiteral("loaf"));

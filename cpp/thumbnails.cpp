@@ -9,6 +9,8 @@
 #include <QImageReader>
 #include <QMimeDatabase>
 #include <QMutex>
+#include <QPainter>
+#include <QPainterPath>
 #include <QProcess>
 #include <QQuickImageResponse>
 #include <QRunnable>
@@ -232,6 +234,9 @@ public:
 
     QImage m_image;
     QString m_error;
+    // Grid/list tile: fill a square and round the corners here, once, so QML
+    // needs no offscreen mask layer per thumbnail.
+    bool m_tile = false;
 
     void produce()
     {
@@ -405,11 +410,33 @@ public:
     {
         if (img.isNull())
             return;
+        if (m_tile && m_requested.isValid() && !m_requested.isEmpty()) {
+            m_image = roundedTile(img, m_requested);
+            return;
+        }
         if (m_requested.isValid() && !m_requested.isEmpty()
             && (img.width() > m_requested.width() || img.height() > m_requested.height()))
             m_image = img.scaled(m_requested, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         else
             m_image = img;
+    }
+
+    // Scale to cover `size`, keep the centre, and clip to a rounded rect
+    // (radius ~1/6 of the side, matching theme.radiusM on a 48 px tile).
+    static QImage roundedTile(const QImage &img, const QSize &size)
+    {
+        const QImage scaled = img.scaled(size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+        const QRect src((scaled.width() - size.width()) / 2, (scaled.height() - size.height()) / 2, size.width(), size.height());
+        QImage out(size, QImage::Format_ARGB32_Premultiplied);
+        out.fill(Qt::transparent);
+        QPainter p(&out);
+        p.setRenderHint(QPainter::Antialiasing);
+        QPainterPath clip;
+        const qreal r = qMin(size.width(), size.height()) / 6.0;
+        clip.addRoundedRect(QRectF(0, 0, size.width(), size.height()), r, r);
+        p.setClipPath(clip);
+        p.drawImage(QPoint(0, 0), scaled, src);
+        return out;
     }
 
     QByteArray m_raw;
@@ -436,8 +463,8 @@ ThumbnailProvider::~ThumbnailProvider()
     m_pool.waitForDone();
 }
 
-ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, std::shared_ptr<std::atomic<bool>> cancelled)
-    : m_path(path), m_requested(requested), m_cancelled(std::move(cancelled))
+ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, bool tile, std::shared_ptr<std::atomic<bool>> cancelled)
+    : m_path(path), m_requested(requested), m_tile(tile), m_cancelled(std::move(cancelled))
 {
     setAutoDelete(true);
 }
@@ -445,13 +472,14 @@ ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, std
 void ThumbRunnable::run()
 {
     ThumbWork work(m_path, m_requested, *m_cancelled);
+    work.m_tile = m_tile;
     if (!m_cancelled->load() && !g_shutdown.load())
         work.produce();
     Q_EMIT done(work.m_image, work.m_error);
 }
 
-// id = hex(UTF-8/raw path bytes) "-" mtime; hex keeps any byte sequence
-// (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
+// id = hex(UTF-8/raw path bytes) "-" mtime [ "/tile" ]; hex keeps any byte
+// sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
 static QByteArray pathFromId(const QString &id)
 {
     const int dash = id.indexOf(QLatin1Char('-'));
@@ -463,7 +491,8 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, 
 {
     auto cancelled = std::make_shared<std::atomic<bool>>(false);
     auto *response = new ThumbResponse(cancelled);
-    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cancelled);
+    const bool tile = id.endsWith(QLatin1String("/tile"));
+    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, tile, cancelled);
     QObject::connect(runnable, &ThumbRunnable::done, response, &ThumbResponse::handleDone, Qt::QueuedConnection);
     m_pool.start(runnable);
     return response;

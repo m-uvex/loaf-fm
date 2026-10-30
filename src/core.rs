@@ -51,6 +51,12 @@ pub mod qobject {
         fn dir_size_ready(self: Pin<&mut LoafCore>, key: QString, info_json: QString);
         #[qsignal]
         fn starred_changed(self: Pin<&mut LoafCore>);
+        /// Something changed in a trash folder (also changes made by other apps).
+        #[qsignal]
+        fn trash_changed(self: Pin<&mut LoafCore>);
+        /// Quick Look archive listing finished: {path, text, truncated, note}.
+        #[qsignal]
+        fn archive_preview_ready(self: Pin<&mut LoafCore>, json: QString);
         #[qsignal]
         fn smb_mounted(self: Pin<&mut LoafCore>, profile_id: QString, path: QString);
         #[qsignal]
@@ -184,6 +190,15 @@ pub mod qobject {
         fn set_permissions(self: Pin<&mut LoafCore>, path: &QString, mode: i32, recursive: bool) -> QString;
         #[qinvokable]
         fn is_archive_file(self: &LoafCore, path: &QString) -> bool;
+        /// Lists an archive for Quick Look on a worker; answers with archive_preview_ready.
+        #[qinvokable]
+        fn start_archive_preview(self: Pin<&mut LoafCore>, path: &QString);
+        /// Icon URL of the app a .desktop file launches ("" if none).
+        #[qinvokable]
+        fn desktop_icon(self: &LoafCore, path: &QString, theme_name: &QString) -> QString;
+        /// Whether two paths are on the same filesystem (drag: move vs copy).
+        #[qinvokable]
+        fn same_device(self: &LoafCore, a: &QString, b: &QString) -> bool;
         #[qinvokable]
         fn mime_type(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -248,7 +263,6 @@ use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, w
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -362,16 +376,20 @@ pub struct CoreRust {
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
     color_watcher: Option<watcher::DirWatcher>,
+    /// One per trash `files/` folder (home and each drive).
+    trash_watchers: Vec<watcher::DirWatcher>,
 }
 
 impl Default for CoreRust {
     fn default() -> Self {
         Self {
-            is_dark: theme::detect_system_dark_mode(),
+            // Last known values: detecting them spawns gsettings/gdbus, which must
+            // not block the first frame. refresh_system_theme() corrects them.
+            is_dark: state::get_bool("systemDark", false),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
             device_type: QString::from(theme::detect_device_type()),
-            icon_theme: QString::from("hicolor"),
+            icon_theme: QString::from(&*state::get_or("systemIconTheme", "hicolor")),
             drives_json: QString::from("[]"),
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
@@ -394,6 +412,7 @@ impl Default for CoreRust {
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
             color_watcher: None,
+            trash_watchers: Vec::new(),
         }
     }
 }
@@ -531,7 +550,9 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
         if !shown_paths.insert(path.to_string_lossy().to_string()) {
             continue;
         }
-        let exists = path.is_dir();
+        // Bookmarks on a network share aren't stat-ed at startup (a dead
+        // server would freeze the window); they show as present.
+        let exists = util::on_network_fs(&path) || path.is_dir();
         items.push(serde_json::json!({
             "id": format!("bookmark:{}", path.to_string_lossy()),
             "kind": "bookmark",
@@ -745,6 +766,40 @@ impl qobject::LoafCore {
         self.as_mut().set_redo_text(q(&r));
     }
 
+    /// Watches every trash folder so emptying or trashing from another app
+    /// (Nautilus) shows up here too. Re-run when drives are (un)mounted.
+    fn watch_trash(self: Pin<&mut Self>) {
+        static GENERATION: AtomicU64 = AtomicU64::new(0);
+        let gen = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+        let thread = self.qt_thread();
+        // Finding the trash folders stats every mount: keep it off the UI thread.
+        std::thread::spawn(move || {
+            let dirs = trash::all_trash_dirs();
+            let _ = thread.queue(move |mut core| {
+                // A slower, older scan must not replace a newer list.
+                if GENERATION.load(Ordering::SeqCst) != gen {
+                    return;
+                }
+                // Free the old inotify instances first (per-user limit).
+                core.as_mut().rust_mut().trash_watchers.clear();
+                let mut watchers = Vec::new();
+                for dir in dirs {
+                    let t = core.qt_thread();
+                    if let Some(w) = watcher::DirWatcher::new(move || {
+                        let _ = t.queue(|mut core| {
+                            core.as_mut().update_trash_empty();
+                            core.as_mut().trash_changed();
+                        });
+                    }) {
+                        w.watch(&dir.join("files"));
+                        watchers.push(w);
+                    }
+                }
+                core.as_mut().rust_mut().trash_watchers = watchers;
+            });
+        });
+    }
+
     fn update_trash_empty(self: Pin<&mut Self>) {
         let thread = self.qt_thread();
         std::thread::spawn(move || {
@@ -780,8 +835,12 @@ impl qobject::LoafCore {
             let _ = thread.queue(move |mut core| {
                 if *core.is_dark() != dark {
                     core.as_mut().set_is_dark(dark);
+                    state::set_bool("systemDark", dark);
                 }
-                core.as_mut().set_icon_theme(q(&icon_theme));
+                if core.icon_theme().to_string() != icon_theme {
+                    core.as_mut().set_icon_theme(q(&icon_theme));
+                    state::set("systemIconTheme", &icon_theme);
+                }
             });
         });
     }
@@ -794,6 +853,21 @@ impl qobject::LoafCore {
         }
         self.as_mut().set_wallpaper_colors_json(q(&content));
         true
+    }
+
+    pub fn desktop_icon(&self, path: &QString, theme_name: &QString) -> QString {
+        let Some(app) = apps::parse_desktop_file(Path::new(&path.to_string()), "") else { return QString::default() };
+        if app.icon.is_empty() {
+            return QString::default();
+        }
+        if app.icon.starts_with('/') {
+            return if Path::new(&app.icon).is_file() {
+                q(&format!("file://{}", trash::encode_path(Path::new(&app.icon))))
+            } else {
+                QString::default()
+            };
+        }
+        self.resolve_icon(theme_name, &q(&app.icon))
     }
 
     pub fn resolve_icon(&self, theme_name: &QString, name: &QString) -> QString {
@@ -985,9 +1059,26 @@ impl qobject::LoafCore {
         });
     }
 
+    /// Like drive_job, but reports where `device` got mounted, so the UI can
+    /// open it (clicking an unmounted drive used to need a second click).
+    fn mount_job<F>(self: Pin<&mut Self>, device: String, title: String, work: F)
+    where
+        F: FnOnce() -> Result<String, String> + Send + 'static,
+    {
+        self.spawn_op("drive", title, move |_op| {
+            let r = work();
+            let mut o = match &r {
+                Ok(_) => Outcome::ok(""),
+                Err(e) => Outcome::err(e.clone()),
+            };
+            o.result = serde_json::json!({"reload_drives": true, "device": device, "mounted": r.unwrap_or_default()});
+            o
+        });
+    }
+
     pub fn mount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
-        self.drive_job(format!("Mounting {}", dev), move || drives::mount(&dev).map(|_| String::new()));
+        self.mount_job(dev.clone(), format!("Mounting {}", dev), move || drives::mount(&dev));
     }
 
     pub fn unmount_drive(self: Pin<&mut Self>, device: &QString) {
@@ -1014,13 +1105,13 @@ impl qobject::LoafCore {
             }
         }
         let thread = self.qt_thread();
-        self.drive_job(format!("Unlocking {}", dev.clone()), move || match drives::unlock(&dev, &pass) {
+        let ui_dev = dev.clone();
+        self.mount_job(ui_dev, format!("Unlocking {}", dev.clone()), move || match drives::unlock(&dev, &pass) {
             Ok(clear) => {
                 if remember {
                     secret_store(&format!("luks:{}", dev), &format!("Loaf: encrypted drive {}", dev), &pass);
                 }
-                let _ = drives::mount(&clear);
-                Ok(String::new())
+                drives::mount(&clear)
             }
             Err(e) => {
                 let dev2 = dev.clone();
@@ -1298,7 +1389,7 @@ impl qobject::LoafCore {
     }
 
     fn app_entry(app: &apps::DesktopApp, theme_name: &str) -> serde_json::Value {
-        let icon = if app.icon.starts_with('/') {
+        let icon = if app.icon.starts_with('/') && Path::new(&app.icon).is_file() {
             format!("file://{}", trash::encode_path(Path::new(&app.icon)))
         } else {
             icons::resolve(theme_name, &app.icon, 32)
@@ -1340,19 +1431,14 @@ impl qobject::LoafCore {
         let recent: Vec<&apps::DesktopApp> =
             recent_ids.iter().filter_map(|id| installed.iter().find(|a| &a.id == id)).collect();
 
-        let mut used: HashSet<&str> = HashSet::new();
-        for app in recent.iter().chain(recommended.iter()) {
-            used.insert(app.id.as_str());
-        }
-        let others: Vec<&apps::DesktopApp> =
-            installed.iter().filter(|a| !a.no_display && !used.contains(a.id.as_str())).collect();
-
+        // "Other Applications" is fetched with all_open_with_apps() only when that
+        // submenu opens: resolving ~200 app icons on every right-click is slow.
         let payload = serde_json::json!({
             "mime": mime,
             "defaultId": default_id,
             "recommended": recommended.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
             "recent": recent.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
-            "others": others.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
+            "hasOthers": installed.iter().any(|a| !a.no_display),
         });
         q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()))
     }
@@ -1549,6 +1635,25 @@ impl qobject::LoafCore {
 
     pub fn is_archive_file(&self, path: &QString) -> bool {
         archive::is_archive(Path::new(&path.to_string()))
+    }
+
+    pub fn start_archive_preview(self: Pin<&mut Self>, path: &QString) {
+        let path = path.to_string();
+        let thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let (text, truncated, note) = info::archive_preview(Path::new(&path));
+            let json = serde_json::json!({"path": path, "text": text, "truncated": truncated, "note": note}).to_string();
+            let _ = thread.queue(move |mut core| core.as_mut().archive_preview_ready(q(&json)));
+        });
+    }
+
+    pub fn same_device(&self, a: &QString, b: &QString) -> bool {
+        use std::os::unix::fs::MetadataExt;
+        // The dragged item itself (a link is moved as a link), but the
+        // folder it lands in followed through links (~/Stick -> USB drive).
+        let a = std::fs::symlink_metadata(a.to_string()).map(|m| m.dev()).ok();
+        let b = std::fs::metadata(b.to_string()).map(|m| m.dev()).ok();
+        matches!((a, b), (Some(x), Some(y)) if x == y)
     }
 
     pub fn mime_type(&self, path: &QString) -> QString {
@@ -1765,8 +1870,11 @@ impl qobject::LoafCore {
         let target = fsops::unique_name(&parent, &format!("{}.{}", base, ext));
         let title = format!("Compressing into “{}”", file_name(&target));
         self.spawn_op("compress", title, move |op| {
-            // Items from other folders can't share relative names: skip them.
+            // Items from other folders can't share relative names: they are
+            // left out, and the result says so instead of claiming success.
+            let total = items.len();
             let items: Vec<PathBuf> = items.into_iter().filter(|p| p.parent() == Some(parent.as_path())).collect();
+            let left_out = total - items.len();
             // Build inside a private staging folder so a cancelled or failed
             // run never leaves a broken archive, and two runs never write
             // into the same file. Then move it to a free name.
@@ -1781,7 +1889,15 @@ impl qobject::LoafCore {
             match built {
                 Ok(target) => {
                     fsops::sync_filesystem(&target);
-                    let mut o = Outcome::ok(format!("Created “{}”", file_name(&target)));
+                    let mut o = if left_out == 0 {
+                        Outcome::ok(format!("Created “{}”", file_name(&target)))
+                    } else {
+                        Outcome::err(format!(
+                            "Created “{}”, but {} from other folders could not be included",
+                            file_name(&target),
+                            plural(left_out, "item", "items")
+                        ))
+                    };
                     o.undo = Some(UndoEntry { label: "Compress".into(), action: UndoAction::Create(vec![target.clone()]) });
                     o.result = serde_json::json!({"created": [target.to_string_lossy()]});
                     o
@@ -1908,10 +2024,7 @@ impl qobject::LoafCore {
         }
         match std::fs::rename(&from, &to) {
             Ok(()) => {
-                if xdg::starred().contains(&from) {
-                    let _ = xdg::set_starred(&from, false);
-                    let _ = xdg::set_starred(&to, true);
-                }
+                xdg::move_starred(&[(from.clone(), to.clone())]);
                 self.as_mut().record_undo(UndoEntry { label: "Rename".into(), action: UndoAction::Rename(vec![(from, to)]) });
                 QString::default()
             }
@@ -2204,6 +2317,7 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
         }
         finished.push((from.clone(), to.clone()));
     }
+    xdg::move_starred(&finished);
     Ok(())
 }
 
@@ -2213,6 +2327,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
     let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut skipped = 0;
+    let mut merged = 0;
     for src in &sources {
         if op.cancelled() {
             break;
@@ -2228,6 +2343,19 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         }
         let plain = dest.join(&name);
         let exists = std::fs::symlink_metadata(&plain).is_ok();
+        // Merge: folder onto folder combines them; other clashes keep both.
+        let both_dirs = exists && plain.is_dir() && src.is_dir() && !plain.is_symlink() && !src.is_symlink();
+        if res == "merge" && both_dirs && mode != "link" && !same_dir {
+            // No undo pair: undoing a "copy" of the merged folder would trash
+            // the whole destination. Counted so the drive still gets synced.
+            match fsops::merge_into(src, &plain, mode == "move", op) {
+                Ok(()) => merged += 1,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => break,
+                Err(e) => errors.push(format!("{}: {}", name, e)),
+            }
+            continue;
+        }
+        let res = if res == "merge" { "rename" } else { res };
         let (target, overwrite) = if same_dir || (exists && res == "rename") {
             (fsops::unique_name(&dest, &name), false)
         } else if exists && res == "skip" {
@@ -2259,7 +2387,10 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             Err(e) => errors.push(format!("{}: {}", name, e)),
         }
     }
-    if mode != "link" && !pairs.is_empty() && needs_sync(&dest) {
+    if mode == "move" && !pairs.is_empty() {
+        xdg::move_starred(&pairs);
+    }
+    if mode != "link" && (!pairs.is_empty() || merged > 0) && needs_sync(&dest) {
         *util::lock(&op.current) = "Writing to the drive…".into();
         op.publish_soon();
         fsops::sync_filesystem(&dest);
@@ -2273,6 +2404,9 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
     };
     let mut o = if errors.is_empty() {
         let mut msg = if n == 0 { String::new() } else { format!("{} {}", verb, plural(n, "item", "items")) };
+        if merged > 0 {
+            msg.push_str(&format!("{}Merged {}", if msg.is_empty() { "" } else { ", " }, plural(merged, "folder", "folders")));
+        }
         if skipped > 0 {
             msg.push_str(&format!("{}{} skipped", if msg.is_empty() { "" } else { ", " }, skipped));
         }
@@ -2364,7 +2498,11 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                 let err = if std::fs::symlink_metadata(from).is_ok() {
                     Some(format!("“{}” exists again at its old place", file_name(from)))
                 } else {
-                    fsops::move_path(to, from, op).err().map(|e| format!("{}: {}", file_name(to), e))
+                    let r = fsops::move_path(to, from, op);
+                    if r.is_ok() {
+                        xdg::move_starred(&[(to.clone(), from.clone())]);
+                    }
+                    r.err().map(|e| format!("{}: {}", file_name(to), e))
                 };
                 if let Some(e) = err {
                     return Partial::stopped(
@@ -2449,6 +2587,7 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
                         format!("{}: {}", file_name(from), e),
                     );
                 }
+                xdg::move_starred(&[(from.clone(), to.clone())]);
             }
             Partial::done(action.clone())
         }
@@ -2486,8 +2625,13 @@ impl cxx_qt::Initialize for qobject::LoafCore {
         });
         let t = self.qt_thread();
         let dw = watcher::DeviceWatcher::new(move || {
-            let _ = t.queue(|core| core.load_drives());
+            let _ = t.queue(|mut core| {
+                core.as_mut().load_drives();
+                core.as_mut().watch_trash();
+                core.as_mut().update_trash_empty();
+            });
         });
+        self.as_mut().watch_trash();
         self.as_mut().rust_mut().device_watcher = dw;
         // Follow wallpaper palette changes without polling.
         let t2 = self.qt_thread();

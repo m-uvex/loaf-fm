@@ -107,6 +107,9 @@ pub mod qobject {
         fn go_forward(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn refresh(self: Pin<&mut LoafEngine>);
+        /// Drops rows whose file is gone (search results after a move/delete).
+        #[qinvokable]
+        fn prune_missing(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn open_trash(self: Pin<&mut LoafEngine>);
         #[qinvokable]
@@ -240,7 +243,9 @@ impl Loc {
         if !path.is_absolute() {
             return None;
         }
-        if path.is_dir() {
+        // Don't stat on a network mount here (UI thread; a dead server hangs
+        // it): the scan worker reports a missing folder instead.
+        if util::on_network_fs(&path) || path.is_dir() {
             return Some(Loc::Dir(path));
         }
         if path.is_file() && archive::is_archive(&path) {
@@ -706,7 +711,8 @@ impl qobject::LoafEngine {
         let gen_ref = self.generation.clone();
         let loc = self.loc.clone();
         let spec = self.sort_spec();
-        let archive_cache = self.archive_cache.clone();
+        // The cached listing can be large: only copy it when browsing an archive.
+        let archive_cache = if matches!(loc, Loc::Archive { .. }) { self.archive_cache.clone() } else { None };
         let thread = self.qt_thread();
         if reset {
             // Show the new location right away instead of the old rows.
@@ -850,12 +856,25 @@ impl qobject::LoafEngine {
         self.jump(true);
     }
 
+    pub fn prune_missing(mut self: Pin<&mut Self>) {
+        let before = self.all.len();
+        // Never stat results on network mounts here (UI thread).
+        let mounts = util::mount_table();
+        self.as_mut().rust_mut().all.retain(|e| {
+            let p = Path::new(&e.path);
+            util::on_network_fs_in(p, &mounts) || std::fs::symlink_metadata(p).is_ok()
+        });
+        if self.all.len() != before {
+            self.refilter(false);
+        }
+    }
+
     pub fn refresh(self: Pin<&mut Self>) {
         match self.loc.clone() {
             Loc::Search { root, query, contents } => {
                 self.run_search(root, query, contents);
             }
-            Loc::Dir(p) if !p.is_dir() => {
+            Loc::Dir(p) if !util::on_network_fs(&p) && !p.is_dir() => {
                 // The folder vanished: go to the nearest existing parent.
                 let mut up = p.clone();
                 while !up.is_dir() {

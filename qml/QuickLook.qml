@@ -14,10 +14,20 @@ LoafPopup {
     // Window shortcuts are blocked while a modal popup is open, so Space
     // (which opened Quick Look) needs its own shortcut to close it again.
     Shortcut { sequence: "Space"; enabled: quickLook.visible; onActivated: quickLook.close() }
+    // "Press Enter to open it": the window's own Enter handling is blocked
+    // while this modal popup is open.
+    Shortcut {
+        sequences: ["Return", "Enter"]
+        enabled: quickLook.visible && (quickLook.info.path || "").length > 0
+        // Same as Enter in the file view: folders and archives open inside
+        // Loaf, and the Trash keeps its own rules.
+        onActivated: { quickLook.close(); window.activePane.openSelected(); }
+    }
 
+    // No resting scale/opacity of 0: with animations off (reduce motion,
+    // low-power) the enter transition is skipped, and the popup would stay
+    // invisible while still blocking the window.
     transformOrigin: Item.Center
-    scale: 0.15
-    opacity: 0.0
 
     enter: Transition {
         enabled: theme.animate
@@ -43,6 +53,8 @@ LoafPopup {
     readonly property bool isCode: info.language !== undefined
         && info.language !== "" && info.language !== "text"
     readonly property bool isMarkdown: info.language === "markdown"
+    // Played with AnimatedImage (the thumbnail provider only gives a still frame).
+    readonly property bool isGif: info.kind === "image" && /\.gif$/i.test(String(info.name || ""))
 
     readonly property bool isAudio: info.kind === "media"
         && /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|wma)$/i.test(String(info.name || ""))
@@ -51,6 +63,22 @@ LoafPopup {
         return info.kind === "archive" ? "file-zip" : info.kind === "folder" ? "folder"
             : (info.kind === "image" ? "image"
             : (info.kind === "media" ? (isAudio ? "music" : "video") : "file-text"));
+    }
+
+    // The archive listing arrives later from a worker thread.
+    Connections {
+        target: core
+        function onArchive_preview_ready(json) {
+            var r = JSON.parse(json);
+            if (r.path !== quickLook.info.path)
+                return;
+            var next = Object.assign({}, quickLook.info);
+            next.text = r.text;
+            next.truncated = r.truncated;
+            next.note = r.note;
+            quickLook.info = next;
+            quickLook.previewHtml = quickLook.buildPreviewHtml();
+        }
     }
 
     function fallbackIcon() {
@@ -70,7 +98,13 @@ LoafPopup {
         }
         info = JSON.parse(raw);
         imageFailed = false;
+        if (info.kind === "archive")
+            core.start_archive_preview(path);
         previewHtml = buildPreviewHtml();
+        // The exit transition leaves opacity/scale low; with animations off the
+        // enter transition won't restore them.
+        opacity = 1;
+        scale = 1;
         openAt((window.width - width) / 2, (window.height - height) / 2);
     }
 
@@ -290,11 +324,22 @@ LoafPopup {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
+            AnimatedImage {
+                anchors.fill: parent
+                anchors.margins: 4
+                visible: quickLook.isGif
+                source: visible ? (quickLook.info.image_url || "") : ""
+                playing: visible && quickLook.visible
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
             Image {
                 id: quickLookImage
                 anchors.fill: parent
                 anchors.margins: 4
-                source: quickLook.info.kind === "image"
+                visible: !quickLook.isGif
+                source: quickLook.isGif ? "" : quickLook.info.kind === "image"
                     ? ((quickLook.imageFailed && quickLook.info.thumb_id) ? ("image://thumb/" + quickLook.info.thumb_id) : (quickLook.info.image_url || ""))
                     : ((quickLook.info.kind === "thumbnail" || quickLook.info.kind === "media") && quickLook.info.thumb_id ? ("image://thumb/" + quickLook.info.thumb_id) : "")
                 sourceSize.width: 1024

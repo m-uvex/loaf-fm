@@ -21,7 +21,9 @@ const DIR_MASK: u32 = libc::IN_CREATE
     | libc::IN_MOVED_FROM
     | libc::IN_MOVED_TO
     | libc::IN_CLOSE_WRITE
-    | libc::IN_MODIFY
+    // No IN_MODIFY: it fires for every write while a file grows (downloads),
+    // rescanning the folder nonstop. Trade-off: a file still being written
+    // shows its new size once it is closed.
     | libc::IN_ATTRIB
     | libc::IN_DELETE_SELF
     | libc::IN_MOVE_SELF;
@@ -60,8 +62,26 @@ fn drain(fd: i32) {
     }
 }
 
+/// eventfd used to wake a watcher thread blocked in poll() so it can stop.
+fn new_waker() -> i32 {
+    unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) }
+}
+
+fn wake(efd: i32) {
+    let one: u64 = 1;
+    unsafe {
+        libc::write(efd, &one as *const u64 as *const libc::c_void, 8);
+    }
+}
+
+/// poll() timeout: sleep until an event arrives, but tick while a change is pending.
+fn timeout_ms(pending: bool) -> i32 {
+    if pending { 50 } else { -1 }
+}
+
 pub struct DirWatcher {
     fd: i32,
+    efd: i32,
     wd: Arc<AtomicI32>,
     stop: Arc<AtomicBool>,
     /// Minimum gap between two notifications (ms); raised for huge folders.
@@ -77,6 +97,11 @@ impl DirWatcher {
         if fd < 0 {
             return None;
         }
+        let efd = new_waker();
+        if efd < 0 {
+            unsafe { libc::close(fd) };
+            return None;
+        }
         let stop = Arc::new(AtomicBool::new(false));
         let wd = Arc::new(AtomicI32::new(-1));
         let min_interval = Arc::new(AtomicU64::new(250));
@@ -88,9 +113,12 @@ impl DirWatcher {
                 let mut last_event = Instant::now();
                 let mut last_fire = Instant::now() - Duration::from_secs(10);
                 while !stop_t.load(Ordering::Relaxed) {
-                    let mut pfd = libc::pollfd { fd, events: libc::POLLIN, revents: 0 };
-                    let ready = unsafe { libc::poll(&mut pfd, 1, 100) };
-                    if ready > 0 && pfd.revents & libc::POLLIN != 0 && drain_events(fd, wd_t.load(Ordering::SeqCst)) {
+                    let mut fds = [
+                        libc::pollfd { fd, events: libc::POLLIN, revents: 0 },
+                        libc::pollfd { fd: efd, events: libc::POLLIN, revents: 0 },
+                    ];
+                    let ready = unsafe { libc::poll(fds.as_mut_ptr(), 2, timeout_ms(first_dirty.is_some())) };
+                    if ready > 0 && fds[0].revents & libc::POLLIN != 0 && drain_events(fd, wd_t.load(Ordering::SeqCst)) {
                         last_event = Instant::now();
                         first_dirty.get_or_insert(last_event);
                     }
@@ -108,7 +136,7 @@ impl DirWatcher {
                 }
             })
             .ok()?;
-        Some(DirWatcher { fd, wd, stop, min_interval_ms: min_interval, thread: Some(thread) })
+        Some(DirWatcher { fd, efd, wd, stop, min_interval_ms: min_interval, thread: Some(thread) })
     }
 
     /// Switches the watch to `dir` (only one folder is watched at a time).
@@ -137,11 +165,13 @@ impl DirWatcher {
 impl Drop for DirWatcher {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        wake(self.efd);
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
         unsafe {
             libc::close(self.fd);
+            libc::close(self.efd);
         }
     }
 }
@@ -149,6 +179,7 @@ impl Drop for DirWatcher {
 /// Watches `/dev/disk/by-uuid` (drives appearing/disappearing) and
 /// `/proc/self/mountinfo` (mounts changing).
 pub struct DeviceWatcher {
+    efd: i32,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
@@ -171,6 +202,16 @@ impl DeviceWatcher {
         }
         let mounts = CString::new("/proc/self/mountinfo").ok()?;
         let mfd = unsafe { libc::open(mounts.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
+        let efd = new_waker();
+        if efd < 0 {
+            unsafe {
+                libc::close(ino);
+                if mfd >= 0 {
+                    libc::close(mfd);
+                }
+            }
+            return None;
+        }
         let stop = Arc::new(AtomicBool::new(false));
         let stop_t = stop.clone();
         let thread = std::thread::Builder::new()
@@ -178,12 +219,14 @@ impl DeviceWatcher {
             .spawn(move || {
                 let mut dirty: Option<Instant> = None;
                 while !stop_t.load(Ordering::Relaxed) {
+                    // A negative fd is ignored by poll(), so a missing mountinfo is fine.
                     let mut fds = [
                         libc::pollfd { fd: ino, events: libc::POLLIN, revents: 0 },
                         libc::pollfd { fd: mfd, events: libc::POLLPRI, revents: 0 },
+                        libc::pollfd { fd: efd, events: libc::POLLIN, revents: 0 },
                     ];
                     let n = if mfd >= 0 { 2 } else { 1 };
-                    let ready = unsafe { libc::poll(fds.as_mut_ptr(), n, 200) };
+                    let ready = unsafe { libc::poll(fds.as_mut_ptr(), 3, timeout_ms(dirty.is_some())) };
                     if ready > 0 {
                         if fds[0].revents & libc::POLLIN != 0 {
                             drain(ino);
@@ -213,15 +256,19 @@ impl DeviceWatcher {
                 }
             })
             .ok()?;
-        Some(DeviceWatcher { stop, thread: Some(thread) })
+        Some(DeviceWatcher { efd, stop, thread: Some(thread) })
     }
 }
 
 impl Drop for DeviceWatcher {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        wake(self.efd);
         if let Some(t) = self.thread.take() {
             let _ = t.join();
+        }
+        unsafe {
+            libc::close(self.efd);
         }
     }
 }

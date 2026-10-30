@@ -25,7 +25,9 @@ pub struct DesktopApp {
     pub path: PathBuf,
 }
 
-static APPS: Mutex<Option<Vec<DesktopApp>>> = Mutex::new(None);
+/// (application folders' newest mtime, apps) — rescanned when an app is
+/// installed or removed while Loaf runs (the folders' mtime changes).
+static APPS: Mutex<Option<(std::time::SystemTime, Vec<DesktopApp>)>> = Mutex::new(None);
 
 /// Application folders in lookup priority order (user first).
 pub fn app_dirs() -> Vec<PathBuf> {
@@ -145,17 +147,25 @@ fn scan_dir(dir: &Path, prefix: &str, seen: &mut HashSet<String>, out: &mut Vec<
 
 /// All installed applications (cached).
 pub fn all() -> Vec<DesktopApp> {
+    let dirs = app_dirs();
+    let stamp = dirs
+        .iter()
+        .filter_map(|d| fs::metadata(d).and_then(|m| m.modified()).ok())
+        .max()
+        .unwrap_or(std::time::UNIX_EPOCH);
     let mut guard = lock(&APPS);
-    if let Some(apps) = guard.as_ref() {
-        return apps.clone();
+    if let Some((cached_stamp, apps)) = guard.as_ref() {
+        if *cached_stamp == stamp {
+            return apps.clone();
+        }
     }
     let mut seen = HashSet::new();
     let mut apps = Vec::new();
-    for dir in app_dirs() {
+    for dir in dirs {
         scan_dir(&dir, "", &mut seen, &mut apps);
     }
     apps.sort_by_key(|a| a.name.to_lowercase());
-    *guard = Some(apps.clone());
+    *guard = Some((stamp, apps.clone()));
     apps
 }
 

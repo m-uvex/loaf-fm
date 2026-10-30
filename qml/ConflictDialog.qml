@@ -35,7 +35,7 @@ LoafDialog {
         Layout.fillWidth: true
         text: dlg.conflicts.length === 1
             ? (dlg.conflicts[0].is_dir && dlg.conflicts[0].src_is_dir
-                ? qsTr("A folder with this name already exists. Replacing it removes its current contents.")
+                ? qsTr("A folder with this name already exists. Merge combines both folders; Replace moves the existing one to the trash.")
                 : qsTr("An item with this name already exists in the destination."))
             : qsTr("Choose what to do with all of them. Items without a conflict are transferred normally.")
         color: theme.textMuted
@@ -82,6 +82,13 @@ LoafDialog {
         Item { Layout.fillWidth: true }
         LoafButton { text: qsTr("Skip"); variant: "tonal"; onClicked: dlg.apply("skip") }
         LoafButton { text: qsTr("Keep Both"); variant: "tonal"; onClicked: dlg.apply("rename") }
+        // Folder onto folder: combine them; nothing in the destination is overwritten.
+        LoafButton {
+            visible: dlg.conflicts.some(function(c) { return c.is_dir && c.src_is_dir; })
+            text: qsTr("Merge")
+            variant: "tonal"
+            onClicked: dlg.apply("merge")
+        }
         LoafButton { text: qsTr("Replace"); variant: "filled"; onClicked: dlg.apply("overwrite") }
     }
 }

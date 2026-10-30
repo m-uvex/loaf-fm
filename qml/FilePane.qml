@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import app.loaf
 
 // One file view (grid + list) bound to its own LoafEngine model. Used for
@@ -45,6 +44,16 @@ Item {
         // hidden items must not stay selected (Delete would hit them).
         onFilter_textChanged: Qt.callLater(pane.trimSelection)
         onShow_hiddenChanged: Qt.callLater(pane.trimSelection)
+    }
+
+    // Trash on other drives isn't covered by the folder watcher, and other
+    // apps (Nautilus) may empty it: refresh the Trash view when it changes.
+    Connections {
+        target: core
+        function onTrash_changed() {
+            if (paneEngine.location_kind === "trash")
+                paneEngine.refresh();
+        }
     }
 
     // Apply right away when the items are already listed (the watcher may
@@ -150,6 +159,29 @@ Item {
         selection = s;
     }
 
+    // Mouse wheel: `step` px per notch (scaled by the real delta, so
+    // high-resolution wheels work), eased briefly. Touchpads report pixels
+    // and are followed 1:1 with no animation.
+    function wheelScroll(view, anim, step, event) {
+        var minY = view.originY;
+        var maxY = Math.max(minY, view.originY + view.contentHeight - view.height);
+        if (event.pixelDelta.y !== 0) {
+            anim.stop();
+            view.contentY = Math.max(minY, Math.min(maxY, view.contentY - event.pixelDelta.y));
+            return;
+        }
+        var from = anim.running ? anim.to : view.contentY;
+        var to = Math.max(minY, Math.min(maxY, from - event.angleDelta.y / 120 * step));
+        anim.stop();
+        if (!theme.animate) {
+            view.contentY = to;
+            return;
+        }
+        anim.from = view.contentY;
+        anim.to = to;
+        anim.start();
+    }
+
     function cols() {
         return isList() ? 1 : Math.max(1, Math.floor(gridView.width / gridView.cellWidth));
     }
@@ -224,6 +256,13 @@ Item {
         target = Math.max(0, Math.min(n - 1, target));
         selectRow(target, false, shift);
         ensureVisible(target);
+    }
+
+    // Rows that fit in the view: one PageUp/PageDown step.
+    function pageRows() {
+        var rowH = isList() ? Math.round(38 * Math.max(0.85, Math.min(1.3, zoom))) + 3 : gridView.cellHeight;
+        var h = isList() ? listView.height : gridView.height;
+        return Math.max(1, Math.floor(h / rowH));
     }
 
     function ensureVisible(row) {
@@ -318,9 +357,7 @@ Item {
         var paths = urlsToPaths(drop.urls).filter(function(p) { return p !== destPath; });
         if (paths.length === 0)
             return;
-        var asCopy = (drop.source === dragProxy)
-            ? dragManager.asCopy
-            : ((drop.proposedAction === Qt.CopyAction) || !(drop.supportedActions & Qt.MoveAction));
+        var asCopy = window.dropIsCopy(drop, paths, destPath);
         drop.accept(asCopy ? Qt.CopyAction : Qt.MoveAction);
         if (dragManager.isRmb) {
             var pt = mouseItem ? mouseItem.mapToItem(window.contentItem, drop.x, drop.y)
@@ -336,7 +373,8 @@ Item {
     }
 
     property real animZoom: theme.zoom
-    Behavior on animZoom { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
+    // Short tween (a spring overshoots and keeps re-laying out the grid).
+    Behavior on animZoom { enabled: theme.animate; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
     readonly property real zoom: animZoom
     readonly property int cellW: Math.round(124 * zoom)
     readonly property int cellH: Math.round(114 * zoom)
@@ -478,12 +516,15 @@ Item {
                 }
                 Component.onCompleted: requestPaint()
 
+                // Only rows near the viewport matter for painting: checking those
+                // against the selection set stays cheap even after Ctrl+A in a
+                // huge folder (looking up every selected path was O(selected x rows)).
                 function collectSelection() {
                     var sel = {};
-                    var paths = pane.selectedPaths();
-                    for (var i = 0; i < paths.length; ++i) {
-                        var r = paneEngine.row_of(paths[i]);
-                        if (r >= 0) sel[r] = true;
+                    var visible = visibleIndices();
+                    for (var i = 0; i < visible.length; ++i) {
+                        if (pane.selection[paneEngine.path_at(visible[i])] === true)
+                            sel[visible[i]] = true;
                     }
                     return sel;
                 }
@@ -778,9 +819,13 @@ Item {
                 clip: true
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
                 Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.42 } }
-                cellWidth: pane.cellW
+                // Share the leftover width between the columns instead of leaving
+                // a gap on the right (what Nautilus does too).
+                cellWidth: Math.floor(width / Math.max(1, Math.floor(width / pane.cellW)))
                 cellHeight: pane.cellH
                 cacheBuffer: theme.lowPower ? 0 : cellHeight * 2
+                // Recycle cells that scroll out instead of destroying and rebuilding them.
+                reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: true
                 model: visible ? paneEngine : null
@@ -817,12 +862,9 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.NoModifier
-                    onWheel: function(event) {
-                        var step = 80 * pane.zoom;
-                        var maxY = Math.max(0, gridView.contentHeight - gridView.height);
-                        gridView.contentY = Math.max(0, Math.min(maxY, gridView.contentY - (event.angleDelta.y > 0 ? step : -step)));
-                    }
+                    onWheel: function(event) { pane.wheelScroll(gridView, gridWheelAnim, gridView.cellHeight, event); }
                 }
+                NumberAnimation { id: gridWheelAnim; target: gridView; property: "contentY"; duration: 140; easing.type: Easing.OutCubic }
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
@@ -943,6 +985,8 @@ Item {
 
                 delegate: Item {
                     id: card
+                    // A recycled cell must not carry a half-started drag.
+                    GridView.onPooled: cardMouse.dragging = false
                     width: gridView.cellWidth
                     height: gridView.cellHeight
 
@@ -972,9 +1016,6 @@ Item {
                     Accessible.role: Accessible.ListItem
                     Accessible.name: name
                     Accessible.selected: isSelected
-
-                    property bool entered: !theme.animate
-                    Component.onCompleted: entered = true
 
                     DropArea {
                         id: folderDrop
@@ -1008,9 +1049,10 @@ Item {
                         visible: card.isCursor
                     }
 
-                    scale: !entered ? 0.82
-                        : (cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0))
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                    // No entry animation: cells are created on every scroll step.
+                    // A short tween (not an oscillating spring) keeps hover cheap.
+                    scale: cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0)
+                    Behavior on scale { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
                     ColumnLayout {
                         id: cardContentCol
@@ -1028,7 +1070,8 @@ Item {
                             Layout.preferredHeight: Math.round(46 * pane.zoom)
 
                             LoafIcon {
-                                visible: !card.hasThumb && theme.iconSource === "phosphor"
+                                // Also the fallback when the system theme has no icon.
+                                visible: !card.hasThumb && (theme.iconSource === "phosphor" || !cardSysIcon.visible)
                                 anchors.centerIn: parent
                                 name: card.isCut ? (card.is_dir ? "folder-dashed" : "file-dashed") : (card.icon || "file")
                                 size: pane.iconSize
@@ -1036,13 +1079,16 @@ Item {
                             }
 
                             Image {
-                                visible: !card.hasThumb && theme.iconSource !== "phosphor"
+                                id: cardSysIcon
+                                visible: !card.hasThumb && theme.iconSource !== "phosphor" && source != "" && status !== Image.Error
                                 anchors.centerIn: parent
-                                source: theme.iconSource !== "phosphor" ? window.systemIcon(card.system_icon) : ""
+                                source: theme.iconSource === "phosphor" ? ""
+                                    : (card.name.endsWith(".desktop") ? (window.desktopIcon(card.path) || window.systemIcon(card.system_icon))
+                                    : window.systemIcon(card.system_icon))
                                 width: pane.iconSize + 2
                                 height: pane.iconSize + 2
-                                sourceSize.width: 64 * pane.zoom
-                                sourceSize.height: 64 * pane.zoom
+                                sourceSize.width: 64 * theme.zoom
+                                sourceSize.height: 64 * theme.zoom
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                             }
@@ -1051,35 +1097,18 @@ Item {
                                 anchors.fill: parent
                                 visible: card.hasThumb
 
-                                Rectangle {
-                                    id: thumbMask
-                                    anchors.fill: parent
-                                    radius: theme.radiusM
-                                    color: theme.surfaceContainerLowest
-                                    visible: false
-                                    layer.enabled: card.thumbable && theme.showThumbnails && !theme.lowPower
-                                }
-
+                                // "/tile": the provider crops and rounds the image once,
+                                // so no offscreen mask layer per thumbnail is needed.
                                 Image {
                                     id: thumbImg
                                     anchors.fill: parent
                                     source: theme.showThumbnails && card.thumbable && card.thumb_id.length > 0
-                                        ? ("image://thumb/" + card.thumb_id) : ""
-                                    fillMode: Image.PreserveAspectCrop
-                                    sourceSize.width: Math.round(48 * pane.zoom)
-                                    sourceSize.height: Math.round(48 * pane.zoom)
+                                        ? ("image://thumb/" + card.thumb_id + "/tile") : ""
+                                    sourceSize.width: Math.round(48 * theme.zoom)
+                                    sourceSize.height: Math.round(48 * theme.zoom)
                                     asynchronous: true
                                     cache: true
                                     smooth: true
-                                    // The rounded mask costs an offscreen layer: only for
-                                    // thumbable items, never in low-power mode. Must not
-                                    // depend on image status: toggling the layer while the
-                                    // thumbnail loads crashes Qt during DPI updates.
-                                    layer.enabled: card.thumbable && theme.showThumbnails && !theme.lowPower
-                                    layer.effect: MultiEffect {
-                                        maskEnabled: true
-                                        maskSource: thumbMask
-                                    }
                                 }
 
                                 Rectangle {
@@ -1297,6 +1326,7 @@ Item {
                 spacing: 3
                 clip: true
                 cacheBuffer: theme.lowPower ? 0 : 400
+                reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: visible ? paneEngine : null
                 Accessible.role: Accessible.List
@@ -1325,6 +1355,15 @@ Item {
                     }
                 }
 
+                WheelHandler {
+                    target: null
+                    acceptedModifiers: Qt.NoModifier
+                    onWheel: function(event) {
+                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom))) + 3;
+                        pane.wheelScroll(listView, listWheelAnim, 3 * rowH, event);
+                    }
+                }
+                NumberAnimation { id: listWheelAnim; target: listView; property: "contentY"; duration: 140; easing.type: Easing.OutCubic }
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
@@ -1455,6 +1494,7 @@ Item {
 
                 delegate: Item {
                     id: row
+                    ListView.onPooled: rowMouse.dragging = false
                     width: listView.width
                     height: Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)))
 
@@ -1511,16 +1551,19 @@ Item {
                                 Layout.alignment: Qt.AlignVCenter
 
                                 LoafIcon {
-                                    visible: !row.hasThumb && theme.iconSource === "phosphor"
+                                    visible: !row.hasThumb && (theme.iconSource === "phosphor" || !rowSysIcon.visible)
                                     anchors.centerIn: parent
                                     name: row.isCut ? (row.is_dir ? "folder-dashed" : "file-dashed") : (row.icon || "file")
                                     size: 18
                                     color: row.isSelected ? theme.secondaryContainerFg : (row.is_dir ? theme.primary : theme.textMain)
                                 }
                                 Image {
-                                    visible: !row.hasThumb && theme.iconSource !== "phosphor"
+                                    id: rowSysIcon
+                                    visible: !row.hasThumb && theme.iconSource !== "phosphor" && source != "" && status !== Image.Error
                                     anchors.centerIn: parent
-                                    source: theme.iconSource !== "phosphor" ? window.systemIcon(row.system_icon) : ""
+                                    source: theme.iconSource === "phosphor" ? ""
+                                        : (row.name.endsWith(".desktop") ? (window.desktopIcon(row.path) || window.systemIcon(row.system_icon))
+                                        : window.systemIcon(row.system_icon))
                                     width: 18; height: 18
                                     sourceSize.width: 36; sourceSize.height: 36
                                     fillMode: Image.PreserveAspectFit
@@ -1535,7 +1578,7 @@ Item {
                                     Image {
                                         id: listThumb
                                         anchors.fill: parent
-                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id) : ""
+                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id + "/tile") : ""
                                         fillMode: Image.PreserveAspectCrop
                                         sourceSize.width: 24; sourceSize.height: 24
                                         asynchronous: true

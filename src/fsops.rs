@@ -278,10 +278,10 @@ fn staging_name(dst: &Path, tag: &str) -> PathBuf {
     unreachable!()
 }
 
-/// Replaces an existing `dst` with `src` (copied or moved) without ever
-/// leaving the user with neither: the new data is staged next to `dst`, the
-/// old item is set aside, the new one renamed in, and only then is the old
-/// one deleted. Any failure restores the original.
+/// Replaces `dst` with `src` (copied or moved). The new data is staged next
+/// to `dst` first; the old item then goes to the **trash** (never deleted
+/// outright, so a replaced folder's other files can be recovered) and the
+/// new one is renamed in. Any failure puts the old item back.
 pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::Result<()> {
     if src == dst {
         return Ok(());
@@ -295,26 +295,77 @@ pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::
     } else {
         copy_tree(src, &staged, mon)?;
     }
-    let old = staging_name(dst, "old");
-    if let Err(e) = fs::rename(dst, &old) {
-        // Put things back the way they were.
+    let undo_stage = |staged: &Path| {
         if is_move {
-            let _ = move_path(&staged, src, &Silent);
+            let _ = move_path(staged, src, &Silent);
         } else {
-            let _ = remove_tree(&staged);
+            let _ = remove_tree(staged);
         }
+    };
+    let old = match crate::trash::trash(dst) {
+        Ok(item) => item,
+        // No usable trash on this filesystem (root-owned mount, NFS, MTP…):
+        // replace the way it always worked (set aside, swap, delete).
+        Err(_) => {
+            let r = swap_and_delete(&staged, dst);
+            if r.is_err() {
+                undo_stage(&staged);
+            }
+            return r;
+        }
+    };
+    if let Err(e) = fs::rename(&staged, dst) {
+        let _ = crate::trash::restore(&old);
+        undo_stage(&staged);
         return Err(e);
     }
-    if let Err(e) = fs::rename(&staged, dst) {
+    Ok(())
+}
+
+/// Puts `staged` at `dst`, deleting what was there. Restores `dst` if the swap fails.
+fn swap_and_delete(staged: &Path, dst: &Path) -> io::Result<()> {
+    let old = staging_name(dst, "old");
+    fs::rename(dst, &old)?;
+    if let Err(e) = fs::rename(staged, dst) {
         let _ = fs::rename(&old, dst);
-        if is_move {
-            let _ = move_path(&staged, src, &Silent);
-        } else {
-            let _ = remove_tree(&staged);
-        }
         return Err(e);
     }
     remove_tree(&old)
+}
+
+/// Merges folder `src` into existing folder `dst`: sub-folders that exist
+/// on both sides are merged too; any other name clash gets a free
+/// "name (2)" so nothing in `dst` is overwritten. A move removes `src`
+/// when it ends up empty.
+pub fn merge_into(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::Result<()> {
+    if is_inside(dst, src) || is_inside(src, dst) {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "source and destination overlap"));
+    }
+    for entry in fs::read_dir(src)? {
+        if mon.cancelled() {
+            return Err(io::Error::from(io::ErrorKind::Interrupted));
+        }
+        let entry = entry?;
+        let from = entry.path();
+        let name = entry.file_name();
+        let to = dst.join(&name);
+        let from_is_dir = entry.file_type()?.is_dir();
+        match fs::symlink_metadata(&to) {
+            Ok(m) if m.is_dir() && from_is_dir => merge_into(&from, &to, is_move, mon)?,
+            other => {
+                let target = if other.is_ok() { unique_name(dst, &name.to_string_lossy()) } else { to };
+                if is_move {
+                    move_path(&from, &target, mon)?;
+                } else {
+                    copy_tree(&from, &target, mon)?;
+                }
+            }
+        }
+    }
+    if is_move {
+        let _ = fs::remove_dir(src); // only succeeds when empty
+    }
+    Ok(())
 }
 
 /// Replaces `dst` with a symlink to `src`. Refuses when `dst` already is
@@ -328,17 +379,22 @@ pub fn replace_with_link(src: &Path, dst: &Path) -> io::Result<()> {
     }
     let staged = staging_name(dst, "new");
     std::os::unix::fs::symlink(src, &staged)?;
-    let old = staging_name(dst, "old");
-    if let Err(e) = fs::rename(dst, &old) {
-        let _ = fs::remove_file(&staged);
-        return Err(e);
-    }
+    let old = match crate::trash::trash(dst) {
+        Ok(item) => item,
+        Err(_) => {
+            let r = swap_and_delete(&staged, dst);
+            if r.is_err() {
+                let _ = fs::remove_file(&staged);
+            }
+            return r;
+        }
+    };
     if let Err(e) = fs::rename(&staged, dst) {
-        let _ = fs::rename(&old, dst);
+        let _ = crate::trash::restore(&old);
         let _ = fs::remove_file(&staged);
         return Err(e);
     }
-    remove_tree(&old)
+    Ok(())
 }
 
 /// Renames without ever replacing an existing `to` (fails with
@@ -505,6 +561,9 @@ mod tests {
         replace(&d.join("a/photos"), &d.join("b/photos"), false, &Silent).unwrap();
         assert!(d.join("b/photos/new.jpg").exists());
         assert!(!d.join("b/photos/old.jpg").exists());
+        // The replaced folder went to the trash, not into the void.
+        let trashed = crate::trash::home_trash().join("files");
+        assert!(fs::read_dir(&trashed).unwrap().flatten().any(|e| e.path().join("old.jpg").exists()));
         assert!(!d.join("b/photos/photos").exists(), "must not nest");
         assert!(d.join("a/photos/new.jpg").exists(), "copy keeps source");
         // No staging leftovers.
@@ -512,6 +571,26 @@ mod tests {
 
         replace(&d.join("a/photos"), &d.join("b/photos"), true, &Silent).unwrap();
         assert!(!d.join("a/photos").exists(), "move removes source");
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn merge_keeps_files_only_in_destination() {
+        let d = tmpdir("merge");
+        fs::create_dir_all(d.join("a/pics/sub")).unwrap();
+        fs::write(d.join("a/pics/new.jpg"), b"new").unwrap();
+        fs::write(d.join("a/pics/same.jpg"), b"from a").unwrap();
+        fs::write(d.join("a/pics/sub/deep.txt"), b"deep").unwrap();
+        fs::create_dir_all(d.join("b/pics/sub")).unwrap();
+        fs::write(d.join("b/pics/only_b.jpg"), b"keep me").unwrap();
+        fs::write(d.join("b/pics/same.jpg"), b"from b").unwrap();
+
+        merge_into(&d.join("a/pics"), &d.join("b/pics"), true, &Silent).unwrap();
+        assert_eq!(fs::read(d.join("b/pics/only_b.jpg")).unwrap(), b"keep me");
+        assert_eq!(fs::read(d.join("b/pics/same.jpg")).unwrap(), b"from b", "never overwritten");
+        assert_eq!(fs::read(d.join("b/pics/same (2).jpg")).unwrap(), b"from a");
+        assert!(d.join("b/pics/new.jpg").exists() && d.join("b/pics/sub/deep.txt").exists());
+        assert!(!d.join("a/pics").exists(), "an emptied source folder is removed on move");
         fs::remove_dir_all(&d).unwrap();
     }
 

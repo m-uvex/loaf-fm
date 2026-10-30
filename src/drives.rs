@@ -203,7 +203,23 @@ pub fn list() -> Vec<Drive> {
                 .unwrap_or_default()
         }
     };
-    parse_lsblk(&json, &|m| statvfs(m), &sysfs_removable)
+    let mut drives = parse_lsblk(&json, &|m| statvfs(m), &sysfs_removable);
+    // Like GNOME: partitions udev marks as not for users (recovery, MSR…)
+    // are hidden unless something mounted them anyway.
+    drives.retain(|d| d.is_mounted || !udev_ignored(&d.device));
+    drives
+}
+
+/// Whether udev tagged the block device UDISKS_IGNORE=1.
+fn udev_ignored(device: &str) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(m) = std::fs::metadata(device) else { return false };
+    let dev = m.rdev();
+    let major = ((dev >> 8) & 0xfff) | ((dev >> 32) & !0xfff);
+    let minor = (dev & 0xff) | ((dev >> 12) & !0xff);
+    std::fs::read_to_string(format!("/run/udev/data/b{}:{}", major, minor))
+        .map(|s| s.lines().any(|l| l == "E:UDISKS_IGNORE=1"))
+        .unwrap_or(false)
 }
 
 fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
@@ -221,7 +237,8 @@ fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
 pub fn mount(device: &str) -> Result<String, String> {
     let out = udisks(&["mount", "-b", device], None)?;
     // "Mounted /dev/sdb1 at /run/media/u/LABEL"
-    Ok(out.trim().rsplit(" at ").next().unwrap_or("").trim_end_matches('.').to_string())
+    // The label itself may contain " at " ("Photos at Home"): split at the first.
+    Ok(out.trim().split_once(" at ").map(|x| x.1).unwrap_or("").trim_end_matches('.').to_string())
 }
 
 pub fn unmount(device: &str) -> Result<(), String> {
@@ -313,12 +330,12 @@ mod tests {
 
     #[test]
     fn parses_drives() {
-        let d = parse_lsblk(SAMPLE, &|m| if m == "/home" { Some((1000, 250)) } else { None }, &|_| false);
+        let d = parse_lsblk(SAMPLE, &|m| if m == "/" { Some((1000, 250)) } else { None }, &|_| false);
         let names: Vec<_> = d.iter().map(|x| x.device.as_str()).collect();
         assert_eq!(names, vec!["/dev/nvme0n1p2", "/dev/sdb1", "/dev/sdc1"], "efi, swap and loop are hidden");
         let root = &d[0];
         assert_eq!(root.name, "fedora");
-        assert_eq!(root.mount_point, "/home");
+        assert_eq!(root.mount_point, "/", "root wins over the other btrfs subvolumes");
         assert_eq!(root.percent, 75.0);
         assert!(!root.is_external);
         let usb = &d[1];

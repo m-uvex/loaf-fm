@@ -21,6 +21,15 @@ ApplicationWindow {
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
     property string activeView: "files" // "files", "settings", "pc"
+    // Settings and This PC are created the first time they're shown.
+    property bool settingsOpened: false
+    property bool pcOpened: false
+    property int settingsTab: 0
+    property string pendingDriveOpen: ""
+    onActiveViewChanged: {
+        if (activeView === "settings") settingsOpened = true;
+        else if (activeView === "pc") pcOpened = true;
+    }
     property bool isEditingPath: false
     property bool keyboardNavActive: false
     property bool splitView: false
@@ -78,10 +87,22 @@ ApplicationWindow {
     }
 
     function systemIcon(name) {
+        // Read here so every icon binding re-resolves once the real system
+        // theme is known (it is detected off the UI thread at startup).
+        void core.icon_theme;
         var source = theme.iconSource === "adwaita" ? "adwaita"
                    : theme.iconSource === "custom" ? theme.customIconTheme
                    : "system";
         return core.resolve_icon(source, name);
+    }
+
+    // A .desktop file shows the app's own icon (its Icon= key), like Nautilus.
+    function desktopIcon(path) {
+        void core.icon_theme;
+        var source = theme.iconSource === "adwaita" ? "adwaita"
+                   : theme.iconSource === "custom" ? theme.customIconTheme
+                   : "system";
+        return core.desktop_icon(path, source);
     }
 
     function urlsToPaths(urls) {
@@ -205,6 +226,60 @@ ApplicationWindow {
         core.transfer(JSON.stringify(paths), dest, mode, "rename");
         if (fromCut)
             afterCutPaste();
+    }
+
+    // ---- drives (shared by the sidebar and This PC) ----------------------
+
+    // Opens a drive; an unmounted one is mounted first (a locked one asks
+    // for its passphrase) and opened when the mount finishes.
+    function openDrive(d, inNewTab) {
+        if (!d)
+            return;
+        if (d.is_mounted && d.mount_point) {
+            if (inNewTab) {
+                newTab(d.mount_point);
+                return;
+            }
+            showFiles();
+            searchInput.text = "";
+            engine.set_path(d.mount_point);
+            return;
+        }
+        pendingDriveOpen = d.device;
+        mountDrive(d);
+    }
+
+    function mountDrive(d) {
+        if (d.is_locked)
+            core.unlock_drive(d.device, "", false); // keyring first, then asks
+        else
+            core.mount_drive(d.device);
+    }
+
+    function openDriveMenu(d, x, y) {
+        var mounted = d.is_mounted === true;
+        var m = [];
+        m.push({ text: qsTr("Open"), icon: "folder-open", action: function() { window.openDrive(d, false); } });
+        m.push({ text: qsTr("Open in New Tab"), icon: "tabs", enabled: mounted, action: function() { window.openDrive(d, true); } });
+        if (!mounted)
+            m.push({ text: qsTr("Mount"), icon: "download", separatorBefore: true, action: function() { window.mountDrive(d); } });
+        else
+            m.push({ text: qsTr("Unmount"), icon: "eject", separatorBefore: true, action: function() { core.unmount_drive(d.device); } });
+        if (d.is_external && d.disk)
+            m.push({ text: qsTr("Eject (Safely Remove)"), icon: "eject", action: function() { core.eject_drive(d.disk); } });
+        if (d.is_encrypted && d.crypt_device && !mounted)
+            m.push({ text: qsTr("Lock Encrypted Drive"), icon: "lock", action: function() { core.lock_drive(d.crypt_device); } });
+        contextMenu.model = m;
+        contextMenu.openAt(x, y);
+    }
+
+    // Copy or move for a drop. Like Nautilus: onto another drive copies
+    // (the source stays on the USB stick), on the same drive moves; Ctrl at
+    // drag start forces a copy. Outside drags follow the other app's choice.
+    function dropIsCopy(drop, paths, dest) {
+        if (drop.source === dragProxy)
+            return dragManager.asCopy || (dest.length > 0 && !core.same_device(paths[0], dest));
+        return drop.proposedAction === Qt.CopyAction || !(drop.supportedActions & Qt.MoveAction);
     }
 
     function handleDrop(paths, destDir, asCopy) {
@@ -499,6 +574,13 @@ ApplicationWindow {
 
     // Paths from the command line or D-Bus (another `loaf`, a browser's
     // "Show in folder", ...).
+    // `loaf trash:///` (and recent:, starred:) open those views like folders.
+    function openTargetInfo(p) {
+        if (/^(trash|recent|starred):/.test(p))
+            return { exists: true, is_dir: true, parent: p };
+        return JSON.parse(core.get_item_info(p) || "{}");
+    }
+
     function handleOpenRequest(paths, mode) {
         if (mode === "window" || paths.length === 0) {
             window.raise();
@@ -514,7 +596,7 @@ ApplicationWindow {
         var props = [];
         for (var i = 0; i < paths.length; ++i) {
             var p = paths[i];
-            var info = JSON.parse(core.get_item_info(p) || "{}");
+            var info = window.openTargetInfo(p);
             if (!info.exists)
                 continue;
             if (mode === "properties") {
@@ -560,7 +642,7 @@ ApplicationWindow {
         var first = !restored;
         for (var i = 0; i < pending.length; ++i) {
             var p = pending[i];
-            var info = JSON.parse(core.get_item_info(p) || "{}");
+            var info = window.openTargetInfo(p);
             if (!info.exists)
                 continue;
             var dir = info.is_dir ? p : info.parent;
@@ -600,7 +682,7 @@ ApplicationWindow {
     Shortcut { sequence: "Delete"; enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
     Shortcut { sequence: "Shift+Delete"; enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
     Shortcut {
-        sequences: ["Alt+Left", StandardKey.Back]
+        sequences: ["Alt+Left", "Back"]
         enabled: !window.anyModalOpen && (engine.can_go_back || window.isAuxView || engine.is_searching_everywhere)
         onActivated: {
             if (engine.is_searching_everywhere) {
@@ -614,7 +696,7 @@ ApplicationWindow {
         }
     }
     Shortcut {
-        sequences: ["Alt+Right", StandardKey.Forward]
+        sequences: ["Alt+Right", "Forward"]
         enabled: !window.anyModalOpen && engine.can_go_forward && !window.isAuxView && !engine.is_searching_everywhere
         onActivated: engine.go_forward()
     }
@@ -630,8 +712,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+N"; enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
     Shortcut { sequence: "F3"; onActivated: window.toggleSplit() }
     Shortcut { sequence: "F9"; onActivated: sidebar.expanded = !sidebar.expanded }
-    Shortcut { sequences: ["Ctrl+=", "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
-    Shortcut { sequences: ["Ctrl+-", StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
+    // Each key listed once: StandardKey.ZoomIn/ZoomOut *are* Ctrl++ / Ctrl+-,
+    // and a sequence registered twice is "ambiguous" and never fires.
+    Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; onActivated: theme.stepZoom(1) }
+    Shortcut { sequences: ["Ctrl+-", "Ctrl+_"]; onActivated: theme.stepZoom(-1) }
     Shortcut { sequence: "Ctrl+0"; onActivated: theme.zoomIndex = 2 }
     Shortcut { sequence: "Ctrl+1"; onActivated: engine.set_view("grid") }
     Shortcut { sequence: "Ctrl+2"; onActivated: engine.set_view("list") }
@@ -642,7 +726,13 @@ ApplicationWindow {
         enabled: window.gridKeyboardReady
         onActivated: {
             var p = window.selectedPaths();
-            window.showProperties(p.length > 0 ? p : [engine.current_path]);
+            if (p.length === 0) {
+                // Trash, Recent, Search…: there's no real folder, so summarize
+                // what is shown (count and total size) instead of a bogus "trash:".
+                p = engine.location_kind === "dir" ? [engine.current_path]
+                    : (engine.item_count > 0 ? JSON.parse(engine.paths_in_range(0, engine.item_count - 1)) : []);
+            }
+            window.showProperties(p);
         }
     }
     Shortcut { sequence: "Ctrl+Q"; onActivated: window.close() }
@@ -675,6 +765,9 @@ ApplicationWindow {
                 } else if (engine.is_searching_everywhere) {
                     engine.clear_search();
                     searchInput.text = "";
+                } else if (engine.filter_text.length > 0) {
+                    searchInput.text = "";
+                    engine.set_filter("");
                 } else if (window.isAuxView) {
                     window.showFiles();
                 }
@@ -696,6 +789,10 @@ ApplicationWindow {
                 case Qt.Key_Right:
                     if (!pane.isList()) { window.keyboardNavActive = true; pane.moveSelection(1, 0, shift); event.accepted = true; return; }
                     break;
+                case Qt.Key_PageUp:
+                    window.keyboardNavActive = true; pane.moveSelection(0, -pane.pageRows(), shift); event.accepted = true; return;
+                case Qt.Key_PageDown:
+                    window.keyboardNavActive = true; pane.moveSelection(0, pane.pageRows(), shift); event.accepted = true; return;
                 case Qt.Key_Home:
                     window.keyboardNavActive = true; pane.selectRow(0, false, shift); pane.ensureVisible(0); event.accepted = true; return;
                 case Qt.Key_End:
@@ -736,6 +833,12 @@ ApplicationWindow {
             }
             if (r && r.reload_drives)
                 core.load_drives();
+            // A drive clicked while unmounted opens as soon as it is mounted.
+            if (ok && r && r.mounted && r.device === window.pendingDriveOpen) {
+                window.pendingDriveOpen = "";
+                window.showFiles();
+                engine.set_path(r.mounted);
+            }
             if (r && r.created && r.created.length > 0) {
                 // Select what was just created in the pane showing its folder.
                 var parent = r.created[0].substring(0, r.created[0].lastIndexOf("/"));
@@ -747,7 +850,9 @@ ApplicationWindow {
             var kinds = pane1Loader.item ? [pane0, pane1Loader.item] : [pane0];
             for (var i = 0; i < kinds.length; ++i) {
                 var lk = kinds[i].engine.location_kind;
-                if (lk !== "dir" && lk !== "search")
+                if (lk === "search")
+                    kinds[i].engine.prune_missing(); // re-searching would lose the scroll position
+                else if (lk !== "dir")
                     kinds[i].engine.refresh();
             }
         }
@@ -777,8 +882,6 @@ ApplicationWindow {
         property bool browseArchives: true
     }
 
-    FontLoader { source: "qrc:/loaf/fonts/Phosphor.ttf" }
-    FontLoader { source: "qrc:/loaf/fonts/Phosphor-Bold.ttf" }
 
     // Decorative background blobs (skipped in low-power mode, when background is translucent, or when disabled).
     Item {
@@ -800,13 +903,13 @@ ApplicationWindow {
     // The settings tab is part of the URL: settings://behavior and friends.
     function settingsUrl() {
         var slugs = ["interface", "behavior", "accessibility", "experimental", "about", "share", "network"];
-        return "settings://" + (slugs[settingsView.activeTab] || slugs[0]);
+        return "settings://" + (slugs[window.settingsTab] || slugs[0]);
     }
 
     function settingsTabName() {
         var names = [qsTr("Interface"), qsTr("Behavior"), qsTr("Accessibility"),
                      qsTr("Experimental"), qsTr("About Loaf"), qsTr("Share"), qsTr("Network")];
-        return names[settingsView.activeTab] || names[0];
+        return names[window.settingsTab] || names[0];
     }
 
     function startEditingPath() {
@@ -831,13 +934,11 @@ ApplicationWindow {
         } else if (raw === "settings" || raw.indexOf("settings://") === 0) {
             window.activeView = "settings";
             window.markCurrentTab("settings", qsTr("Settings"));
-            if (raw === "settings://behavior") settingsView.activeTab = 1;
-            else if (raw === "settings://accessibility") settingsView.activeTab = 2;
-            else if (raw === "settings://experimental") settingsView.activeTab = 3;
-            else if (raw === "settings://about") settingsView.activeTab = 4;
-            else if (raw === "settings://share") settingsView.activeTab = 5;
-            else if (raw === "settings://network") settingsView.activeTab = 6;
-            else settingsView.activeTab = 0;
+            var tabs = ["settings://interface", "settings://behavior", "settings://accessibility", "settings://experimental",
+                        "settings://about", "settings://share", "settings://network"];
+            window.settingsTab = Math.max(0, tabs.indexOf(raw));
+            if (settingsLoader.item)
+                settingsLoader.item.activeTab = window.settingsTab;
         } else {
             showFiles();
             engine.set_path(raw);
@@ -1093,7 +1194,7 @@ ApplicationWindow {
                                     var paths = window.urlsToPaths(drop.urls).filter(function(p) { return p !== dest; });
                                     if (paths.length === 0)
                                         return;
-                                    var asCopy = (drop.source === dragProxy) ? dragManager.asCopy : (drop.proposedAction === Qt.CopyAction);
+                                    var asCopy = window.dropIsCopy(drop, paths, dest);
                                     drop.accept(asCopy ? Qt.CopyAction : Qt.MoveAction);
                                     if (dragManager.isRmb) {
                                         var pt = chipDrop.mapToItem(window.contentItem, drop.x, drop.y);
@@ -1456,8 +1557,14 @@ ApplicationWindow {
                         if (places[i].path && places[i].path === engine.current_path)
                             return places[i].id;
                     }
+                    for (var j = 0; j < drives.length; ++j) {
+                        if (drives[j].is_mounted && drives[j].mount_point === engine.current_path)
+                            return "device:" + drives[j].device;
+                    }
                     return "";
                 }
+                onDriveClicked: function(drive, inNewTab) { window.openDrive(drive, inNewTab); }
+                onDriveMenuRequested: function(drive, x, y) { window.openDriveMenu(drive, x, y); }
                 onPlaceClicked: function(place, inNewTab) {
                     if (place.kind === "pc") {
                         if (inNewTab) {
@@ -1740,11 +1847,18 @@ ApplicationWindow {
                         opacity: window.activeView === "settings" ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-                        SettingsView {
-                            id: settingsView
+                        // Built on first open: keeps startup and memory light.
+                        Loader {
+                            id: settingsLoader
                             anchors.fill: parent
                             anchors.margins: 22
-                            searchQuery: window.activeView === "settings" ? searchInput.text : ""
+                            active: window.settingsOpened
+                            sourceComponent: SettingsView {
+                                id: settingsView
+                                searchQuery: window.activeView === "settings" ? searchInput.text : ""
+                                Component.onCompleted: activeTab = window.settingsTab
+                                onActiveTabChanged: window.settingsTab = activeTab
+                            }
                         }
                     }
 
@@ -1758,10 +1872,11 @@ ApplicationWindow {
                         opacity: window.activeView === "pc" ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-                        PCView {
-                            id: pcView
+                        Loader {
                             anchors.fill: parent
                             anchors.margins: 22
+                            active: window.pcOpened
+                            sourceComponent: PCView {}
                         }
                     }
                 }
@@ -2006,12 +2121,14 @@ ApplicationWindow {
             for (var s = 0; s < suggested.length; ++s)
                 sub.push(appRow(suggested[s], paths, defaultId));
         }
-        var others = data.others || [];
-        if (others.length > 0) {
+        if (data.hasOthers) {
             sub.push({ text: qsTr("Other Applications…"), icon: "list", separatorBefore: sub.length > 0, submenu: function() {
+                var others = JSON.parse(core.all_open_with_apps() || "[]");
                 var out = [];
-                for (var o = 0; o < others.length; ++o)
-                    out.push(appRow(others[o], paths, defaultId));
+                for (var o = 0; o < others.length; ++o) {
+                    if (!used[others[o].id])
+                        out.push(appRow(others[o], paths, defaultId));
+                }
                 return out;
             } });
         }
@@ -2941,97 +3058,180 @@ ApplicationWindow {
         dialogWidth: 440
         property var all: []
         onOpened: all = JSON.parse(core.all_places_json() || "[]")
+        onClosed: customizePlacesList.finishDrag(false) // never leave a drag stuck
         Connections {
             target: core
             function onPlaces_jsonChanged() {
-                if (customizePlaces.visible)
+                // Mid-drag the rows must stay; finishDrag reloads on drop.
+                if (customizePlaces.visible && customizePlacesList.dragFrom < 0)
                     customizePlaces.all = JSON.parse(core.all_places_json() || "[]");
             }
         }
-        ListView {
+        // A Flickable + Column, not a ListView: ListView culls rows by their slot,
+        // which hid the dragged (translated) row while auto-scrolling.
+        Flickable {
             id: customizePlacesList
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(380, contentHeight)
+            Layout.preferredHeight: Math.min(contentHeight, Math.max(220, window.height - 320))
             clip: true
-            model: customizePlaces.all
+            contentWidth: width
+            contentHeight: placesColumn.height
+            boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
-            spacing: 4
+            interactive: dragFrom < 0
 
-            delegate: Rectangle {
-                id: placeRow
-                required property var modelData
-                required property int index
-                width: ListView.view.width
-                height: 40
-                radius: theme.radiusM
-                color: dragHandleArea.containsMouse ? theme.hoverOverlay : "transparent"
+            // Drag only moves rows on screen; the order is saved once on drop.
+            // Saving on every move rebuilt the model and killed the drag.
+            readonly property int pitch: 44 // row height + spacing
+            property int dragFrom: -1
+            property int dragTo: -1
+            property bool dragMoved: false // a plain click must not auto-scroll
+            property real dragDy: 0
+            property real pressY: 0   // pointer y in content coordinates at press
+            property real pointerY: 0 // pointer y in view coordinates
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 8
-                    anchors.rightMargin: 8
-                    spacing: 10
-                    Item {
-                        width: 20; height: 32
-                        LoafIcon {
-                            anchors.centerIn: parent
-                            name: "dots-six-vertical"
-                            size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
+            function dragUpdate() {
+                var n = customizePlaces.all.length;
+                var dy = pointerY + contentY - pressY;
+                if (Math.abs(dy) > 4) dragMoved = true;
+                dragDy = Math.max(-dragFrom * pitch, Math.min((n - 1 - dragFrom) * pitch, dy));
+                dragTo = Math.round(dragFrom + dragDy / pitch);
+            }
+            function finishDrag(commit) {
+                var from = dragFrom, to = dragTo;
+                dragFrom = -1;
+                dragTo = -1;
+                dragDy = 0;
+                dragMoved = false;
+                if (from < 0) return;
+                if (commit && to !== from && from < customizePlaces.all.length)
+                    core.move_place(customizePlaces.all[from].id, to);
+                // Always reload: places_json doesn't change when only hidden rows move,
+                // and a reload skipped mid-drag must still land.
+                customizePlaces.all = JSON.parse(core.all_places_json() || "[]");
+            }
+
+            // Scroll while the dragged row is held near the top or bottom edge.
+            Timer {
+                interval: 16
+                repeat: true
+                running: customizePlacesList.dragFrom >= 0 && customizePlacesList.dragMoved
+                    && (customizePlacesList.pointerY < 32 || customizePlacesList.pointerY > customizePlacesList.height - 32)
+                onTriggered: {
+                    var v = customizePlacesList;
+                    var maxY = v.originY + Math.max(0, v.contentHeight - v.height);
+                    v.contentY = Math.max(v.originY, Math.min(maxY, v.contentY + (v.pointerY < 32 ? -8 : 8)));
+                    v.dragUpdate();
+                }
+            }
+
+            Column {
+                id: placesColumn
+                width: customizePlacesList.width
+                spacing: 4
+                Repeater {
+                    model: customizePlaces.all
+                    delegate: Rectangle {
+                        id: placeRow
+                        required property var modelData
+                        required property int index
+                        readonly property bool dragging: customizePlacesList.dragFrom === index
+                        // Rows between the drag start and target slide over to make room.
+                        readonly property real shift: {
+                            var f = customizePlacesList.dragFrom, t = customizePlacesList.dragTo, p = customizePlacesList.pitch;
+                            if (f < 0 || dragging) return 0;
+                            if (f < t && index > f && index <= t) return -p;
+                            if (f > t && index >= t && index < f) return p;
+                            return 0;
                         }
-                        MouseArea {
-                            id: dragHandleArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.SizeVerCursor
-                            property int startY: 0
-                            property int startIdx: -1
-                            onPressed: function(mouse) {
-                                startY = mouse.y;
-                                startIdx = placeRow.index;
+                        width: placesColumn.width
+                        height: 40
+                        z: dragging ? 2 : 0
+                        radius: theme.radiusM
+                        color: dragging ? theme.surfaceContainerHighest
+                            : (dragHandleArea.containsMouse ? theme.hoverOverlay : "transparent")
+                        border.width: dragging ? 1 : 0
+                        border.color: theme.primary
+                        scale: dragging ? 1.02 : 1
+                        Behavior on scale { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                        transform: Translate {
+                            y: placeRow.dragging ? customizePlacesList.dragDy : placeRow.shift
+                            Behavior on y {
+                                enabled: theme.animate && !placeRow.dragging
+                                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                             }
-                            onPositionChanged: function(mouse) {
-                                if (pressed) {
-                                    var pt = mapToItem(customizePlacesList.contentItem, mouse.x, mouse.y);
-                                    var targetIdx = Math.max(0, Math.min(customizePlaces.all.length - 1, Math.floor(pt.y / 44)));
-                                    if (targetIdx !== placeRow.index) {
-                                        core.move_place(placeRow.modelData.id, targetIdx);
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 10
+                            Item {
+                                width: 20; height: 32
+                                LoafIcon {
+                                    anchors.centerIn: parent
+                                    name: "dots-six-vertical"
+                                    size: 16
+                                    color: dragHandleArea.containsMouse ? theme.primary : theme.outline
+                                }
+                                MouseArea {
+                                    id: dragHandleArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    preventStealing: true // else the Flickable takes the drag
+                                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                    onPressed: function(mouse) {
+                                        var v = customizePlacesList;
+                                        var y = mapToItem(v, mouse.x, mouse.y).y;
+                                        v.pointerY = y;
+                                        v.pressY = y + v.contentY;
+                                        v.dragDy = 0;
+                                        v.dragTo = placeRow.index;
+                                        v.dragFrom = placeRow.index;
                                     }
+                                    onPositionChanged: function(mouse) {
+                                        if (!pressed) return;
+                                        customizePlacesList.pointerY = mapToItem(customizePlacesList, mouse.x, mouse.y).y;
+                                        customizePlacesList.dragUpdate();
+                                    }
+                                    onReleased: customizePlacesList.finishDrag(true)
+                                    onCanceled: customizePlacesList.finishDrag(false)
                                 }
                             }
-                        }
-                    }
 
-                    LoafIcon {
-                        name: placeRow.modelData.icon || "folder"
-                        size: 16
-                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
-                    }
+                            LoafIcon {
+                                name: placeRow.modelData.icon || "folder"
+                                size: 16
+                                color: placeRow.modelData.hidden ? theme.outline : theme.primary
+                            }
 
-                    Text {
-                        text: placeRow.modelData.name || ""
-                        color: placeRow.modelData.hidden ? theme.textMuted : theme.textMain
-                        font.pixelSize: theme.fs(13)
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                        opacity: placeRow.modelData.hidden ? 0.55 : 1.0
-                    }
-                    LoafButton {
-                        icon: placeRow.modelData.hidden ? "eye-slash" : "eye"
-                        variant: "text"
-                        Accessible.name: placeRow.modelData.hidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
-                        onClicked: core.set_place_hidden(placeRow.modelData.id, !placeRow.modelData.hidden)
-                    }
-                    LoafButton {
-                        icon: "trash"
-                        variant: "text"
-                        enabled: placeRow.modelData.kind === "bookmark" || (placeRow.modelData.id && placeRow.modelData.id.indexOf("bookmark:") === 0)
-                        Accessible.name: qsTr("Remove bookmark")
-                        onClicked: {
-                            if (placeRow.modelData.path)
-                                core.remove_bookmark(placeRow.modelData.path);
-                            else
-                                core.set_place_hidden(placeRow.modelData.id, true);
+                            Text {
+                                text: placeRow.modelData.name || ""
+                                color: placeRow.modelData.hidden ? theme.textMuted : theme.textMain
+                                font.pixelSize: theme.fs(13)
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                opacity: placeRow.modelData.hidden ? 0.55 : 1.0
+                            }
+                            LoafButton {
+                                icon: placeRow.modelData.hidden ? "eye-slash" : "eye"
+                                variant: "text"
+                                Accessible.name: placeRow.modelData.hidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                                onClicked: core.set_place_hidden(placeRow.modelData.id, !placeRow.modelData.hidden)
+                            }
+                            LoafButton {
+                                icon: "trash"
+                                variant: "text"
+                                enabled: placeRow.modelData.kind === "bookmark" || (placeRow.modelData.id && placeRow.modelData.id.indexOf("bookmark:") === 0)
+                                Accessible.name: qsTr("Remove bookmark")
+                                onClicked: {
+                                    if (placeRow.modelData.path)
+                                        core.remove_bookmark(placeRow.modelData.path);
+                                    else
+                                        core.set_place_hidden(placeRow.modelData.id, true);
+                                }
+                            }
                         }
                     }
                 }
