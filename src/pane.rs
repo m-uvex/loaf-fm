@@ -752,7 +752,8 @@ impl qobject::LoafEngine {
         let gen_ref = self.generation.clone();
         let loc = self.loc.clone();
         let spec = self.sort_spec();
-        let archive_cache = self.archive_cache.clone();
+        // The cached listing can be large: only copy it when browsing an archive.
+        let archive_cache = if matches!(loc, Loc::Archive { .. }) { self.archive_cache.clone() } else { None };
         let thread = self.qt_thread();
         if reset {
             // Show the new location right away instead of the old rows.

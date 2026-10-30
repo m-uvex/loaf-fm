@@ -9,6 +9,7 @@
 #include <QImageReader>
 #include <QMimeDatabase>
 #include <QMutex>
+#include <QPainter>
 #include <QProcess>
 #include <QQuickImageResponse>
 #include <QRunnable>
@@ -225,9 +226,10 @@ private:
 class ThumbWork
 {
 public:
-    ThumbWork(const QByteArray &rawPath, const QSize &requested, bool cover, const std::atomic<bool> &cancelled)
+    ThumbWork(const QByteArray &rawPath, const QSize &requested, bool cover, bool round,
+              const std::atomic<bool> &cancelled)
         : m_raw(rawPath), m_path(QFile::decodeName(rawPath)), m_requested(requested), m_cover(cover),
-          m_cancelled(cancelled) {}
+          m_round(round), m_cancelled(cancelled) {}
 
     bool stopped() const { return m_cancelled.load() || g_shutdown.load(); }
 
@@ -414,22 +416,42 @@ public:
             QImage out = img;
             if (img.width() > m_requested.width() && img.height() > m_requested.height())
                 out = img.scaled(m_requested, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-            const QSize crop = out.size().boundedTo(m_requested);
-            m_image = out.copy((out.width() - crop.width()) / 2, (out.height() - crop.height()) / 2,
-                               crop.width(), crop.height());
+            // Keep the box's shape even for a small image, so rounded corners
+            // aren't cut off by the QML crop.
+            const QSize crop = m_requested.scaled(out.size(), Qt::KeepAspectRatio).boundedTo(m_requested);
+            m_image = rounded(out.copy((out.width() - crop.width()) / 2, (out.height() - crop.height()) / 2,
+                                       crop.width(), crop.height()));
             return;
         }
         if (m_requested.isValid() && !m_requested.isEmpty()
             && (img.width() > m_requested.width() || img.height() > m_requested.height()))
-            m_image = img.scaled(m_requested, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            m_image = rounded(img.scaled(m_requested, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         else
-            m_image = img;
+            m_image = rounded(img);
+    }
+
+    // Corner radius ~1/6 of the short side, matching the frame drawn in QML.
+    // Drawn with an image brush: unlike a clip path, it is antialiased.
+    QImage rounded(const QImage &img) const
+    {
+        if (!m_round || img.isNull())
+            return img;
+        QImage out(img.size(), QImage::Format_ARGB32_Premultiplied);
+        out.fill(Qt::transparent);
+        QPainter p(&out);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QBrush(img));
+        const qreal r = qMin(img.width(), img.height()) / 6.0;
+        p.drawRoundedRect(QRectF(0, 0, img.width(), img.height()), r, r);
+        return out;
     }
 
     QByteArray m_raw;
     QString m_path;
     QSize m_requested;
     bool m_cover;
+    bool m_round;
     const std::atomic<bool> &m_cancelled;
 };
 
@@ -451,25 +473,26 @@ ThumbnailProvider::~ThumbnailProvider()
     m_pool.waitForDone();
 }
 
-ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, bool cover,
+ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, bool cover, bool round,
                              std::shared_ptr<std::atomic<bool>> cancelled)
-    : m_path(path), m_requested(requested), m_cover(cover), m_cancelled(std::move(cancelled))
+    : m_path(path), m_requested(requested), m_cover(cover), m_round(round), m_cancelled(std::move(cancelled))
 {
     setAutoDelete(true);
 }
 
 void ThumbRunnable::run()
 {
-    ThumbWork work(m_path, m_requested, m_cover, *m_cancelled);
+    ThumbWork work(m_path, m_requested, m_cover, m_round, *m_cancelled);
     if (!m_cancelled->load() && !g_shutdown.load())
         work.produce();
     Q_EMIT done(work.m_image, work.m_error);
 }
 
-// id = hex(UTF-8/raw path bytes) "-" mtime ["/cover"]; hex keeps any byte
-// sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
+// id = hex(UTF-8/raw path bytes) "-" mtime ["/cover"]["/round"]; hex keeps any
+// byte sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
 // "/cover" asks for an image that fills the requested size (cropped tiles)
-// instead of fitting inside it.
+// instead of fitting inside it. "/round" rounds the corners here, once, so
+// QML needs no offscreen mask layer per thumbnail.
 static QByteArray pathFromId(const QString &id)
 {
     const int dash = id.indexOf(QLatin1Char('-'));
@@ -481,8 +504,9 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, 
 {
     auto cancelled = std::make_shared<std::atomic<bool>>(false);
     auto *response = new ThumbResponse(cancelled);
-    const bool cover = id.endsWith(QLatin1String("/cover"));
-    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cover, cancelled);
+    const bool cover = id.contains(QLatin1String("/cover"));
+    const bool round = id.endsWith(QLatin1String("/round"));
+    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cover, round, cancelled);
     QObject::connect(runnable, &ThumbRunnable::done, response, &ThumbResponse::handleDone, Qt::QueuedConnection);
     m_pool.start(runnable);
     return response;
