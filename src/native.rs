@@ -21,6 +21,11 @@ pub mod ffi {
         /// MIME type via shared-mime-info (QMimeDatabase). Thread safe.
         fn mime_type_for(path: &str, sniff: bool) -> String;
 
+        /// Whether a file matches a MIME filter, shared-mime-info
+        /// inheritance and aliases included. `is_dir` matches only
+        /// directory types. Thread safe.
+        fn mime_filter_matches(file_name: &str, filter_mime: &str, is_dir: bool) -> bool;
+
         /// Human readable description of a MIME type ("PNG image").
         fn mime_comment_for(mime: &str) -> String;
 
@@ -30,6 +35,10 @@ pub mod ffi {
 
 pub fn mime_type(path: &std::path::Path, sniff: bool) -> String {
     ffi::mime_type_for(&path.to_string_lossy(), sniff)
+}
+
+pub fn mime_filter_matches(file_name: &str, filter_mime: &str, is_dir: bool) -> bool {
+    ffi::mime_filter_matches(file_name, filter_mime, is_dir)
 }
 
 pub fn mime_comment(mime: &str) -> String {

@@ -48,6 +48,8 @@ pub mod qobject {
         #[qproperty(QString, search_query)]
         #[qproperty(bool, searching)]
         #[qproperty(bool, read_only)]
+        #[qproperty(bool, dir_only)]
+        #[qproperty(QString, portal_filter_json)]
         type LoafEngine = super::PaneRust;
     }
     unsafe extern "RustQt" {
@@ -119,6 +121,11 @@ pub mod qobject {
         fn clear_search(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn set_filter(self: Pin<&mut LoafEngine>, text: &QString);
+        /// Picker rules for the portal file chooser: the selected filter as
+        /// JSON ("", or {"name", "patterns": [["glob"|"mime", pattern], ..]})
+        /// and whether only directories may be picked. Empty JSON clears.
+        #[qinvokable]
+        fn set_picker_rules(self: Pin<&mut LoafEngine>, filter_json: &QString, dir_only: bool);
         #[qinvokable]
         fn toggle_show_hidden(self: Pin<&mut LoafEngine>);
         #[qinvokable]
@@ -281,6 +288,8 @@ pub struct PaneRust {
     search_query: QString,
     searching: bool,
     read_only: bool,
+    dir_only: bool,
+    portal_filter_json: QString,
 
     loc: Loc,
     /// Location to return to when a search is cleared.
@@ -320,6 +329,8 @@ impl Default for PaneRust {
             search_query: QString::default(),
             searching: false,
             read_only: false,
+            dir_only: false,
+            portal_filter_json: QString::default(),
             loc: Loc::Dir(home),
             before_search: None,
             all: Vec::new(),
@@ -576,9 +587,17 @@ impl qobject::LoafEngine {
         let show_hidden = *self.show_hidden();
         // Trash, recent and search lists show everything they found.
         let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. });
+        let portal_filter = crate::portal::filters::Filter::parse(&self.portal_filter_json().to_string());
+        let dir_only = *self.dir_only();
         self.all
             .iter()
             .filter(|e| listing::visible(e, show_hidden || !honour_hidden, &filter))
+            .filter(|e| !dir_only || e.is_dir)
+            .filter(|e| {
+                portal_filter
+                    .as_ref()
+                    .is_none_or(|f| f.matches(&e.name, e.is_dir, &|name, mime, is_dir| crate::native::mime_filter_matches(name, mime, is_dir)))
+            })
             .cloned()
             .collect()
     }
@@ -953,6 +972,15 @@ impl qobject::LoafEngine {
             return;
         }
         self.as_mut().set_filter_text(text.clone());
+        self.refilter(false);
+    }
+
+    pub fn set_picker_rules(mut self: Pin<&mut Self>, filter_json: &QString, dir_only: bool) {
+        if *self.portal_filter_json() == *filter_json && *self.dir_only() == dir_only {
+            return;
+        }
+        self.as_mut().set_portal_filter_json(filter_json.clone());
+        self.as_mut().set_dir_only(dir_only);
         self.refilter(false);
     }
 

@@ -258,6 +258,18 @@ rust::String mime_type_for(rust::Str path, bool sniff)
     return toRust(db.mimeTypeForFile(toQString(path), sniff ? QMimeDatabase::MatchDefault : QMimeDatabase::MatchExtension).name());
 }
 
+bool mime_filter_matches(const rust::Str fileName, const rust::Str filterMime, bool isDir)
+{
+    static QMimeDatabase db;
+    const QMimeType filter = db.mimeTypeForName(toQString(filterMime));
+    if (!filter.isValid())
+        return false;
+    if (isDir)
+        return filter.inherits(QStringLiteral("inode/directory"));
+    const QMimeType actual = db.mimeTypeForFile(toQString(fileName), QMimeDatabase::MatchExtension);
+    return actual.isValid() && actual.inherits(filter.name());
+}
+
 rust::String mime_comment_for(rust::Str mime)
 {
     static QMimeDatabase db;

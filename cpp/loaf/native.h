@@ -106,6 +106,9 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
 // MIME helpers for Rust.
 rust::String mime_type_for(rust::Str path, bool sniff);
 rust::String mime_comment_for(rust::Str mime);
+// Whether a file name matches a MIME filter (shared-mime-info inheritance
+// and aliases included). Directories only match directory types.
+bool mime_filter_matches(rust::Str fileName, rust::Str filterMime, bool isDir);
 
 // Sets the application name / desktop file id (Wayland app id).
 void set_application_identity(rust::Str version);
