@@ -131,7 +131,35 @@ ApplicationWindow {
         target: nativeBridge
         function onClipboardChanged() { window.refreshCutSet(); }
         function onOpenRequested(paths, mode) { window.handleOpenRequest(paths, mode); }
+        function onPickerRequested(handle, spec) { window.openPicker(handle, spec); }
+        function onPickerDismissed(handle) { window.closePicker(handle); }
     }
+
+    // ---- portal file chooser windows ---------------------------------------
+    // One PickerWindow per active request, keyed by the D-Bus handle.
+    property var pickerWindows: ({})
+
+    Component {
+        id: pickerComponent
+        PickerWindow {}
+    }
+
+    function openPicker(handle, specJson) {
+        var win = pickerComponent.createObject(null, { "request": JSON.parse(specJson) });
+        if (!win)
+            return;
+        pickerWindows[handle] = win;
+        win.finished.connect(function(finishedHandle) { delete window.pickerWindows[finishedHandle]; });
+    }
+
+    function closePicker(handle) {
+        var win = pickerWindows[handle];
+        if (!win)
+            return;
+        delete pickerWindows[handle];
+        win.dismiss();
+    }
+
 
     // Opens an item from a view: folders navigate, archives open as
     // folders when browsing is enabled, files launch their app.

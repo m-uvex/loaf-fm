@@ -15,6 +15,11 @@ Item {
     property alias engine: paneEngine
     property bool isActive: true
     property bool showHeader: true
+    // Portal picker behavior: folders navigate, files are handed to the
+    // picker through filePicked, and selection stays single when the
+    // requesting app did not ask for multiple files.
+    property bool pickerMode: false
+    property bool pickerMultiple: false
 
     // { "/abs/path": true }
     property var selection: ({})
@@ -28,6 +33,7 @@ Item {
     property bool pendingRename: false
 
     signal activated()
+    signal filePicked(string path)
 
     LoafEngine {
         id: paneEngine
@@ -186,6 +192,10 @@ Item {
         var p = paneEngine.path_at(row);
         if (!p)
             return;
+        if (pickerMode && !pickerMultiple) {
+            ctrl = false;
+            shift = false;
+        }
         if (shift) {
             var a = anchorPath ? paneEngine.row_of(anchorPath) : -1;
             if (a < 0)
@@ -276,6 +286,13 @@ Item {
         if (!p)
             return;
         var item = JSON.parse(paneEngine.item_json(row));
+        if (pickerMode) {
+            if (item.is_dir)
+                paneEngine.set_path(item.path);
+            else
+                filePicked(item.path);
+            return;
+        }
         window.openItem(pane, item);
     }
 

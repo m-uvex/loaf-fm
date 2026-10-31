@@ -10,6 +10,7 @@ fn main() {
             .qml_file("qml/PCView.qml")
             .qml_file("qml/FilePane.qml")
             .qml_file("qml/Sidebar.qml")
+            .qml_file("qml/PickerWindow.qml")
             .qml_file("qml/QuickLook.qml")
             .qml_file("qml/PropertiesDialog.qml")
             .qml_file("qml/BatchRenameDialog.qml")
