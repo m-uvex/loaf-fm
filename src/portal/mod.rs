@@ -4,3 +4,5 @@
 //! the D-Bus layer.
 
 pub mod filters;
+pub mod request;
+pub mod uri;

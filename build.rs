@@ -52,9 +52,12 @@ fn main() {
     .file("src/native.rs")
     .file("src/pane.rs")
     .file("src/core.rs")
+    .file("src/portal_bridge.rs")
     .cpp_file("cpp/loaf/native.h")
+    .cpp_file("cpp/loaf/portal.h")
     .cpp_file("cpp/loaf/thumbnails.h")
     .cpp_file("cpp/native.cpp")
+    .cpp_file("cpp/portal.cpp")
     .cpp_file("cpp/thumbnails.cpp");
     // Our own headers live in cpp/ ("loaf/native.h").
     let builder = unsafe {

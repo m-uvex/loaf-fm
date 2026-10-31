@@ -9,6 +9,7 @@ pub mod listing;
 pub mod native;
 pub mod pane;
 pub mod portal;
+pub mod portal_bridge;
 pub mod search;
 pub mod share;
 pub mod smb;
