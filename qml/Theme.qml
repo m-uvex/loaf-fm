@@ -47,6 +47,8 @@ Item {
     property string phosphorWeight: "regular" // "regular", "bold", "fill", "duotone", "light", "thin"
     property string dragAction: "select" // "select" (selection box) or "scroll" (pan view)
     property bool showThumbnails: true
+    // "square": thumbnails cropped to the icon box; "original": their own aspect ratio.
+    property string thumbnailShape: "square"
     property bool showExperimentalIcons: false
     property bool showAdvancedArchives: false
     property bool experimentalPcCustomization: false
@@ -2082,6 +2084,8 @@ Item {
 
         value = readSetting("showThumbnails");
         if (value.length > 0) showThumbnails = (value === "true");
+        value = readSetting("thumbnailShape");
+        if (value === "square" || value === "original") thumbnailShape = value;
         value = readSetting("showExperimentalIcons");
         if (value.length > 0) showExperimentalIcons = (value === "true");
         value = readSetting("showAdvancedArchives");
@@ -2171,6 +2175,7 @@ Item {
     onPhosphorWeightChanged: writeSetting("phosphorWeight", phosphorWeight)
     onDragActionChanged: writeSetting("dragAction", dragAction)
     onShowThumbnailsChanged: writeSetting("showThumbnails", showThumbnails)
+    onThumbnailShapeChanged: writeSetting("thumbnailShape", thumbnailShape)
     onShowExperimentalIconsChanged: writeSetting("showExperimentalIcons", showExperimentalIcons)
     onShowAdvancedArchivesChanged: writeSetting("showAdvancedArchives", showAdvancedArchives)
     onExperimentalPcCustomizationChanged: writeSetting("experimentalPcCustomization", experimentalPcCustomization)

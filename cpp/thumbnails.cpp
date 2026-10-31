@@ -225,8 +225,9 @@ private:
 class ThumbWork
 {
 public:
-    ThumbWork(const QByteArray &rawPath, const QSize &requested, const std::atomic<bool> &cancelled)
-        : m_raw(rawPath), m_path(QFile::decodeName(rawPath)), m_requested(requested), m_cancelled(cancelled) {}
+    ThumbWork(const QByteArray &rawPath, const QSize &requested, bool cover, const std::atomic<bool> &cancelled)
+        : m_raw(rawPath), m_path(QFile::decodeName(rawPath)), m_requested(requested), m_cover(cover),
+          m_cancelled(cancelled) {}
 
     bool stopped() const { return m_cancelled.load() || g_shutdown.load(); }
 
@@ -247,7 +248,9 @@ public:
 
         const int wanted = qMax(m_requested.width(), m_requested.height()) > 0
             ? qMax(m_requested.width(), m_requested.height()) : 128;
-        const Flavor flavor = flavorFor(wanted);
+        // A cropped thumbnail needs its short side to fill the box: one flavor
+        // up still covers it for images up to 2:1.
+        const Flavor flavor = flavorFor(m_cover ? wanted * 2 : wanted);
         const QByteArray uri = glibFileUri(m_raw);
         const QString md5 = QString::fromLatin1(QCryptographicHash::hash(uri, QCryptographicHash::Md5).toHex());
         const QString mtime = QString::number(fi.lastModified().toSecsSinceEpoch());
@@ -405,6 +408,17 @@ public:
     {
         if (img.isNull())
             return;
+        if (m_cover && m_requested.isValid() && !m_requested.isEmpty()) {
+            // Scale to cover the box and keep its centre, so the QML crop
+            // never has to upscale.
+            QImage out = img;
+            if (img.width() > m_requested.width() && img.height() > m_requested.height())
+                out = img.scaled(m_requested, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            const QSize crop = out.size().boundedTo(m_requested);
+            m_image = out.copy((out.width() - crop.width()) / 2, (out.height() - crop.height()) / 2,
+                               crop.width(), crop.height());
+            return;
+        }
         if (m_requested.isValid() && !m_requested.isEmpty()
             && (img.width() > m_requested.width() || img.height() > m_requested.height()))
             m_image = img.scaled(m_requested, Qt::KeepAspectRatio, Qt::SmoothTransformation);
@@ -415,6 +429,7 @@ public:
     QByteArray m_raw;
     QString m_path;
     QSize m_requested;
+    bool m_cover;
     const std::atomic<bool> &m_cancelled;
 };
 
@@ -436,22 +451,25 @@ ThumbnailProvider::~ThumbnailProvider()
     m_pool.waitForDone();
 }
 
-ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, std::shared_ptr<std::atomic<bool>> cancelled)
-    : m_path(path), m_requested(requested), m_cancelled(std::move(cancelled))
+ThumbRunnable::ThumbRunnable(const QByteArray &path, const QSize &requested, bool cover,
+                             std::shared_ptr<std::atomic<bool>> cancelled)
+    : m_path(path), m_requested(requested), m_cover(cover), m_cancelled(std::move(cancelled))
 {
     setAutoDelete(true);
 }
 
 void ThumbRunnable::run()
 {
-    ThumbWork work(m_path, m_requested, *m_cancelled);
+    ThumbWork work(m_path, m_requested, m_cover, *m_cancelled);
     if (!m_cancelled->load() && !g_shutdown.load())
         work.produce();
     Q_EMIT done(work.m_image, work.m_error);
 }
 
-// id = hex(UTF-8/raw path bytes) "-" mtime; hex keeps any byte sequence
-// (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
+// id = hex(UTF-8/raw path bytes) "-" mtime ["/cover"]; hex keeps any byte
+// sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
+// "/cover" asks for an image that fills the requested size (cropped tiles)
+// instead of fitting inside it.
 static QByteArray pathFromId(const QString &id)
 {
     const int dash = id.indexOf(QLatin1Char('-'));
@@ -463,7 +481,8 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, 
 {
     auto cancelled = std::make_shared<std::atomic<bool>>(false);
     auto *response = new ThumbResponse(cancelled);
-    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cancelled);
+    const bool cover = id.endsWith(QLatin1String("/cover"));
+    auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cover, cancelled);
     QObject::connect(runnable, &ThumbRunnable::done, response, &ThumbResponse::handleDone, Qt::QueuedConnection);
     m_pool.start(runnable);
     return response;
