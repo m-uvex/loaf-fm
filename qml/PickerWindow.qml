@@ -301,12 +301,16 @@ Window {
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.bottomMargin: 12
             spacing: 10
 
             Sidebar {
                 id: sidebar
                 Layout.fillHeight: true
                 Layout.preferredWidth: implicitWidth
+                expanded: true
                 activeId: {
                     var kind = pane.engine.location_kind;
                     if (kind === "trash" || kind === "recent" || kind === "starred")
