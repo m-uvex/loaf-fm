@@ -106,7 +106,13 @@ Rectangle {
                 var it = placeList.itemAtIndex(i);
                 if (it) {
                     var p = it.mapToItem(rail, 0, 0);
-                    selectionHighlight.targetY = p.y;
+                    var listTop = placeList.mapToItem(rail, 0, 0).y;
+                    var listBottom = listTop + placeList.height;
+                    if (p.y < listTop || p.y + it.height > listBottom) {
+                        selectionHighlight.targetY = -100;
+                    } else {
+                        selectionHighlight.targetY = p.y;
+                    }
                     return;
                 }
             }
