@@ -22,6 +22,9 @@ fn normalize_picker_request(json: &str) -> String {
     crate::portal::request::normalize_request_json(json)
 }
 
+// cxx marshals string collections as Vec, so the parameter stays a Vec
+// even though clippy would prefer a slice.
+#[allow(clippy::ptr_arg)]
 fn picker_file_uris(paths: &Vec<String>) -> Vec<String> {
     paths
         .iter()
