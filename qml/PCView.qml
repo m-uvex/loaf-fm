@@ -349,6 +349,13 @@ Item {
         renamePrompt.open();
     }
 
+    // Custom label for the "This PC" page; empty falls back to the hostname.
+    function renamePc() {
+        pcNamePrompt.initialText = core.pc_label || core.hostname || "";
+        pcNamePrompt.label = qsTr("Leave empty to use the hostname again.");
+        pcNamePrompt.open();
+    }
+
     function driveMenuModel(d) {
         var mounted = pcView.isMounted(d);
         var external = d && d.is_external === true;
@@ -491,7 +498,7 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: core.hostname || qsTr("This PC")
+                        text: window.pcTitle()
                         color: theme.textMain
                         font.pixelSize: theme.fs(32)
                         font.bold: true
@@ -540,6 +547,15 @@ Item {
                         x: 100; y: 66
                         color: theme.primary
                     }
+                }
+
+                LoafButton {
+                    id: renamePcBtn
+                    Layout.alignment: Qt.AlignTop
+                    icon: "pencil-simple"
+                    variant: "text"
+                    Accessible.name: qsTr("Rename This PC")
+                    onClicked: pcView.renamePc()
                 }
 
                 LoafButton {
@@ -1039,6 +1055,15 @@ Item {
             if (name.length > 0 && pcView.renameDevice.length > 0) {
                 core.rename_drive(pcView.renameDevice, name);
             }
+        }
+    }
+    LoafTextPrompt {
+        id: pcNamePrompt
+        title: qsTr("Rename This PC")
+        confirmText: qsTr("Save")
+        placeholder: qsTr("Name")
+        onAccepted: function (text) {
+            core.set_pc_name(String(text).trim());
         }
     }
 }

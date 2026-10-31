@@ -13,7 +13,7 @@ ApplicationWindow {
     background: null
     title: (nativeBridge.isAdmin ? qsTr("[Administrator] ") : "") + "Loaf - " + (activeView === "settings"
         ? qsTr("Settings")
-        : activeView === "pc" ? (core.hostname || qsTr("This PC"))
+        : activeView === "pc" ? window.pcTitle()
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
 
@@ -270,7 +270,7 @@ ApplicationWindow {
         if (window.activeView === "settings")
             t.title = qsTr("Settings");
         else if (window.activeView === "pc")
-            t.title = core.hostname || qsTr("This PC");
+            t.title = window.pcTitle();
         else
             t.title = engine.current_dir_name;
     }
@@ -340,7 +340,7 @@ ApplicationWindow {
         var target = (isSettings || isPc) ? "" : (path || core.user_dir("HOME"));
         var list = tabs.slice();
         var state = JSON.stringify({ location: target, back: [], forward: [] });
-        var title = isSettings ? qsTr("Settings") : (isPc ? (core.hostname || qsTr("This PC")) : titleFromState(state));
+        var title = isSettings ? qsTr("Settings") : (isPc ? window.pcTitle() : titleFromState(state));
         list.splice(currentTab + 1, 0, {
             states: [state, ""],
             split: false,
@@ -378,7 +378,7 @@ ApplicationWindow {
             }
         }
         activeView = "pc";
-        markCurrentTab("pc", core.hostname || qsTr("This PC"));
+        markCurrentTab("pc", window.pcTitle());
     }
 
     function openSettings() {
@@ -817,6 +817,11 @@ ApplicationWindow {
         return names[settingsView.activeTab] || names[0];
     }
 
+    // Title of the "This PC" page: a custom name wins over the hostname.
+    function pcTitle() {
+        return core.pc_label || core.hostname || qsTr("This PC");
+    }
+
     function startEditingPath() {
         pathInput.text = window.activeView === "pc" ? "pc://"
             : (window.activeView === "settings" ? window.settingsUrl()
@@ -835,7 +840,7 @@ ApplicationWindow {
         }
         if (raw === "pc" || raw === "pc://" || raw === "pc:///" || raw === "thispc://" || raw === "computer:///") {
             window.activeView = "pc";
-            window.markCurrentTab("pc", core.hostname || qsTr("This PC"));
+            window.markCurrentTab("pc", window.pcTitle());
         } else if (raw === "settings" || raw.indexOf("settings://") === 0) {
             window.activeView = "settings";
             window.markCurrentTab("settings", qsTr("Settings"));
@@ -1210,7 +1215,7 @@ ApplicationWindow {
                             }
                             Text {
                                 text: window.activeView === "pc"
-                                    ? (core.hostname || qsTr("This PC"))
+                                    ? window.pcTitle()
                                     : window.settingsTabName()
                                 color: theme.secondaryContainerFg
                                 font.pixelSize: theme.fs(12)
@@ -1589,7 +1594,7 @@ ApplicationWindow {
                             : !!(window.tabs[index] && window.tabs[index].split)
 
                         readonly property string leftName: current
-                            ? (window.activeView === "settings" ? qsTr("Settings") : (window.activeView === "pc" ? (core.hostname || qsTr("This PC")) : pane0.engine.current_dir_name))
+                            ? (window.activeView === "settings" ? qsTr("Settings") : (window.activeView === "pc" ? window.pcTitle() : pane0.engine.current_dir_name))
                             : (window.tabs[index] ? (window.tabs[index].title || qsTr("Tab")) : "")
                         readonly property string rightName: current ? (pane1Loader.item ? pane1Loader.item.engine.current_dir_name : (window.tabs[index] ? window.tabs[index].rightTitle || qsTr("Split") : qsTr("Split")))
                             : (window.tabs[index] ? (window.tabs[index].rightTitle || qsTr("Split")) : qsTr("Split"))
@@ -2622,6 +2627,8 @@ ApplicationWindow {
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
+            if (place.kind === "pc")
+                m.push({ text: qsTr("Rename This PC…"), icon: "pencil-simple", action: function() { pcView.renamePc(); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
             m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
             if (place.kind === "bookmark")

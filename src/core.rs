@@ -19,6 +19,7 @@ pub mod qobject {
         #[qproperty(bool, is_dark)]
         #[qproperty(QString, wallpaper_colors_json)]
         #[qproperty(QString, hostname)]
+        #[qproperty(QString, pc_label)]
         #[qproperty(QString, device_type)]
         #[qproperty(QString, icon_theme)]
         #[qproperty(QString, drives_json)]
@@ -97,6 +98,9 @@ pub mod qobject {
         fn edit_place(self: Pin<&mut LoafCore>, id: &QString, name: &QString, path: &QString);
         #[qinvokable]
         fn reset_places(self: Pin<&mut LoafCore>);
+        /// Custom label for the "This PC" page; empty goes back to the hostname.
+        #[qinvokable]
+        fn set_pc_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
         fn set_starred(self: Pin<&mut LoafCore>, paths_json: &QString, on: bool);
         #[qinvokable]
@@ -343,6 +347,7 @@ pub struct CoreRust {
     is_dark: bool,
     wallpaper_colors_json: QString,
     hostname: QString,
+    pc_label: QString,
     device_type: QString,
     icon_theme: QString,
     drives_json: QString,
@@ -379,6 +384,7 @@ impl Default for CoreRust {
             is_dark: theme::detect_system_dark_mode(),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
+            pc_label: QString::from(state::get_or("pcLabel", "")),
             device_type: QString::from(theme::detect_device_type()),
             icon_theme: QString::from("hicolor"),
             drives_json: QString::from("[]"),
@@ -568,12 +574,25 @@ fn mtp_places(devices: &[mtp::Device]) -> Vec<serde_json::Value> {
         .collect()
 }
 
+/// Display name for the "This PC" page: a custom label wins over the
+/// hostname, and an empty hostname falls back to the generic title.
+fn pc_name(hostname: &str, pc_label: &str) -> String {
+    let custom = pc_label.trim();
+    if !custom.is_empty() {
+        custom.to_string()
+    } else if hostname.is_empty() {
+        "This PC".to_string()
+    } else {
+        hostname.to_string()
+    }
+}
+
 /// Every sidebar entry, with a `hidden` flag.
-fn build_places(hostname: &str, device_type: &str, drives: &[drives::Drive], mtp: &[mtp::Device]) -> Vec<serde_json::Value> {
+fn build_places(hostname: &str, pc_label: &str, device_type: &str, drives: &[drives::Drive], mtp: &[mtp::Device]) -> Vec<serde_json::Value> {
     let cfg = places_config();
     let mut items: Vec<serde_json::Value> = Vec::new();
     let pc_icon = if device_type == "laptop" { "laptop" } else { "desktop" };
-    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": if hostname.is_empty() { "This PC" } else { hostname }, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
+    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": pc_name(hostname, pc_label), "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
     items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": "Recent", "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
     items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": "Starred", "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
     // Paths already shown by a built-in place, so a GTK bookmark pointing at
@@ -895,7 +914,7 @@ impl qobject::LoafCore {
     }
     pub fn load_places(mut self: Pin<&mut Self>) {
         let places: Vec<serde_json::Value> =
-            build_places(&self.hostname().to_string(), &self.device_type().to_string(), &self.drives, &self.mtp)
+            build_places(&self.hostname().to_string(), &self.pc_label().to_string(), &self.device_type().to_string(), &self.drives, &self.mtp)
                 .into_iter()
                 .filter(|p| !p["hidden"].as_bool().unwrap_or(false))
                 .collect();
@@ -905,6 +924,7 @@ impl qobject::LoafCore {
     pub fn all_places_json(&self) -> QString {
         q(&serde_json::to_string(&build_places(
             &self.hostname().to_string(),
+            &self.pc_label().to_string(),
             &self.device_type().to_string(),
             &self.drives,
             &self.mtp,
@@ -964,6 +984,7 @@ impl qobject::LoafCore {
         let mut c = places_config();
         let mut order: Vec<String> = build_places(
             &self.hostname().to_string(),
+            &self.pc_label().to_string(),
             &self.device_type().to_string(),
             &self.drives,
             &self.mtp,
@@ -1003,6 +1024,14 @@ impl qobject::LoafCore {
     pub fn reset_places(self: Pin<&mut Self>) {
         save_places_config(&PlacesConfig::default());
         self.load_places();
+    }
+
+    /// Custom label for the "This PC" page; empty restores the hostname.
+    pub fn set_pc_name(mut self: Pin<&mut Self>, name: &QString) {
+        let label = name.to_string().trim().to_string();
+        state::set("pcLabel", &label);
+        self.as_mut().set_pc_label(q(&label));
+        self.as_mut().load_places();
     }
 
     pub fn set_starred(mut self: Pin<&mut Self>, paths_json: &QString, on: bool) {
@@ -2780,6 +2809,14 @@ mod tests {
         assert_eq!(places[0]["path"], "/run/user/1000/gvfs/mtp:host=%5Busb%3A001%2C004%5D");
         assert_eq!(places[1]["is_mounted"], false, "unmounted phones stay in the rail so they can connect");
         assert_eq!(places[1]["path"], "");
+    }
+
+    #[test]
+    fn this_pc_label_prefers_the_custom_name() {
+        assert_eq!(pc_name("archbox", ""), "archbox");
+        assert_eq!(pc_name("archbox", "   "), "archbox", "blank labels fall back");
+        assert_eq!(pc_name("archbox", "Gaming rig"), "Gaming rig");
+        assert_eq!(pc_name("", ""), "This PC", "no hostname, no label");
     }
 
     #[test]

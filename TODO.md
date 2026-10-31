@@ -54,7 +54,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
   - Quick action buttons to mount, unmount, rename, and safely eject removable storage.
   - [x] **Removable USB Drives in Sidebar**: Plugged-in USB drives and SD cards appear as hideable, reorderable sidebar entries (mounted or unmounted), with mount/unlock on click, safe eject, and live hotplug refresh.
   - [x] **MTP / Mobile Devices**: Android phones connected over USB appear in the sidebar and a customizable "Mobile Devices" section on This PC. Browse, copy, and move files through GVfs, with connect/disconnect and live hotplug refresh.
-  - [ ] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
+  - [x] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
 
 ---
 
