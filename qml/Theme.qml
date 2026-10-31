@@ -62,7 +62,7 @@ Item {
     property int shareThrottleKbps: 0 // 0 for unlimited
     property string contextMenuMode: "full" // "full", "minimal", "custom"
     property var disabledMenuItems: ({})
-    property bool hideTrashWhenEmpty: true
+    property bool hideTrashWhenEmpty: false
     property string toolbarOperations: "auto" // "auto", "always", "hidden" -- back/forward buttons
     property bool showNewTabButton: true
     property bool showNewWindowButton: true

@@ -4,8 +4,9 @@ import QtQuick.Layouts
 import app.loaf
 
 // Navigation rail: This PC, Recent, Starred, the user's (localized) folders,
-// GTK bookmarks and Trash, from core.places_json. Scrolls when the window is
-// short, accepts drops, and every entry has a context menu.
+// removable drives, Android phones, GTK bookmarks and Trash, from
+// core.places_json. Scrolls when the window is short, accepts drops, and every
+// entry has a context menu.
 Rectangle {
     id: rail
 
@@ -250,8 +251,14 @@ Rectangle {
                 label: modelData.name
                 showLabel: rail.expanded
                 selected: rail.activeId === modelData.id
-                dimmed: modelData.missing === true || (modelData.kind === "smb" && modelData.connected !== true)
-                dropPath: (modelData.kind === "place" || modelData.kind === "bookmark" || (modelData.kind === "smb" && modelData.connected === true)) ? modelData.path : ""
+                dimmed: modelData.missing === true
+                        || (modelData.kind === "smb" && modelData.connected !== true)
+                        || (modelData.kind === "drive" && modelData.is_mounted !== true)
+                        || (modelData.kind === "mtp" && modelData.is_mounted !== true)
+                dropPath: (modelData.kind === "place" || modelData.kind === "bookmark"
+                           || (modelData.kind === "drive" && modelData.is_mounted === true)
+                           || (modelData.kind === "mtp" && modelData.is_mounted === true)
+                           || (modelData.kind === "smb" && modelData.connected === true)) ? modelData.path : ""
                 accessibleName: modelData.name
                 onClicked: rail.placeClicked(modelData, false)
                 onMiddleClicked: rail.placeClicked(modelData, true)

@@ -6,6 +6,7 @@ pub mod fsops;
 pub mod icons;
 pub mod info;
 pub mod listing;
+pub mod mtp;
 pub mod native;
 pub mod pane;
 pub mod search;

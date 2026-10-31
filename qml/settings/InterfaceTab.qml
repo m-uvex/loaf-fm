@@ -27,9 +27,11 @@ ColumnLayout {
     readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
     readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
     readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
+    readonly property bool matchThisPc: matches("this pc computer name label hostname rename dashboard drive overview")
 
     readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
         + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0) + (matchMenus ? 1 : 0)
+        + (matchThisPc ? 1 : 0)
 
     Layout.fillWidth: true
     spacing: 16
@@ -344,7 +346,7 @@ ColumnLayout {
 
     // Category 5: Menus & Sidebar
     SettingCard {
-        visible: root.matchMenus
+        visible: root.matchMenus || root.matchThisPc
         title: qsTr("Menus & Sidebar")
         subtitle: qsTr("Context menus and left sidebar rail pins")
         icon: "sliders"
@@ -396,6 +398,23 @@ ColumnLayout {
                 icon: "sliders-horizontal"
                 variant: "tonal"
                 onClicked: if (typeof customizePlaces !== "undefined") customizePlaces.open()
+            }
+        }
+
+        SettingDivider { visible: root.matchThisPc }
+
+        SettingRow {
+            visible: root.matchThisPc
+            icon: "desktop"
+            title: qsTr("This PC name")
+            subtitle: qsTr("Shown in the sidebar, tabs, and window title; leave empty to use the hostname")
+
+            LoafTextField {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 220
+                placeholderText: typeof core !== "undefined" && core && core.hostname ? core.hostname : qsTr("Hostname")
+                text: typeof core !== "undefined" && core ? core.pc_label : ""
+                selectByMouse: true
+                onEditingFinished: core.set_pc_name(text)
             }
         }
     }

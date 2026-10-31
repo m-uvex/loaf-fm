@@ -35,6 +35,7 @@ fn main() {
             .qml_file("qml/components/UsageBar.qml")
             .qml_file("qml/components/LoafShape.qml")
             .qml_file("qml/components/DriveCard.qml")
+            .qml_file("qml/components/MtpCard.qml")
             .qml_file("qml/settings/SettingDivider.qml")
             .qml_file("qml/settings/SettingRow.qml")
             .qml_file("qml/settings/SettingCard.qml")

@@ -13,9 +13,9 @@ Item {
 
     // ---- customization model -----------------------------------------------
 
-    readonly property var knownSections: ["places", "frequent", "internal", "external"]
+    readonly property var knownSections: ["places", "frequent", "internal", "external", "mobile"]
 
-    property var sectionOrder: ["places", "frequent", "internal", "external"]
+    property var sectionOrder: ["places", "frequent", "internal", "external", "mobile"]
     property var sectionConfig: pcView.defaultConfig()
     property bool isCustomizing: false
 
@@ -32,7 +32,8 @@ Item {
             "places": { visible: true, view: "grid" },
             "frequent": { visible: true, view: "carousel" },
             "internal": { visible: true, view: "cards" },
-            "external": { visible: true, view: "cards" }
+            "external": { visible: true, view: "cards" },
+            "mobile": { visible: true, view: "cards" }
         };
     }
 
@@ -76,6 +77,38 @@ Item {
         return (cfg && cfg.view === "carousel") ? "carousel" : "grid";
     }
 
+    function sectionIcon(secKey) {
+        if (secKey === "places")
+            return "folder";
+        if (secKey === "frequent")
+            return "clock";
+        if (secKey === "internal")
+            return "hard-drives";
+        if (secKey === "mobile")
+            return "device-mobile";
+        return "usb";
+    }
+
+    function sectionTitle(secKey) {
+        if (secKey === "places")
+            return qsTr("Places");
+        if (secKey === "frequent")
+            return qsTr("Frequent");
+        if (secKey === "internal")
+            return qsTr("Internal Storage");
+        if (secKey === "mobile")
+            return qsTr("Mobile Devices");
+        return qsTr("External Storage");
+    }
+
+    function sectionSubtitle(secKey) {
+        if (secKey === "external")
+            return theme.plural(pcView.externalDrives.length, qsTr("1 drive connected"), qsTr("%1 drives connected"));
+        if (secKey === "mobile")
+            return theme.plural(pcView.mtpDevices.length, qsTr("1 phone connected"), qsTr("%1 phones connected"));
+        return "";
+    }
+
     // A section only exists when it has something to show. External Storage in
     // particular must never appear (not even while customizing) with no drives.
     function sectionExists(secKey) {
@@ -83,6 +116,8 @@ Item {
             return pcView.externalDrives.length > 0;
         if (secKey === "internal")
             return pcView.internalDrives.length > 0;
+        if (secKey === "mobile")
+            return pcView.mtpDevices.length > 0;
         return true;
     }
 
@@ -139,6 +174,13 @@ Item {
     readonly property var externalDrives: pcView.allDrives.filter(function (d) {
         return d.is_external;
     })
+    readonly property var mtpDevices: {
+        try {
+            return JSON.parse(core.mtp_json || "[]");
+        } catch (e) {
+            return [];
+        }
+    }
     readonly property var frequentDirs: {
         try {
             return JSON.parse(core.frequent_dirs_json || "[]");
@@ -221,6 +263,70 @@ Item {
         core.unmount_drive(d.device);
     }
 
+    // ---- MTP / phone actions -----------------------------------------------
+
+    function openMtp(d) {
+        if (!d)
+            return;
+        if (d.is_mounted === true && d.path) {
+            window.showFiles();
+            engine.set_path(d.path);
+        } else {
+            pcView.mountMtp(d);
+        }
+    }
+
+    function mountMtp(d) {
+        if (!d || !d.uri)
+            return;
+        core.mount_mtp(d.uri);
+    }
+
+    function unmountMtp(d) {
+        if (!d || !d.uri)
+            return;
+        core.unmount_mtp(d.uri);
+    }
+
+    function mtpMenuModel(d) {
+        var mounted = d && d.is_mounted === true;
+        var items = [];
+        items.push({
+            "text": qsTr("Open"),
+            "icon": "folder-open",
+            "enabled": mounted,
+            "action": function () { pcView.openMtp(d); }
+        });
+        items.push({
+            "text": qsTr("Open in New Tab"),
+            "icon": "tabs",
+            "enabled": mounted,
+            "action": function () { if (d.path) window.newTab(d.path); }
+        });
+        if (mounted) {
+            items.push({
+                "text": qsTr("Disconnect"),
+                "icon": "plug-slash",
+                "separatorBefore": true,
+                "action": function () { pcView.unmountMtp(d); }
+            });
+        } else {
+            items.push({
+                "text": qsTr("Connect"),
+                "icon": "plug",
+                "separatorBefore": true,
+                "action": function () { pcView.mountMtp(d); }
+            });
+        }
+        return items;
+    }
+
+    function openMtpMenu(d, sceneX, sceneY) {
+        pcView.menuMtp = d;
+        mtpMenu.model = pcView.mtpMenuModel(d);
+        mtpMenu.openAt(sceneX, sceneY);
+    }
+
     // Folder shortcuts: the user's real (localized) folders, issue #21/#22.
     readonly property var quickPlaces: {
         try {
@@ -232,6 +338,7 @@ Item {
 
     property string renameDevice: ""
     property var menuDrive: ({})
+    property var menuMtp: ({})
 
     function requestRename(d) {
         if (!d)
@@ -240,6 +347,13 @@ Item {
         renamePrompt.initialText = d.name;
         renamePrompt.label = d.name;
         renamePrompt.open();
+    }
+
+    // Custom label for the "This PC" page; empty falls back to the hostname.
+    function renamePc() {
+        pcNamePrompt.initialText = core.pc_label || core.hostname || "";
+        pcNamePrompt.label = qsTr("Leave empty to use the hostname again.");
+        pcNamePrompt.open();
     }
 
     function driveMenuModel(d) {
@@ -384,7 +498,7 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: core.hostname || qsTr("This PC")
+                        text: window.pcTitle()
                         color: theme.textMain
                         font.pixelSize: theme.fs(32)
                         font.bold: true
@@ -436,6 +550,15 @@ Item {
                 }
 
                 LoafButton {
+                    id: renamePcBtn
+                    Layout.alignment: Qt.AlignTop
+                    icon: "pencil-simple"
+                    variant: "text"
+                    Accessible.name: qsTr("Rename This PC")
+                    onClicked: pcView.renamePc()
+                }
+
+                LoafButton {
                     id: customizeBtn
                     visible: pcView.customizationEnabled
                     Layout.alignment: Qt.AlignTop
@@ -461,15 +584,9 @@ Item {
                     property string secView: pcView.sectionView(modelData)
                     SectionHeader {
                         Layout.fillWidth: true
-                        icon: sectionDelegate.secKey === "places" ? "folder"
-                              : (sectionDelegate.secKey === "frequent" ? "clock"
-                              : (sectionDelegate.secKey === "internal" ? "hard-drives" : "usb"))
-                        title: sectionDelegate.secKey === "places" ? qsTr("Places")
-                               : (sectionDelegate.secKey === "frequent" ? qsTr("Frequent")
-                               : (sectionDelegate.secKey === "internal" ? qsTr("Internal Storage") : qsTr("External Storage")))
-                        subtitle: sectionDelegate.secKey === "external"
-                                  ? theme.plural(pcView.externalDrives.length, qsTr("1 drive connected"), qsTr("%1 drives connected"))
-                                  : ""
+                        icon: pcView.sectionIcon(sectionDelegate.secKey)
+                        title: pcView.sectionTitle(sectionDelegate.secKey)
+                        subtitle: pcView.sectionSubtitle(sectionDelegate.secKey)
                         LoafButton {
                             visible: pcView.customizing
                                      && (sectionDelegate.secKey === "places" || sectionDelegate.secKey === "frequent")
@@ -862,6 +979,25 @@ Item {
                             }
                         }
                     }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        visible: sectionDelegate.secVisible
+                                 && sectionDelegate.secKey === "mobile"
+                                 && pcView.mtpDevices.length > 0
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: pcView.columnCount(340)
+                            columnSpacing: 12
+                            rowSpacing: 12
+
+                            Repeater {
+                                model: pcView.mtpDevices
+                                delegate: mtpDelegate
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -881,8 +1017,30 @@ Item {
             }
         }
     }
+    Component {
+        id: mtpDelegate
+
+        MtpCard {
+            id: mtpCard
+            device: modelData
+
+            onActivated: pcView.openMtp(mtpCard.device)
+            onConnectRequested: pcView.mountMtp(mtpCard.device)
+            onDisconnectRequested: pcView.unmountMtp(mtpCard.device)
+            onContextRequested: function (mx, my) {
+                var p = mtpCard.mapToItem(null, mx - mtpCard.x, my - mtpCard.y);
+                pcView.openMtpMenu(mtpCard.device, p.x, p.y);
+            }
+        }
+    }
     LoafMenu {
         id: driveMenu
+        parent: Overlay.overlay
+        model: []
+        menuMinWidth: 208
+    }
+    LoafMenu {
+        id: mtpMenu
         parent: Overlay.overlay
         model: []
         menuMinWidth: 208
@@ -897,6 +1055,15 @@ Item {
             if (name.length > 0 && pcView.renameDevice.length > 0) {
                 core.rename_drive(pcView.renameDevice, name);
             }
+        }
+    }
+    LoafTextPrompt {
+        id: pcNamePrompt
+        title: qsTr("Rename This PC")
+        confirmText: qsTr("Save")
+        placeholder: qsTr("Name")
+        onAccepted: function (text) {
+            core.set_pc_name(String(text).trim());
         }
     }
 }

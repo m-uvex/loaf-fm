@@ -52,7 +52,9 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
   - Categorized display for internal partitions, external USB drives, and active network mounts.
   - Visual disk usage gauge bars showing used and available capacity at a glance.
   - Quick action buttons to mount, unmount, rename, and safely eject removable storage.
-  - [ ] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
+  - [x] **Removable USB Drives in Sidebar**: Plugged-in USB drives and SD cards appear as hideable, reorderable sidebar entries (mounted or unmounted), with mount/unlock on click, safe eject, and live hotplug refresh.
+  - [x] **MTP / Mobile Devices**: Android phones connected over USB appear in the sidebar and a customizable "Mobile Devices" section on This PC. Browse, copy, and move files through GVfs, with connect/disconnect and live hotplug refresh.
+  - [x] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
 
 ---
 
@@ -129,7 +131,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [x] **Open as Administrator**: Root / pkexec operations support.
 - [ ] **Side Terminal Panel**: Embedded terminal panel next to previews.
 - [x] **Browse Inside Archives**: Direct archive tree navigation without extraction.
-- [ ] **MTP / Android Device Support**: Native phone-over-USB storage access.
+- [x] **MTP / Android Device Support**: Native phone-over-USB storage access.
 - [x] **Video Thumbnails**: Extract and display video frame thumbnails in grid and list views.
 - [ ] **Advanced Selection Behaviors**:
   - [x] Grid-accurate shift selection (selecting a file then `Shift + Down` selects only the item directly underneath, bypassing left-to-right row wrapping).

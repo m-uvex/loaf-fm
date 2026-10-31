@@ -19,9 +19,11 @@ pub mod qobject {
         #[qproperty(bool, is_dark)]
         #[qproperty(QString, wallpaper_colors_json)]
         #[qproperty(QString, hostname)]
+        #[qproperty(QString, pc_label)]
         #[qproperty(QString, device_type)]
         #[qproperty(QString, icon_theme)]
         #[qproperty(QString, drives_json)]
+        #[qproperty(QString, mtp_json)]
         #[qproperty(QString, frequent_dirs_json)]
         #[qproperty(QString, places_json)]
         #[qproperty(QString, smb_profiles_json)]
@@ -96,6 +98,9 @@ pub mod qobject {
         fn edit_place(self: Pin<&mut LoafCore>, id: &QString, name: &QString, path: &QString);
         #[qinvokable]
         fn reset_places(self: Pin<&mut LoafCore>);
+        /// Custom label for the "This PC" page; empty goes back to the hostname.
+        #[qinvokable]
+        fn set_pc_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
         fn set_starred(self: Pin<&mut LoafCore>, paths_json: &QString, on: bool);
         #[qinvokable]
@@ -126,6 +131,12 @@ pub mod qobject {
         fn lock_drive(self: Pin<&mut LoafCore>, device: &QString);
         #[qinvokable]
         fn rename_drive(self: Pin<&mut LoafCore>, device: &QString, name: &QString);
+        #[qinvokable]
+        fn load_mtp(self: Pin<&mut LoafCore>);
+        #[qinvokable]
+        fn mount_mtp(self: Pin<&mut LoafCore>, uri: &QString);
+        #[qinvokable]
+        fn unmount_mtp(self: Pin<&mut LoafCore>, uri: &QString);
         #[qinvokable]
         fn load_smb_profiles(self: Pin<&mut LoafCore>);
         #[qinvokable]
@@ -244,7 +255,7 @@ pub mod qobject {
 use crate::archive::{self, ArchiveError};
 use crate::fsops::{self, Monitor};
 use crate::share;
-use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, watcher, xdg};
+use crate::{apps, drives, icons, info, mtp, native, smb, state, theme, trash, util, watcher, xdg};
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -336,9 +347,11 @@ pub struct CoreRust {
     is_dark: bool,
     wallpaper_colors_json: QString,
     hostname: QString,
+    pc_label: QString,
     device_type: QString,
     icon_theme: QString,
     drives_json: QString,
+    mtp_json: QString,
     frequent_dirs_json: QString,
     places_json: QString,
     smb_profiles_json: QString,
@@ -359,6 +372,7 @@ pub struct CoreRust {
     /// An undo or redo is running; further requests wait for it.
     history_running: bool,
     drives: Vec<drives::Drive>,
+    mtp: Vec<mtp::Device>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
     color_watcher: Option<watcher::DirWatcher>,
@@ -370,9 +384,11 @@ impl Default for CoreRust {
             is_dark: theme::detect_system_dark_mode(),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
+            pc_label: QString::from(state::get_or("pcLabel", "")),
             device_type: QString::from(theme::detect_device_type()),
             icon_theme: QString::from("hicolor"),
             drives_json: QString::from("[]"),
+            mtp_json: QString::from("[]"),
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
             smb_profiles_json: QString::from("[]"),
@@ -391,6 +407,7 @@ impl Default for CoreRust {
             redo_stack: Vec::new(),
             history_running: false,
             drives: Vec::new(),
+            mtp: Vec::new(),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
             color_watcher: None,
@@ -507,12 +524,75 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
     }))
 }
 
+/// Removable drives (USB sticks, SD cards, external SSDs) as sidebar entries.
+/// Unmounted drives are kept so they can be mounted from the rail; the entry
+/// id is based on the device node so hidden/reordered state survives mounts.
+fn drive_places(drives: &[drives::Drive]) -> Vec<serde_json::Value> {
+    drives
+        .iter()
+        .filter(|d| d.is_external)
+        .map(|d| {
+            serde_json::json!({
+                "id": format!("drive:{}", d.device),
+                "kind": "drive",
+                "name": d.name,
+                "path": d.mount_point,
+                "icon": if d.is_locked { "lock" } else { "usb" },
+                "system_icon": "drive-removable-media-symbolic",
+                "device": d.device,
+                "disk": d.disk,
+                "mount_point": d.mount_point,
+                "is_mounted": d.is_mounted,
+                "is_external": true,
+                "is_locked": d.is_locked,
+                "is_encrypted": d.is_encrypted,
+                "crypt_device": d.crypt_device,
+                "fs_type": d.fs_type,
+            })
+        })
+        .collect()
+}
+
+/// MTP / Android phones exposed by GVfs as sidebar entries. Ids are based on
+/// the GVfs URI so hidden/reordered state survives unplugging the phone.
+fn mtp_places(devices: &[mtp::Device]) -> Vec<serde_json::Value> {
+    devices
+        .iter()
+        .map(|d| {
+            serde_json::json!({
+                "id": format!("mtp:{}", d.uri),
+                "kind": "mtp",
+                "name": d.name,
+                "path": d.path,
+                "icon": "device-mobile",
+                "system_icon": "phone-symbolic",
+                "uri": d.uri,
+                "device": d.device,
+                "is_mounted": d.is_mounted,
+            })
+        })
+        .collect()
+}
+
+/// Display name for the "This PC" page: a custom label wins over the
+/// hostname, and an empty hostname falls back to the generic title.
+fn pc_name(hostname: &str, pc_label: &str) -> String {
+    let custom = pc_label.trim();
+    if !custom.is_empty() {
+        custom.to_string()
+    } else if hostname.is_empty() {
+        "This PC".to_string()
+    } else {
+        hostname.to_string()
+    }
+}
+
 /// Every sidebar entry, with a `hidden` flag.
-fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
+fn build_places(hostname: &str, pc_label: &str, device_type: &str, drives: &[drives::Drive], mtp: &[mtp::Device]) -> Vec<serde_json::Value> {
     let cfg = places_config();
     let mut items: Vec<serde_json::Value> = Vec::new();
     let pc_icon = if device_type == "laptop" { "laptop" } else { "desktop" };
-    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": if hostname.is_empty() { "This PC" } else { hostname }, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
+    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": pc_name(hostname, pc_label), "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
     items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": "Recent", "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
     items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": "Starred", "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
     // Paths already shown by a built-in place, so a GTK bookmark pointing at
@@ -525,6 +605,26 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
         }
         shown_paths.insert(path.clone());
         items.push(serde_json::json!({"id": p.id, "kind": "place", "name": name, "path": path, "icon": p.icon, "system_icon": format!("{}-symbolic", p.system_icon)}));
+    }
+    // Removable storage (USB drives and phones) is collected now so bookmarks
+    // to the same path can be de-duplicated, but appended at the bottom of the
+    // rail, just above Trash, so it never pushes the user's folders around.
+    let mut storage_places: Vec<serde_json::Value> = Vec::new();
+    for d in drive_places(drives) {
+        if let Some(mount) = d["mount_point"].as_str() {
+            if !mount.is_empty() {
+                shown_paths.insert(mount.to_string());
+            }
+        }
+        storage_places.push(d);
+    }
+    for d in mtp_places(mtp) {
+        if let Some(path) = d["path"].as_str() {
+            if !path.is_empty() {
+                shown_paths.insert(path.to_string());
+            }
+        }
+        storage_places.push(d);
     }
     for b in xdg::bookmarks() {
         let Some(path) = b.path() else { continue };
@@ -567,6 +667,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             "connected": state.connected,
         }));
     }
+    items.extend(storage_places);
     items.push(serde_json::json!({"id": "trash", "kind": "trash", "name": "Trash", "path": "trash:///", "icon": "trash", "system_icon": "user-trash-symbolic"}));
 
     // Apply the user's order: listed ids first in that order, then the rest.
@@ -812,15 +913,23 @@ impl qobject::LoafCore {
         q(&serde_json::to_string(&themes).unwrap_or_default())
     }
     pub fn load_places(mut self: Pin<&mut Self>) {
-        let places: Vec<serde_json::Value> = build_places(&self.hostname().to_string(), &self.device_type().to_string())
-            .into_iter()
-            .filter(|p| !p["hidden"].as_bool().unwrap_or(false))
-            .collect();
+        let places: Vec<serde_json::Value> =
+            build_places(&self.hostname().to_string(), &self.pc_label().to_string(), &self.device_type().to_string(), &self.drives, &self.mtp)
+                .into_iter()
+                .filter(|p| !p["hidden"].as_bool().unwrap_or(false))
+                .collect();
         self.as_mut().set_places_json(q(&serde_json::to_string(&places).unwrap_or_default()));
     }
 
     pub fn all_places_json(&self) -> QString {
-        q(&serde_json::to_string(&build_places(&self.hostname().to_string(), &self.device_type().to_string())).unwrap_or_default())
+        q(&serde_json::to_string(&build_places(
+            &self.hostname().to_string(),
+            &self.pc_label().to_string(),
+            &self.device_type().to_string(),
+            &self.drives,
+            &self.mtp,
+        ))
+        .unwrap_or_default())
     }
 
     pub fn add_bookmark(mut self: Pin<&mut Self>, path: &QString) {
@@ -873,10 +982,16 @@ impl qobject::LoafCore {
 
     pub fn move_place(self: Pin<&mut Self>, id: &QString, to: i32) {
         let mut c = places_config();
-        let mut order: Vec<String> = build_places(&self.hostname().to_string(), &self.device_type().to_string())
-            .iter()
-            .filter_map(|p| p["id"].as_str().map(String::from))
-            .collect();
+        let mut order: Vec<String> = build_places(
+            &self.hostname().to_string(),
+            &self.pc_label().to_string(),
+            &self.device_type().to_string(),
+            &self.drives,
+            &self.mtp,
+        )
+        .iter()
+        .filter_map(|p| p["id"].as_str().map(String::from))
+        .collect();
         let id = id.to_string();
         if let Some(from) = order.iter().position(|o| *o == id) {
             let item = order.remove(from);
@@ -909,6 +1024,14 @@ impl qobject::LoafCore {
     pub fn reset_places(self: Pin<&mut Self>) {
         save_places_config(&PlacesConfig::default());
         self.load_places();
+    }
+
+    /// Custom label for the "This PC" page; empty restores the hostname.
+    pub fn set_pc_name(mut self: Pin<&mut Self>, name: &QString) {
+        let label = name.to_string().trim().to_string();
+        state::set("pcLabel", &label);
+        self.as_mut().set_pc_label(q(&label));
+        self.as_mut().load_places();
     }
 
     pub fn set_starred(mut self: Pin<&mut Self>, paths_json: &QString, on: bool) {
@@ -959,9 +1082,12 @@ impl qobject::LoafCore {
             let list = drives::list();
             let _ = thread.queue(move |mut core| {
                 let json = serde_json::to_string(&list).unwrap_or_else(|_| "[]".into());
+                let changed = core.drives_json().to_string() != json;
                 core.as_mut().rust_mut().drives = list;
-                if core.drives_json().to_string() != json {
+                if changed {
                     core.as_mut().set_drives_json(q(&json));
+                    // Drives are also sidebar places, so refresh those too.
+                    core.as_mut().load_places();
                 }
             });
         });
@@ -1041,6 +1167,62 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let name = name.to_string();
         self.drive_job(format!("Renaming {}", dev), move || drives::set_label(&dev, &name).map(|_| String::new()));
+    }
+
+    /// Refreshes the connected MTP / Android phones (GVfs), then the sidebar.
+    pub fn load_mtp(self: Pin<&mut Self>) {
+        let thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let list = mtp::list();
+            let _ = thread.queue(move |mut core| {
+                let json = serde_json::to_string(&list).unwrap_or_else(|_| "[]".into());
+                let changed = core.mtp_json().to_string() != json;
+                core.as_mut().rust_mut().mtp = list;
+                if changed {
+                    core.as_mut().set_mtp_json(q(&json));
+                    // Phones are also sidebar places, so refresh those too.
+                    core.as_mut().load_places();
+                }
+            });
+        });
+    }
+
+    fn mtp_name(&self, uri: &str) -> String {
+        self.mtp.iter().find(|d| d.uri == uri).map(|d| d.name.clone()).unwrap_or_else(|| "phone".to_string())
+    }
+
+    pub fn mount_mtp(self: Pin<&mut Self>, uri: &QString) {
+        let uri = uri.to_string();
+        let title = format!("Connecting {}", self.mtp_name(&uri));
+        self.spawn_op("drive", title, move |_op| match mtp::mount(&uri) {
+            Ok(path) => {
+                let mut o = Outcome::ok(String::new());
+                o.result = serde_json::json!({"reload_mtp": true, "open_path": path});
+                o
+            }
+            Err(e) => {
+                let mut o = Outcome::err(e);
+                o.result = serde_json::json!({"reload_mtp": true});
+                o
+            }
+        });
+    }
+
+    pub fn unmount_mtp(self: Pin<&mut Self>, uri: &QString) {
+        let uri = uri.to_string();
+        let title = format!("Disconnecting {}", self.mtp_name(&uri));
+        self.spawn_op("drive", title, move |_op| match mtp::unmount(&uri) {
+            Ok(()) => {
+                let mut o = Outcome::ok(String::new());
+                o.result = serde_json::json!({"reload_mtp": true});
+                o
+            }
+            Err(e) => {
+                let mut o = Outcome::err(e);
+                o.result = serde_json::json!({"reload_mtp": true});
+                o
+            }
+        });
     }
 
     fn refresh_smb(mut self: Pin<&mut Self>) {
@@ -2480,13 +2662,20 @@ impl cxx_qt::Initialize for qobject::LoafCore {
         self.as_mut().load_smb_profiles();
         self.as_mut().refresh_frequent_dirs();
         self.as_mut().update_trash_empty();
+        // Populate drives (and their sidebar entries) once before the
+        // hotplug watcher takes over.
+        self.as_mut().load_drives();
+        self.as_mut().load_mtp();
         // Warm the application cache off the UI thread.
         std::thread::spawn(|| {
             let _ = apps::all();
         });
         let t = self.qt_thread();
         let dw = watcher::DeviceWatcher::new(move || {
-            let _ = t.queue(|core| core.load_drives());
+            let _ = t.queue(|mut core| {
+                core.as_mut().load_drives();
+                core.as_mut().load_mtp();
+            });
         });
         self.as_mut().rust_mut().device_watcher = dw;
         // Follow wallpaper palette changes without polling.
@@ -2548,6 +2737,87 @@ impl cxx_qt::Initialize for qobject::LoafCore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn usb_drive(name: &str, device: &str, mount: &str, external: bool, locked: bool) -> drives::Drive {
+        drives::Drive {
+            name: name.to_string(),
+            device: device.to_string(),
+            disk: "/dev/sdb".to_string(),
+            mount_point: mount.to_string(),
+            is_mounted: !mount.is_empty(),
+            is_external: external,
+            is_locked: locked,
+            is_encrypted: locked,
+            crypt_device: if locked { "/dev/dm-0".to_string() } else { String::new() },
+            fs_type: "exfat".to_string(),
+            total_bytes: 100,
+            used_bytes: 40,
+            free_bytes: 60,
+            total_str: "100 B".to_string(),
+            used_str: "40 B".to_string(),
+            free_str: "60 B".to_string(),
+            percent: 40.0,
+            model: "SanDisk".to_string(),
+        }
+    }
+
+    #[test]
+    fn removable_drives_become_sidebar_places() {
+        let list = vec![
+            usb_drive("System", "/dev/nvme0n1p2", "/", false, false),
+            usb_drive("STICK", "/dev/sdb1", "/run/media/u/STICK", true, false),
+            usb_drive("Vault", "/dev/sdc1", "", true, true),
+        ];
+        let places = drive_places(&list);
+        assert_eq!(places.len(), 2, "internal disks are not sidebar places");
+
+        let stick = &places[0];
+        assert_eq!(stick["id"], "drive:/dev/sdb1");
+        assert_eq!(stick["kind"], "drive");
+        assert_eq!(stick["path"], "/run/media/u/STICK");
+        assert_eq!(stick["is_mounted"], true);
+        assert_eq!(stick["disk"], "/dev/sdb");
+
+        let vault = &places[1];
+        assert_eq!(vault["path"], "");
+        assert_eq!(vault["is_locked"], true, "locked drives can be unlocked from the rail");
+        assert_eq!(vault["icon"], "lock");
+    }
+
+    #[test]
+    fn mtp_devices_become_sidebar_places() {
+        let phone = mtp::Device {
+            name: "Pixel 8".to_string(),
+            uri: "mtp://[usb:001,004]".to_string(),
+            device: "/dev/bus/usb/001/004".to_string(),
+            path: "/run/user/1000/gvfs/mtp:host=%5Busb%3A001%2C004%5D".to_string(),
+            is_mounted: true,
+        };
+        let idle = mtp::Device {
+            name: "Samsung".to_string(),
+            uri: "mtp://SAMSUNG_SAMSUNG_Android_".to_string(),
+            device: String::new(),
+            path: String::new(),
+            is_mounted: false,
+        };
+        let places = mtp_places(&[phone, idle]);
+        assert_eq!(places.len(), 2);
+        assert_eq!(places[0]["id"], "mtp:mtp://[usb:001,004]");
+        assert_eq!(places[0]["kind"], "mtp");
+        assert_eq!(places[0]["icon"], "device-mobile");
+        assert_eq!(places[0]["is_mounted"], true);
+        assert_eq!(places[0]["path"], "/run/user/1000/gvfs/mtp:host=%5Busb%3A001%2C004%5D");
+        assert_eq!(places[1]["is_mounted"], false, "unmounted phones stay in the rail so they can connect");
+        assert_eq!(places[1]["path"], "");
+    }
+
+    #[test]
+    fn this_pc_label_prefers_the_custom_name() {
+        assert_eq!(pc_name("archbox", ""), "archbox");
+        assert_eq!(pc_name("archbox", "   "), "archbox", "blank labels fall back");
+        assert_eq!(pc_name("archbox", "Gaming rig"), "Gaming rig");
+        assert_eq!(pc_name("", ""), "This PC", "no hostname, no label");
+    }
 
     #[test]
     fn network_bookmark_places() {

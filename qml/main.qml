@@ -13,7 +13,7 @@ ApplicationWindow {
     background: null
     title: (nativeBridge.isAdmin ? qsTr("[Administrator] ") : "") + "Loaf - " + (activeView === "settings"
         ? qsTr("Settings")
-        : activeView === "pc" ? (core.hostname || qsTr("This PC"))
+        : activeView === "pc" ? window.pcTitle()
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
 
@@ -270,7 +270,7 @@ ApplicationWindow {
         if (window.activeView === "settings")
             t.title = qsTr("Settings");
         else if (window.activeView === "pc")
-            t.title = core.hostname || qsTr("This PC");
+            t.title = window.pcTitle();
         else
             t.title = engine.current_dir_name;
     }
@@ -340,7 +340,7 @@ ApplicationWindow {
         var target = (isSettings || isPc) ? "" : (path || core.user_dir("HOME"));
         var list = tabs.slice();
         var state = JSON.stringify({ location: target, back: [], forward: [] });
-        var title = isSettings ? qsTr("Settings") : (isPc ? (core.hostname || qsTr("This PC")) : titleFromState(state));
+        var title = isSettings ? qsTr("Settings") : (isPc ? window.pcTitle() : titleFromState(state));
         list.splice(currentTab + 1, 0, {
             states: [state, ""],
             split: false,
@@ -378,7 +378,7 @@ ApplicationWindow {
             }
         }
         activeView = "pc";
-        markCurrentTab("pc", core.hostname || qsTr("This PC"));
+        markCurrentTab("pc", window.pcTitle());
     }
 
     function openSettings() {
@@ -736,6 +736,14 @@ ApplicationWindow {
             }
             if (r && r.reload_drives)
                 core.load_drives();
+            if (r && r.reload_mtp)
+                core.load_mtp();
+            if (r && r.open_path) {
+                // A phone was just connected: show its storage right away.
+                window.showFiles();
+                searchInput.text = "";
+                engine.set_path(r.open_path);
+            }
             if (r && r.created && r.created.length > 0) {
                 // Select what was just created in the pane showing its folder.
                 var parent = r.created[0].substring(0, r.created[0].lastIndexOf("/"));
@@ -809,6 +817,11 @@ ApplicationWindow {
         return names[settingsView.activeTab] || names[0];
     }
 
+    // Title of the "This PC" page: a custom name wins over the hostname.
+    function pcTitle() {
+        return core.pc_label || core.hostname || qsTr("This PC");
+    }
+
     function startEditingPath() {
         pathInput.text = window.activeView === "pc" ? "pc://"
             : (window.activeView === "settings" ? window.settingsUrl()
@@ -827,7 +840,7 @@ ApplicationWindow {
         }
         if (raw === "pc" || raw === "pc://" || raw === "pc:///" || raw === "thispc://" || raw === "computer:///") {
             window.activeView = "pc";
-            window.markCurrentTab("pc", core.hostname || qsTr("This PC"));
+            window.markCurrentTab("pc", window.pcTitle());
         } else if (raw === "settings" || raw.indexOf("settings://") === 0) {
             window.activeView = "settings";
             window.markCurrentTab("settings", qsTr("Settings"));
@@ -1202,7 +1215,7 @@ ApplicationWindow {
                             }
                             Text {
                                 text: window.activeView === "pc"
-                                    ? (core.hostname || qsTr("This PC"))
+                                    ? window.pcTitle()
                                     : window.settingsTabName()
                                 color: theme.secondaryContainerFg
                                 font.pixelSize: theme.fs(12)
@@ -1487,6 +1500,38 @@ ApplicationWindow {
                             core.open_uri(place.path);
                         return;
                     }
+                    if (place.kind === "drive") {
+                        if (inNewTab && place.is_mounted && place.path) {
+                            window.newTab(place.path);
+                            return;
+                        }
+                        window.showFiles();
+                        searchInput.text = "";
+                        if (place.is_mounted && place.path) {
+                            engine.set_path(place.path);
+                        } else if (place.is_locked) {
+                            core.unlock_drive(place.device, "", false);
+                        } else {
+                            core.mount_drive(place.device);
+                            window.toast("info", qsTr("Mounting “%1”…").arg(place.name));
+                        }
+                        return;
+                    }
+                    if (place.kind === "mtp") {
+                        if (place.is_mounted && place.path) {
+                            if (inNewTab) {
+                                window.newTab(place.path);
+                                return;
+                            }
+                            window.showFiles();
+                            searchInput.text = "";
+                            engine.set_path(place.path);
+                        } else {
+                            core.mount_mtp(place.uri);
+                            window.toast("info", qsTr("Connecting “%1”…").arg(place.name));
+                        }
+                        return;
+                    }
                     if (inNewTab && place.path) {
                         window.newTab(place.path);
                         return;
@@ -1549,7 +1594,7 @@ ApplicationWindow {
                             : !!(window.tabs[index] && window.tabs[index].split)
 
                         readonly property string leftName: current
-                            ? (window.activeView === "settings" ? qsTr("Settings") : (window.activeView === "pc" ? (core.hostname || qsTr("This PC")) : pane0.engine.current_dir_name))
+                            ? (window.activeView === "settings" ? qsTr("Settings") : (window.activeView === "pc" ? window.pcTitle() : pane0.engine.current_dir_name))
                             : (window.tabs[index] ? (window.tabs[index].title || qsTr("Tab")) : "")
                         readonly property string rightName: current ? (pane1Loader.item ? pane1Loader.item.engine.current_dir_name : (window.tabs[index] ? window.tabs[index].rightTitle || qsTr("Split") : qsTr("Split")))
                             : (window.tabs[index] ? (window.tabs[index].rightTitle || qsTr("Split")) : qsTr("Split"))
@@ -2535,12 +2580,55 @@ ApplicationWindow {
                 openAt(x, y);
                 return;
             }
+            if (place.kind === "drive") {
+                var mounted = place.is_mounted === true;
+                if (mounted && place.path) {
+                    m.push({ text: qsTr("Open"), icon: "folder-open", action: function() { window.showFiles(); engine.set_path(place.path); } });
+                    m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
+                }
+                if (!mounted && place.is_locked)
+                    m.push({ text: qsTr("Unlock…"), icon: "lock-open", separatorBefore: true, action: function() { core.unlock_drive(place.device, "", false); } });
+                else if (!mounted)
+                    m.push({ text: qsTr("Mount"), icon: "download", separatorBefore: true, action: function() { core.mount_drive(place.device); } });
+                if (mounted)
+                    m.push({ text: qsTr("Unmount"), icon: "eject", separatorBefore: true, action: function() { core.unmount_drive(place.device); } });
+                if (place.is_encrypted && place.crypt_device && !mounted)
+                    m.push({ text: qsTr("Lock Encrypted Drive"), icon: "lock", action: function() { core.lock_drive(place.crypt_device); } });
+                if (place.disk && place.is_external !== false)
+                    m.push({ text: qsTr("Eject (Safely Remove)"), icon: "eject", separatorBefore: !mounted, action: function() { core.eject_drive(place.disk); } });
+                m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
+                m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
+                m.push({ text: qsTr("Hide from Sidebar"), icon: "eye-slash", separatorBefore: true, action: function() { core.set_place_hidden(place.id, true); } });
+                m.push({ text: qsTr("Customize Sidebar…"), icon: "sliders-horizontal", action: function() { customizePlaces.open(); } });
+                model = m;
+                openAt(x, y);
+                return;
+            }
+            if (place.kind === "mtp") {
+                var connected = place.is_mounted === true;
+                if (connected && place.path) {
+                    m.push({ text: qsTr("Open"), icon: "folder-open", action: function() { window.showFiles(); engine.set_path(place.path); } });
+                    m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
+                    m.push({ text: qsTr("Disconnect"), icon: "plug-slash", separatorBefore: true, action: function() { core.unmount_mtp(place.uri); } });
+                } else {
+                    m.push({ text: qsTr("Connect"), icon: "plug", action: function() { core.mount_mtp(place.uri); } });
+                }
+                m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
+                m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
+                m.push({ text: qsTr("Hide from Sidebar"), icon: "eye-slash", separatorBefore: true, action: function() { core.set_place_hidden(place.id, true); } });
+                m.push({ text: qsTr("Customize Sidebar…"), icon: "sliders-horizontal", action: function() { customizePlaces.open(); } });
+                model = m;
+                openAt(x, y);
+                return;
+            }
             if (place.path && place.path.indexOf("/") === 0)
                 m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
             if (place.kind === "trash")
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
+            if (place.kind === "pc")
+                m.push({ text: qsTr("Rename This PC…"), icon: "pencil-simple", action: function() { pcView.renamePc(); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
             m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
             if (place.kind === "bookmark")
