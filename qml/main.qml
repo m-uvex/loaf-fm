@@ -9,13 +9,17 @@ ApplicationWindow {
     height: 720
     minimumWidth: 640
     minimumHeight: 420
-    visible: true
     background: null
     title: (nativeBridge.isAdmin ? qsTr("[Administrator] ") : "") + "Loaf - " + (activeView === "settings"
         ? qsTr("Settings")
         : activeView === "pc" ? (core.hostname || qsTr("This PC"))
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
+
+    // Portal activation (--portal) starts without a main window; it shows
+    // up when a normal open request arrives.
+    readonly property bool portalOnly: nativeBridge.portalOnly
+    visible: !portalOnly
 
     // Mirror the whole layout for right-to-left languages.
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
@@ -149,7 +153,15 @@ ApplicationWindow {
         if (!win)
             return;
         pickerWindows[handle] = win;
-        win.finished.connect(function(finishedHandle) { delete window.pickerWindows[finishedHandle]; });
+        win.finished.connect(window.pickerFinished);
+    }
+
+    function pickerFinished(handle) {
+        delete pickerWindows[handle];
+        // A portal-only instance with nothing left to show can exit; the
+        // next request activates it again.
+        if (portalOnly && !visible && Object.keys(pickerWindows).length === 0)
+            Qt.quit();
     }
 
     function closePicker(handle) {
@@ -511,7 +523,8 @@ ApplicationWindow {
                 window.width = s.width;
                 window.height = s.height;
             }
-            if (s.maximized)
+            // Portal-only windows stay hidden until a real request arrives.
+            if (!portalOnly && s.maximized)
                 window.showMaximized();
             sidebar.expanded = s.sidebar === true;
             if (!geometryOnly && s.tabs && s.tabs.length > 0) {
@@ -526,11 +539,19 @@ ApplicationWindow {
     }
 
     // Paths from the command line or D-Bus (another `loaf`, a browser's
-    // "Show in folder", ...).
+    // "Show in folder", ...). The empty start-up emission from queueOpen
+    // must not un-hide a portal-only window.
     function handleOpenRequest(paths, mode) {
+        // A second `loaf --portal` only checks that we serve the portal.
+        if (mode === "portal")
+            return;
+        if (!visible && (mode === "window" || paths.length > 0))
+            visible = true;
         if (mode === "window" || paths.length === 0) {
-            window.raise();
-            window.requestActivate();
+            if (visible) {
+                window.raise();
+                window.requestActivate();
+            }
             if (mode === "window")
                 newTab(core.user_dir("HOME"));
             return;

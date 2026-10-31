@@ -265,6 +265,7 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
     const QString modeStr = toQString(mode);
     const bool newWindow = modeStr.contains(QLatin1String("new-window"));
     const bool portalMode = modeStr.contains(QLatin1String("portal"));
+    native->setPortalMode(portalMode);
     native->queueOpen(toLocalPaths(raw), modeStr.section(QLatin1Char(','), 0, 0));
 
     QDBusConnection bus = QDBusConnection::sessionBus();
@@ -288,7 +289,7 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         // portal mode (D-Bus activation) it is the reason we are running,
         // so losing the race to another backend means there is nothing to
         // do and the process can exit quietly.
-        if (!native->initPortal()) {
+        if (!native->initPortal(portalMode)) {
             if (portalMode)
                 QTimer::singleShot(0, QCoreApplication::instance(), &QCoreApplication::quit);
             else

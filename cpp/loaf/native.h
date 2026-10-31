@@ -20,6 +20,9 @@ class LoafNative : public QObject
     Q_OBJECT
     // "tab" (normal) or "mini" (compact window, from --mini).
     Q_PROPERTY(QString startupMode READ startupMode CONSTANT)
+    // True when started through D-Bus activation (--portal): only picker
+    // windows are shown until a normal open request arrives.
+    Q_PROPERTY(bool portalOnly READ portalOnly CONSTANT)
     // True when started through "Open as Administrator".
     Q_PROPERTY(bool isAdmin READ isAdmin CONSTANT)
 public:
@@ -46,8 +49,9 @@ public:
 
     // ---- portal file chooser ----------------------------------------------
     // Creates the portal service and exports the FileChooser backend.
-    // Returns false when another backend owns the portal name.
-    bool initPortal();
+    // Returns false when another backend owns the portal name. In portal
+    // mode (D-Bus activation) the service exits when idle.
+    bool initPortal(bool portalOnly);
     // QML answers a picker request: code 0 = picked, 1 = cancelled. The
     // results JSON carries uris (paths), choices and current_filter.
     Q_INVOKABLE void respondPicker(const QString &handle, uint code, const QString &resultsJson);
@@ -60,7 +64,9 @@ public:
     Q_INVOKABLE void setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const;
 
     void queueOpen(const QStringList &paths, const QString &mode);
+    void setPortalMode(bool portal) { m_portalOnly = portal; }
     QString startupMode() const { return m_mode; }
+    bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
 
 Q_SIGNALS:
@@ -78,6 +84,7 @@ private:
 
     QStringList m_pending;
     QString m_mode = QStringLiteral("tab");
+    bool m_portalOnly = false;
     QVariantMap m_clipboard;
     class PortalService *m_portal = nullptr;
 };

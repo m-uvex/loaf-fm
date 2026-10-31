@@ -69,6 +69,10 @@ class PortalService : public QObject
 public:
     explicit PortalService(LoafNative *native);
 
+    // Portal-only instances (--portal activation) exit when the last
+    // picker is answered and no file manager window is visible.
+    void setPortalOnly(bool portalOnly) { m_portalOnly = portalOnly; }
+
     void start(const QString &kind, const QDBusObjectPath &handle, const QString &appId,
                const QString &parentWindow, const QString &title, const QVariantMap &options,
                const QDBusMessage &message);
@@ -86,10 +90,12 @@ private:
 
     void beginRequest(const QString &handle, const QString &spec);
     void finishRequest(const QString &handle, bool dismissed);
+    void quitIfIdle();
     // Takes the pending entry out; returns false when it is already gone.
     bool takePending(const QString &handle, QDBusMessage *reply);
 
     LoafNative *m_native;
+    bool m_portalOnly = false;
     QMutex m_mutex;
     QMap<QString, PendingRequest> m_pending;
 };
