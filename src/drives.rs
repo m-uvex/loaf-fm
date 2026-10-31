@@ -313,12 +313,12 @@ mod tests {
 
     #[test]
     fn parses_drives() {
-        let d = parse_lsblk(SAMPLE, &|m| if m == "/home" { Some((1000, 250)) } else { None }, &|_| false);
+        let d = parse_lsblk(SAMPLE, &|m| if m == "/" { Some((1000, 250)) } else { None }, &|_| false);
         let names: Vec<_> = d.iter().map(|x| x.device.as_str()).collect();
         assert_eq!(names, vec!["/dev/nvme0n1p2", "/dev/sdb1", "/dev/sdc1"], "efi, swap and loop are hidden");
         let root = &d[0];
         assert_eq!(root.name, "fedora");
-        assert_eq!(root.mount_point, "/home");
+        assert_eq!(root.mount_point, "/", "prefers / over a submount like /home");
         assert_eq!(root.percent, 75.0);
         assert!(!root.is_external);
         let usb = &d[1];
