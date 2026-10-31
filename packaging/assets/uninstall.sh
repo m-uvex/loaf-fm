@@ -11,6 +11,8 @@ echo "Uninstalling Loaf from $PREFIX..."
 
 rm -f "$PREFIX/bin/loaf"
 rm -f "$PREFIX/share/applications/loaf.desktop"
+rm -f "$PREFIX/share/xdg-desktop-portal/portals/loaf.portal"
+rm -f "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service"
 rm -rf "$PREFIX/share/licenses/loaf"
 find "$PREFIX/share/icons/hicolor" -name "loaf.png" -delete 2>/dev/null || true
 find "$PREFIX/share/icons/hicolor" -name "loaf.svg" -delete 2>/dev/null || true
