@@ -350,16 +350,22 @@ rust::String mime_comment_for(rust::Str mime)
     return toRust(db.mimeTypeForName(toQString(mime)).comment());
 }
 
-void set_application_identity(rust::Str version)
+void set_application_identity(rust::Str version, rust::Str window_class)
 {
     // Keep an alpha channel even when the window starts with a solid background;
     // users can enable translucency later without recreating the window.
     QQuickWindow::setDefaultAlphaBuffer(true);
     QCoreApplication::setApplicationVersion(toQString(version));
-    QCoreApplication::setApplicationName(QStringLiteral("loaf"));
+    // The application name is the X11 WM_CLASS instance name and the desktop
+    // file id is the Wayland app id / X11 class name. Both take `--class` so
+    // window rules match whichever part the compositor looks at.
+    QString windowClass = toQString(window_class);
+    if (windowClass.isEmpty())
+        windowClass = QStringLiteral("loaf");
+    QCoreApplication::setApplicationName(windowClass);
     QCoreApplication::setOrganizationName(QStringLiteral("loaf"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Loaf"));
-    QGuiApplication::setDesktopFileName(QStringLiteral("loaf"));
+    QGuiApplication::setDesktopFileName(windowClass);
 }
 
 } // namespace loaf

@@ -154,7 +154,8 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
 rust::String mime_type_for(rust::Str path, bool sniff);
 rust::String mime_comment_for(rust::Str mime);
 
-// Sets the application name / desktop file id (Wayland app id).
-void set_application_identity(rust::Str version);
+// Sets the application name / desktop file id (Wayland app id, X11 window
+// class) from `window_class`.
+void set_application_identity(rust::Str version, rust::Str window_class);
 
 } // namespace loaf
