@@ -322,10 +322,17 @@ Window {
                     }
                     return "";
                 }
-                // Only real folders are useful in a picker; special places
-                // (This PC, settings) have no meaning here.
+                // Recent/Starred/Trash list real files, so they are
+                // browsable in a picker; This PC and settings have no
+                // meaning here.
                 onPlaceClicked: function(place) {
-                    if (place.path && place.path.indexOf("/") === 0 && !place.missing)
+                    if (place.kind === "trash")
+                        pane.engine.open_trash();
+                    else if (place.kind === "recent")
+                        pane.engine.open_recent();
+                    else if (place.kind === "starred")
+                        pane.engine.open_starred();
+                    else if (place.path && place.path.indexOf("/") === 0 && !place.missing)
                         pane.engine.set_path(place.path);
                 }
                 onSettingsClicked: {}
