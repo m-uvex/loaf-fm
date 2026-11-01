@@ -60,6 +60,7 @@ Window {
     // serialized as "true"/"false" in the reply.
     property var choiceValues: ({})
     property bool answered: false
+    property bool pathEditing: false
 
     readonly property string acceptLabel: {
         if ((request.accept_label || "").length > 0)
@@ -134,6 +135,42 @@ Window {
     function applyPickerRules() {
         var f = activeFilterObject;
         pane.engine.set_picker_rules(f && f.patterns && f.patterns.length > 0 ? JSON.stringify(f) : "", directoryMode);
+    }
+
+    // True while a text field owns the keyboard, so the window-level key
+    // handler must not steal keys for view navigation.
+    readonly property bool fieldHasFocus: searchField.activeFocus || pathInput.activeFocus || nameField.activeFocus
+
+    function startEditingPath() {
+        pathInput.text = pane.engine.location_kind === "dir" ? pane.engine.current_path : "";
+        pathEditing = true;
+        pathInput.forceActiveFocus();
+        pathInput.selectAll();
+    }
+
+    function commitPathEdit() {
+        var raw = pathInput.text.trim();
+        pathEditing = false;
+        rootLayout.forceActiveFocus();
+        if (raw.length === 0)
+            return;
+        pane.engine.set_path(raw);
+        clearSearch();
+    }
+
+    function clearSearch() {
+        searchField.text = "";
+        if (pane.engine.location_kind === "search")
+            pane.engine.clear_search();
+    }
+
+    Timer {
+        id: searchDebounce
+        interval: 250
+        onTriggered: {
+            if (searchField.text.trim().length > 0)
+                pane.engine.search(searchField.text, "folder", theme.searchContents);
+        }
     }
 
     // Answers the request on the D-Bus side and closes the window. `uris`
@@ -247,7 +284,19 @@ Window {
         spacing: 0
         focus: true
 
+        // Navigating leaves search/filter mode; keep the field in sync.
+        Connections {
+            target: pane.engine
+            function onCurrent_pathChanged() {
+                if (searchField.text.length > 0)
+                    searchField.text = "";
+            }
+        }
+
         Keys.onPressed: function(event) {
+            // Text fields own the keyboard first.
+            if (fieldHasFocus)
+                return;
             if (event.key === Qt.Key_Escape) {
                 respond(1, []);
                 event.accepted = true;
@@ -287,7 +336,7 @@ Window {
         // ---- header: title and filter ------------------------------------
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 60
+            Layout.preferredHeight: 56
 
             Text {
                 anchors.left: parent.left
@@ -323,6 +372,218 @@ Window {
                     value: String(activeFilter)
                     accessibleName: qsTr("File type filter")
                     onSelected: function(value) { activeFilter = parseInt(value); }
+                }
+            }
+        }
+
+        // ---- header: path bar and search -----------------------------------
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.bottomMargin: 10
+            spacing: 10
+
+            // Path bar: breadcrumbs, click to type a path (Tab completes).
+            Rectangle {
+                id: pathBar
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                radius: theme.radiusFull
+                color: theme.surfaceContainer
+                border.width: pathInput.activeFocus ? 2 : 1
+                border.color: pathInput.activeFocus ? theme.primary : theme.outlineVariant
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 8
+
+                    LoafIcon {
+                        name: pane.engine.location_kind === "search" ? "magnifying-glass" : "folder"
+                        size: 16
+                        color: theme.primary
+                    }
+
+                    TextInput {
+                        id: pathInput
+                        Layout.fillWidth: true
+                        visible: pathEditing
+                        color: theme.textMain
+                        font.pixelSize: theme.fs(13)
+                        font.family: "monospace"
+                        selectByMouse: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        clip: true
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: qsTr("Location")
+                        Keys.onReturnPressed: commitPathEdit()
+                        Keys.onEnterPressed: commitPathEdit()
+                        Keys.onEscapePressed: function(event) {
+                            pathEditing = false;
+                            rootLayout.forceActiveFocus();
+                            event.accepted = true;
+                        }
+                        Keys.onTabPressed: function(event) {
+                            var done = core.complete_path(text, pane.engine.show_hidden);
+                            if (done !== text) {
+                                text = done;
+                                cursorPosition = text.length;
+                            }
+                            event.accepted = true;
+                        }
+                        onActiveFocusChanged: if (!activeFocus && pathEditing) pathEditing = false
+                    }
+
+                    ListView {
+                        id: breadcrumbs
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 32
+                        visible: !pathEditing
+                        orientation: ListView.Horizontal
+                        spacing: 4
+                        clip: true
+                        model: JSON.parse(pane.engine.breadcrumbs_json || "[]")
+                        onCountChanged: Qt.callLater(positionViewAtEnd)
+                        interactive: contentWidth > width
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        delegate: Item {
+                            id: crumbDelegate
+                            required property var modelData
+                            required property int index
+                            width: crumbRow.implicitWidth + 20
+                            height: breadcrumbs.height
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: theme.radiusFull
+                                color: crumbMouse.containsMouse || crumbDelegate.isCurrent ? theme.hoverOverlay : "transparent"
+                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            }
+                            RowLayout {
+                                id: crumbRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                LoafIcon {
+                                    name: crumbDelegate.modelData.icon
+                                    size: 14
+                                    color: crumbDelegate.isCurrent ? theme.primary : theme.textMuted
+                                }
+                                Text {
+                                    text: crumbDelegate.modelData.name
+                                    color: crumbDelegate.isCurrent ? theme.textMain : theme.textMuted
+                                    font.pixelSize: theme.fs(13)
+                                    font.bold: crumbDelegate.isCurrent
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            MouseArea {
+                                id: crumbMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: !crumbDelegate.modelData.is_forward
+                                opacity: crumbDelegate.modelData.is_forward ? 0.4 : 1.0
+                                onClicked: pane.engine.set_path(crumbDelegate.modelData.path)
+                            }
+                            readonly property bool isCurrent: {
+                                var next = breadcrumbs.model[crumbDelegate.index + 1];
+                                return !crumbDelegate.modelData.is_forward && (!next || next.is_forward);
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: !pathEditing
+                        cursorShape: Qt.IBeamCursor
+                        onClicked: startEditingPath()
+                    }
+                }
+            }
+
+            // Search: typing filters the current view, Enter searches the
+            // folder subtree.
+            Rectangle {
+                id: searchBox
+                Layout.preferredWidth: 230
+                Layout.preferredHeight: 40
+                radius: theme.radiusFull
+                color: theme.surfaceContainer
+                border.width: searchField.activeFocus ? 2 : 1
+                border.color: searchField.activeFocus ? theme.primary : theme.outlineVariant
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 8
+                    spacing: 8
+
+                    LoafIcon {
+                        name: "magnifying-glass"
+                        size: 16
+                        color: theme.textMuted
+                    }
+
+                    TextInput {
+                        id: searchField
+                        Layout.fillWidth: true
+                        color: theme.textMain
+                        font.pixelSize: theme.fs(13)
+                        selectByMouse: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        clip: true
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: qsTr("Search")
+
+                        Text {
+                            text: pane.engine.location_kind === "search" ? qsTr("Search…") : qsTr("Filter this folder…")
+                            color: theme.outline
+                            font.pixelSize: theme.fs(13)
+                            visible: !searchField.text && !searchField.activeFocus
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        onTextChanged: {
+                            if (pane.engine.location_kind === "search")
+                                searchDebounce.restart();
+                            else
+                                pane.engine.set_filter(text);
+                        }
+                        Keys.onReturnPressed: function(event) {
+                            if (text.trim().length > 0)
+                                pane.engine.search(text, "folder", theme.searchContents);
+                            event.accepted = true;
+                        }
+                        Keys.onEnterPressed: function(event) {
+                            if (text.trim().length > 0)
+                                pane.engine.search(text, "folder", theme.searchContents);
+                            event.accepted = true;
+                        }
+                        Keys.onEscapePressed: function(event) {
+                            clearSearch();
+                            event.accepted = true;
+                        }
+                    }
+
+                    LoafIcon {
+                        name: "x"
+                        size: 14
+                        color: theme.textMuted
+                        visible: searchField.text.length > 0
+                        opacity: searchClearMouse.containsMouse ? 1.0 : 0.6
+
+                        MouseArea {
+                            id: searchClearMouse
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: clearSearch()
+                        }
+                    }
                 }
             }
         }
