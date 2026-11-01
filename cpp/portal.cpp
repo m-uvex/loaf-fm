@@ -70,10 +70,10 @@ QJsonObject filterToJson(const PortalFilter &filter)
 {
     QJsonArray patterns;
     for (const PortalPattern &pattern : filter.patterns) {
-        // 0 = glob, 1 = MIME type; anything else cannot be honored.
-        const char *kind = pattern.kind == 0 ? "glob" : pattern.kind == 1 ? "mime" : nullptr;
-        if (!kind)
-            continue;
+        // 0 = glob, 1 = MIME type; anything else is best-effort treated as
+        // a glob rather than dropped, so a filter can never silently turn
+        // into a catch-all.
+        const char *kind = pattern.kind == 1 ? "mime" : "glob";
         patterns.append(QJsonArray { QLatin1String(kind), pattern.pattern });
     }
     return QJsonObject { { "name", filter.name }, { "patterns", patterns } };

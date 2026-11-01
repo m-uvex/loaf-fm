@@ -73,16 +73,20 @@ impl Filter {
 }
 
 /// Apps occasionally send regex-flavored patterns instead of shell globs
-/// (e.g. `.*pdf` or `.*\.pdf` from an accept attribute). Normalize the
-/// common cases so they behave like the globs the spec asks for:
-/// a leading `.*` becomes `*` and escaped dots become literal dots.
+/// (e.g. `.*pdf` or `.*\.pdf` from an accept attribute), and catch-all
+/// filters arrive as `.*`, `*` or `*.*`. Normalize the common cases so
+/// they behave like the globs the spec asks for: a leading `.*` becomes
+/// `*`, escaped dots become literal dots, and `*.*` widens to `*` (an
+/// extensionless file is still a file).
 fn normalize_glob(pattern: &str) -> String {
-    let unescaped = pattern.replace("\\.", ".");
-    if let Some(rest) = unescaped.strip_prefix(".*") {
-        format!("*{rest}")
-    } else {
-        unescaped
+    let mut normalized = pattern.replace("\\.", ".");
+    if let Some(rest) = normalized.strip_prefix(".*") {
+        normalized = format!("*{rest}");
     }
+    if normalized == "*.*" {
+        normalized = "*".to_string();
+    }
+    normalized
 }
 
 #[cfg(test)]
@@ -175,6 +179,10 @@ mod tests {
         assert!(f.matches("doc.pdf", false, &fake_mime));
         let f = filter("Everything", &[("glob", ".*")]);
         assert!(f.matches("whatever.txt", false, &fake_mime));
+        // Firefox-style "All Files" catch-alls arrive as *.* or .*.
+        let f = filter("All Files", &[("glob", "*.*")]);
+        assert!(f.matches("100MB.bin", false, &fake_mime));
+        assert!(f.matches("makefile", false, &fake_mime));
         // Ordinary globs are untouched.
         let f = filter("Images", &[("glob", "*.png")]);
         assert!(f.matches("shot.png", false, &fake_mime));

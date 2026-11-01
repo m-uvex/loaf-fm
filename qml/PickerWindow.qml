@@ -22,10 +22,22 @@ Window {
 
     readonly property var filters: request.filters || []
     // True when the app already offers a catch-all (a filter with no
-    // patterns), so we do not add a second "All files" entry.
+    // patterns, or one whose patterns all mean "everything" — Firefox
+    // sends `.*` or `*.*`), so we do not add a second "All files" entry.
     readonly property bool appHasCatchAll: {
         for (var i = 0; i < filters.length; ++i) {
-            if ((filters[i].patterns || []).length === 0)
+            var patterns = filters[i].patterns || [];
+            if (patterns.length === 0)
+                return true;
+            var allStar = true;
+            for (var j = 0; j < patterns.length; ++j) {
+                var p = String((patterns[j] || [])[1] || "");
+                if (p !== "*" && p !== ".*" && p !== "*.*") {
+                    allStar = false;
+                    break;
+                }
+            }
+            if (allStar)
                 return true;
         }
         return false;

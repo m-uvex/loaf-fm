@@ -13,6 +13,11 @@ use super::filters::Filter;
 /// `{"ok":true,"spec":...}` on success, `{"ok":false,"error":...}` when the
 /// request must be answered with a response code of 2.
 pub fn normalize_request_json(raw: &str) -> String {
+    // LOAF_VERBOSE diagnostics go to stderr directly (Qt logging may be
+    // routed elsewhere); this is the one place every request passes.
+    if std::env::var("LOAF_VERBOSE").is_ok() {
+        eprintln!("loaf: portal request: {raw}");
+    }
     match normalize(raw) {
         Ok(spec) => json!({ "ok": true, "spec": spec }).to_string(),
         Err(error) => json!({ "ok": false, "error": error }).to_string(),
