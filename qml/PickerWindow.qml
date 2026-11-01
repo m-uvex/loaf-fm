@@ -311,6 +311,7 @@ Window {
                 Layout.fillHeight: true
                 Layout.preferredWidth: implicitWidth
                 expanded: true
+                pickerMode: true
                 activeId: {
                     var kind = pane.engine.location_kind;
                     if (kind === "trash" || kind === "recent" || kind === "starred")

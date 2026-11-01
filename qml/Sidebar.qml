@@ -10,6 +10,9 @@ Rectangle {
     id: rail
 
     property bool expanded: false
+    // Portal picker: Settings has no meaning there and Trash only shows
+    // when it has content.
+    property bool pickerMode: false
     // Id of the highlighted entry ("pc", "settings", "home", "bookmark:/x", ...).
     property string activeId: ""
 
@@ -33,7 +36,9 @@ Rectangle {
         return { id: "trash", kind: "trash", name: qsTr("Trash"), path: "trash:///", icon: "trash", system_icon: "user-trash-symbolic" };
     }
 
-    readonly property bool showTrash: !theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active)
+    readonly property bool showTrash: pickerMode
+        ? (typeof core !== "undefined" && core && !core.trash_empty)
+        : (!theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active))
 
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
@@ -345,6 +350,7 @@ Rectangle {
 
         RailButton {
             id: settingsBtn
+            visible: !rail.pickerMode
             Layout.fillWidth: true
             iconName: "gear"
             systemIcon: "preferences-system-symbolic"
