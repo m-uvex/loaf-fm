@@ -981,7 +981,7 @@ impl qobject::LoafEngine {
         }
         self.as_mut().set_portal_filter_json(filter_json.clone());
         self.as_mut().set_dir_only(dir_only);
-        self.refilter(false);
+        self.as_mut().refilter(false);
     }
 
     pub fn toggle_show_hidden(mut self: Pin<&mut Self>) {

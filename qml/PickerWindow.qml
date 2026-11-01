@@ -21,23 +21,27 @@ Window {
     readonly property bool modal: request.modal !== false
 
     readonly property var filters: request.filters || []
+    // True when the app already offers a catch-all (a filter with no
+    // patterns), so we do not add a second "All files" entry.
+    readonly property bool appHasCatchAll: {
+        for (var i = 0; i < filters.length; ++i) {
+            if ((filters[i].patterns || []).length === 0)
+                return true;
+        }
+        return false;
+    }
     readonly property var filterOptions: {
-        var options = [{ "value": "-1", "label": qsTr("All files") }];
+        var options = [];
+        if (!appHasCatchAll)
+            options.push({ "value": "-1", "label": qsTr("All files") });
         for (var i = 0; i < filters.length; ++i)
             options.push({ "value": String(i), "label": filters[i].name });
         return options;
     }
-    // Index into `filters`, -1 = all files.
-    property int activeFilter: {
-        var current = request.current_filter;
-        if (current) {
-            for (var i = 0; i < filters.length; ++i) {
-                if (filters[i].name === current.name)
-                    return i;
-            }
-        }
-        return -1;
-    }
+    // Index into `filters`, -1 = all files. Starts plain and is set
+    // imperatively in onCompleted so the current_filter match cannot fight
+    // with user selections.
+    property int activeFilter: -1
     readonly property var activeFilterObject: activeFilter >= 0 && activeFilter < filters.length ? filters[activeFilter] : null
 
     // Chosen value per choice id; booleans are stored as JS booleans and
@@ -96,14 +100,28 @@ Window {
             pane.engine.set_path(start);
         if ((request.current_file || "").length > 0)
             pane.pendingSelect = [request.current_file];
+        // Preselect the app's current_filter, if it matches one by name.
+        var current = request.current_filter;
+        if (current) {
+            for (var j = 0; j < filters.length; ++j) {
+                if (filters[j].name === current.name) {
+                    activeFilter = j;
+                    break;
+                }
+            }
+        }
         nativeBridge.setPickerTransient(picker, request.parent_window || "", modal);
         applyPickerRules();
     }
 
     // Directory-only and the selected filter are engine rules, so the
-    // normal listing machinery does the filtering.
+    // normal listing machinery does the filtering. A catch-all (the
+    // synthetic "All files" or an app filter without patterns) maps to no
+    // engine filter at all, so toggling filters can never leave a
+    // restrictive rule behind.
     function applyPickerRules() {
-        pane.engine.set_picker_rules(activeFilterObject ? JSON.stringify(activeFilterObject) : "", directoryMode);
+        var f = activeFilterObject;
+        pane.engine.set_picker_rules(f && f.patterns && f.patterns.length > 0 ? JSON.stringify(f) : "", directoryMode);
     }
 
     // Answers the request on the D-Bus side and closes the window. `uris`
@@ -313,9 +331,6 @@ Window {
                 expanded: true
                 pickerMode: true
                 activeId: {
-                    var kind = pane.engine.location_kind;
-                    if (kind === "trash" || kind === "recent" || kind === "starred")
-                        return kind;
                     var places = sidebar.places;
                     for (var i = 0; i < places.length; ++i) {
                         if (places[i].path && places[i].path === pane.engine.current_path)
@@ -323,17 +338,10 @@ Window {
                     }
                     return "";
                 }
-                // Recent/Starred/Trash list real files, so they are
-                // browsable in a picker; This PC and settings have no
-                // meaning here.
+                // The picker only offers real folders; Recent/Starred/Trash
+                // and This PC are hidden entirely.
                 onPlaceClicked: function(place) {
-                    if (place.kind === "trash")
-                        pane.engine.open_trash();
-                    else if (place.kind === "recent")
-                        pane.engine.open_recent();
-                    else if (place.kind === "starred")
-                        pane.engine.open_starred();
-                    else if (place.path && place.path.indexOf("/") === 0 && !place.missing)
+                    if (place.path && place.path.indexOf("/") === 0 && !place.missing)
                         pane.engine.set_path(place.path);
                 }
                 onSettingsClicked: {}

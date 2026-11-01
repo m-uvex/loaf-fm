@@ -10,8 +10,8 @@ Rectangle {
     id: rail
 
     property bool expanded: false
-    // Portal picker: Settings has no meaning there and Trash only shows
-    // when it has content.
+    // Portal picker: Settings, This PC, Recent, Starred and Trash have no
+    // meaning there and are hidden.
     property bool pickerMode: false
     // Id of the highlighted entry ("pc", "settings", "home", "bookmark:/x", ...).
     property string activeId: ""
@@ -36,9 +36,8 @@ Rectangle {
         return { id: "trash", kind: "trash", name: qsTr("Trash"), path: "trash:///", icon: "trash", system_icon: "user-trash-symbolic" };
     }
 
-    readonly property bool showTrash: pickerMode
-        ? (typeof core !== "undefined" && core && !core.trash_empty)
-        : (!theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active))
+    readonly property bool showTrash: !pickerMode
+        && (!theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active))
 
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
@@ -245,7 +244,14 @@ Rectangle {
             clip: true
             spacing: 6
             boundsBehavior: Flickable.StopAtBounds
-            model: rail.places.filter(function(p) { return p.id !== "trash"; })
+            model: rail.places.filter(function(p) {
+                if (p.id === "trash")
+                    return false;
+                // The picker can only return real files and folders.
+                if (rail.pickerMode && (p.kind === "pc" || p.kind === "recent" || p.kind === "starred"))
+                    return false;
+                return true;
+            })
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
 
             onContentYChanged: rail.updateHighlight()

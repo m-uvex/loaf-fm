@@ -66,9 +66,22 @@ impl Filter {
         }
         let lowered = file_name.to_lowercase();
         self.patterns.iter().any(|pattern| match pattern.kind {
-            FilterKind::Glob => glob_match(&pattern.pattern.to_lowercase(), &lowered),
+            FilterKind::Glob => glob_match(&normalize_glob(&pattern.pattern).to_lowercase(), &lowered),
             FilterKind::MimeType => mime_matches(file_name, &pattern.pattern, is_dir),
         })
+    }
+}
+
+/// Apps occasionally send regex-flavored patterns instead of shell globs
+/// (e.g. `.*pdf` or `.*\.pdf` from an accept attribute). Normalize the
+/// common cases so they behave like the globs the spec asks for:
+/// a leading `.*` becomes `*` and escaped dots become literal dots.
+fn normalize_glob(pattern: &str) -> String {
+    let unescaped = pattern.replace("\\.", ".");
+    if let Some(rest) = unescaped.strip_prefix(".*") {
+        format!("*{rest}")
+    } else {
+        unescaped
     }
 }
 
@@ -149,6 +162,26 @@ mod tests {
     fn empty_patterns_match_everything() {
         let f = filter("All files", &[]);
         assert!(f.matches("anything.bin", false, &fake_mime));
+    }
+
+    #[test]
+    fn regex_flavored_globs_are_normalized() {
+        // Apps sometimes send regex-style patterns; they must behave like
+        // the globs the spec asks for.
+        let f = filter("Binaries", &[("glob", ".*bin")]);
+        assert!(f.matches("100MB.bin", false, &fake_mime));
+        assert!(f.matches("bin", false, &fake_mime));
+        let f = filter("Pdf", &[("glob", ".*\\.pdf")]);
+        assert!(f.matches("doc.pdf", false, &fake_mime));
+        let f = filter("Everything", &[("glob", ".*")]);
+        assert!(f.matches("whatever.txt", false, &fake_mime));
+        // Ordinary globs are untouched.
+        let f = filter("Images", &[("glob", "*.png")]);
+        assert!(f.matches("shot.png", false, &fake_mime));
+        assert!(!f.matches("shot.jpg", false, &fake_mime));
+        let f = filter("Dotfiles", &[("glob", ".hidden")]);
+        assert!(f.matches(".hidden", false, &fake_mime));
+        assert!(!f.matches("notes.md", false, &fake_mime));
     }
 
     #[test]
