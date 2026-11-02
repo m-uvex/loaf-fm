@@ -193,6 +193,29 @@ mod tests {
     }
 
     #[test]
+    fn chromium_filters_match_case_insensitive_bracket_globs() {
+        // Chromium encodes extension filters as per-character bracket
+        // classes ("*.bin" arrives as "*.[bB][iI][nN]") and labels its
+        // catch-all "All Files" with the pattern "*.*".
+        let bin = filter("*.bin", &[("glob", "*.[bB][iI][nN]")]);
+        assert!(bin.matches("100MB.bin", false, &fake_mime));
+        assert!(bin.matches("100MB.BIN", false, &fake_mime));
+        assert!(!bin.matches("notes.txt", false, &fake_mime));
+        assert!(!bin.matches("Telegram Desktop", true, &fake_mime));
+        let all = filter("All Files", &[("glob", "*.*")]);
+        assert!(all.matches("100MB.bin", false, &fake_mime));
+        assert!(all.matches("archive.tar.gz", false, &fake_mime));
+    }
+
+    #[test]
+    fn chromiums_filter_json_round_trips_through_the_spec() {
+        let spec = json!({"name": "*.bin", "patterns": [["glob", "*.[bB][iI][nN]"]]});
+        let f = Filter::from_json(&spec).expect("Chromium's filter shape parses");
+        assert!(f.matches("100MB.bin", false, &fake_mime));
+        assert!(!f.matches("photo.png", false, &fake_mime));
+    }
+
+    #[test]
     fn parse_accepts_valid_and_rejects_malformed() {
         let valid = json!({"name": "Images", "patterns": [["glob", "*.png"], ["mime", "image/png"]]});
         assert_eq!(Filter::from_json(&valid), Some(filter("Images", &[("glob", "*.png"), ("mime", "image/png")])));

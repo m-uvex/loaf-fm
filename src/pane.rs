@@ -1134,8 +1134,9 @@ pub fn glob_match(pat: &str, s: &str) -> bool {
     let t: Vec<char> = s.chars().collect();
     let (mut pi, mut ti, mut star, mut mark) = (0usize, 0usize, None::<usize>, 0usize);
     while ti < t.len() {
-        if pi < p.len() && (p[pi] == '?' || p[pi] == t[ti]) {
-            pi += 1;
+        let step = if pi < p.len() { match_step(&p, pi, t[ti]) } else { None };
+        if let Some(next) = step {
+            pi = next;
             ti += 1;
         } else if pi < p.len() && p[pi] == '*' {
             star = Some(pi);
@@ -1153,6 +1154,56 @@ pub fn glob_match(pat: &str, s: &str) -> bool {
         pi += 1;
     }
     pi == p.len()
+}
+
+// One pattern element against one text char, returning the pattern index to
+// continue at or None. `?` and `*` are the usual wildcards; `[...]` is an
+// fnmatch character class, and an unterminated class degenerates to a
+// literal `[`.
+fn match_step(p: &[char], pi: usize, c: char) -> Option<usize> {
+    match p[pi] {
+        '?' => Some(pi + 1),
+        '[' => match_class(p, pi, c).or_else(|| if c == '[' { Some(pi + 1) } else { None }),
+        ch if ch == c => Some(pi + 1),
+        _ => None,
+    }
+}
+
+// Parses the class starting at `pi` (p[pi] == '[') and matches `c` against
+// it: sets `[abc]`, ranges `[a-z]` (a `-` at an edge is literal), negation
+// via a leading `!` or `^`, and a `]` first in the set is a literal member.
+// Returns the index after the closing `]`, or None when `c` is not in the
+// class or the class never closes.
+fn match_class(p: &[char], pi: usize, c: char) -> Option<usize> {
+    let mut i = pi + 1;
+    let negated = matches!(p.get(i), Some('!') | Some('^'));
+    if negated {
+        i += 1;
+    }
+    let mut hit = false;
+    let mut first = true;
+    while i < p.len() && (first || p[i] != ']') {
+        first = false;
+        if p.get(i + 1) == Some(&'-') && p.get(i + 2).is_some_and(|&ch| ch != ']') {
+            if c >= p[i] && c <= p[i + 2] {
+                hit = true;
+            }
+            i += 3;
+        } else {
+            if c == p[i] {
+                hit = true;
+            }
+            i += 1;
+        }
+    }
+    if i >= p.len() {
+        return None; // never closed
+    }
+    if negated != hit {
+        Some(i + 1)
+    } else {
+        None
+    }
 }
 
 /// Entries directly inside `inner` of an archive listing.
@@ -1239,6 +1290,26 @@ mod tests {
         assert!(glob_match("img_??.png", "img_01.png"));
         assert!(!glob_match("*.jpg", "photo.jpeg"));
         assert!(glob_match("*", ""));
+    }
+
+    #[test]
+    fn globbing_matches_fnmatch_character_classes() {
+        // Chromium sends extension filters case-insensitively this way:
+        // "*.bin" becomes "*.[bB][iI][nN]".
+        assert!(glob_match("*.[bb][ii][nn]", "100mb.bin"));
+        assert!(!glob_match("*.[bb][ii][nn]", "notes.txt"));
+        assert!(glob_match("*.[a-c]ab", "drum.cab"));
+        assert!(!glob_match("*.[a-c]ab", "drum.jar"));
+        assert!(glob_match("b[!aeiou]t", "bxt"));
+        assert!(!glob_match("b[!aeiou]t", "bat"));
+        // A ']' first in the set is a literal member.
+        assert!(glob_match("[]]x", "]x"));
+        // An unterminated class is a literal '['.
+        assert!(glob_match("a[bc", "a[bc"));
+        assert!(!glob_match("a[bc", "abc"));
+        // Classes combine with the usual wildcards.
+        assert!(glob_match("*.[pP][dD][fF]", "doc.PDF"));
+        assert!(glob_match("?.[ab]", "1.b"));
     }
 
     #[test]
