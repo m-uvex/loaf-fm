@@ -290,6 +290,7 @@ pub struct PaneRust {
     read_only: bool,
     dir_only: bool,
     portal_filter_json: QString,
+    portal_filter: Option<crate::portal::filters::Filter>,
 
     loc: Loc,
     /// Location to return to when a search is cleared.
@@ -331,6 +332,7 @@ impl Default for PaneRust {
             read_only: false,
             dir_only: false,
             portal_filter_json: QString::default(),
+            portal_filter: None,
             loc: Loc::Dir(home),
             before_search: None,
             all: Vec::new(),
@@ -587,16 +589,32 @@ impl qobject::LoafEngine {
         let show_hidden = *self.show_hidden();
         // Trash, recent and search lists show everything they found.
         let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. });
-        let portal_filter = crate::portal::filters::Filter::parse(&self.portal_filter_json().to_string());
         let dir_only = *self.dir_only();
+        let mime_cache = std::cell::RefCell::new(std::collections::HashMap::<(String, String), bool>::new());
+        let mime_matches = |name: &str, filter_mime: &str, is_dir: bool| -> bool {
+            let extension_key = match name.rfind('.') {
+                Some(index) if index > 0 => &name[index..],
+                _ => name,
+            };
+            let mut cache = mime_cache.borrow_mut();
+            let key = (extension_key.to_string(), filter_mime.to_string());
+            if let Some(&matched) = cache.get(&key) {
+                return matched;
+            }
+            let matched = crate::native::mime_filter_matches(name, filter_mime, is_dir);
+            cache.insert(key, matched);
+            matched
+        };
         self.all
             .iter()
             .filter(|e| listing::visible(e, show_hidden || !honour_hidden, &filter))
             .filter(|e| !dir_only || e.is_dir)
             .filter(|e| {
-                portal_filter
-                    .as_ref()
-                    .is_none_or(|f| f.matches(&e.name, e.is_dir, &|name, mime, is_dir| crate::native::mime_filter_matches(name, mime, is_dir)))
+                e.is_dir
+                    || self
+                        .portal_filter
+                        .as_ref()
+                        .is_none_or(|f| f.matches(&e.name, e.is_dir, &mime_matches))
             })
             .cloned()
             .collect()
@@ -979,6 +997,8 @@ impl qobject::LoafEngine {
         if *self.portal_filter_json() == *filter_json && *self.dir_only() == dir_only {
             return;
         }
+        let parsed_filter = crate::portal::filters::Filter::parse(&filter_json.to_string());
+        self.as_mut().rust_mut().portal_filter = parsed_filter;
         self.as_mut().set_portal_filter_json(filter_json.clone());
         self.as_mut().set_dir_only(dir_only);
         self.as_mut().refilter(false);

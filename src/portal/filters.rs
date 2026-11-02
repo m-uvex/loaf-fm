@@ -23,6 +23,16 @@ pub struct FilterPattern {
     pub pattern: String,
 }
 
+impl FilterPattern {
+    pub fn new(kind: FilterKind, pattern: &str) -> Self {
+        let pattern = match kind {
+            FilterKind::Glob => normalize_glob(pattern).to_lowercase(),
+            FilterKind::MimeType => pattern.to_string(),
+        };
+        Self { kind, pattern }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Filter {
     pub name: String,
@@ -43,7 +53,7 @@ impl Filter {
                 _ => return None,
             };
             let pattern = entry.get(1)?.as_str()?;
-            patterns.push(FilterPattern { kind, pattern: pattern.to_string() });
+            patterns.push(FilterPattern::new(kind, pattern));
         }
         Some(Filter { name, patterns })
     }
@@ -61,14 +71,22 @@ impl Filter {
     /// (file name, filter MIME, is directory) and decides whether the file
     /// has that MIME type.
     pub fn matches(&self, file_name: &str, is_dir: bool, mime_matches: &impl Fn(&str, &str, bool) -> bool) -> bool {
-        if self.patterns.is_empty() {
+        if self.patterns.is_empty() || is_dir {
             return true;
         }
         let lowered = file_name.to_lowercase();
         self.patterns.iter().any(|pattern| match pattern.kind {
-            FilterKind::Glob => glob_match(&normalize_glob(&pattern.pattern).to_lowercase(), &lowered),
+            FilterKind::Glob => glob_match(&pattern.pattern, &lowered),
             FilterKind::MimeType => mime_matches(file_name, &pattern.pattern, is_dir),
         })
+    }
+
+    /// True when the filter has no patterns or all its patterns are catch-all globs.
+    pub fn is_catch_all(&self) -> bool {
+        self.patterns.is_empty()
+            || self.patterns.iter().all(|pattern| {
+                pattern.kind == FilterKind::Glob && pattern.pattern == "*"
+            })
     }
 }
 
@@ -117,9 +135,11 @@ mod tests {
             name: name.into(),
             patterns: patterns
                 .iter()
-                .map(|(kind, pattern)| FilterPattern {
-                    kind: if *kind == "glob" { FilterKind::Glob } else { FilterKind::MimeType },
-                    pattern: pattern.to_string(),
+                .map(|(kind, pattern)| {
+                    FilterPattern::new(
+                        if *kind == "glob" { FilterKind::Glob } else { FilterKind::MimeType },
+                        pattern,
+                    )
                 })
                 .collect(),
         }
@@ -201,11 +221,20 @@ mod tests {
         assert!(bin.matches("100MB.bin", false, &fake_mime));
         assert!(bin.matches("100MB.BIN", false, &fake_mime));
         assert!(!bin.matches("notes.txt", false, &fake_mime));
-        assert!(!bin.matches("Telegram Desktop", true, &fake_mime));
+        assert!(bin.matches("Telegram Desktop", true, &fake_mime));
         let all = filter("All Files", &[("glob", "*.*")]);
         assert!(all.matches("100MB.bin", false, &fake_mime));
         assert!(all.matches("archive.tar.gz", false, &fake_mime));
     }
+
+    #[test]
+    fn directories_pass_glob_filter() {
+        let bin = filter("*.bin", &[("glob", "*.[bB][iI][nN]")]);
+        assert!(bin.matches("Documents", true, &fake_mime));
+        assert!(bin.matches("Downloads", true, &fake_mime));
+        assert!(!bin.matches("notes.txt", false, &fake_mime));
+    }
+
 
     #[test]
     fn chromiums_filter_json_round_trips_through_the_spec() {

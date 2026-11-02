@@ -93,7 +93,12 @@ pub fn normalize(raw: &str) -> Result<Value, String> {
     spec.insert("current_name".into(), json!(current_name));
     spec.insert("current_file".into(), json!(current_file));
     spec.insert("files".into(), json!(files));
-    spec.insert("filters".into(), json!(filter_list(&value)));
+    let filters = filter_list(&value);
+    let app_has_catch_all = filters
+        .iter()
+        .any(|entry| Filter::from_json(entry).is_some_and(|filter| filter.is_catch_all()));
+    spec.insert("filters".into(), json!(filters));
+    spec.insert("app_has_catch_all".into(), json!(app_has_catch_all));
     spec.insert("current_filter".into(), json!(current_filter(&value)));
     spec.insert("choices".into(), json!(choice_list(&value)));
     Ok(Value::Object(spec))
