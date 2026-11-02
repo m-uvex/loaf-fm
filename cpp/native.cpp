@@ -320,16 +320,28 @@ rust::String mime_type_for(rust::Str path, bool sniff)
     return toRust(db.mimeTypeForFile(toQString(path), sniff ? QMimeDatabase::MatchDefault : QMimeDatabase::MatchExtension).name());
 }
 
-bool mime_filter_matches(const rust::Str fileName, const rust::Str filterMime, bool isDir)
+MimeFilterMatcher::MimeFilterMatcher(const rust::Vec<rust::String> &filterMimes)
 {
-    static QMimeDatabase db;
-    const QMimeType filter = db.mimeTypeForName(toQString(filterMime));
-    if (!filter.isValid())
+    filterTypes.reserve(static_cast<qsizetype>(filterMimes.size()));
+    for (const rust::String &filterMime : filterMimes)
+        filterTypes.append(database.mimeTypeForName(toQString(filterMime)));
+}
+
+bool MimeFilterMatcher::matches(const rust::Str fileName) const
+{
+    const QMimeType actual = database.mimeTypeForFile(toQString(fileName), QMimeDatabase::MatchExtension);
+    if (!actual.isValid())
         return false;
-    if (isDir)
-        return filter.inherits(QStringLiteral("inode/directory"));
-    const QMimeType actual = db.mimeTypeForFile(toQString(fileName), QMimeDatabase::MatchExtension);
-    return actual.isValid() && actual.inherits(filter.name());
+    for (const QMimeType &filter : filterTypes) {
+        if (filter.isValid() && actual.inherits(filter.name()))
+            return true;
+    }
+    return false;
+}
+
+std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes)
+{
+    return std::make_unique<MimeFilterMatcher>(filterMimes);
 }
 
 rust::String mime_comment_for(rust::Str mime)

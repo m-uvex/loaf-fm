@@ -67,26 +67,31 @@ impl Filter {
         Self::from_json(&serde_json::from_str(json).ok()?)
     }
 
-    /// True when `file_name` passes the filter. `mime_matches` receives
-    /// (file name, filter MIME, is directory) and decides whether the file
-    /// has that MIME type.
-    pub fn matches(&self, file_name: &str, is_dir: bool, mime_matches: &impl Fn(&str, &str, bool) -> bool) -> bool {
-        if self.patterns.is_empty() || is_dir {
+    /// True when `file_name` passes the filter. `mime_matches` evaluates the
+    /// filter's MIME patterns with the supplied file name.
+    pub fn matches(&self, file_name: &str, mime_matches: &impl Fn(&str, &Filter) -> bool) -> bool {
+        if self.patterns.is_empty() {
             return true;
         }
         let lowered = file_name.to_lowercase();
-        self.patterns.iter().any(|pattern| match pattern.kind {
-            FilterKind::Glob => glob_match(&pattern.pattern, &lowered),
-            FilterKind::MimeType => mime_matches(file_name, &pattern.pattern, is_dir),
-        })
+        if self.patterns.iter().any(|pattern| {
+            pattern.kind == FilterKind::Glob && glob_match(&pattern.pattern, &lowered)
+        }) {
+            return true;
+        }
+        self.patterns
+            .iter()
+            .any(|pattern| pattern.kind == FilterKind::MimeType)
+            && mime_matches(file_name, self)
     }
 
     /// True when the filter has no patterns or all its patterns are catch-all globs.
     pub fn is_catch_all(&self) -> bool {
         self.patterns.is_empty()
-            || self.patterns.iter().all(|pattern| {
-                pattern.kind == FilterKind::Glob && pattern.pattern == "*"
-            })
+            || self
+                .patterns
+                .iter()
+                .all(|pattern| pattern.kind == FilterKind::Glob && pattern.pattern == "*")
     }
 }
 
@@ -114,10 +119,7 @@ mod tests {
 
     /// Fake shared-mime-info: known extensions plus text/markdown inheriting
     /// text/plain.
-    fn fake_mime(file_name: &str, filter_mime: &str, is_dir: bool) -> bool {
-        if is_dir {
-            return filter_mime == "inode/directory";
-        }
+    fn fake_mime(file_name: &str, filter: &Filter) -> bool {
         let actual = if file_name.ends_with(".png") {
             "image/png"
         } else if file_name.ends_with(".jpg") {
@@ -127,7 +129,11 @@ mod tests {
         } else {
             "application/octet-stream"
         };
-        actual == filter_mime || (actual == "text/markdown" && filter_mime == "text/plain")
+        filter.patterns.iter().any(|pattern| {
+            pattern.kind == FilterKind::MimeType
+                && (actual == pattern.pattern
+                    || (actual == "text/markdown" && pattern.pattern == "text/plain"))
+        })
     }
 
     fn filter(name: &str, patterns: &[(&str, &str)]) -> Filter {
@@ -137,7 +143,11 @@ mod tests {
                 .iter()
                 .map(|(kind, pattern)| {
                     FilterPattern::new(
-                        if *kind == "glob" { FilterKind::Glob } else { FilterKind::MimeType },
+                        if *kind == "glob" {
+                            FilterKind::Glob
+                        } else {
+                            FilterKind::MimeType
+                        },
                         pattern,
                     )
                 })
@@ -148,106 +158,89 @@ mod tests {
     #[test]
     fn glob_patterns_match_case_insensitively() {
         let f = filter("Images", &[("glob", "*.JPG"), ("glob", "*.png")]);
-        assert!(f.matches("photo.jpg", false, &fake_mime));
-        assert!(f.matches("photo.PNG", false, &fake_mime));
-        assert!(!f.matches("photo.jpeg", false, &fake_mime));
-        assert!(f.matches("shot.png", false, &fake_mime));
+        assert!(f.matches("photo.jpg", &fake_mime));
+        assert!(f.matches("photo.PNG", &fake_mime));
+        assert!(!f.matches("photo.jpeg", &fake_mime));
+        assert!(f.matches("shot.png", &fake_mime));
     }
 
     #[test]
     fn mime_patterns_use_the_injected_matcher() {
         let f = filter("Images", &[("mime", "image/png")]);
-        assert!(f.matches("shot.png", false, &fake_mime));
-        assert!(!f.matches("shot.jpg", false, &fake_mime));
-    }
-
-    #[test]
-    fn directories_match_directory_mime_filters() {
-        let f = filter("Folders", &[("mime", "inode/directory")]);
-        assert!(f.matches("Documents", true, &fake_mime));
-        assert!(!f.matches("Documents", false, &fake_mime));
+        assert!(f.matches("shot.png", &fake_mime));
+        assert!(!f.matches("shot.jpg", &fake_mime));
     }
 
     #[test]
     fn mime_inheritance_is_delegated_to_the_matcher() {
         let f = filter("Text", &[("mime", "text/plain")]);
-        assert!(f.matches("notes.md", false, &fake_mime));
+        assert!(f.matches("notes.md", &fake_mime));
     }
 
     #[test]
     fn patterns_are_alternatives() {
         let f = filter("Images", &[("glob", "*.png"), ("mime", "image/jpeg")]);
-        assert!(f.matches("shot.png", false, &fake_mime));
-        assert!(f.matches("shot.jpg", false, &fake_mime));
-        assert!(!f.matches("notes.md", false, &fake_mime));
+        assert!(f.matches("shot.png", &fake_mime));
+        assert!(f.matches("shot.jpg", &fake_mime));
+        assert!(!f.matches("notes.md", &fake_mime));
     }
 
     #[test]
     fn empty_patterns_match_everything() {
         let f = filter("All files", &[]);
-        assert!(f.matches("anything.bin", false, &fake_mime));
+        assert!(f.matches("anything.bin", &fake_mime));
     }
 
     #[test]
     fn regex_flavored_globs_are_normalized() {
-        // Apps sometimes send regex-style patterns; they must behave like
-        // the globs the spec asks for.
         let f = filter("Binaries", &[("glob", ".*bin")]);
-        assert!(f.matches("100MB.bin", false, &fake_mime));
-        assert!(f.matches("bin", false, &fake_mime));
+        assert!(f.matches("100MB.bin", &fake_mime));
+        assert!(f.matches("bin", &fake_mime));
         let f = filter("Pdf", &[("glob", ".*\\.pdf")]);
-        assert!(f.matches("doc.pdf", false, &fake_mime));
+        assert!(f.matches("doc.pdf", &fake_mime));
         let f = filter("Everything", &[("glob", ".*")]);
-        assert!(f.matches("whatever.txt", false, &fake_mime));
-        // Firefox-style "All Files" catch-alls arrive as *.* or .*.
+        assert!(f.matches("whatever.txt", &fake_mime));
         let f = filter("All Files", &[("glob", "*.*")]);
-        assert!(f.matches("100MB.bin", false, &fake_mime));
-        assert!(f.matches("makefile", false, &fake_mime));
-        // Ordinary globs are untouched.
+        assert!(f.matches("100MB.bin", &fake_mime));
+        assert!(f.matches("makefile", &fake_mime));
         let f = filter("Images", &[("glob", "*.png")]);
-        assert!(f.matches("shot.png", false, &fake_mime));
-        assert!(!f.matches("shot.jpg", false, &fake_mime));
+        assert!(f.matches("shot.png", &fake_mime));
+        assert!(!f.matches("shot.jpg", &fake_mime));
         let f = filter("Dotfiles", &[("glob", ".hidden")]);
-        assert!(f.matches(".hidden", false, &fake_mime));
-        assert!(!f.matches("notes.md", false, &fake_mime));
+        assert!(f.matches(".hidden", &fake_mime));
+        assert!(!f.matches("notes.md", &fake_mime));
     }
 
     #[test]
     fn chromium_filters_match_case_insensitive_bracket_globs() {
-        // Chromium encodes extension filters as per-character bracket
-        // classes ("*.bin" arrives as "*.[bB][iI][nN]") and labels its
-        // catch-all "All Files" with the pattern "*.*".
         let bin = filter("*.bin", &[("glob", "*.[bB][iI][nN]")]);
-        assert!(bin.matches("100MB.bin", false, &fake_mime));
-        assert!(bin.matches("100MB.BIN", false, &fake_mime));
-        assert!(!bin.matches("notes.txt", false, &fake_mime));
-        assert!(bin.matches("Telegram Desktop", true, &fake_mime));
+        assert!(bin.matches("100MB.bin", &fake_mime));
+        assert!(bin.matches("100MB.BIN", &fake_mime));
+        assert!(!bin.matches("notes.txt", &fake_mime));
         let all = filter("All Files", &[("glob", "*.*")]);
-        assert!(all.matches("100MB.bin", false, &fake_mime));
-        assert!(all.matches("archive.tar.gz", false, &fake_mime));
+        assert!(all.matches("100MB.bin", &fake_mime));
+        assert!(all.matches("archive.tar.gz", &fake_mime));
     }
-
-    #[test]
-    fn directories_pass_glob_filter() {
-        let bin = filter("*.bin", &[("glob", "*.[bB][iI][nN]")]);
-        assert!(bin.matches("Documents", true, &fake_mime));
-        assert!(bin.matches("Downloads", true, &fake_mime));
-        assert!(!bin.matches("notes.txt", false, &fake_mime));
-    }
-
 
     #[test]
     fn chromiums_filter_json_round_trips_through_the_spec() {
         let spec = json!({"name": "*.bin", "patterns": [["glob", "*.[bB][iI][nN]"]]});
         let f = Filter::from_json(&spec).expect("Chromium's filter shape parses");
-        assert!(f.matches("100MB.bin", false, &fake_mime));
-        assert!(!f.matches("photo.png", false, &fake_mime));
+        assert!(f.matches("100MB.bin", &fake_mime));
+        assert!(!f.matches("photo.png", &fake_mime));
     }
 
     #[test]
     fn parse_accepts_valid_and_rejects_malformed() {
-        let valid = json!({"name": "Images", "patterns": [["glob", "*.png"], ["mime", "image/png"]]});
-        assert_eq!(Filter::from_json(&valid), Some(filter("Images", &[("glob", "*.png"), ("mime", "image/png")])));
+        let valid =
+            json!({"name": "Images", "patterns": [["glob", "*.png"], ["mime", "image/png"]]});
+        assert_eq!(
+            Filter::from_json(&valid),
+            Some(filter(
+                "Images",
+                &[("glob", "*.png"), ("mime", "image/png")]
+            ))
+        );
         assert!(Filter::parse("").is_none());
         assert!(Filter::parse("not json").is_none());
         assert!(Filter::from_json(&json!({"patterns": []})).is_none());

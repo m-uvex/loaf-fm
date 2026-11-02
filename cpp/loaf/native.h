@@ -10,10 +10,27 @@
 
 #include "rust/cxx.h"
 
+#include <QMimeDatabase>
+#include <QMimeType>
+
+#include <memory>
 class QQmlApplicationEngine;
 
 namespace loaf {
 class PortalService;
+class MimeFilterMatcher
+{
+public:
+    explicit MimeFilterMatcher(const rust::Vec<rust::String> &filterMimes);
+    bool matches(rust::Str fileName) const;
+
+private:
+    QMimeDatabase database;
+    QList<QMimeType> filterTypes;
+};
+
+std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes);
+
 
 class LoafNative : public QObject
 {
@@ -136,9 +153,6 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
 // MIME helpers for Rust.
 rust::String mime_type_for(rust::Str path, bool sniff);
 rust::String mime_comment_for(rust::Str mime);
-// Whether a file name matches a MIME filter (shared-mime-info inheritance
-// and aliases included). Directories only match directory types.
-bool mime_filter_matches(rust::Str fileName, rust::Str filterMime, bool isDir);
 
 // Sets the application name / desktop file id (Wayland app id).
 void set_application_identity(rust::Str version);

@@ -495,6 +495,14 @@ fn dir_crumbs(target: &Path) -> Vec<Crumb> {
     out
 }
 
+fn portal_filter_matches_entry(
+    entry: &Entry,
+    portal_filter: Option<&crate::portal::filters::Filter>,
+    mime_matches: &impl Fn(&str, &crate::portal::filters::Filter) -> bool,
+) -> bool {
+    entry.is_dir || portal_filter.is_none_or(|filter| filter.matches(&entry.name, mime_matches))
+}
+
 impl qobject::LoafEngine {
     pub fn row_count(&self, _parent: &QModelIndex) -> i32 {
         self.rows.len() as i32
@@ -590,31 +598,32 @@ impl qobject::LoafEngine {
         // Trash, recent and search lists show everything they found.
         let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. });
         let dir_only = *self.dir_only();
-        let mime_cache = std::cell::RefCell::new(std::collections::HashMap::<(String, String), bool>::new());
-        let mime_matches = |name: &str, filter_mime: &str, is_dir: bool| -> bool {
-            let extension_key = match name.find('.') {
-                Some(index) if index > 0 => &name[index..],
-                _ => name,
-            };
-            let mut cache = mime_cache.borrow_mut();
-            let key = (extension_key.to_string(), filter_mime.to_string());
-            if let Some(&matched) = cache.get(&key) {
-                return matched;
-            }
-            let matched = crate::native::mime_filter_matches(name, filter_mime, is_dir);
-            cache.insert(key, matched);
-            matched
+        let mime_patterns = self
+            .portal_filter
+            .as_ref()
+            .map(|filter| {
+                filter
+                    .patterns
+                    .iter()
+                    .filter(|pattern| pattern.kind == crate::portal::filters::FilterKind::MimeType)
+                    .map(|pattern| pattern.pattern.clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let mime_matcher = (!mime_patterns.is_empty())
+            .then(|| crate::native::ffi::new_mime_filter_matcher(&mime_patterns));
+        let mime_matches = |file_name: &str, _: &crate::portal::filters::Filter| {
+            mime_matcher
+                .as_ref()
+                .and_then(|matcher| matcher.as_ref())
+                .is_some_and(|matcher| matcher.matches(file_name))
         };
         self.all
             .iter()
             .filter(|e| listing::visible(e, show_hidden || !honour_hidden, &filter))
             .filter(|e| !dir_only || e.is_dir)
-            .filter(|e| {
-                e.is_dir
-                    || self
-                        .portal_filter
-                        .as_ref()
-                        .is_none_or(|f| f.matches(&e.name, e.is_dir, &mime_matches))
+            .filter(|entry| {
+                portal_filter_matches_entry(entry, self.portal_filter.as_ref(), &mime_matches)
             })
             .cloned()
             .collect()
@@ -1330,6 +1339,37 @@ mod tests {
         // Classes combine with the usual wildcards.
         assert!(glob_match("*.[pP][dD][fF]", "doc.PDF"));
         assert!(glob_match("?.[ab]", "1.b"));
+    }
+
+    #[test]
+    fn directories_remain_visible_under_portal_glob_filter() {
+        let filter = crate::portal::filters::Filter::parse(
+            r#"{"name":"Binaries","patterns":[["glob","*.bin"]]}"#,
+        )
+        .unwrap();
+        let entry = Entry {
+            name: "Telegram Desktop".into(),
+            name_lower: "telegram desktop".into(),
+            path: "/tmp/Telegram Desktop".into(),
+            is_dir: true,
+            is_symlink: false,
+            is_hidden: false,
+            size: 0,
+            modified: 0,
+            icon: "folder",
+            system_icon: "folder",
+            category: "folder",
+            thumbable: false,
+            detail: String::new(),
+            display_name: "Telegram Desktop".into(),
+        };
+        let mime_matches = |_: &str, _: &crate::portal::filters::Filter| false;
+
+        assert!(portal_filter_matches_entry(
+            &entry,
+            Some(&filter),
+            &mime_matches,
+        ));
     }
 
     #[test]
