@@ -92,6 +92,8 @@ Window {
     modality: modal ? Qt.WindowModal : Qt.NonModal
     visible: true
 
+    Shortcut { sequences: ["Ctrl+L", "Alt+D"]; onActivated: startEditingPath() }
+
     onActiveFilterChanged: applyPickerRules()
 
     onClosing: function(close) {
@@ -143,6 +145,13 @@ Window {
         var f = filterAt(activeFilter);
         pane.engine.set_picker_rules(f && f.patterns && f.patterns.length > 0 ? JSON.stringify(f) : "", directoryMode);
     }
+    function systemIcon(name) {
+        var source = theme.iconSource === "adwaita" ? "adwaita"
+                   : theme.iconSource === "custom" ? theme.customIconTheme
+                   : "system";
+        return core.resolve_icon(source, name);
+    }
+
 
     // True while a text field owns the keyboard, so the window-level key
     // handler must not steal keys for view navigation.
@@ -164,6 +173,62 @@ Window {
         pane.engine.set_path(raw);
         clearSearch();
     }
+    function defocusInputs() {
+        if (searchField.activeFocus)
+            searchField.focus = false;
+        if (pathEditing)
+            pathEditing = false;
+        rootLayout.forceActiveFocus();
+    }
+
+    component TopIconButton: Item {
+        id: tib
+        property string iconName: ""
+        property string systemIcon: ""
+        property string accessibleName: ""
+        property bool small: false
+        signal clicked()
+        implicitWidth: small ? 24 : 36
+        implicitHeight: small ? 24 : 36
+        opacity: enabled ? 1.0 : 0.4
+        Accessible.role: Accessible.Button
+        Accessible.name: accessibleName
+        Accessible.onPressAction: tib.clicked()
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: tibMouse.containsMouse ? theme.hoverOverlay : "transparent"
+            border.width: tib.activeFocus ? 2 : 0
+            border.color: theme.primary
+        }
+        LoafIcon {
+            visible: theme.iconSource === "phosphor" || tib.systemIcon.length === 0
+            anchors.centerIn: parent
+            name: tib.iconName
+            size: tib.small ? 12 : 18
+            color: theme.textMain
+        }
+        Image {
+            visible: theme.iconSource !== "phosphor" && tib.systemIcon.length > 0
+            anchors.centerIn: parent
+            source: visible ? systemIcon(tib.systemIcon) : ""
+            width: 18
+            height: 18
+            sourceSize.width: 36
+            sourceSize.height: 36
+        }
+        MouseArea {
+            id: tibMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: tib.clicked()
+        }
+        ToolTip.visible: tibMouse.containsMouse && tib.accessibleName.length > 0
+        ToolTip.text: tib.accessibleName
+        ToolTip.delay: 600
+    }
+
 
     function clearSearch() {
         searchField.text = "";
@@ -392,21 +457,28 @@ Window {
             Layout.bottomMargin: 10
             spacing: 10
 
-            // Path bar: breadcrumbs, click to type a path (Tab completes).
+            // Path bar: breadcrumbs, or a text field (Ctrl+L) with Tab completion.
             Rectangle {
                 id: pathBar
                 Layout.fillWidth: true
+                Layout.minimumWidth: 140
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
-                border.width: pathInput.activeFocus ? 2 : 1
-                border.color: pathInput.activeFocus ? theme.primary : theme.outlineVariant
+                color: pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer
+                clip: true
+
+                MouseArea {
+                    anchors.fill: parent
+                    onDoubleClicked: startEditingPath()
+                    onClicked: defocusInputs()
+                }
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 6
                     spacing: 8
+                    visible: pathEditing || theme.pathBarMode === "text"
 
                     LoafIcon {
                         name: pane.engine.location_kind === "search" ? "magnifying-glass" : "folder"
@@ -428,11 +500,7 @@ Window {
                         Accessible.name: qsTr("Location")
                         Keys.onReturnPressed: commitPathEdit()
                         Keys.onEnterPressed: commitPathEdit()
-                        Keys.onEscapePressed: function(event) {
-                            pathEditing = false;
-                            rootLayout.forceActiveFocus();
-                            event.accepted = true;
-                        }
+                        Keys.onEscapePressed: { pathEditing = false; rootLayout.forceActiveFocus(); }
                         Keys.onTabPressed: function(event) {
                             var done = core.complete_path(text, pane.engine.show_hidden);
                             if (done !== text) {
@@ -444,51 +512,111 @@ Window {
                         onActiveFocusChanged: if (!activeFocus && pathEditing) pathEditing = false
                     }
 
-                    ListView {
-                        id: breadcrumbs
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 32
+                    // Read-only path mirror for "text only" mode.
+                    Text {
                         visible: !pathEditing
-                        orientation: ListView.Horizontal
-                        spacing: 4
-                        clip: true
-                        model: JSON.parse(pane.engine.breadcrumbs_json || "[]")
-                        onCountChanged: Qt.callLater(positionViewAtEnd)
-                        interactive: contentWidth > width
-                        boundsBehavior: Flickable.StopAtBounds
+                        Layout.fillWidth: true
+                        text: pane.engine.location_kind === "dir" || pane.engine.location_kind === "archive"
+                            ? pane.engine.current_path : pane.engine.location_kind + "://"
+                        color: theme.textMain
+                        font.pixelSize: theme.fs(13)
+                        font.family: "monospace"
+                        elide: Text.ElideMiddle
+                        verticalAlignment: Text.AlignVCenter
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: qsTr("Current location")
+                    }
 
-                        delegate: Item {
-                            id: crumbDelegate
-                            required property var modelData
-                            required property int index
-                            width: crumbRow.implicitWidth + 20
-                            height: breadcrumbs.height
+                    TopIconButton {
+                        visible: pathEditing
+                        iconName: "check"
+                        accessibleName: qsTr("Go")
+                        onClicked: commitPathEdit()
+                    }
+                }
+
+                ListView {
+                    id: breadcrumbs
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    orientation: ListView.Horizontal
+                    spacing: 4
+                    clip: true
+                    visible: !pathEditing && theme.pathBarMode !== "text"
+                    model: JSON.parse(pane.engine.breadcrumbs_json || "[]")
+                    onCountChanged: Qt.callLater(positionViewAtEnd)
+                    interactive: contentWidth > width
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    add: Transition {
+                        enabled: theme.animate
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 180; easing.type: Easing.OutCubic }
+                            NumberAnimation { property: "scale"; from: 0.8; to: 1.0; duration: 200; easing.type: Easing.OutBack }
+                        }
+                    }
+                    displaced: Transition {
+                        enabled: theme.animate
+                        NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+                    }
+
+                    delegate: RowLayout {
+                        id: crumbDelegate
+                        required property var modelData
+                        required property int index
+                        height: breadcrumbs.height
+                        spacing: 4
+
+                        Item {
+                            id: chip
+                            Layout.preferredHeight: 32
+                            Layout.preferredWidth: chipRow.implicitWidth + 22
+                            readonly property var nextCrumb: breadcrumbs.model[crumbDelegate.index + 1]
+                            readonly property bool isCurrent: !crumbDelegate.modelData.is_forward && (!nextCrumb || nextCrumb.is_forward)
+                            Accessible.role: Accessible.Button
+                            Accessible.name: crumbDelegate.modelData.name
 
                             Rectangle {
                                 anchors.fill: parent
                                 radius: theme.radiusFull
-                                color: crumbMouse.containsMouse || crumbDelegate.isCurrent ? theme.hoverOverlay : "transparent"
-                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                                color: crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay)
+                                border.color: crumbDelegate.modelData.is_forward ? theme.outline : "transparent"
+                                border.width: crumbDelegate.modelData.is_forward ? 1 : 0
+                                opacity: (chip.isCurrent || crumbDelegate.modelData.is_forward || chipMouse.containsMouse) ? 1.0 : 0.0
+                                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                             }
+
                             RowLayout {
-                                id: crumbRow
+                                id: chipRow
                                 anchors.centerIn: parent
                                 spacing: 6
                                 LoafIcon {
-                                    name: crumbDelegate.modelData.icon
-                                    size: 14
-                                    color: crumbDelegate.isCurrent ? theme.primary : theme.textMuted
+                                    visible: crumbDelegate.modelData.is_root_place && theme.iconSource === "phosphor"
+                                    name: crumbDelegate.modelData.icon || "folder"
+                                    size: 15
+                                    color: chip.isCurrent ? theme.secondaryContainerFg : theme.textMain
+                                }
+                                Image {
+                                    visible: crumbDelegate.modelData.is_root_place && theme.iconSource !== "phosphor"
+                                    source: visible ? systemIcon(crumbDelegate.modelData.system_icon || "folder") : ""
+                                    Layout.preferredWidth: 15
+                                    Layout.preferredHeight: 15
+                                    sourceSize.width: 32
+                                    sourceSize.height: 32
+                                    fillMode: Image.PreserveAspectFit
                                 }
                                 Text {
                                     text: crumbDelegate.modelData.name
-                                    color: crumbDelegate.isCurrent ? theme.textMain : theme.textMuted
-                                    font.pixelSize: theme.fs(13)
-                                    font.bold: crumbDelegate.isCurrent
-                                    elide: Text.ElideRight
+                                    color: crumbDelegate.modelData.is_forward ? theme.textMuted
+                                        : (chip.isCurrent ? theme.secondaryContainerFg : (chipMouse.containsMouse ? theme.textMain : theme.textMuted))
+                                    font.pixelSize: theme.fs(12)
+                                    font.bold: chip.isCurrent
                                 }
                             }
+
                             MouseArea {
-                                id: crumbMouse
+                                id: chipMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
@@ -496,21 +624,15 @@ Window {
                                 opacity: crumbDelegate.modelData.is_forward ? 0.4 : 1.0
                                 onClicked: pane.engine.set_path(crumbDelegate.modelData.path)
                             }
-                            readonly property bool isCurrent: {
-                                var next = breadcrumbs.model[crumbDelegate.index + 1];
-                                return !crumbDelegate.modelData.is_forward && (!next || next.is_forward);
-                            }
                         }
-                    }
 
-                    // Same contract as the main window's path bar: one
-                    // click hands keyboard focus to the view, double click
-                    // opens the editor.
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: !pathEditing
-                        onClicked: rootLayout.forceActiveFocus()
-                        onDoubleClicked: startEditingPath()
+                        LoafIcon {
+                            visible: crumbDelegate.index < breadcrumbs.count - 1
+                            name: "caret-right"
+                            size: 11
+                            color: theme.outline
+                            Layout.alignment: Qt.AlignVCenter
+                        }
                     }
                 }
             }
