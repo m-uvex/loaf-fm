@@ -58,6 +58,7 @@ public:
     Q_INVOKABLE void cancelPicker(const QString &handle);
     // Overwrite checks for the save dialog.
     Q_INVOKABLE bool fileExists(const QString &path) const;
+    Q_INVOKABLE bool isDirectory(const QString &path) const;
     // Makes a picker window transient for the caller's window on X11
     // ("x11:0x..." handles); Wayland needs xdg-foreign, which Qt Quick does
     // not expose, so there we degrade gracefully.

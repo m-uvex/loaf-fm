@@ -12,8 +12,8 @@
 #include <QDBusMessage>
 #include <QDBusObjectPath>
 #include <QJsonObject>
+#include <optional>
 #include <QMap>
-#include <QMutex>
 #include <QObject>
 #include <QVariantMap>
 
@@ -60,9 +60,8 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, PortalChoicePair 
 QDBusArgument &operator<<(QDBusArgument &argument, const PortalChoice &choice);
 const QDBusArgument &operator>>(const QDBusArgument &argument, PortalChoice &choice);
 
-// Owns the pending requests. QtDBus may deliver adaptor calls on its
-// dispatch thread, so shared state sits behind a mutex and anything that
-// touches QObjects is queued onto the GUI thread.
+// Owns the pending requests. Adaptor slots execute on the GUI thread
+// because the adaptors and PortalService live on that thread.
 class PortalService : public QObject
 {
     Q_OBJECT
@@ -89,14 +88,13 @@ private:
     };
 
     void beginRequest(const QString &handle, const QString &spec);
-    void finishRequest(const QString &handle, bool dismissed);
+    void finishRequest(const QString &handle, QObject *requestObject, bool dismissed);
     void quitIfIdle();
-    // Takes the pending entry out; returns false when it is already gone.
-    bool takePending(const QString &handle, QDBusMessage *reply);
+    // Takes the pending entry out; returns nullopt when already gone.
+    std::optional<PendingRequest> takePending(const QString &handle);
 
     LoafNative *m_native;
     bool m_portalOnly = false;
-    QMutex m_mutex;
     QMap<QString, PendingRequest> m_pending;
 };
 

@@ -188,6 +188,11 @@ bool LoafNative::fileExists(const QString &path) const
 {
     return QFileInfo::exists(path);
 }
+bool LoafNative::isDirectory(const QString &path) const
+{
+    return QFileInfo(path).isDir();
+}
+
 
 void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
 {

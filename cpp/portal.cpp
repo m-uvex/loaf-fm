@@ -112,24 +112,6 @@ T demarshal(const QVariant &value)
     return qdbus_cast<T>(value.value<QDBusArgument>());
 }
 
-// Walks the a{sv} option map from its undecoded form. Values stay as
-// QDBusArgument when complex (see demarshal/demarshalBytes below).
-QVariantMap demarshalOptions(const QDBusArgument &argument)
-{
-    QVariantMap map;
-    QDBusArgument entry = argument;
-    entry.beginMap();
-    while (!entry.atEnd()) {
-        entry.beginMapEntry();
-        QString key;
-        QDBusVariant value;
-        entry >> key >> value;
-        map.insert(key, value.variant());
-        entry.endMapEntry();
-    }
-    entry.endMap();
-    return map;
-}
 
 // Builds the JSON request spec (see src/portal/filters.rs) from the D-Bus
 // option map. Options are kept out of the spec when absent, so the Rust
@@ -341,15 +323,14 @@ PortalService::PortalService(LoafNative *native)
     qDBusRegisterMetaType<QList<PortalChoice>>();
 }
 
-bool PortalService::takePending(const QString &handle, QDBusMessage *reply)
+std::optional<PortalService::PendingRequest> PortalService::takePending(const QString &handle)
 {
-    QMutexLocker locker(&m_mutex);
     const auto it = m_pending.constFind(handle);
     if (it == m_pending.constEnd())
-        return false;
-    *reply = it->reply;
+        return std::nullopt;
+    PendingRequest taken = *it;
     m_pending.erase(it);
-    return true;
+    return taken;
 }
 
 void PortalService::start(const QString &kind, const QDBusObjectPath &handle, const QString &appId,
@@ -358,6 +339,11 @@ void PortalService::start(const QString &kind, const QDBusObjectPath &handle, co
 {
     message.setDelayedReply(true);
     const QString handlePath = handle.path();
+    if (m_pending.contains(handlePath)) {
+        qWarning("loaf: rejecting duplicate portal request handle: %s", qPrintable(handlePath));
+        sendReply(message, 2, QVariantMap());
+        return;
+    }
 
     const QString requestJson =
         buildRequestJson(kind, handlePath, appId, parentWindow, title, options);
@@ -372,13 +358,8 @@ void PortalService::start(const QString &kind, const QDBusObjectPath &handle, co
     }
     const QString spec = QString::fromUtf8(QJsonDocument(envelope.value("spec").toObject()).toJson(QJsonDocument::Compact));
 
-    {
-        QMutexLocker locker(&m_mutex);
-        m_pending.insert(handlePath, PendingRequest { message, nullptr });
-    }
-    // QObject creation and signal emission belong to the GUI thread even if
-    // QtDBus delivered this call on its dispatch thread.
-    QMetaObject::invokeMethod(this, [this, handlePath, spec] { beginRequest(handlePath, spec); }, Qt::QueuedConnection);
+    m_pending.insert(handlePath, PendingRequest { message, nullptr });
+    beginRequest(handlePath, spec);
 }
 
 void PortalService::beginRequest(const QString &handle, const QString &spec)
@@ -387,53 +368,42 @@ void PortalService::beginRequest(const QString &handle, const QString &spec)
     new PortalRequestAdaptor(host, this, handle);
     if (!QDBusConnection::sessionBus().registerObject(handle, host, QDBusConnection::ExportAdaptors)) {
         qWarning("loaf: could not export the portal request object at %s", qPrintable(handle));
-        QDBusMessage reply;
-        if (takePending(handle, &reply))
-            sendReply(reply, 2, QVariantMap());
+        if (auto pending = takePending(handle))
+            sendReply(pending->reply, 2, QVariantMap());
         host->deleteLater();
         return;
     }
-    {
-        QMutexLocker locker(&m_mutex);
-        auto it = m_pending.find(handle);
-        if (it != m_pending.end())
-            it->requestObject = host;
-    }
+    auto it = m_pending.find(handle);
+    if (it != m_pending.end())
+        it->requestObject = host;
     Q_EMIT m_native->pickerRequested(handle, spec);
 }
 
 void PortalService::respond(const QString &handle, uint code, const QString &resultsJson)
 {
-    QDBusMessage reply;
-    if (!takePending(handle, &reply))
+    auto pending = takePending(handle);
+    if (!pending)
         return; // already answered, or a handle we do not know
-    sendReply(reply, code, resultsFromJson(resultsJson));
-    finishRequest(handle, false);
+    sendReply(pending->reply, code, resultsFromJson(resultsJson));
+    finishRequest(handle, pending->requestObject, false);
 }
 
 void PortalService::closeRequest(const QString &handle)
 {
-    QDBusMessage reply;
-    if (!takePending(handle, &reply))
+    auto pending = takePending(handle);
+    if (!pending)
         return;
     // Response 2: the interaction ended in some other way than the user
     // cancelling or picking (the frontend closed the request).
-    sendReply(reply, 2, QVariantMap());
-    QMetaObject::invokeMethod(this, [this, handle] { finishRequest(handle, true); }, Qt::QueuedConnection);
+    sendReply(pending->reply, 2, QVariantMap());
+    finishRequest(handle, pending->requestObject, true);
 }
 
-void PortalService::finishRequest(const QString &handle, bool dismissed)
+void PortalService::finishRequest(const QString &handle, QObject *requestObject, bool dismissed)
 {
     QDBusConnection::sessionBus().unregisterObject(handle, QDBusConnection::UnregisterTree);
-    {
-        QMutexLocker locker(&m_mutex);
-        auto it = m_pending.find(handle);
-        if (it != m_pending.end()) {
-            if (it->requestObject)
-                it->requestObject->deleteLater();
-            m_pending.erase(it);
-        }
-    }
+    if (requestObject)
+        requestObject->deleteLater();
     if (dismissed)
         Q_EMIT m_native->pickerDismissed(handle);
     // A portal-only instance that just answered its last request and shows
@@ -445,11 +415,8 @@ void PortalService::finishRequest(const QString &handle, bool dismissed)
 
 void PortalService::quitIfIdle()
 {
-    {
-        QMutexLocker locker(&m_mutex);
-        if (!m_pending.isEmpty())
-            return;
-    }
+    if (!m_pending.isEmpty())
+        return;
     const auto windows = QGuiApplication::topLevelWindows();
     for (const QWindow *window : windows) {
         if (window->isVisible())
