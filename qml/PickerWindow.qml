@@ -795,6 +795,7 @@ Window {
                     placeholderText: qsTr("File name")
                     Accessible.name: qsTr("File name")
                     onAccepted: acceptRequest()
+                    Keys.onEscapePressed: function(event) { event.accepted = false; }
                 }
             }
 
