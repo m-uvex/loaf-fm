@@ -54,7 +54,14 @@ Window {
     // imperatively in onCompleted so the current_filter match cannot fight
     // with user selections.
     property int activeFilter: -1
-    readonly property var activeFilterObject: activeFilter >= 0 && activeFilter < filters.length ? filters[activeFilter] : null
+
+    // Look the filter up straight from `activeFilter` instead of through a
+    // dependent binding: bindings still hold the previous value while a
+    // change handler runs, so a binding read here applied the previous
+    // filter (every selection lagged one step behind).
+    function filterAt(index) {
+        return index >= 0 && index < filters.length ? filters[index] : null;
+    }
 
     // Chosen value per choice id; booleans are stored as JS booleans and
     // serialized as "true"/"false" in the reply.
@@ -133,7 +140,7 @@ Window {
     // engine filter at all, so toggling filters can never leave a
     // restrictive rule behind.
     function applyPickerRules() {
-        var f = activeFilterObject;
+        var f = filterAt(activeFilter);
         pane.engine.set_picker_rules(f && f.patterns && f.patterns.length > 0 ? JSON.stringify(f) : "", directoryMode);
     }
 
@@ -192,8 +199,9 @@ Window {
             }
             if (choices.length > 0)
                 results.choices = choices;
-            if (activeFilterObject)
-                results.current_filter = activeFilterObject;
+            var currentFilter = filterAt(activeFilter);
+            if (currentFilter)
+                results.current_filter = currentFilter;
         }
         nativeBridge.respondPicker(request.handle, code, JSON.stringify(results));
         finished(request.handle);
@@ -495,11 +503,14 @@ Window {
                         }
                     }
 
+                    // Same contract as the main window's path bar: one
+                    // click hands keyboard focus to the view, double click
+                    // opens the editor.
                     MouseArea {
                         anchors.fill: parent
                         enabled: !pathEditing
-                        cursorShape: Qt.IBeamCursor
-                        onClicked: startEditingPath()
+                        onClicked: rootLayout.forceActiveFocus()
+                        onDoubleClicked: startEditingPath()
                     }
                 }
             }
