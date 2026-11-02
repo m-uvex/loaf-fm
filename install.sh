@@ -285,6 +285,8 @@ install_from_tree() {
             fi
         fi
 
+    fi
+
     if [ -d "$tree/share/icons/hicolor" ]; then
         cp -r "$tree/share/icons/hicolor/." "$PREFIX/share/icons/hicolor/" 2>/dev/null || true
     fi
