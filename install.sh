@@ -263,7 +263,9 @@ install_from_tree() {
     if [ -f "$tree/share/applications/loaf.desktop" ]; then
         install -m 644 "$tree/share/applications/loaf.desktop" "$PREFIX/share/applications/loaf.desktop"
         if [ "$PREFIX" != "/usr" ]; then
-            sed -i "s|^Exec=loaf|Exec=$PREFIX/bin/loaf|" "$PREFIX/share/applications/loaf.desktop" 2>/dev/null || true
+            if ! sed -i "s|^Exec=loaf|Exec=$PREFIX/bin/loaf|" "$PREFIX/share/applications/loaf.desktop" 2>/dev/null; then
+                echo -e "${AMBER}[!] Warning: failed to update Exec path in $PREFIX/share/applications/loaf.desktop${RESET}" >&2
+            fi
         fi
     fi
 
@@ -277,10 +279,11 @@ install_from_tree() {
         install -m 644 "$tree/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service" \
             "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service"
         if [ "$PREFIX" != "/usr" ]; then
-            sed -i "s|^Exec=/usr/bin/loaf|Exec=$PREFIX/bin/loaf|" \
-                "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service" 2>/dev/null || true
+            if ! sed -i "s|^Exec=/usr/bin/loaf|Exec=$PREFIX/bin/loaf|" \
+                "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service" 2>/dev/null; then
+                echo -e "${AMBER}[!] Warning: failed to update Exec path in $PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service${RESET}" >&2
+            fi
         fi
-    fi
 
     if [ -d "$tree/share/icons/hicolor" ]; then
         cp -r "$tree/share/icons/hicolor/." "$PREFIX/share/icons/hicolor/" 2>/dev/null || true

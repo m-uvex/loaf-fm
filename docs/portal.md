@@ -117,9 +117,8 @@ window).
   as raw bytes with the trailing NUL stripped; non-UTF-8 paths are handled
   lossily for display, and the returned URIs are strictly percent-encoded
   `file://` URIs.
-- **Special locations**: Recent/Starred entries can be picked, but accepting
-  with nothing selected in a non-folder view returns an error instead of a
-  URI; archives and `trash:///` cannot be returned.
+- **Special locations**: Recent, Starred and Trash are no longer offered in the
+  picker; only real filesystem folders can be browsed and returned.
 - The C++ D-Bus marshaling layer is exercised by the manual `gdbus` /
   end-to-end tests above rather than unit tests; the filter matching, request
   validation and URI encoding have Rust unit tests (`cargo test`).
