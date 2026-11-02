@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
+import "components"
 
 // One portal file chooser request: a dedicated window that reuses the
 // normal browsing views (sidebar + file pane) plus a filter dropdown, the
@@ -21,27 +22,7 @@ Window {
     readonly property bool modal: request.modal !== false
 
     readonly property var filters: request.filters || []
-    // True when the app already offers a catch-all (a filter with no
-    // patterns, or one whose patterns all mean "everything" — Firefox
-    // sends `.*` or `*.*`), so we do not add a second "All files" entry.
-    readonly property bool appHasCatchAll: {
-        for (var i = 0; i < filters.length; ++i) {
-            var patterns = filters[i].patterns || [];
-            if (patterns.length === 0)
-                return true;
-            var allStar = true;
-            for (var j = 0; j < patterns.length; ++j) {
-                var p = String((patterns[j] || [])[1] || "");
-                if (p !== "*" && p !== ".*" && p !== "*.*") {
-                    allStar = false;
-                    break;
-                }
-            }
-            if (allStar)
-                return true;
-        }
-        return false;
-    }
+    readonly property bool appHasCatchAll: request.app_has_catch_all === true
     readonly property var filterOptions: {
         var options = [];
         if (!appHasCatchAll)
@@ -71,7 +52,7 @@ Window {
 
     readonly property string acceptLabel: {
         if ((request.accept_label || "").length > 0)
-            return request.accept_label;
+            return request.accept_label.replace(/_(_)?/g, function(match, escaped) { return escaped ? "_" : ""; });
         if (isSave)
             return qsTr("Save");
         if (directoryMode || isSaveFiles)
@@ -102,20 +83,22 @@ Window {
     }
 
     Component.onCompleted: {
+        var initialChoiceValues = {};
         for (var i = 0; i < (request.choices || []).length; ++i) {
             var choice = request.choices[i];
             var values = choice.values || [];
             if (values.length === 0)
-                choiceValues[choice.id] = choice.selected === "true";
+                initialChoiceValues[choice.id] = choice.selected === "true";
             else if ((choice.selected || "").length > 0)
-                choiceValues[choice.id] = choice.selected;
+                initialChoiceValues[choice.id] = choice.selected;
             else
-                choiceValues[choice.id] = values[0].id;
+                initialChoiceValues[choice.id] = values[0].id;
         }
+        choiceValues = initialChoiceValues;
         var start = request.start_folder || "";
         if (!start && (isSave || isSaveFiles)) {
-            var documents = pane.engine.current_path + "/Documents";
-            if (nativeBridge.fileExists(documents))
+            var documents = core.user_dir("DOCUMENTS");
+            if (documents && nativeBridge.fileExists(documents))
                 start = documents;
         }
         if (start)
@@ -181,53 +164,6 @@ Window {
         rootLayout.forceActiveFocus();
     }
 
-    component TopIconButton: Item {
-        id: tib
-        property string iconName: ""
-        property string systemIcon: ""
-        property string accessibleName: ""
-        property bool small: false
-        signal clicked()
-        implicitWidth: small ? 24 : 36
-        implicitHeight: small ? 24 : 36
-        opacity: enabled ? 1.0 : 0.4
-        Accessible.role: Accessible.Button
-        Accessible.name: accessibleName
-        Accessible.onPressAction: tib.clicked()
-        Rectangle {
-            anchors.fill: parent
-            radius: width / 2
-            color: tibMouse.containsMouse ? theme.hoverOverlay : "transparent"
-            border.width: tib.activeFocus ? 2 : 0
-            border.color: theme.primary
-        }
-        LoafIcon {
-            visible: theme.iconSource === "phosphor" || tib.systemIcon.length === 0
-            anchors.centerIn: parent
-            name: tib.iconName
-            size: tib.small ? 12 : 18
-            color: theme.textMain
-        }
-        Image {
-            visible: theme.iconSource !== "phosphor" && tib.systemIcon.length > 0
-            anchors.centerIn: parent
-            source: visible ? systemIcon(tib.systemIcon) : ""
-            width: 18
-            height: 18
-            sourceSize.width: 36
-            sourceSize.height: 36
-        }
-        MouseArea {
-            id: tibMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tib.clicked()
-        }
-        ToolTip.visible: tibMouse.containsMouse && tib.accessibleName.length > 0
-        ToolTip.text: tib.accessibleName
-        ToolTip.delay: 600
-    }
 
 
     function clearSearch() {
@@ -296,7 +232,13 @@ Window {
                 return;
             var target = pane.engine.current_path + "/" + name;
             if (nativeBridge.fileExists(target)) {
+                if (nativeBridge.isDirectory(target)) {
+                    pane.engine.set_path(target);
+                    nameField.text = "";
+                    return;
+                }
                 overwriteDialog.targets = [target];
+                overwriteDialog.existingCount = 1;
                 overwriteDialog.open();
                 return;
             }
@@ -318,6 +260,7 @@ Window {
             }
             if (existing.length > 0) {
                 overwriteDialog.targets = uris;
+                overwriteDialog.existingCount = existing.length;
                 overwriteDialog.open();
                 return;
             }
@@ -336,19 +279,20 @@ Window {
         }
         if (selected.length === 0)
             return;
-        if (!multiple) {
-            // A single selected folder is entered instead of returned.
-            if (selected.length === 1) {
-                var row = pane.engine.row_of(selected[0]);
-                var item = row >= 0 ? JSON.parse(pane.engine.item_json(row)) : null;
-                if (item && item.is_dir) {
-                    pane.engine.set_path(item.path);
-                    return;
-                }
-            }
-            selected = [selected[0]];
+        var filePaths = [];
+        var folderPaths = [];
+        for (var index = 0; index < selected.length; ++index) {
+            if (nativeBridge.isDirectory(selected[index]))
+                folderPaths.push(selected[index]);
+            else
+                filePaths.push(selected[index]);
         }
-        respond(0, selected);
+        if (filePaths.length === 0) {
+            if (folderPaths.length === 1)
+                pane.engine.set_path(folderPaths[0]);
+            return;
+        }
+        respond(0, multiple ? filePaths : [filePaths[0]]);
     }
 
     ColumnLayout {
@@ -367,13 +311,20 @@ Window {
         }
 
         Keys.onPressed: function(event) {
-            // Text fields own the keyboard first.
+            if (event.key === Qt.Key_Escape) {
+                // pathInput handles its own Escape (closes path editing).
+                // searchField propagates Escape up when its text is empty.
+                // nameField has no Escape handler, so it propagates here.
+                if (!pathEditing) {
+                    respond(1, []);
+                    event.accepted = true;
+                }
+                return;
+            }
+            // All other keys: text fields own the keyboard first.
             if (fieldHasFocus)
                 return;
-            if (event.key === Qt.Key_Escape) {
-                respond(1, []);
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 acceptRequest();
                 event.accepted = true;
             } else if (event.key === Qt.Key_Left) {
@@ -438,8 +389,6 @@ Window {
                 }
                 LoafSelect {
                     id: filterSelect
-                    width: 220
-                    implicitWidth: 220
                     Layout.preferredWidth: 220
                     options: filterOptions
                     value: String(activeFilter)
@@ -685,19 +634,19 @@ Window {
                             else
                                 pane.engine.set_filter(text);
                         }
-                        Keys.onReturnPressed: function(event) {
+                        function runSearch(event) {
                             if (text.trim().length > 0)
                                 pane.engine.search(text, "folder", theme.searchContents);
                             event.accepted = true;
                         }
-                        Keys.onEnterPressed: function(event) {
-                            if (text.trim().length > 0)
-                                pane.engine.search(text, "folder", theme.searchContents);
-                            event.accepted = true;
-                        }
+                        Keys.onReturnPressed: function(event) { runSearch(event); }
+                        Keys.onEnterPressed: function(event) { runSearch(event); }
                         Keys.onEscapePressed: function(event) {
-                            clearSearch();
-                            event.accepted = true;
+                            if (text.length > 0) {
+                                clearSearch();
+                                event.accepted = true;
+                            }
+                            // Empty search field: let Escape propagate to cancel the dialog.
                         }
                     }
 
@@ -750,7 +699,6 @@ Window {
                     if (place.path && place.path.indexOf("/") === 0 && !place.missing)
                         pane.engine.set_path(place.path);
                 }
-                onSettingsClicked: {}
             }
 
             FilePane {
@@ -760,7 +708,15 @@ Window {
                 showHeader: false
                 pickerMode: true
                 pickerMultiple: multiple
-                onFilePicked: function(path) { respond(0, [path]); }
+                onFilePicked: function(path) {
+                    if (isSaveFiles)
+                        return;
+                    if (isSave) {
+                        nameField.text = path.split("/").pop();
+                        return;
+                    }
+                    respond(0, [path]);
+                }
             }
         }
 
@@ -805,8 +761,6 @@ Window {
                                 font.pixelSize: theme.fs(13)
                             }
                             LoafSelect {
-                                width: 180
-                                implicitWidth: 180
                                 Layout.preferredWidth: 180
                                 options: (modelData.values || []).map(function(value) {
                                     return { "value": value.id, "label": value.label };
@@ -862,7 +816,8 @@ Window {
     LoafDialog {
         id: overwriteDialog
         property var targets: []
-        readonly property bool many: targets.length > 1
+        property int existingCount: 0
+        readonly property bool many: existingCount > 1
         width: 420
         title: many ? qsTr("Replace files?") : qsTr("Replace file?")
 
@@ -872,7 +827,7 @@ Window {
             color: theme.textMain
             font.pixelSize: theme.fs(13)
             text: overwriteDialog.many
-                ? qsTr("%1 of the files already exist in this folder. Replace them?").arg(overwriteDialog.targets.length)
+                ? qsTr("%1 of the files already exist in this folder. Replace them?").arg(overwriteDialog.existingCount)
                 : qsTr("“%1” already exists. Replace it?").arg(overwriteDialog.targets.length > 0 ? overwriteDialog.targets[0].split("/").pop() : "")
         }
 

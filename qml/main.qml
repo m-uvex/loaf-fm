@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
+import "components"
 
 ApplicationWindow {
     id: window
@@ -158,10 +159,6 @@ ApplicationWindow {
 
     function pickerFinished(handle) {
         delete pickerWindows[handle];
-        // A portal-only instance with nothing left to show can exit; the
-        // next request activates it again.
-        if (portalOnly && !visible && Object.keys(pickerWindows).length === 0)
-            Qt.quit();
     }
 
     function closePicker(handle) {
@@ -1833,53 +1830,6 @@ ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 34
-    }
-    component TopIconButton: Item {
-        id: tib
-        property string iconName: ""
-        property string systemIcon: ""
-        property string accessibleName: ""
-        property bool small: false
-        signal clicked()
-        implicitWidth: small ? 24 : 36
-        implicitHeight: small ? 24 : 36
-        opacity: enabled ? 1.0 : 0.4
-        Accessible.role: Accessible.Button
-        Accessible.name: accessibleName
-        Accessible.onPressAction: tib.clicked()
-        Rectangle {
-            anchors.fill: parent
-            radius: width / 2
-            color: tibMouse.containsMouse ? theme.hoverOverlay : "transparent"
-            border.width: tib.activeFocus ? 2 : 0
-            border.color: theme.primary
-        }
-        LoafIcon {
-            visible: theme.iconSource === "phosphor" || tib.systemIcon.length === 0
-            anchors.centerIn: parent
-            name: tib.iconName
-            size: tib.small ? 12 : 18
-            color: theme.textMain
-        }
-        Image {
-            visible: theme.iconSource !== "phosphor" && tib.systemIcon.length > 0
-            anchors.centerIn: parent
-            source: visible ? window.systemIcon(tib.systemIcon) : ""
-            width: 18
-            height: 18
-            sourceSize.width: 36
-            sourceSize.height: 36
-        }
-        MouseArea {
-            id: tibMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tib.clicked()
-        }
-        ToolTip.visible: tibMouse.containsMouse && tib.accessibleName.length > 0
-        ToolTip.text: tib.accessibleName
-        ToolTip.delay: 600
     }
     QtObject {
         id: dragManager
