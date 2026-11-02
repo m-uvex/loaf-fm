@@ -592,7 +592,7 @@ impl qobject::LoafEngine {
         let dir_only = *self.dir_only();
         let mime_cache = std::cell::RefCell::new(std::collections::HashMap::<(String, String), bool>::new());
         let mime_matches = |name: &str, filter_mime: &str, is_dir: bool| -> bool {
-            let extension_key = match name.rfind('.') {
+            let extension_key = match name.find('.') {
                 Some(index) if index > 0 => &name[index..],
                 _ => name,
             };
