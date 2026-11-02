@@ -312,9 +312,8 @@ Window {
 
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Escape) {
-                // pathInput handles its own Escape (closes path editing).
-                // searchField propagates Escape up when its text is empty.
-                // nameField has no Escape handler, so it propagates here.
+                // Escape in path-edit mode is handled by pathInput.
+                // nameField has no Escape handler, so Escape reaches this handler.
                 if (!pathEditing) {
                     respond(1, []);
                     event.accepted = true;
@@ -449,7 +448,11 @@ Window {
                         Accessible.name: qsTr("Location")
                         Keys.onReturnPressed: commitPathEdit()
                         Keys.onEnterPressed: commitPathEdit()
-                        Keys.onEscapePressed: { pathEditing = false; rootLayout.forceActiveFocus(); }
+                        Keys.onEscapePressed: function(event) {
+                            pathEditing = false;
+                            rootLayout.forceActiveFocus();
+                            event.accepted = true;
+                        }
                         Keys.onTabPressed: function(event) {
                             var done = core.complete_path(text, pane.engine.show_hidden);
                             if (done !== text) {
@@ -645,11 +648,12 @@ Window {
                             if (text.length > 0) {
                                 clearSearch();
                                 event.accepted = true;
+                            } else {
+                                event.accepted = false;
                             }
-                            // Empty search field: let Escape propagate to cancel the dialog.
                         }
-                    }
 
+                    }
                     LoafIcon {
                         name: "x"
                         size: 14
