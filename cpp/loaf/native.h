@@ -6,18 +6,40 @@
 #include <QObject>
 #include <QStringList>
 #include <QVariantMap>
+#include <QWindow>
 
 #include "rust/cxx.h"
 
+#include <QMimeDatabase>
+#include <QMimeType>
+
+#include <memory>
 class QQmlApplicationEngine;
 
 namespace loaf {
+class PortalService;
+class MimeFilterMatcher
+{
+public:
+    explicit MimeFilterMatcher(const rust::Vec<rust::String> &filterMimes);
+    bool matches(rust::Str fileName) const;
+
+private:
+    QMimeDatabase database;
+    QList<QMimeType> filterTypes;
+};
+
+std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes);
+
 
 class LoafNative : public QObject
 {
     Q_OBJECT
     // "tab" (normal) or "mini" (compact window, from --mini).
     Q_PROPERTY(QString startupMode READ startupMode CONSTANT)
+    // True when started through D-Bus activation (--portal): only picker
+    // windows are shown until a normal open request arrives.
+    Q_PROPERTY(bool portalOnly READ portalOnly CONSTANT)
     // True when started through "Open as Administrator".
     Q_PROPERTY(bool isAdmin READ isAdmin CONSTANT)
 public:
@@ -42,8 +64,27 @@ public:
     // opened by the UI (drained by QML on start-up).
     Q_INVOKABLE QStringList takePendingOpen();
 
+    // ---- portal file chooser ----------------------------------------------
+    // Creates the portal service and exports the FileChooser backend.
+    // Returns false when another backend owns the portal name. In portal
+    // mode (D-Bus activation) the service exits when idle.
+    bool initPortal(bool portalOnly);
+    // QML answers a picker request: code 0 = picked, 1 = cancelled. The
+    // results JSON carries uris (paths), choices and current_filter.
+    Q_INVOKABLE void respondPicker(const QString &handle, uint code, const QString &resultsJson);
+    Q_INVOKABLE void cancelPicker(const QString &handle);
+    // Overwrite checks for the save dialog.
+    Q_INVOKABLE bool fileExists(const QString &path) const;
+    Q_INVOKABLE bool isDirectory(const QString &path) const;
+    // Makes a picker window transient for the caller's window on X11
+    // ("x11:0x..." handles); Wayland needs xdg-foreign, which Qt Quick does
+    // not expose, so there we degrade gracefully.
+    Q_INVOKABLE void setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const;
+
     void queueOpen(const QStringList &paths, const QString &mode);
+    void setPortalMode(bool portal) { m_portalOnly = portal; }
     QString startupMode() const { return m_mode; }
+    bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
 
 Q_SIGNALS:
@@ -51,13 +92,19 @@ Q_SIGNALS:
     // mode: "tab" (open folders), "select" (show items), "properties",
     // "window" (raise / new window request).
     void openRequested(const QStringList &paths, const QString &mode);
+    // A portal file chooser request arrived; spec is the normalized JSON.
+    void pickerRequested(const QString &handle, const QString &spec);
+    // The request was closed from the D-Bus side (Request.Close()).
+    void pickerDismissed(const QString &handle);
 
 private:
     QVariantMap readClipboard() const;
 
     QStringList m_pending;
     QString m_mode = QStringLiteral("tab");
+    bool m_portalOnly = false;
     QVariantMap m_clipboard;
+    class PortalService *m_portal = nullptr;
 };
 
 // org.freedesktop.FileManager1 (used by browsers' "Show in folder").

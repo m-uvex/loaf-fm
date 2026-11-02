@@ -190,6 +190,7 @@ loaf [OPTIONS] [PATH...]
   -p, --path <DIR>   Start in DIR
   -m, --mini         Start in the compact layout
       --new-window   Open a separate window instead of a tab in the running one
+      --portal       Serve the xdg-desktop-portal file chooser (D-Bus activation)
   -v, --verbose      Print diagnostic messages
       --version      Print the version
   -h, --help         Print help
@@ -197,7 +198,9 @@ loaf [OPTIONS] [PATH...]
 
 Running `loaf <path>` while Loaf is open hands the path to the running window
 (as a new tab). Loaf also answers `org.freedesktop.FileManager1`, so "Show in
-folder" from browsers and other apps opens it.
+folder" from browsers and other apps opens it. Loaf can also act as the
+xdg-desktop-portal file chooser backend so app open/save dialogs use a Loaf
+picker — see [docs/portal.md](docs/portal.md).
 
 ---
 

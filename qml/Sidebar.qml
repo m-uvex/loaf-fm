@@ -10,6 +10,9 @@ Rectangle {
     id: rail
 
     property bool expanded: false
+    // Portal picker: Settings, This PC, Recent, Starred and Trash have no
+    // meaning there and are hidden.
+    property bool pickerMode: false
     // Id of the highlighted entry ("pc", "settings", "home", "bookmark:/x", ...).
     property string activeId: ""
 
@@ -33,7 +36,8 @@ Rectangle {
         return { id: "trash", kind: "trash", name: qsTr("Trash"), path: "trash:///", icon: "trash", system_icon: "user-trash-symbolic" };
     }
 
-    readonly property bool showTrash: !theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active)
+    readonly property bool showTrash: !pickerMode
+        && (!theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active))
 
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
@@ -106,7 +110,13 @@ Rectangle {
                 var it = placeList.itemAtIndex(i);
                 if (it) {
                     var p = it.mapToItem(rail, 0, 0);
-                    selectionHighlight.targetY = p.y;
+                    var listTop = placeList.mapToItem(rail, 0, 0).y;
+                    var listBottom = listTop + placeList.height;
+                    if (p.y < listTop || p.y + it.height > listBottom) {
+                        selectionHighlight.targetY = -100;
+                    } else {
+                        selectionHighlight.targetY = p.y;
+                    }
                     return;
                 }
             }
@@ -234,7 +244,14 @@ Rectangle {
             clip: true
             spacing: 6
             boundsBehavior: Flickable.StopAtBounds
-            model: rail.places.filter(function(p) { return p.id !== "trash"; })
+            model: rail.places.filter(function(p) {
+                if (p.id === "trash")
+                    return false;
+                // The picker can only return real files and folders.
+                if (rail.pickerMode && (p.kind === "pc" || p.kind === "recent" || p.kind === "starred"))
+                    return false;
+                return true;
+            })
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
 
             onContentYChanged: rail.updateHighlight()
@@ -339,6 +356,7 @@ Rectangle {
 
         RailButton {
             id: settingsBtn
+            visible: !rail.pickerMode
             Layout.fillWidth: true
             iconName: "gear"
             systemIcon: "preferences-system-symbolic"

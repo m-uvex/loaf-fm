@@ -23,6 +23,14 @@ if [ "$PREFIX" != "/usr" ]; then
     sed -i "s|^Exec=loaf|Exec=$PREFIX/bin/loaf|" "$PREFIX/share/applications/loaf.desktop"
 fi
 
+# xdg-desktop-portal backend (file chooser) + D-Bus activation.
+mkdir -p "$PREFIX/share/xdg-desktop-portal/portals" "$PREFIX/share/dbus-1/services"
+install -m 644 "$DIR/share/xdg-desktop-portal/portals/loaf.portal" "$PREFIX/share/xdg-desktop-portal/portals/loaf.portal"
+install -m 644 "$DIR/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service" "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service"
+if [ "$PREFIX" != "/usr" ]; then
+    sed -i "s|^Exec=/usr/bin/loaf|Exec=$PREFIX/bin/loaf|" "$PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service"
+fi
+
 cp -r "$DIR/share/icons/hicolor/"* "$PREFIX/share/icons/hicolor/"
 
 if [ -f "$DIR/LICENSE" ] || [ -f "$DIR/share/licenses/loaf/LICENSE" ]; then

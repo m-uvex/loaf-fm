@@ -8,6 +8,8 @@ pub mod info;
 pub mod listing;
 pub mod native;
 pub mod pane;
+pub mod portal;
+pub mod portal_bridge;
 pub mod search;
 pub mod share;
 pub mod smb;
@@ -31,6 +33,8 @@ Options:
   -p, --path <DIR>   Start in DIR
   -m, --mini         Start in the compact (mini) layout
       --new-window   Always open a separate window
+      --portal       Serve the xdg-desktop-portal file chooser (D-Bus
+                     activation): no main window until one is requested
   -v, --verbose      Print diagnostic messages
       --version      Print the version and exit
   -h, --help         Print this help and exit
@@ -40,10 +44,16 @@ struct Args {
     paths: Vec<String>,
     mini: bool,
     new_window: bool,
+    portal: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
-    let mut out = Args { paths: Vec::new(), mini: false, new_window: false };
+    let mut out = Args {
+        paths: Vec::new(),
+        mini: false,
+        new_window: false,
+        portal: false,
+    };
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -58,9 +68,12 @@ fn parse_args() -> Result<Args, String> {
             "-v" | "--verbose" => std::env::set_var("LOAF_VERBOSE", "1"),
             "-m" | "--mini" => out.mini = true,
             "--new-window" => out.new_window = true,
+            "--portal" => out.portal = true,
             "-p" | "--path" => out.paths.push(it.next().ok_or("--path needs a folder")?),
             "--" => out.paths.extend(it.by_ref()),
-            s if s.starts_with('-') && s.len() > 1 => return Err(format!("unknown option '{}' (see --help)", s)),
+            s if s.starts_with('-') && s.len() > 1 => {
+                return Err(format!("unknown option '{}' (see --help)", s))
+            }
             s => out.paths.push(s.to_string()),
         }
     }
@@ -92,8 +105,15 @@ fn main() {
     let mut app = QGuiApplication::new();
     let admin = std::env::var("LOAF_ADMIN").is_ok();
     if !args.new_window && !admin {
-        let mode = if args.paths.is_empty() { "window" } else { "tab" };
-        if native::ffi::forward_to_running_instance(&args.paths, mode) {
+        // A portal handoff must not raise the running instance's window.
+        let (forward_paths, forward_mode) = if args.portal {
+            (Vec::new(), "portal")
+        } else if args.paths.is_empty() {
+            (Vec::new(), "window")
+        } else {
+            (args.paths.clone(), "tab")
+        };
+        if native::ffi::forward_to_running_instance(&forward_paths, forward_mode) {
             return;
         }
     }
@@ -102,14 +122,16 @@ fn main() {
         Ok(path) if !path.is_empty() => QUrl::from(&format!("file://{path}")),
         _ => QUrl::from("qrc:/qt/qml/app/loaf/qml/main.qml"),
     };
-    let mode = match (args.mini, args.new_window || admin) {
-        (true, true) => "mini,new-window",
-        (true, false) => "mini",
-        (false, true) => "tab,new-window",
-        (false, false) => "tab",
-    };
+    let mut modes = vec![if args.mini { "mini" } else { "tab" }];
+    if args.new_window || admin {
+        modes.push("new-window");
+    }
+    if args.portal {
+        modes.push("portal");
+    }
+    let mode = modes.join(",");
     if let Some(mut engine) = engine.as_mut() {
-        native::ffi::setup_engine(engine.as_mut(), &args.paths, mode);
+        native::ffi::setup_engine(engine.as_mut(), &args.paths, &mode);
         engine.load(&url);
     }
     if let Some(app) = app.as_mut() {

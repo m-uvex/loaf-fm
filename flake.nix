@@ -44,6 +44,10 @@
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}";
           postInstall = ''
             install -Dm644 packaging/assets/loaf.desktop $out/share/applications/loaf.desktop
+            install -Dm644 packaging/assets/loaf.portal $out/share/xdg-desktop-portal/portals/loaf.portal
+            install -Dm644 packaging/assets/org.freedesktop.impl.portal.desktop.loaf.service $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service
+            substituteInPlace $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service \
+              --replace-fail "Exec=/usr/bin/loaf" "Exec=$out/bin/loaf"
             mkdir -p $out/share/icons
             cp -r packaging/assets/icons/hicolor $out/share/icons/
           '';
