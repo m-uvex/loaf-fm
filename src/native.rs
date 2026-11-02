@@ -28,7 +28,9 @@ pub mod ffi {
         /// Human readable description of a MIME type ("PNG image").
         fn mime_comment_for(mime: &str) -> String;
 
-        fn set_application_identity(version: &str);
+        /// Sets the application name / desktop file id (Wayland app id, X11
+        /// WM_CLASS) to `window_class`.
+        fn set_application_identity(version: &str, window_class: &str);
     }
 }
 

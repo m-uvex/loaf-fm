@@ -33,6 +33,7 @@ Options:
   -p, --path <DIR>   Start in DIR
   -m, --mini         Start in the compact (mini) layout
       --new-window   Always open a separate window
+      --class <NAME> Use NAME as the window class (Wayland app id / WM_CLASS)
       --portal       Serve the xdg-desktop-portal file chooser (D-Bus
                      activation): no main window until one is requested
   -v, --verbose      Print diagnostic messages
@@ -40,11 +41,15 @@ Options:
   -h, --help         Print this help and exit
 ";
 
+/// Window class (Wayland app id / WM_CLASS) used when `--class` is not given.
+const DEFAULT_CLASS: &str = "loaf";
+
 struct Args {
     paths: Vec<String>,
     mini: bool,
     new_window: bool,
     portal: bool,
+    class: String,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -53,6 +58,7 @@ fn parse_args() -> Result<Args, String> {
         mini: false,
         new_window: false,
         portal: false,
+        class: DEFAULT_CLASS.to_string(),
     };
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -69,6 +75,13 @@ fn parse_args() -> Result<Args, String> {
             "-m" | "--mini" => out.mini = true,
             "--new-window" => out.new_window = true,
             "--portal" => out.portal = true,
+            "--class" => {
+                let name = it.next().ok_or("--class needs a name")?;
+                if name.is_empty() {
+                    return Err("--class needs a name".to_string());
+                }
+                out.class = name;
+            }
             "-p" | "--path" => out.paths.push(it.next().ok_or("--path needs a folder")?),
             "--" => out.paths.extend(it.by_ref()),
             s if s.starts_with('-') && s.len() > 1 => {
@@ -101,10 +114,13 @@ fn main() {
             std::process::exit(2);
         }
     };
-    native::ffi::set_application_identity(env!("CARGO_PKG_VERSION"));
+    native::ffi::set_application_identity(env!("CARGO_PKG_VERSION"), &args.class);
     let mut app = QGuiApplication::new();
     let admin = std::env::var("LOAF_ADMIN").is_ok();
-    if !args.new_window && !admin {
+    // A custom window class is a distinct application identity: the running
+    // instance cannot provide it, so this process runs as its own instance.
+    let standalone = args.new_window || admin || args.class != DEFAULT_CLASS;
+    if !standalone {
         // A portal handoff must not raise the running instance's window.
         let (forward_paths, forward_mode) = if args.portal {
             (Vec::new(), "portal")
@@ -123,7 +139,7 @@ fn main() {
         _ => QUrl::from("qrc:/qt/qml/app/loaf/qml/main.qml"),
     };
     let mut modes = vec![if args.mini { "mini" } else { "tab" }];
-    if args.new_window || admin {
+    if standalone {
         modes.push("new-window");
     }
     if args.portal {
