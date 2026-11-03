@@ -86,6 +86,7 @@ def main():
         source = source.rsplit("}", 1)[0] + (root / "tests/devices-navigation.inc.qml").read_text() + "}\n"
         probe = sandbox / "main.qml"
         probe.write_text(source)
+        os.symlink(root / "qml/components", sandbox / "components")
         config = sandbox / "config/loaf/config.json"
         config.parent.mkdir(parents=True)
         config.write_text(json.dumps({"devicesTestRoot": str(sandbox)}))

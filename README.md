@@ -172,7 +172,7 @@ Requirements:
 Optional at runtime (features degrade gracefully without them):
 - `7zip`/`p7zip` (zip, 7z, rar, iso, encrypted archives), `tar`, `zstd`, `cpio`
 - `udisks2` (mount, eject, unlock encrypted drives, rename labels)
-- KDE MTP support (`kio-extras` with `kmtpd`) for USB phone browsing and read/write transfers; KIOFuse is not required.
+- Optional MTP USB phone support: `kio-extras` package on Arch (`pacman -S kio-extras`), Debian/Ubuntu (`apt install kio-extras`), or `pkgs.kio-extras` on NixOS. This provides the `org.kde.kmtpd5` session D-Bus service for USB phone browsing and read/write transfers. A full KDE Plasma desktop environment or manually running daemon is not required (D-Bus session bus activates the installed service on demand across Hyprland, Sway, GNOME, etc.). When absent, MTP devices degrade cleanly without affecting local disk browsing or causing UI hangs; KIOFuse is not required.
 - `ffmpegthumbnailer` / `evince-thumbnailer` (video and PDF thumbnails)
 - `xdg-utils`, `libsecret` (`secret-tool`, to remember drive passphrases), `polkit` (Open as Administrator)
 

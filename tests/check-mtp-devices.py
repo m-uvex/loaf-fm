@@ -231,8 +231,10 @@ BUS_CONFIG = '''<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen>
 <allow send_destination="*"/><allow receive_sender="*"/></policy></busconfig>'''
 
 
-def inside(binary, directory, missing):
+def inside(binary, directory, mode):
     sandbox = Path(directory)
+    missing = (mode == "missing")
+    autoactivate = (mode == "activate")
     env = os.environ.copy()
     env.update(PATH=str(sandbox / "bin") + os.pathsep + env.get("PATH", os.defpath),
                XDG_CONFIG_HOME=str(sandbox / "config"), QT_QPA_PLATFORM="offscreen",
@@ -240,7 +242,7 @@ def inside(binary, directory, missing):
                LOAF_QML=str(sandbox / "main.qml"), LOAF_DEVICE_TEST_ROOT=directory)
     service = None
     try:
-        if not missing:
+        if not missing and not autoactivate:
             service = subprocess.Popen([sys.executable, str(sandbox / "service.py")], env=env,
                                        stdout=subprocess.PIPE, text=True)
             assert service.stdout.readline().strip() == "READY", "Fixture did not start"
@@ -262,7 +264,7 @@ def inside(binary, directory, missing):
                 print("MTP_UI_TEST_READ_WRITE_PASS (byte comparison, moves, collision and failure preservation)")
             print(marker)
         run_app([], "MTP_UI_TEST_MISSING_SERVICE_PASS" if missing else "MTP_UI_TEST_ALL_PASS")
-        if not missing:
+        if not missing and not autoactivate:
             startup = "mtp://loaf/" + ("/test/phone/" + "long-device-identifier-" * 8).encode().hex() + "/Internal%20storage/Camera"
             config_file = sandbox / "config/loaf/config.json"
             config = json.loads(config_file.read_text())
@@ -277,10 +279,10 @@ def inside(binary, directory, missing):
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--inside":
-        return inside(sys.argv[2], sys.argv[3], sys.argv[4] == "missing")
+        return inside(sys.argv[2], sys.argv[3], sys.argv[4])
     root = Path(__file__).resolve().parents[1]
     binary = str(Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "target/debug/loaf")
-    for missing in [False, True]:
+    for mode in ["present", "activate", "missing"]:
         with tempfile.TemporaryDirectory(prefix="loaf-mtp-") as directory:
             sandbox = Path(directory)
             (sandbox / "stay").mkdir()
@@ -291,9 +293,24 @@ def main():
                 path.chmod(0o755)
             config = sandbox / "config/loaf/config.json"
             config.parent.mkdir(parents=True)
-            config.write_text(json.dumps({"devicesTestRoot": directory, "mtpMissingService": str(missing).lower(), "mtpPrimaryUri": "mtp://loaf/" + ("/test/phone/" + "long-device-identifier-" * 8).encode().hex() + "/"}))
+            config.write_text(json.dumps({"devicesTestRoot": directory, "mtpMissingService": "true" if mode == "missing" else "false", "mtpPrimaryUri": "mtp://loaf/" + ("/test/phone/" + "long-device-identifier-" * 8).encode().hex() + "/"}))
             (sandbox / "service.py").write_text(SERVICE)
-            (sandbox / "bus.conf").write_text(BUS_CONFIG)
+
+            services_dir = sandbox / "services"
+            services_dir.mkdir()
+            if mode == "activate":
+                launcher = sandbox / "start_kmtpd.sh"
+                launcher.write_text(f"""#!/bin/sh\nexport LOAF_DEVICE_TEST_ROOT="{directory}"\necho "ACTIVATED" >> "{sandbox}/activation.log"\nexec "{sys.executable}" "{sandbox}/service.py"\n""")
+                launcher.chmod(0o755)
+                (services_dir / "org.kde.kmtpd5.service").write_text(f"""[D-BUS Service]\nName=org.kde.kmtpd5\nExec={launcher}\n""")
+                bus_config = f"""<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen>
+<servicedir>{services_dir}</servicedir>
+<auth>EXTERNAL</auth><policy context="default"><allow own="*"/>
+<allow send_destination="*"/><allow receive_sender="*"/></policy></busconfig>"""
+            else:
+                bus_config = BUS_CONFIG
+
+            (sandbox / "bus.conf").write_text(bus_config)
             (sandbox / "local.txt").write_bytes(b"Loaf MTP local test bytes\n")
             (sandbox / "failed-move.txt").write_bytes(b"keep this source on failure")
             (sandbox / "move-me.txt").write_bytes(b"move round trip")
@@ -305,13 +322,18 @@ def main():
             (sandbox / "Source tree/.hidden").write_bytes(b"hidden source")
             source = (root / "qml/main.qml").read_text().replace("import app.loaf", "import app.loaf\nimport QtTest", 1)
             (sandbox / "main.qml").write_text(source.rsplit("}",1)[0] + (root / "tests/mtp-navigation.inc.qml").read_text() + "}\n")
-            command = ["dbus-run-session", "--config-file=" + str(sandbox / "bus.conf"), "--", sys.executable, str(Path(__file__).resolve()), "--inside", binary, directory, "missing" if missing else "present"]
+            os.symlink(root / "qml/components", sandbox / "components")
+            command = ["dbus-run-session", "--config-file=" + str(sandbox / "bus.conf"), "--", sys.executable, str(Path(__file__).resolve()), "--inside", binary, directory, mode]
             result = subprocess.run(command, capture_output=True, text=True, timeout=55)
             assert result.returncode == 0, result.stdout + result.stderr
-            if not missing:
+            if mode == "present":
                 calls = [json.loads(line) for line in (sandbox / "list_calls.jsonl").read_text().splitlines()]
                 assert any(call["phone"] == "second" for call in calls), calls
                 assert any(call["path"] == "/a # % π" for call in calls), calls
+            elif mode == "activate":
+                act_log = sandbox / "activation.log"
+                assert act_log.exists() and "ACTIVATED" in act_log.read_text(), "Service was not cold activated by D-Bus!"
+                print("MTP_UI_TEST_COLD_ACTIVATION_PASS")
             print(result.stdout.strip())
 
 
