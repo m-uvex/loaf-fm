@@ -13,9 +13,9 @@ Item {
 
     // ---- customization model -----------------------------------------------
 
-    readonly property var knownSections: ["places", "frequent", "internal", "external"]
+    readonly property var knownSections: ["places", "frequent", "internal", "external", "network"]
 
-    property var sectionOrder: ["places", "frequent", "internal", "external"]
+    property var sectionOrder: ["places", "frequent", "internal", "external", "network"]
     property var sectionConfig: pcView.defaultConfig()
     property bool isCustomizing: false
 
@@ -32,7 +32,8 @@ Item {
             "places": { visible: true, view: "grid" },
             "frequent": { visible: true, view: "carousel" },
             "internal": { visible: true, view: "cards" },
-            "external": { visible: true, view: "cards" }
+            "external": { visible: true, view: "cards" },
+            "network": { visible: true, view: "grid" }
         };
     }
 
@@ -83,6 +84,8 @@ Item {
             return pcView.externalDrives.length > 0;
         if (secKey === "internal")
             return pcView.internalDrives.length > 0;
+        if (secKey === "network")
+            return theme.smbAutoDiscovery && pcView.discoveredServers.length > 0;
         return true;
     }
 
@@ -145,6 +148,29 @@ Item {
         } catch (e) {
             return [];
         }
+    }
+    readonly property var discoveredServers: {
+        try {
+            return JSON.parse(core.smb_discovered_json || "[]").filter(function (d) {
+                return d.ignored !== true;
+            });
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function serverSubtitle(entry) {
+        var parts = [];
+        if (entry.server && entry.server !== entry.name)
+            parts.push(entry.server);
+        if (entry.address)
+            parts.push(entry.address);
+        return parts.join("  ·  ");
+    }
+
+    function addDiscoveredShare(server, share) {
+        if (typeof core !== "undefined" && core && share)
+            core.add_smb_discovered(server, share);
     }
 
     readonly property real totalInternalBytes: pcView.internalDrives.reduce(function (acc, d) {
@@ -479,13 +505,25 @@ Item {
                         Layout.fillWidth: true
                         icon: sectionDelegate.secKey === "places" ? "folder"
                               : (sectionDelegate.secKey === "frequent" ? "clock"
-                              : (sectionDelegate.secKey === "internal" ? "hard-drives" : "usb"))
+                              : (sectionDelegate.secKey === "internal" ? "hard-drives"
+                              : (sectionDelegate.secKey === "external" ? "usb" : "network")))
                         title: sectionDelegate.secKey === "places" ? qsTr("Places")
                                : (sectionDelegate.secKey === "frequent" ? qsTr("Frequent")
-                               : (sectionDelegate.secKey === "internal" ? qsTr("Internal Storage") : qsTr("External Storage")))
+                               : (sectionDelegate.secKey === "internal" ? qsTr("Internal Storage")
+                               : (sectionDelegate.secKey === "external" ? qsTr("External Storage") : qsTr("Network Shares"))))
                         subtitle: sectionDelegate.secKey === "external"
                                   ? theme.plural(pcView.externalDrives.length, qsTr("1 drive connected"), qsTr("%1 drives connected"))
-                                  : ""
+                                  : (sectionDelegate.secKey === "network"
+                                     ? theme.plural(pcView.discoveredServers.length, qsTr("1 server found"), qsTr("%1 servers found"))
+                                     : "")
+                        LoafButton {
+                            visible: sectionDelegate.secKey === "network" && !pcView.customizing
+                            text: qsTr("Scan")
+                            icon: "arrows-clockwise"
+                            variant: "tonal"
+                            enabled: core.smb_discovery_scanning !== true
+                            onClicked: core.refresh_smb_discovery()
+                        }
                         LoafButton {
                             visible: pcView.customizing
                                      && (sectionDelegate.secKey === "places" || sectionDelegate.secKey === "frequent")
@@ -875,6 +913,107 @@ Item {
                             Repeater {
                                 model: pcView.externalDrives
                                 delegate: driveDelegate
+                            }
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        visible: sectionDelegate.secVisible
+                                 && sectionDelegate.secKey === "network"
+                                 && pcView.discoveredServers.length > 0
+
+                        Repeater {
+                            model: pcView.discoveredServers
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property var entry: modelData
+
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                implicitHeight: networkRow.implicitHeight + 28
+                                radius: theme.radiusXl
+                                color: theme.surfaceContainerHigh
+                                border.width: 1
+                                border.color: theme.borderSubtle
+
+                                RowLayout {
+                                    id: networkRow
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 14
+
+                                    LoafShape {
+                                        Layout.preferredWidth: 44
+                                        Layout.preferredHeight: 44
+                                        shape: "cookie6"
+                                        color: theme.secondaryContainer
+
+                                        LoafIcon {
+                                            anchors.centerIn: parent
+                                            name: "network"
+                                            size: 21
+                                            color: theme.secondaryContainerFg
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
+                                        spacing: 5
+
+                                        Text {
+                                            text: entry.name || entry.server || ""
+                                            color: theme.textMain
+                                            font.pixelSize: theme.fs(13)
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+
+                                        Text {
+                                            visible: pcView.serverSubtitle(entry).length > 0
+                                            text: pcView.serverSubtitle(entry)
+                                            color: theme.textMuted
+                                            font.pixelSize: theme.fs(11)
+                                            elide: Text.ElideMiddle
+                                            Layout.fillWidth: true
+                                        }
+
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            visible: (entry.shares || []).length > 0
+
+                                            Repeater {
+                                                model: entry.shares || []
+
+                                                delegate: LoafButton {
+                                                    required property string modelData
+                                                    text: modelData
+                                                    icon: "plus"
+                                                    variant: "tonal"
+                                                    onClicked: pcView.addDiscoveredShare(entry.server, modelData)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    LoafButton {
+                                        text: qsTr("Add Share…")
+                                        icon: "plus"
+                                        variant: "outlined"
+                                        onClicked: window.openSmbEditor({ server: entry.server, name: entry.name, share: "" })
+                                    }
+
+                                    LoafButton {
+                                        icon: "eye-slash"
+                                        variant: "ghost"
+                                        Accessible.name: qsTr("Hide this server")
+                                        onClicked: core.ignore_smb_server(entry.server)
+                                    }
+                                }
                             }
                         }
                     }

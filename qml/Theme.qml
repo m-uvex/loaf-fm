@@ -53,6 +53,7 @@ Item {
     property bool showAdvancedArchives: false
     property bool experimentalPcCustomization: false
     property bool shareViaLinkEnabled: false
+    property bool smbAutoDiscovery: true
     property string shareProvider: "local" // "local" (Cloudflare Tunnel), "cloud" (Loaf Cloud - coming soon)
     property bool shareCompressFolders: true
     property bool shareCompressFiles: false
@@ -2086,6 +2087,8 @@ Item {
 
         value = readSetting("shareViaLinkEnabled");
         if (value.length > 0) shareViaLinkEnabled = (value === "true");
+        value = readSetting("smbAutoDiscovery");
+        if (value.length > 0) smbAutoDiscovery = (value !== "false");
 
         value = readSetting("shareProvider");
         if (value.length > 0) shareProvider = value;
@@ -2171,6 +2174,11 @@ Item {
     onShowAdvancedArchivesChanged: writeSetting("showAdvancedArchives", showAdvancedArchives)
     onExperimentalPcCustomizationChanged: writeSetting("experimentalPcCustomization", experimentalPcCustomization)
     onShareViaLinkEnabledChanged: writeSetting("shareViaLinkEnabled", shareViaLinkEnabled)
+    onSmbAutoDiscoveryChanged: {
+        writeSetting("smbAutoDiscovery", smbAutoDiscovery);
+        if (typeof core !== "undefined" && core)
+            core.set_smb_discovery_enabled(smbAutoDiscovery);
+    }
     onShareProviderChanged: writeSetting("shareProvider", shareProvider)
     onShareCompressFoldersChanged: writeSetting("shareCompressFolders", shareCompressFolders)
     onShareCompressFilesChanged: writeSetting("shareCompressFiles", shareCompressFiles)

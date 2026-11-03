@@ -27,6 +27,8 @@ pub mod qobject {
         #[qproperty(QString, frequent_dirs_json)]
         #[qproperty(QString, places_json)]
         #[qproperty(QString, smb_profiles_json)]
+        #[qproperty(QString, smb_discovered_json)]
+        #[qproperty(bool, smb_discovery_scanning)]
         #[qproperty(QString, operations_json)]
         #[qproperty(bool, busy)]
         #[qproperty(bool, can_undo)]
@@ -152,6 +154,19 @@ pub mod qobject {
         #[qinvokable]
         fn disconnect_smb(self: Pin<&mut LoafCore>, id: &QString);
         #[qinvokable]
+        fn refresh_smb_discovery(self: Pin<&mut LoafCore>);
+        #[qinvokable]
+        fn set_smb_discovery_enabled(self: Pin<&mut LoafCore>, enabled: bool);
+        #[qinvokable]
+        fn ignore_smb_server(self: Pin<&mut LoafCore>, server: &QString);
+        #[qinvokable]
+        fn unignore_smb_server(self: Pin<&mut LoafCore>, server: &QString);
+        #[qinvokable]
+        fn clear_ignored_smb_servers(self: Pin<&mut LoafCore>);
+        /// Saves a discovered server/share (if needed) and mounts it.
+        #[qinvokable]
+        fn add_smb_discovered(self: Pin<&mut LoafCore>, server: &QString, share: &QString) -> QString;
+        #[qinvokable]
         fn open_item(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
         fn open_with_apps(self: &LoafCore, path: &QString) -> QString;
@@ -257,6 +272,7 @@ use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, w
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -351,6 +367,8 @@ pub struct CoreRust {
     frequent_dirs_json: QString,
     places_json: QString,
     smb_profiles_json: QString,
+    smb_discovered_json: QString,
+    smb_discovery_scanning: bool,
     operations_json: QString,
     busy: bool,
     can_undo: bool,
@@ -389,6 +407,8 @@ impl Default for CoreRust {
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
             smb_profiles_json: QString::from("[]"),
+            smb_discovered_json: QString::from("[]"),
+            smb_discovery_scanning: false,
             operations_json: QString::from("[]"),
             busy: false,
             can_undo: false,
@@ -573,8 +593,9 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             items.push(entry);
         }
     }
-    for p in smb::profiles() {
-        let state = smb::state_for(&p);
+    let profiles = smb::profiles();
+    for p in &profiles {
+        let state = smb::state_for(p);
         items.push(serde_json::json!({
             "id": format!("smb:{}", p.id),
             "kind": "smb",
@@ -589,6 +610,31 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             "domain": p.domain,
             "connected": state.connected,
         }));
+    }
+    // Automatically discovered servers that are not configured yet. They are
+    // shortcuts to the SMB editor (with the server prefilled), not profiles.
+    if smb::discovery_enabled() {
+        let saved: HashSet<String> = profiles.iter().map(|p| smb::normalized_server(&p.server)).collect();
+        for d in smb::cached_discovered() {
+            if d.server.trim().is_empty() || smb::is_ignored(&d.server) {
+                continue;
+            }
+            if saved.contains(&smb::normalized_server(&d.server)) {
+                continue;
+            }
+            items.push(serde_json::json!({
+                "id": format!("smb-discovery:{}", d.server),
+                "kind": "smb-discovery",
+                "name": if d.name.trim().is_empty() { d.server.clone() } else { d.name.clone() },
+                "path": "",
+                "icon": "network",
+                "system_icon": "folder-remote-symbolic",
+                "server": d.server,
+                "address": d.address,
+                "shares": d.shares,
+                "discovered": true,
+            }));
+        }
     }
     items.push(serde_json::json!({"id": "trash", "kind": "trash", "name": "Trash", "path": "trash:///", "icon": "trash", "system_icon": "user-trash-symbolic"}));
 
@@ -1373,6 +1419,94 @@ impl qobject::LoafCore {
             }
         });
     }
+
+    pub fn load_smb_discovery(mut self: Pin<&mut Self>) {
+        let json = smb::discovered_json();
+        if self.smb_discovered_json().to_string() != json {
+            self.as_mut().set_smb_discovered_json(q(&json));
+        }
+    }
+
+    /// Scans the LAN on a worker thread. Concurrent requests share the one
+    /// scan already in flight instead of opening many network queries.
+    pub fn refresh_smb_discovery(mut self: Pin<&mut Self>) {
+        if !smb::discovery_enabled() {
+            self.as_mut().set_smb_discovery_scanning(false);
+            self.as_mut().load_smb_discovery();
+            return;
+        }
+        if *self.smb_discovery_scanning() {
+            return;
+        }
+        self.as_mut().set_smb_discovery_scanning(true);
+        let thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let ran = smb::discover_now().is_some();
+            let _ = thread.queue(move |mut core| {
+                core.as_mut().set_smb_discovery_scanning(false);
+                if ran {
+                    core.as_mut().load_smb_discovery();
+                    core.as_mut().load_places();
+                }
+            });
+        });
+    }
+
+    pub fn set_smb_discovery_enabled(mut self: Pin<&mut Self>, enabled: bool) {
+        smb::set_discovery_enabled(enabled);
+        if enabled {
+            // Show the last scan right away; the refresh below updates it.
+            self.as_mut().load_smb_discovery();
+            self.as_mut().load_places();
+            self.as_mut().refresh_smb_discovery();
+        } else {
+            self.as_mut().set_smb_discovery_scanning(false);
+            self.as_mut().load_places();
+        }
+    }
+
+    pub fn ignore_smb_server(mut self: Pin<&mut Self>, server: &QString) {
+        smb::set_ignored(&server.to_string(), true);
+        self.as_mut().load_smb_discovery();
+        self.as_mut().load_places();
+    }
+
+    pub fn unignore_smb_server(mut self: Pin<&mut Self>, server: &QString) {
+        smb::set_ignored(&server.to_string(), false);
+        self.as_mut().load_smb_discovery();
+        self.as_mut().load_places();
+    }
+
+    pub fn clear_ignored_smb_servers(mut self: Pin<&mut Self>) {
+        smb::clear_ignored();
+        self.as_mut().load_smb_discovery();
+        self.as_mut().load_places();
+    }
+
+    pub fn add_smb_discovered(mut self: Pin<&mut Self>, server: &QString, share: &QString) -> QString {
+        let server_text = server.to_string();
+        let share_text = share.to_string();
+        let share_text = share_text.trim().trim_matches('/');
+        if server_text.trim().is_empty() || share_text.is_empty() {
+            return QString::default();
+        }
+        // Reuse an existing profile instead of creating a duplicate.
+        if let Some(existing) = smb::profiles().into_iter().find(|p| {
+            smb::normalized_server(&p.server) == smb::normalized_server(&server_text)
+                && p.share.trim_matches('/').eq_ignore_ascii_case(share_text)
+        }) {
+            let id = q(&existing.id);
+            self.as_mut().connect_smb(&id, &QString::default(), false);
+            return id;
+        }
+        let empty = QString::default();
+        let id = self.as_mut().save_smb_profile(&empty, &empty, server, share, &empty, &empty);
+        if !id.is_empty() {
+            self.as_mut().connect_smb(&id, &QString::default(), false);
+        }
+        id
+    }
+
     pub fn open_item(mut self: Pin<&mut Self>, path: &QString) {
         let p = path.to_string();
         if p.starts_with("mtp:") {
@@ -2705,10 +2839,15 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
 impl cxx_qt::Initialize for qobject::LoafCore {
     fn initialize(mut self: Pin<&mut Self>) {
         self.as_mut().refresh_system_theme();
+        // Show the last scan immediately; the background refresh below
+        // updates it once the network has been queried.
+        smb::load_cached_discovery();
         self.as_mut().load_places();
         // The device watcher only reports later changes.
         self.as_mut().load_drives();
         self.as_mut().load_smb_profiles();
+        self.as_mut().load_smb_discovery();
+        self.as_mut().refresh_smb_discovery();
         self.as_mut().refresh_frequent_dirs();
         self.as_mut().update_trash_empty();
         // Warm the application cache off the UI thread.

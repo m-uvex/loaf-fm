@@ -1010,6 +1010,15 @@ ApplicationWindow {
         }
     }
 
+    // Re-scan the LAN periodically so a NAS that was asleep at startup still
+    // shows up without the user opening Settings.
+    Timer {
+        interval: 300000
+        repeat: true
+        running: theme.smbAutoDiscovery
+        onTriggered: core.refresh_smb_discovery()
+    }
+
     Theme {
         id: theme
         // Archives open like folders on double click.
@@ -1721,6 +1730,17 @@ ApplicationWindow {
                             engine.set_path(place.path);
                         else
                             core.connect_smb(place.profile_id, "", false);
+                        return;
+                    }
+                    if (place.kind === "smb-discovery") {
+                        // Discovered entries are not saved profiles yet: open the
+                        // editor prefilled so the user can pick a share and name.
+                        var shares = place.shares || [];
+                        window.openSmbEditor({
+                            server: place.server,
+                            name: place.name,
+                            share: shares.length > 0 ? shares[0] : ""
+                        });
                         return;
                     }
                     // Network bookmarks (remote URIs): Loaf can't
@@ -2560,6 +2580,12 @@ ApplicationWindow {
                     text: qsTr("Add SMB Share…"),
                     icon: "network",
                     action: function() { window.openSmbEditor({}); }
+                },
+                {
+                    text: qsTr("Scan for Network Shares"),
+                    icon: "arrows-clockwise",
+                    enabled: theme.smbAutoDiscovery,
+                    action: function() { core.refresh_smb_discovery(); }
                 }
             ];
             openAt(px, py);
@@ -2767,6 +2793,41 @@ ApplicationWindow {
                 m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
                 m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
                 m.push({ text: qsTr("Add SMB Share…"), icon: "plus", separatorBefore: true, action: function() { window.openSmbEditor({}); } });
+                model = m;
+                openAt(x, y);
+                return;
+            }
+            if (place.kind === "smb-discovery") {
+                var shares = place.shares || [];
+                var connectTo = function(server, share) {
+                    return function() { core.add_smb_discovered(server, share); };
+                };
+                for (var si = 0; si < shares.length; ++si) {
+                    m.push({
+                        text: qsTr("Connect to %1").arg(shares[si]),
+                        icon: "plug",
+                        separatorBefore: si === 0,
+                        action: connectTo(place.server, shares[si])
+                    });
+                }
+                m.push({
+                    text: qsTr("Add Share…"),
+                    icon: "plus",
+                    separatorBefore: shares.length === 0,
+                    action: function() { window.openSmbEditor({ server: place.server, name: place.name, share: "" }); }
+                });
+                m.push({
+                    text: qsTr("Scan Again"),
+                    icon: "arrows-clockwise",
+                    action: function() { core.refresh_smb_discovery(); }
+                });
+                m.push({
+                    text: qsTr("Hide Server"),
+                    icon: "eye-slash",
+                    danger: true,
+                    separatorBefore: true,
+                    action: function() { core.ignore_smb_server(place.server); }
+                });
                 model = m;
                 openAt(x, y);
                 return;

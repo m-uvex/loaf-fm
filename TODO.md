@@ -100,6 +100,9 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 
 ## Network, Cloud & Remote Storage
 - [x] **Named SMB Profile Manager**: Friendly aliases for SMB connections.
+- [x] **Automatic SMB Discovery**: Detect SMB/CIFS servers and shares on the local network without manual host entry, using mDNS/Avahi, WS-Discovery, and NetBIOS name resolution, and surface discovered hosts in the sidebar and "This PC" network section.
+  - [x] **Discovery Toggle & Refresh**: Setting to enable/disable LAN scanning, plus manual refresh and an ignore list for unwanted hosts.
+  - [x] **One-Click Add from Discovery**: Turn a discovered server/share into a saved SMB profile with prompted credentials, then mount it directly.
 - [ ] **Remote Protocols & Cloud Services**: SFTP, FTP, WebDAV, Google Drive, and Microsoft OneDrive mounting support.
 - [x] **Keyring Integration**: Secure password storage in system keyring for SMB and encrypted volumes.
 

@@ -283,7 +283,14 @@ Rectangle {
             clip: true
             spacing: 6
             boundsBehavior: Flickable.StopAtBounds
-            model: rail.entries
+            model: rail.places.filter(function(p) {
+                if (p.id === "trash")
+                    return false;
+                // The picker can only return real files and folders.
+                if (rail.pickerMode && (p.kind === "pc" || p.kind === "recent" || p.kind === "starred" || p.kind === "smb-discovery"))
+                    return false;
+                return true;
+            })
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
 
             onContentYChanged: Qt.callLater(rail.updateHighlight)
