@@ -15,6 +15,11 @@ Item {
     property alias engine: paneEngine
     property bool isActive: true
     property bool showHeader: true
+    // Portal picker behavior: folders navigate, files are handed to the
+    // picker through filePicked, and selection stays single when the
+    // requesting app did not ask for multiple files.
+    property bool pickerMode: false
+    property bool pickerMultiple: false
 
     // { "/abs/path": true }
     property var selection: ({})
@@ -28,6 +33,7 @@ Item {
     property bool pendingRename: false
 
     signal activated()
+    signal filePicked(string path)
 
     LoafEngine {
         id: paneEngine
@@ -186,6 +192,10 @@ Item {
         var p = paneEngine.path_at(row);
         if (!p)
             return;
+        if (pickerMode && !pickerMultiple) {
+            ctrl = false;
+            shift = false;
+        }
         if (shift) {
             var a = anchorPath ? paneEngine.row_of(anchorPath) : -1;
             if (a < 0)
@@ -276,6 +286,13 @@ Item {
         if (!p)
             return;
         var item = JSON.parse(paneEngine.item_json(row));
+        if (pickerMode) {
+            if (item.is_dir)
+                paneEngine.set_path(item.path);
+            else
+                filePicked(item.path);
+            return;
+        }
         window.openItem(pane, item);
     }
 
@@ -339,9 +356,16 @@ Item {
     property real animZoom: theme.zoom
     Behavior on animZoom { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
     readonly property real zoom: animZoom
-    readonly property int cellW: Math.round(124 * zoom)
-    readonly property int cellH: Math.round(114 * zoom)
+    // Only the icon follows the zoom: the padding and the two-line name keep
+    // their size, so a bigger zoom makes the icons fill the cells.
+    readonly property real chromeScale: Math.min(1, zoom)
+    readonly property int iconBox: Math.round(46 * zoom)
+    readonly property int cellW: Math.round(Math.max(124 * chromeScale, iconBox + 48))
+    readonly property int cellH: Math.round(iconBox + 68 * chromeScale)
     readonly property int iconSize: Math.round(42 * zoom)
+    // Thumbnails are requested for the zoom being animated to, not every
+    // step of the spring, so a zoom change loads each one once.
+    readonly property int thumbBox: Math.round(46 * theme.zoom)
 
     ParallelAnimation {
         id: enterAnim
@@ -1025,15 +1049,15 @@ Item {
                         opacity: card.isCut ? 0.52 : 1.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                         anchors.fill: parent
-                        anchors.margins: 12 * pane.zoom
+                        anchors.margins: 12 * pane.chromeScale
                         spacing: 6
 
                         Item { Layout.fillHeight: true }
 
                         Item {
                             Layout.alignment: Qt.AlignHCenter
-                            Layout.preferredWidth: Math.round(46 * pane.zoom)
-                            Layout.preferredHeight: Math.round(46 * pane.zoom)
+                            Layout.preferredWidth: pane.iconBox
+                            Layout.preferredHeight: pane.iconBox
 
                             LoafIcon {
                                 visible: !card.hasThumb && theme.iconSource === "phosphor"
@@ -1056,8 +1080,16 @@ Item {
                             }
 
                             Item {
-                                anchors.fill: parent
+                                id: thumbFrame
+                                anchors.centerIn: parent
                                 visible: card.hasThumb
+                                readonly property bool square: theme.thumbnailShape !== "original"
+                                // In "original" mode the frame hugs the picture so
+                                // the rounded corners and border follow its shape.
+                                readonly property real fit: (square || thumbImg.implicitWidth <= 0 || thumbImg.implicitHeight <= 0)
+                                    ? 0 : Math.min(parent.width / thumbImg.implicitWidth, parent.height / thumbImg.implicitHeight)
+                                width: fit > 0 ? Math.round(thumbImg.implicitWidth * fit) : parent.width
+                                height: fit > 0 ? Math.round(thumbImg.implicitHeight * fit) : parent.height
 
                                 Rectangle {
                                     id: thumbMask
@@ -1072,13 +1104,14 @@ Item {
                                     id: thumbImg
                                     anchors.fill: parent
                                     source: theme.showThumbnails && card.thumbable && card.thumb_id.length > 0
-                                        ? ("image://thumb/" + card.thumb_id) : ""
-                                    fillMode: Image.PreserveAspectCrop
-                                    sourceSize.width: Math.round(48 * pane.zoom)
-                                    sourceSize.height: Math.round(48 * pane.zoom)
+                                        ? ("image://thumb/" + card.thumb_id + (thumbFrame.square ? "/cover" : "")) : ""
+                                    fillMode: thumbFrame.square ? Image.PreserveAspectCrop : Image.Stretch
+                                    sourceSize.width: pane.thumbBox
+                                    sourceSize.height: pane.thumbBox
                                     asynchronous: true
                                     cache: true
                                     smooth: true
+                                    mipmap: true
                                     // The rounded mask costs an offscreen layer: only for
                                     // thumbable items, never in low-power mode. Must not
                                     // depend on image status: toggling the layer while the
@@ -1543,7 +1576,7 @@ Item {
                                     Image {
                                         id: listThumb
                                         anchors.fill: parent
-                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id) : ""
+                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id + "/cover") : ""
                                         fillMode: Image.PreserveAspectCrop
                                         sourceSize.width: 24; sourceSize.height: 24
                                         asynchronous: true

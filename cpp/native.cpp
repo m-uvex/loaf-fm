@@ -1,4 +1,5 @@
 #include "loaf/native.h"
+#include "loaf/portal.h"
 #include "loaf/thumbnails.h"
 
 #include <QClipboard>
@@ -28,6 +29,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QTimer>
 #include <QTranslator>
 #include <QUrl>
 
@@ -201,6 +203,49 @@ bool LoafNative::isAdmin() const
     return !qEnvironmentVariable("LOAF_ADMIN").isEmpty();
 }
 
+void LoafNative::respondPicker(const QString &handle, uint code, const QString &resultsJson)
+{
+    if (m_portal)
+        m_portal->respond(handle, code, resultsJson);
+}
+
+void LoafNative::cancelPicker(const QString &handle)
+{
+    respondPicker(handle, 1, QStringLiteral("{}"));
+}
+
+bool LoafNative::fileExists(const QString &path) const
+{
+    return QFileInfo::exists(path);
+}
+bool LoafNative::isDirectory(const QString &path) const
+{
+    return QFileInfo(path).isDir();
+}
+
+
+void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
+{
+    if (!window)
+        return;
+    // Wayland needs xdg-foreign to make one window transient for another,
+    // which Qt Quick does not expose; X11 window ids work.
+    if (QGuiApplication::platformName() != QLatin1String("xcb") || !parentWindow.startsWith(QLatin1String("x11:")))
+        return;
+    bool ok = false;
+    const qulonglong id = parentWindow.mid(4).toULongLong(&ok, 0);
+    if (!ok || id == 0)
+        return;
+    QWindow *parent = QWindow::fromWinId(static_cast<WId>(id));
+    if (!parent)
+        return;
+    window->setTransientParent(parent);
+    if (modal)
+        window->setModality(Qt::WindowModal);
+    // fromWinId only wraps the foreign window; drop the wrapper with the picker.
+    connect(window, &QObject::destroyed, parent, &QObject::deleteLater);
+}
+
 FileManager1Adaptor::FileManager1Adaptor(QObject *host, LoafNative *native)
     : QDBusAbstractAdaptor(host), m_native(native) {}
 
@@ -251,9 +296,11 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
     QStringList raw;
     for (const rust::String &p : paths)
         raw << QString::fromUtf8(p.data(), static_cast<qsizetype>(p.size()));
-    // mode: "tab" or "mini", optionally with ",new-window".
+    // mode: "tab" or "mini", optionally with ",new-window" or ",portal".
     const QString modeStr = toQString(mode);
     const bool newWindow = modeStr.contains(QLatin1String("new-window"));
+    const bool portalMode = modeStr.contains(QLatin1String("portal"));
+    native->setPortalMode(portalMode);
     native->queueOpen(toLocalPaths(raw), modeStr.section(QLatin1Char(','), 0, 0));
 
     QDBusConnection bus = QDBusConnection::sessionBus();
@@ -272,7 +319,22 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         // FileManager1 stays with whichever file manager claimed it first.
         if (bus.registerService(QStringLiteral("org.freedesktop.FileManager1")))
             bus.registerObject(QStringLiteral("/org/freedesktop/FileManager1"), fmObj, QDBusConnection::ExportAdaptors);
+
+        // The portal backend serves file chooser requests on demand; in
+        // portal mode (D-Bus activation) it is the reason we are running,
+        // so losing the race to another backend means there is nothing to
+        // do and the process can exit quietly.
+        if (!native->initPortal(portalMode)) {
+            if (portalMode)
+                QTimer::singleShot(0, QCoreApplication::instance(), &QCoreApplication::quit);
+            else
+                qWarning("loaf: another backend already owns org.freedesktop.impl.portal.desktop.loaf");
+        }
     }
+    if (portalMode)
+        // Only picker windows are shown; the process exits when the last
+        // one closes and no file manager window was opened meanwhile.
+        QGuiApplication::setQuitOnLastWindowClosed(false);
 
     auto *translator = new QTranslator(&engine);
     if (translator->load(QLocale(), QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n")))
@@ -288,22 +350,52 @@ rust::String mime_type_for(rust::Str path, bool sniff)
     return toRust(db.mimeTypeForFile(toQString(path), sniff ? QMimeDatabase::MatchDefault : QMimeDatabase::MatchExtension).name());
 }
 
+MimeFilterMatcher::MimeFilterMatcher(const rust::Vec<rust::String> &filterMimes)
+{
+    filterTypes.reserve(static_cast<qsizetype>(filterMimes.size()));
+    for (const rust::String &filterMime : filterMimes)
+        filterTypes.append(database.mimeTypeForName(toQString(filterMime)));
+}
+
+bool MimeFilterMatcher::matches(const rust::Str fileName) const
+{
+    const QMimeType actual = database.mimeTypeForFile(toQString(fileName), QMimeDatabase::MatchExtension);
+    if (!actual.isValid())
+        return false;
+    for (const QMimeType &filter : filterTypes) {
+        if (filter.isValid() && actual.inherits(filter.name()))
+            return true;
+    }
+    return false;
+}
+
+std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes)
+{
+    return std::make_unique<MimeFilterMatcher>(filterMimes);
+}
+
 rust::String mime_comment_for(rust::Str mime)
 {
     static QMimeDatabase db;
     return toRust(db.mimeTypeForName(toQString(mime)).comment());
 }
 
-void set_application_identity(rust::Str version)
+void set_application_identity(rust::Str version, rust::Str window_class)
 {
     // Keep an alpha channel even when the window starts with a solid background;
     // users can enable translucency later without recreating the window.
     QQuickWindow::setDefaultAlphaBuffer(true);
     QCoreApplication::setApplicationVersion(toQString(version));
-    QCoreApplication::setApplicationName(QStringLiteral("loaf"));
+    // The application name is the X11 WM_CLASS instance name and the desktop
+    // file id is the Wayland app id / X11 class name. Both take `--class` so
+    // window rules match whichever part the compositor looks at.
+    QString windowClass = toQString(window_class);
+    if (windowClass.isEmpty())
+        windowClass = QStringLiteral("loaf");
+    QCoreApplication::setApplicationName(windowClass);
     QCoreApplication::setOrganizationName(QStringLiteral("loaf"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Loaf"));
-    QGuiApplication::setDesktopFileName(QStringLiteral("loaf"));
+    QGuiApplication::setDesktopFileName(windowClass);
 }
 
 // Explicit messages avoid QDBusInterface's synchronous introspection before its

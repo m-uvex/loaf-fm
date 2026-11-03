@@ -1,4 +1,4 @@
-// Asynchronous thumbnail image provider: image://thumb/<hex path>-<mtime>
+// Asynchronous thumbnail image provider: image://thumb/<hex path>-<mtime>[/cover]
 //
 // Follows the freedesktop.org Thumbnail Managing Standard so thumbnails are
 // shared with Nautilus, Dolphin, etc.:
@@ -25,7 +25,8 @@ class ThumbRunnable : public QObject, public QRunnable
 {
     Q_OBJECT
 public:
-    ThumbRunnable(const QByteArray &path, const QSize &requested, std::shared_ptr<std::atomic<bool>> cancelled);
+    ThumbRunnable(const QByteArray &path, const QSize &requested, bool cover,
+                  std::shared_ptr<std::atomic<bool>> cancelled);
     void run() override;
 
 Q_SIGNALS:
@@ -34,6 +35,7 @@ Q_SIGNALS:
 private:
     QByteArray m_path; // raw file name bytes
     QSize m_requested;
+    bool m_cover;
     std::shared_ptr<std::atomic<bool>> m_cancelled;
 };
 

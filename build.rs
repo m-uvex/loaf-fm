@@ -10,6 +10,7 @@ fn main() {
             .qml_file("qml/PCView.qml")
             .qml_file("qml/FilePane.qml")
             .qml_file("qml/Sidebar.qml")
+            .qml_file("qml/PickerWindow.qml")
             .qml_file("qml/QuickLook.qml")
             .qml_file("qml/PropertiesDialog.qml")
             .qml_file("qml/BatchRenameDialog.qml")
@@ -35,6 +36,7 @@ fn main() {
             .qml_file("qml/components/UsageBar.qml")
             .qml_file("qml/components/LoafShape.qml")
             .qml_file("qml/components/DriveCard.qml")
+            .qml_file("qml/components/TopIconButton.qml")
             .qml_file("qml/settings/SettingDivider.qml")
             .qml_file("qml/settings/SettingRow.qml")
             .qml_file("qml/settings/SettingCard.qml")
@@ -52,9 +54,12 @@ fn main() {
     .file("src/native.rs")
     .file("src/pane.rs")
     .file("src/core.rs")
+    .file("src/portal_bridge.rs")
     .cpp_file("cpp/loaf/native.h")
+    .cpp_file("cpp/loaf/portal.h")
     .cpp_file("cpp/loaf/thumbnails.h")
     .cpp_file("cpp/native.cpp")
+    .cpp_file("cpp/portal.cpp")
     .cpp_file("cpp/thumbnails.cpp");
     // Our own headers live in cpp/ ("loaf/native.h").
     let builder = unsafe {

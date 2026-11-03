@@ -29,6 +29,8 @@ package() {
     cd "$pkgname-$pkgver"
     install -Dm755 "target/release/loaf" "$pkgdir/usr/bin/loaf"
     install -Dm644 "packaging/assets/loaf.desktop" "$pkgdir/usr/share/applications/loaf.desktop"
+    install -Dm644 "packaging/assets/loaf.portal" "$pkgdir/usr/share/xdg-desktop-portal/portals/loaf.portal"
+    install -Dm644 "packaging/assets/org.freedesktop.impl.portal.desktop.loaf.service" "$pkgdir/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service"
     for sz in 16 32 48 64 128 256 512; do
         install -Dm644 "packaging/assets/icons/hicolor/${sz}x${sz}/apps/loaf.png" \
             "$pkgdir/usr/share/icons/hicolor/${sz}x${sz}/apps/loaf.png"

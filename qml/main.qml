@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
+import "components"
 
 ApplicationWindow {
     id: window
@@ -9,13 +10,17 @@ ApplicationWindow {
     height: 720
     minimumWidth: 640
     minimumHeight: 420
-    visible: true
     background: null
     title: (nativeBridge.isAdmin ? qsTr("[Administrator] ") : "") + "Loaf - " + (activeView === "settings"
         ? qsTr("Settings")
         : activeView === "pc" ? (core.hostname || qsTr("This PC"))
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
+
+    // Portal activation (--portal) starts without a main window; it shows
+    // up when a normal open request arrives.
+    readonly property bool portalOnly: nativeBridge.portalOnly
+    visible: !portalOnly
 
     // Mirror the whole layout for right-to-left languages.
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
@@ -226,7 +231,39 @@ ApplicationWindow {
             if (pane1Loader.item && pane1Loader.item.engine.location_kind === "mtp") pane1Loader.item.engine.refresh();
         }
         function onOpenRequested(paths, mode) { window.handleOpenRequest(paths, mode); }
+        function onPickerRequested(handle, spec) { window.openPicker(handle, spec); }
+        function onPickerDismissed(handle) { window.closePicker(handle); }
     }
+
+    // ---- portal file chooser windows ---------------------------------------
+    // One PickerWindow per active request, keyed by the D-Bus handle.
+    property var pickerWindows: ({})
+
+    Component {
+        id: pickerComponent
+        PickerWindow {}
+    }
+
+    function openPicker(handle, specJson) {
+        var win = pickerComponent.createObject(null, { "request": JSON.parse(specJson) });
+        if (!win)
+            return;
+        pickerWindows[handle] = win;
+        win.finished.connect(window.pickerFinished);
+    }
+
+    function pickerFinished(handle) {
+        delete pickerWindows[handle];
+    }
+
+    function closePicker(handle) {
+        var win = pickerWindows[handle];
+        if (!win)
+            return;
+        delete pickerWindows[handle];
+        win.dismiss();
+    }
+
 
     // Opens an item from a view: folders navigate, archives open as
     // folders when browsing is enabled, files launch their app.
@@ -611,7 +648,8 @@ ApplicationWindow {
                 window.width = s.width;
                 window.height = s.height;
             }
-            if (s.maximized)
+            // Portal-only windows stay hidden until a real request arrives.
+            if (!portalOnly && s.maximized)
                 window.showMaximized();
             sidebar.expanded = s.sidebar === true;
             if (!geometryOnly && s.tabs && s.tabs.length > 0) {
@@ -626,11 +664,19 @@ ApplicationWindow {
     }
 
     // Paths from the command line or D-Bus (another `loaf`, a browser's
-    // "Show in folder", ...).
+    // "Show in folder", ...). The empty start-up emission from queueOpen
+    // must not un-hide a portal-only window.
     function handleOpenRequest(paths, mode) {
+        // A second `loaf --portal` only checks that we serve the portal.
+        if (mode === "portal")
+            return;
+        if (!visible && (mode === "window" || paths.length > 0))
+            visible = true;
         if (mode === "window" || paths.length === 0) {
-            window.raise();
-            window.requestActivate();
+            if (visible) {
+                window.raise();
+                window.requestActivate();
+            }
             if (mode === "window")
                 newTab(core.user_dir("HOME"));
             return;
@@ -1981,53 +2027,6 @@ ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 34
-    }
-    component TopIconButton: Item {
-        id: tib
-        property string iconName: ""
-        property string systemIcon: ""
-        property string accessibleName: ""
-        property bool small: false
-        signal clicked()
-        implicitWidth: small ? 24 : 36
-        implicitHeight: small ? 24 : 36
-        opacity: enabled ? 1.0 : 0.4
-        Accessible.role: Accessible.Button
-        Accessible.name: accessibleName
-        Accessible.onPressAction: tib.clicked()
-        Rectangle {
-            anchors.fill: parent
-            radius: width / 2
-            color: tibMouse.containsMouse ? theme.hoverOverlay : "transparent"
-            border.width: tib.activeFocus ? 2 : 0
-            border.color: theme.primary
-        }
-        LoafIcon {
-            visible: theme.iconSource === "phosphor" || tib.systemIcon.length === 0
-            anchors.centerIn: parent
-            name: tib.iconName
-            size: tib.small ? 12 : 18
-            color: theme.textMain
-        }
-        Image {
-            visible: theme.iconSource !== "phosphor" && tib.systemIcon.length > 0
-            anchors.centerIn: parent
-            source: visible ? window.systemIcon(tib.systemIcon) : ""
-            width: 18
-            height: 18
-            sourceSize.width: 36
-            sourceSize.height: 36
-        }
-        MouseArea {
-            id: tibMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tib.clicked()
-        }
-        ToolTip.visible: tibMouse.containsMouse && tib.accessibleName.length > 0
-        ToolTip.text: tib.accessibleName
-        ToolTip.delay: 600
     }
     QtObject {
         id: dragManager

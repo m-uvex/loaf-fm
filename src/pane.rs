@@ -48,6 +48,8 @@ pub mod qobject {
         #[qproperty(QString, search_query)]
         #[qproperty(bool, searching)]
         #[qproperty(bool, read_only)]
+        #[qproperty(bool, dir_only)]
+        #[qproperty(QString, portal_filter_json)]
         type LoafEngine = super::PaneRust;
     }
     unsafe extern "RustQt" {
@@ -119,6 +121,11 @@ pub mod qobject {
         fn clear_search(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn set_filter(self: Pin<&mut LoafEngine>, text: &QString);
+        /// Picker rules for the portal file chooser: the selected filter as
+        /// JSON ("", or {"name", "patterns": [["glob"|"mime", pattern], ..]})
+        /// and whether only directories may be picked. Empty JSON clears.
+        #[qinvokable]
+        fn set_picker_rules(self: Pin<&mut LoafEngine>, filter_json: &QString, dir_only: bool);
         #[qinvokable]
         fn toggle_show_hidden(self: Pin<&mut LoafEngine>);
         #[qinvokable]
@@ -287,6 +294,9 @@ pub struct PaneRust {
     search_query: QString,
     searching: bool,
     read_only: bool,
+    dir_only: bool,
+    portal_filter_json: QString,
+    portal_filter: Option<crate::portal::filters::Filter>,
 
     loc: Loc,
     /// Location to return to when a search is cleared.
@@ -326,6 +336,9 @@ impl Default for PaneRust {
             search_query: QString::default(),
             searching: false,
             read_only: false,
+            dir_only: false,
+            portal_filter_json: QString::default(),
+            portal_filter: None,
             loc: Loc::Dir(home),
             before_search: None,
             all: Vec::new(),
@@ -488,6 +501,14 @@ fn dir_crumbs(target: &Path) -> Vec<Crumb> {
     out
 }
 
+fn portal_filter_matches_entry(
+    entry: &Entry,
+    portal_filter: Option<&crate::portal::filters::Filter>,
+    mime_matches: &impl Fn(&str, &crate::portal::filters::Filter) -> bool,
+) -> bool {
+    entry.is_dir || portal_filter.is_none_or(|filter| filter.matches(&entry.name, mime_matches))
+}
+
 impl qobject::LoafEngine {
     pub fn row_count(&self, _parent: &QModelIndex) -> i32 {
         self.rows.len() as i32
@@ -582,9 +603,34 @@ impl qobject::LoafEngine {
         let show_hidden = *self.show_hidden();
         // Trash, recent and search lists show everything they found.
         let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. } | Loc::Mtp(_));
+        let dir_only = *self.dir_only();
+        let mime_patterns = self
+            .portal_filter
+            .as_ref()
+            .map(|filter| {
+                filter
+                    .patterns
+                    .iter()
+                    .filter(|pattern| pattern.kind == crate::portal::filters::FilterKind::MimeType)
+                    .map(|pattern| pattern.pattern.clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let mime_matcher = (!mime_patterns.is_empty())
+            .then(|| crate::native::ffi::new_mime_filter_matcher(&mime_patterns));
+        let mime_matches = |file_name: &str, _: &crate::portal::filters::Filter| {
+            mime_matcher
+                .as_ref()
+                .and_then(|matcher| matcher.as_ref())
+                .is_some_and(|matcher| matcher.matches(file_name))
+        };
         self.all
             .iter()
             .filter(|e| listing::visible(e, show_hidden || !honour_hidden, &filter))
+            .filter(|e| !dir_only || e.is_dir)
+            .filter(|entry| {
+                portal_filter_matches_entry(entry, self.portal_filter.as_ref(), &mime_matches)
+            })
             .cloned()
             .collect()
     }
@@ -974,6 +1020,17 @@ impl qobject::LoafEngine {
         self.refilter(false);
     }
 
+    pub fn set_picker_rules(mut self: Pin<&mut Self>, filter_json: &QString, dir_only: bool) {
+        if *self.portal_filter_json() == *filter_json && *self.dir_only() == dir_only {
+            return;
+        }
+        let parsed_filter = crate::portal::filters::Filter::parse(&filter_json.to_string());
+        self.as_mut().rust_mut().portal_filter = parsed_filter;
+        self.as_mut().set_portal_filter_json(filter_json.clone());
+        self.as_mut().set_dir_only(dir_only);
+        self.as_mut().refilter(false);
+    }
+
     pub fn toggle_show_hidden(mut self: Pin<&mut Self>) {
         let v = !*self.show_hidden();
         self.as_mut().set_show_hidden(v);
@@ -1124,8 +1181,9 @@ pub fn glob_match(pat: &str, s: &str) -> bool {
     let t: Vec<char> = s.chars().collect();
     let (mut pi, mut ti, mut star, mut mark) = (0usize, 0usize, None::<usize>, 0usize);
     while ti < t.len() {
-        if pi < p.len() && (p[pi] == '?' || p[pi] == t[ti]) {
-            pi += 1;
+        let step = if pi < p.len() { match_step(&p, pi, t[ti]) } else { None };
+        if let Some(next) = step {
+            pi = next;
             ti += 1;
         } else if pi < p.len() && p[pi] == '*' {
             star = Some(pi);
@@ -1143,6 +1201,56 @@ pub fn glob_match(pat: &str, s: &str) -> bool {
         pi += 1;
     }
     pi == p.len()
+}
+
+// One pattern element against one text char, returning the pattern index to
+// continue at or None. `?` and `*` are the usual wildcards; `[...]` is an
+// fnmatch character class, and an unterminated class degenerates to a
+// literal `[`.
+fn match_step(p: &[char], pi: usize, c: char) -> Option<usize> {
+    match p[pi] {
+        '?' => Some(pi + 1),
+        '[' => match_class(p, pi, c).or_else(|| if c == '[' { Some(pi + 1) } else { None }),
+        ch if ch == c => Some(pi + 1),
+        _ => None,
+    }
+}
+
+// Parses the class starting at `pi` (p[pi] == '[') and matches `c` against
+// it: sets `[abc]`, ranges `[a-z]` (a `-` at an edge is literal), negation
+// via a leading `!` or `^`, and a `]` first in the set is a literal member.
+// Returns the index after the closing `]`, or None when `c` is not in the
+// class or the class never closes.
+fn match_class(p: &[char], pi: usize, c: char) -> Option<usize> {
+    let mut i = pi + 1;
+    let negated = matches!(p.get(i), Some('!') | Some('^'));
+    if negated {
+        i += 1;
+    }
+    let mut hit = false;
+    let mut first = true;
+    while i < p.len() && (first || p[i] != ']') {
+        first = false;
+        if p.get(i + 1) == Some(&'-') && p.get(i + 2).is_some_and(|&ch| ch != ']') {
+            if c >= p[i] && c <= p[i + 2] {
+                hit = true;
+            }
+            i += 3;
+        } else {
+            if c == p[i] {
+                hit = true;
+            }
+            i += 1;
+        }
+    }
+    if i >= p.len() {
+        return None; // never closed
+    }
+    if negated != hit {
+        Some(i + 1)
+    } else {
+        None
+    }
 }
 
 /// Entries directly inside `inner` of an archive listing.
@@ -1229,6 +1337,57 @@ mod tests {
         assert!(glob_match("img_??.png", "img_01.png"));
         assert!(!glob_match("*.jpg", "photo.jpeg"));
         assert!(glob_match("*", ""));
+    }
+
+    #[test]
+    fn globbing_matches_fnmatch_character_classes() {
+        // Chromium sends extension filters case-insensitively this way:
+        // "*.bin" becomes "*.[bB][iI][nN]".
+        assert!(glob_match("*.[bb][ii][nn]", "100mb.bin"));
+        assert!(!glob_match("*.[bb][ii][nn]", "notes.txt"));
+        assert!(glob_match("*.[a-c]ab", "drum.cab"));
+        assert!(!glob_match("*.[a-c]ab", "drum.jar"));
+        assert!(glob_match("b[!aeiou]t", "bxt"));
+        assert!(!glob_match("b[!aeiou]t", "bat"));
+        // A ']' first in the set is a literal member.
+        assert!(glob_match("[]]x", "]x"));
+        // An unterminated class is a literal '['.
+        assert!(glob_match("a[bc", "a[bc"));
+        assert!(!glob_match("a[bc", "abc"));
+        // Classes combine with the usual wildcards.
+        assert!(glob_match("*.[pP][dD][fF]", "doc.PDF"));
+        assert!(glob_match("?.[ab]", "1.b"));
+    }
+
+    #[test]
+    fn directories_remain_visible_under_portal_glob_filter() {
+        let filter = crate::portal::filters::Filter::parse(
+            r#"{"name":"Binaries","patterns":[["glob","*.bin"]]}"#,
+        )
+        .unwrap();
+        let entry = Entry {
+            name: "Telegram Desktop".into(),
+            name_lower: "telegram desktop".into(),
+            path: "/tmp/Telegram Desktop".into(),
+            is_dir: true,
+            is_symlink: false,
+            is_hidden: false,
+            size: 0,
+            modified: 0,
+            icon: "folder",
+            system_icon: "folder",
+            category: "folder",
+            thumbable: false,
+            detail: String::new(),
+            display_name: "Telegram Desktop".into(),
+        };
+        let mime_matches = |_: &str, _: &crate::portal::filters::Filter| false;
+
+        assert!(portal_filter_matches_entry(
+            &entry,
+            Some(&filter),
+            &mime_matches,
+        ));
     }
 
     #[test]

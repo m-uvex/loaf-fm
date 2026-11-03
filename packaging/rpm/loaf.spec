@@ -78,6 +78,8 @@ cargo build --release --locked
 %install
 install -Dm755 target/release/loaf %{buildroot}%{_bindir}/loaf
 install -Dm644 packaging/assets/loaf.desktop %{buildroot}%{_datadir}/applications/loaf.desktop
+install -Dm644 packaging/assets/loaf.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/loaf.portal
+install -Dm644 packaging/assets/org.freedesktop.impl.portal.desktop.loaf.service %{buildroot}%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service
 for sz in 16 32 48 64 128 256 512; do
     install -Dm644 packaging/assets/icons/hicolor/${sz}x${sz}/apps/loaf.png \
         %{buildroot}%{_datadir}/icons/hicolor/${sz}x${sz}/apps/loaf.png
@@ -95,6 +97,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/loaf.desktop
 %doc README.md THIRD-PARTY-LICENSES.md
 %{_bindir}/loaf
 %{_datadir}/applications/loaf.desktop
+%{_datadir}/xdg-desktop-portal/portals/loaf.portal
+%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service
 %{_datadir}/icons/hicolor/*/apps/loaf.*
 %{_datadir}/licenses/%{name}/
 

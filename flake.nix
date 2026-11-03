@@ -37,13 +37,19 @@
             pkgs.libGL
             pkgs.p7zip
             pkgs.zip
+            pkgs.shared-mime-info
           ];
           QMAKE = "${qtEnv}/bin/qmake";
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}";
+          XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share";
           postInstall = ''
             install -Dm644 packaging/assets/loaf.desktop $out/share/applications/loaf.desktop
+            install -Dm644 packaging/assets/loaf.portal $out/share/xdg-desktop-portal/portals/loaf.portal
+            install -Dm644 packaging/assets/org.freedesktop.impl.portal.desktop.loaf.service $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service
+            substituteInPlace $out/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service \
+              --replace-fail "Exec=/usr/bin/loaf" "Exec=$out/bin/loaf"
             mkdir -p $out/share/icons
             cp -r packaging/assets/icons/hicolor $out/share/icons/
           '';
@@ -83,6 +89,7 @@
             pkgs.libGL
             pkgs.p7zip
             pkgs.zip
+            pkgs.shared-mime-info
           ];
 
           QMAKE = "${qtEnv}/bin/qmake";
@@ -90,6 +97,7 @@
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LD_LIBRARY_PATH";
           LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LIBRARY_PATH";
+          XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share:$XDG_DATA_DIRS";
         };
       })
     ) // {

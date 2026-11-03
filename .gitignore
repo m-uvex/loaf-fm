@@ -2,11 +2,13 @@
 /target/
 result
 .direnv/
+.envrc
 tmp/
 tests/
 
 # Editors
 .vscode/
+.zcode
 .idea/
 .opencode/
 .qmlls.ini

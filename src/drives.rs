@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(names, vec!["/dev/nvme0n1p2", "/dev/sdb1", "/dev/sdc1"], "efi, swap and loop are hidden");
         let root = &d[0];
         assert_eq!(root.name, "fedora");
-        assert_eq!(root.mount_point, "/", "prefers / when multiple mountpoints are present");
+        assert_eq!(root.mount_point, "/", "root wins over the other btrfs subvolumes");
         assert_eq!(root.percent, 75.0);
         assert!(!root.is_external);
         let usb = &d[1];

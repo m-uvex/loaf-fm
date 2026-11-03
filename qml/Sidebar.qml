@@ -10,6 +10,9 @@ Rectangle {
     id: rail
 
     property bool expanded: false
+    // Portal picker: Settings, This PC, Recent, Starred and Trash have no
+    // meaning there and are hidden.
+    property bool pickerMode: false
     // Id of the highlighted entry ("pc", "settings", "home", "bookmark:/x", ...).
     property string activeId: ""
     property var focusedButton: null
@@ -38,15 +41,25 @@ Rectangle {
         }
     }
 
-    readonly property var entries: places.filter(function(p) { return p.id !== "trash"; }).concat(
-        drives.map(function(d) {
-            var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
-            var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
-            return { id: "device:" + d.device, kind: "device", name: d.name,
-                icon: iconName,
-                system_icon: sysIcon,
-                path: d.mount_point, drive: d };
-        }))
+    readonly property var entries: {
+        var basePlaces = places.filter(function(p) {
+            if (p.id === "trash")
+                return false;
+            // The picker can only return real files and folders.
+            if (rail.pickerMode && (p.kind === "pc" || p.kind === "recent" || p.kind === "starred"))
+                return false;
+            return true;
+        });
+        return basePlaces.concat(
+            drives.map(function(d) {
+                var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
+                var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
+                return { id: "device:" + d.device, kind: "device", name: d.name,
+                    icon: iconName,
+                    system_icon: sysIcon,
+                    path: d.mount_point, drive: d };
+            }));
+    }
 
     readonly property var trashPlace: {
         for (var i = 0; i < places.length; ++i) {
@@ -55,7 +68,8 @@ Rectangle {
         return { id: "trash", kind: "trash", name: qsTr("Trash"), path: "trash:///", icon: "trash", system_icon: "user-trash-symbolic" };
     }
 
-    readonly property bool showTrash: !theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active)
+    readonly property bool showTrash: !pickerMode
+        && (!theme.hideTrashWhenEmpty || (typeof core !== "undefined" && core && !core.trash_empty) || (typeof dragManager !== "undefined" && dragManager && dragManager.active))
 
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
@@ -126,9 +140,16 @@ Rectangle {
         for (var i = 0; i < filtered.length; ++i) {
             if (filtered[i].id === rail.activeId) {
                 var it = placeList.itemAtIndex(i);
-                if (it && it.y >= placeList.contentY && it.y + it.height <= placeList.contentY + placeList.height) {
-                    var p = it.button.mapToItem(rail, 0, 0);
-                    selectionHighlight.targetY = p.y;
+                if (it) {
+                    var btnItem = it.button ? it.button : it;
+                    var p = btnItem.mapToItem(rail, 0, 0);
+                    var listTop = placeList.mapToItem(rail, 0, 0).y;
+                    var listBottom = listTop + placeList.height;
+                    if (p.y < listTop || p.y + it.height > listBottom) {
+                        selectionHighlight.targetY = -100;
+                    } else {
+                        selectionHighlight.targetY = p.y;
+                    }
                     return;
                 }
             }
@@ -383,6 +404,7 @@ Rectangle {
 
         RailButton {
             id: settingsBtn
+            visible: !rail.pickerMode
             Layout.fillWidth: true
             iconName: "gear"
             systemIcon: "preferences-system-symbolic"

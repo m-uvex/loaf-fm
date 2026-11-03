@@ -23,12 +23,13 @@ ColumnLayout {
     readonly property bool matchLowPower: matches("performance low power mode battery old slow computer gpu")
     readonly property bool matchMotion: matches("reduce motion animations transitions springs accessibility")
     readonly property bool matchThumbnails: matches("picture thumbnails preview image photo svg gallery")
+    readonly property bool matchThumbShape: matches("thumbnail shape square crop original aspect ratio preview image photo")
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
     readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
 
     readonly property int matchCount: (matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
-        + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0)
+        + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
 
     Layout.fillWidth: true
     spacing: 16
@@ -106,7 +107,7 @@ ColumnLayout {
 
     // Category 2: View & Scaling
     SettingCard {
-        visible: root.matchFontSize || root.matchIconSize
+        visible: root.matchFontSize || root.matchIconSize || root.matchThumbShape
         title: qsTr("View & Scaling")
         subtitle: qsTr("Text scaling and folder item icon sizes")
         icon: "magnifying-glass-plus"
@@ -167,6 +168,26 @@ ColumnLayout {
                         font.bold: true
                     }
                 }
+            }
+        }
+
+        SettingDivider { visible: (root.matchFontSize || root.matchIconSize) && root.matchThumbShape }
+
+        SettingRow {
+            visible: root.matchThumbShape
+            icon: "crop"
+            title: qsTr("Thumbnail shape")
+            subtitle: qsTr("Crop picture thumbnails to a square, or keep their original aspect ratio")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                enabled: theme.showThumbnails
+                options: [
+                    { value: "square", label: qsTr("Square"), shortLabel: qsTr("Square") },
+                    { value: "original", label: qsTr("Original"), shortLabel: qsTr("Orig.") }
+                ]
+                value: theme.thumbnailShape
+                onSelected: function(v) { theme.thumbnailShape = v; }
             }
         }
     }
