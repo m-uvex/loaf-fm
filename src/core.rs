@@ -19,6 +19,8 @@ pub mod qobject {
         #[qproperty(bool, is_dark)]
         #[qproperty(QString, wallpaper_colors_json)]
         #[qproperty(QString, hostname)]
+        /// User-chosen label for the "This PC" page; empty uses the hostname.
+        #[qproperty(QString, pc_name)]
         #[qproperty(QString, device_type)]
         #[qproperty(QString, icon_theme)]
         #[qproperty(QString, drives_json)]
@@ -66,6 +68,9 @@ pub mod qobject {
         fn get_setting(self: &LoafCore, key: &QString) -> QString;
         #[qinvokable]
         fn set_setting(self: Pin<&mut LoafCore>, key: &QString, value: &QString);
+        /// Sets (or clears, with an empty string) the custom "This PC" label.
+        #[qinvokable]
+        fn set_pc_custom_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
         fn refresh_system_theme(self: Pin<&mut LoafCore>);
         #[qinvokable]
@@ -336,6 +341,7 @@ pub struct CoreRust {
     is_dark: bool,
     wallpaper_colors_json: QString,
     hostname: QString,
+    pc_name: QString,
     device_type: QString,
     icon_theme: QString,
     drives_json: QString,
@@ -370,6 +376,7 @@ impl Default for CoreRust {
             is_dark: theme::detect_system_dark_mode(),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
+            pc_name: QString::from(&*state::get("pcName").unwrap_or_default()),
             device_type: QString::from(theme::detect_device_type()),
             icon_theme: QString::from("hicolor"),
             drives_json: QString::from("[]"),
@@ -512,7 +519,16 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     let cfg = places_config();
     let mut items: Vec<serde_json::Value> = Vec::new();
     let pc_icon = if device_type == "laptop" { "laptop" } else { "desktop" };
-    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": if hostname.is_empty() { "This PC" } else { hostname }, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
+    let custom_name = state::get("pcName").unwrap_or_default();
+    let custom_name = custom_name.trim();
+    let pc_name = if !custom_name.is_empty() {
+        custom_name
+    } else if hostname.is_empty() {
+        "This PC"
+    } else {
+        hostname
+    };
+    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": pc_name, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
     items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": "Recent", "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
     items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": "Starred", "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
     // Paths already shown by a built-in place, so a GTK bookmark pointing at
@@ -770,6 +786,13 @@ impl qobject::LoafCore {
 
     pub fn set_setting(self: Pin<&mut Self>, key: &QString, value: &QString) {
         state::set(&key.to_string(), &value.to_string());
+    }
+
+    pub fn set_pc_custom_name(mut self: Pin<&mut Self>, name: &QString) {
+        let name = name.to_string().trim().to_string();
+        state::set("pcName", &name);
+        self.as_mut().set_pc_name(q(&name));
+        self.load_places();
     }
 
     pub fn refresh_system_theme(self: Pin<&mut Self>) {

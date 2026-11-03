@@ -242,6 +242,29 @@ Item {
         renamePrompt.open();
     }
 
+    function requestPcRename() {
+        pcNamePrompt.initialText = core.pc_name || core.hostname || qsTr("This PC");
+        pcNamePrompt.open();
+    }
+
+    function openPcMenu(px, py) {
+        pcMenu.model = [
+            {
+                "text": qsTr("Rename This PC…"),
+                "icon": "pencil-simple",
+                "action": function () { pcView.requestPcRename(); }
+            },
+            {
+                "text": qsTr("Reset to Hostname"),
+                "icon": "arrow-counter-clockwise",
+                "separatorBefore": true,
+                "enabled": core.pc_name.length > 0,
+                "action": function () { core.set_pc_custom_name(""); }
+            }
+        ];
+        pcMenu.openAt(px, py);
+    }
+
     function driveMenuModel(d) {
         var mounted = pcView.isMounted(d);
         var external = d && d.is_external === true;
@@ -384,13 +407,25 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: core.hostname || qsTr("This PC")
+                        id: pcNameText
+                        text: core.pc_name || core.hostname || qsTr("This PC")
                         color: theme.textMain
                         font.pixelSize: theme.fs(32)
                         font.bold: true
                         font.letterSpacing: -0.8
                         Layout.fillWidth: true
                         elide: Text.ElideRight
+
+                        // Only the name itself opens the page context menu.
+                        MouseArea {
+                            width: Math.min(parent.width, pcNameText.contentWidth)
+                            height: parent.height
+                            acceptedButtons: Qt.RightButton
+                            onClicked: function (mouse) {
+                                var p = mapToItem(window.contentItem, mouse.x, mouse.y);
+                                pcView.openPcMenu(p.x, p.y);
+                            }
+                        }
                     }
                     Text {
                         text: {
@@ -887,6 +922,12 @@ Item {
         model: []
         menuMinWidth: 208
     }
+    LoafMenu {
+        id: pcMenu
+        parent: Overlay.overlay
+        model: []
+        menuMinWidth: 208
+    }
     LoafTextPrompt {
         id: renamePrompt
         title: qsTr("Rename Drive")
@@ -897,6 +938,17 @@ Item {
             if (name.length > 0 && pcView.renameDevice.length > 0) {
                 core.rename_drive(pcView.renameDevice, name);
             }
+        }
+    }
+
+    LoafTextPrompt {
+        id: pcNamePrompt
+        title: qsTr("Rename This PC")
+        label: qsTr("Leave empty to use the hostname (%1)").arg(core.hostname || qsTr("This PC"))
+        placeholder: core.hostname || qsTr("This PC")
+        confirmText: qsTr("Save")
+        onAccepted: function (text) {
+            core.set_pc_custom_name(String(text).trim());
         }
     }
 }
