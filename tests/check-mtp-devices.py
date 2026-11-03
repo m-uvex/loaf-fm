@@ -2,7 +2,8 @@
 """Run real Loaf UI against an isolated KMTPd service; never touch USB hardware.
 
 Requires dbus-python, PyGObject and QtTest. The private bus disables activation
-of installed services. No fake tool can forward commands to the host system.
+of host services; only an isolated fake service can autoactivate in activate mode.
+No host backend, hardware, or fake tool can forward commands to the host system.
 """
 import json
 import os
@@ -15,7 +16,7 @@ FAKE_DISKS = '''#!/usr/bin/env python3
 import os, sys
 from pathlib import Path
 if Path(sys.argv[0]).name == "lsblk":
-    print('{"blockdevices": []}')
+    print('{"blockdevices": [{"name": "loaf-test-disk", "path": "/dev/loaf-test-disk", "type": "disk", "size": 100000000, "rm": true, "tran": "usb", "children": [{"name": "loaf-test-usb", "path": "/dev/loaf-test-usb", "label": "Test USB", "mountpoints": ["/tmp"], "fstype": "ext4", "size": 100000000, "type": "part"}]}]}')
 else:
     with (Path(os.environ["LOAF_DEVICE_TEST_ROOT"]) / "forbidden").open("a") as f:
         f.write(repr(sys.argv) + "\\n")
@@ -246,6 +247,10 @@ def inside(binary, directory, mode):
             service = subprocess.Popen([sys.executable, str(sandbox / "service.py")], env=env,
                                        stdout=subprocess.PIPE, text=True)
             assert service.stdout.readline().strip() == "READY", "Fixture did not start"
+        elif autoactivate:
+            import dbus
+            session_bus = dbus.SessionBus()
+            assert not session_bus.name_has_owner("org.kde.kmtpd5"), "org.kde.kmtpd5 already has an owner before Loaf launch in activate mode!"
         def run_app(arguments, marker):
             result = subprocess.run([binary, "--new-window", *arguments], env=env, capture_output=True, text=True, timeout=45)
             output = result.stdout + result.stderr

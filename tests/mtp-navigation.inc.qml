@@ -180,12 +180,20 @@ Timer {
             window.showFiles(); engine.set_path(stay); sidebar.expanded = true;
             if (core.get_setting("mtpMissingService") === "true") {
                 mtpEvents.wait(1800);
-                mtpCheck(sidebar.drives.length === 0 && !engine.loading, "Missing optional service did not degrade gracefully");
+                mtpCheck(sidebar.drives.length === 1 && !engine.loading, "Missing optional service did not degrade gracefully");
                 console.log("MTP_UI_TEST_MISSING_SERVICE_PASS"); Qt.quit(); return;
             }
             var root = core.get_setting("mtpPrimaryUri");
             var second = "mtp://loaf/2f746573742f7365636f6e64/";
-            mtpWait(function() { return sidebar.drives.length === 3; }, "Phone discovery failed");
+            mtpWait(function() { return sidebar.drives.length === 4; }, "Phone discovery failed");
+            // Check pickerMode filtering: normal mode includes phone and block drive; pickerMode excludes phone but retains block drive
+            sidebar.pickerMode = false;
+            mtpCheck(sidebar.entries.some(function(e) { return e.id === "device:" + root; }), "Normal sidebar missing phone");
+            mtpCheck(sidebar.entries.some(function(e) { return e.id === "device:/dev/loaf-test-usb"; }), "Normal sidebar missing block drive");
+            sidebar.pickerMode = true;
+            mtpCheck(!sidebar.entries.some(function(e) { return e.id === "device:" + root; }), "Picker mode included phone");
+            mtpCheck(sidebar.entries.some(function(e) { return e.id === "device:/dev/loaf-test-usb"; }), "Picker mode excluded block drive");
+            sidebar.pickerMode = false;
             mtpClickPhone(root); mtpLoaded(root);
             mtpCheck(engine.read_only && engine.location_kind === "mtp", "MTP is not a read-only virtual location");
             mtpCheck(sidebar.activeId === "device:" + root, "Phone highlight missing");
@@ -220,9 +228,9 @@ Timer {
             mtpClickPhone(root); mtpLoaded(root);
             console.log("MTP_CASE unplug");
             core.set_setting("mtpTestPresence", "absent");
-            mtpWait(function() { return sidebar.drives.length === 0 && !engine.loading && engine.error_text.length > 0; }, "Unplug did not refresh sidebar and view");
+            mtpWait(function() { return sidebar.drives.length === 1 && !engine.loading && engine.error_text.length > 0; }, "Unplug did not refresh sidebar and view");
             core.set_setting("mtpTestPresence", "present");
-            mtpWait(function() { return sidebar.drives.length === 3; }, "Reconnect not discovered");
+            mtpWait(function() { return sidebar.drives.length === 4; }, "Reconnect not discovered");
             mtpClickPhone(root); mtpLoaded(root);
             console.log("MTP_UI_TEST_ALL_PASS");
         } catch (error) { console.error("MTP_UI_TEST_FAIL", error.message); }

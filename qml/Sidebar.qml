@@ -50,8 +50,13 @@ Rectangle {
                 return false;
             return true;
         });
+        var availableDrives = drives.filter(function(d) {
+            if (rail.pickerMode && d.provider === "mtp")
+                return false;
+            return true;
+        });
         return basePlaces.concat(
-            drives.map(function(d) {
+            availableDrives.map(function(d) {
                 var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
                 var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
                 return { id: "device:" + d.device, kind: "device", name: d.name,
