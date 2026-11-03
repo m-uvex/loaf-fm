@@ -248,7 +248,6 @@ use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, w
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -367,11 +366,13 @@ pub struct CoreRust {
 impl Default for CoreRust {
     fn default() -> Self {
         Self {
-            is_dark: theme::detect_system_dark_mode(),
+            // Last known values: detecting them spawns gsettings/gdbus, which must
+            // not block the first frame. refresh_system_theme() corrects them.
+            is_dark: state::get_bool("systemDark", false),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
             device_type: QString::from(theme::detect_device_type()),
-            icon_theme: QString::from("hicolor"),
+            icon_theme: QString::from(&*state::get_or("systemIconTheme", "hicolor")),
             drives_json: QString::from("[]"),
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
@@ -780,8 +781,12 @@ impl qobject::LoafCore {
             let _ = thread.queue(move |mut core| {
                 if *core.is_dark() != dark {
                     core.as_mut().set_is_dark(dark);
+                    state::set_bool("systemDark", dark);
                 }
-                core.as_mut().set_icon_theme(q(&icon_theme));
+                if core.icon_theme().to_string() != icon_theme {
+                    core.as_mut().set_icon_theme(q(&icon_theme));
+                    state::set("systemIconTheme", &icon_theme);
+                }
             });
         });
     }
@@ -1298,7 +1303,7 @@ impl qobject::LoafCore {
     }
 
     fn app_entry(app: &apps::DesktopApp, theme_name: &str) -> serde_json::Value {
-        let icon = if app.icon.starts_with('/') {
+        let icon = if app.icon.starts_with('/') && Path::new(&app.icon).is_file() {
             format!("file://{}", trash::encode_path(Path::new(&app.icon)))
         } else {
             icons::resolve(theme_name, &app.icon, 32)
@@ -1340,19 +1345,14 @@ impl qobject::LoafCore {
         let recent: Vec<&apps::DesktopApp> =
             recent_ids.iter().filter_map(|id| installed.iter().find(|a| &a.id == id)).collect();
 
-        let mut used: HashSet<&str> = HashSet::new();
-        for app in recent.iter().chain(recommended.iter()) {
-            used.insert(app.id.as_str());
-        }
-        let others: Vec<&apps::DesktopApp> =
-            installed.iter().filter(|a| !a.no_display && !used.contains(a.id.as_str())).collect();
-
+        // "Other Applications" is fetched with all_open_with_apps() only when that
+        // submenu opens: resolving ~200 app icons on every right-click is slow.
         let payload = serde_json::json!({
             "mime": mime,
             "defaultId": default_id,
             "recommended": recommended.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
             "recent": recent.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
-            "others": others.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
+            "hasOthers": installed.iter().any(|a| !a.no_display),
         });
         q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()))
     }

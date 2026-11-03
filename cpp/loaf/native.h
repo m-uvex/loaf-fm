@@ -42,6 +42,8 @@ class LoafNative : public QObject
     Q_PROPERTY(bool portalOnly READ portalOnly CONSTANT)
     // True when started through "Open as Administrator".
     Q_PROPERTY(bool isAdmin READ isAdmin CONSTANT)
+    // Whether the window was created with an alpha channel (see native.cpp).
+    Q_PROPERTY(bool alphaBuffer READ alphaBuffer CONSTANT)
 public:
     explicit LoafNative(QObject *parent = nullptr);
 
@@ -86,6 +88,7 @@ public:
     QString startupMode() const { return m_mode; }
     bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
+    bool alphaBuffer() const;
 
 Q_SIGNALS:
     void clipboardChanged();

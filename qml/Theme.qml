@@ -123,22 +123,13 @@ Item {
     property bool clickToRename: false
     property bool searchContents: false
 
-    FontLoader { id: fontReg; source: "qrc:/loaf/fonts/Phosphor.ttf" }
-    FontLoader { id: fontBold; source: "qrc:/loaf/fonts/Phosphor-Bold.ttf" }
-    FontLoader { id: fontFill; source: "qrc:/loaf/fonts/Phosphor-Fill.ttf" }
-    FontLoader { id: fontDuotone; source: "qrc:/loaf/fonts/Phosphor-Duotone.ttf" }
-    FontLoader { id: fontLight; source: "qrc:/loaf/fonts/Phosphor-Light.ttf" }
-    FontLoader { id: fontThin; source: "qrc:/loaf/fonts/Phosphor-Thin.ttf" }
+    // Only the weight in use is loaded (each file is ~0.5 MB; there are six).
+    readonly property string iconFontFile: ({ bold: "Phosphor-Bold", fill: "Phosphor-Fill", duotone: "Phosphor-Duotone",
+                                              light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
+    FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
 
     function getFontFamily() {
-        switch (phosphorWeight) {
-            case "bold": return (fontBold && fontBold.name) ? fontBold.name : "Phosphor-Bold";
-            case "fill": return (fontFill && fontFill.name) ? fontFill.name : "Phosphor-Fill";
-            case "duotone": return (fontDuotone && fontDuotone.name) ? fontDuotone.name : "Phosphor-Duotone";
-            case "light": return (fontLight && fontLight.name) ? fontLight.name : "Phosphor-Light";
-            case "thin": return (fontThin && fontThin.name) ? fontThin.name : "Phosphor-Thin";
-            default: return (fontReg && fontReg.name) ? fontReg.name : "Phosphor";
-        }
+        return iconFont.status === FontLoader.Ready ? iconFont.name : iconFontFile;
     }
 
     readonly property bool isDark: themeMode === "dark" ? true

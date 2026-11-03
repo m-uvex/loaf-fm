@@ -26,6 +26,14 @@ ApplicationWindow {
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
     property string activeView: "files" // "files", "settings", "pc"
+    // Settings and This PC are created the first time they're shown.
+    property bool settingsOpened: false
+    property bool pcOpened: false
+    property int settingsTab: 0
+    onActiveViewChanged: {
+        if (activeView === "settings") settingsOpened = true;
+        else if (activeView === "pc") pcOpened = true;
+    }
     property bool isEditingPath: false
     property bool keyboardNavActive: false
     property bool splitView: false
@@ -83,6 +91,9 @@ ApplicationWindow {
     }
 
     function systemIcon(name) {
+        // Read here so every icon binding re-resolves once the real system
+        // theme is known (it is detected off the UI thread at startup).
+        void core.icon_theme;
         var source = theme.iconSource === "adwaita" ? "adwaita"
                    : theme.iconSource === "custom" ? theme.customIconTheme
                    : "system";
@@ -823,8 +834,6 @@ ApplicationWindow {
         property bool browseArchives: true
     }
 
-    FontLoader { source: "qrc:/loaf/fonts/Phosphor.ttf" }
-    FontLoader { source: "qrc:/loaf/fonts/Phosphor-Bold.ttf" }
 
     // Decorative background blobs (skipped in low-power mode, when background is translucent, or when disabled).
     Item {
@@ -846,13 +855,13 @@ ApplicationWindow {
     // The settings tab is part of the URL: settings://behavior and friends.
     function settingsUrl() {
         var slugs = ["interface", "behavior", "accessibility", "experimental", "about", "share", "network"];
-        return "settings://" + (slugs[settingsView.activeTab] || slugs[0]);
+        return "settings://" + (slugs[window.settingsTab] || slugs[0]);
     }
 
     function settingsTabName() {
         var names = [qsTr("Interface"), qsTr("Behavior"), qsTr("Accessibility"),
                      qsTr("Experimental"), qsTr("About Loaf"), qsTr("Share"), qsTr("Network")];
-        return names[settingsView.activeTab] || names[0];
+        return names[window.settingsTab] || names[0];
     }
 
     function startEditingPath() {
@@ -877,13 +886,11 @@ ApplicationWindow {
         } else if (raw === "settings" || raw.indexOf("settings://") === 0) {
             window.activeView = "settings";
             window.markCurrentTab("settings", qsTr("Settings"));
-            if (raw === "settings://behavior") settingsView.activeTab = 1;
-            else if (raw === "settings://accessibility") settingsView.activeTab = 2;
-            else if (raw === "settings://experimental") settingsView.activeTab = 3;
-            else if (raw === "settings://about") settingsView.activeTab = 4;
-            else if (raw === "settings://share") settingsView.activeTab = 5;
-            else if (raw === "settings://network") settingsView.activeTab = 6;
-            else settingsView.activeTab = 0;
+            var tabs = ["settings://interface", "settings://behavior", "settings://accessibility", "settings://experimental",
+                        "settings://about", "settings://share", "settings://network"];
+            window.settingsTab = Math.max(0, tabs.indexOf(raw));
+            if (settingsLoader.item)
+                settingsLoader.item.activeTab = window.settingsTab;
         } else {
             showFiles();
             engine.set_path(raw);
@@ -1786,11 +1793,18 @@ ApplicationWindow {
                         opacity: window.activeView === "settings" ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-                        SettingsView {
-                            id: settingsView
+                        // Built on first open: keeps startup and memory light.
+                        Loader {
+                            id: settingsLoader
                             anchors.fill: parent
                             anchors.margins: 22
-                            searchQuery: window.activeView === "settings" ? searchInput.text : ""
+                            active: window.settingsOpened
+                            sourceComponent: SettingsView {
+                                id: settingsView
+                                searchQuery: window.activeView === "settings" ? searchInput.text : ""
+                                Component.onCompleted: activeTab = window.settingsTab
+                                onActiveTabChanged: window.settingsTab = activeTab
+                            }
                         }
                     }
 
@@ -1804,10 +1818,11 @@ ApplicationWindow {
                         opacity: window.activeView === "pc" ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-                        PCView {
-                            id: pcView
+                        Loader {
                             anchors.fill: parent
                             anchors.margins: 22
+                            active: window.pcOpened
+                            sourceComponent: PCView {}
                         }
                     }
                 }
@@ -2005,12 +2020,14 @@ ApplicationWindow {
             for (var s = 0; s < suggested.length; ++s)
                 sub.push(appRow(suggested[s], paths, defaultId));
         }
-        var others = data.others || [];
-        if (others.length > 0) {
+        if (data.hasOthers) {
             sub.push({ text: qsTr("Other Applications…"), icon: "list", separatorBefore: sub.length > 0, submenu: function() {
+                var others = JSON.parse(core.all_open_with_apps() || "[]");
                 var out = [];
-                for (var o = 0; o < others.length; ++o)
-                    out.push(appRow(others[o], paths, defaultId));
+                for (var o = 0; o < others.length; ++o) {
+                    if (!used[others[o].id])
+                        out.push(appRow(others[o], paths, defaultId));
+                }
                 return out;
             } });
         }

@@ -67,7 +67,9 @@ ColumnLayout {
             title: qsTr("Background opacity")
             subtitle: theme.lowPower
                 ? qsTr("Disabled in low-power mode")
-                : qsTr("Fades the window itself so the desktop shows through margins and gaps")
+                : (theme.backgroundOpacity < 0.999 && !nativeBridge.alphaBuffer
+                    ? qsTr("Restart Loaf to apply transparency")
+                    : qsTr("Fades the window itself so the desktop shows through margins and gaps"))
 
             LoafSlider {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
