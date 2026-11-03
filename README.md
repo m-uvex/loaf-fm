@@ -172,8 +172,13 @@ Requirements:
 Optional at runtime (features degrade gracefully without them):
 - `7zip`/`p7zip` (zip, 7z, rar, iso, encrypted archives), `tar`, `zstd`, `cpio`
 - `udisks2` (mount, eject, unlock encrypted drives, rename labels)
+- Optional MTP USB phone support: `kio-extras` package on Arch (`pacman -S kio-extras`), Debian/Ubuntu (`apt install kio-extras`), or `pkgs.kdePackages.kio-extras` on NixOS. This package provides the canonical session D-Bus service `org.kde.kmtpd5` (executed via `kio-extras-service`/`kiod6`) for USB phone browsing and read/write transfers. On NixOS, install it at the system level (`environment.systemPackages = [ pkgs.kdePackages.kio-extras ];` and `services.dbus.packages = [ pkgs.kdePackages.kio-extras ];`) so its D-Bus service is registered in the session activation registry, rather than merely in a transient `nix-shell`. A full KDE Plasma desktop environment or manually running daemon is not required (the host D-Bus session bus activates the service on demand across Hyprland, Sway, GNOME, etc., provided the service file is registered). When absent or unregistered, MTP devices degrade cleanly without affecting local disk browsing or causing UI hangs; KIOFuse is not required.
 - `ffmpegthumbnailer` / `evince-thumbnailer` (video and PDF thumbnails)
 - `xdg-utils`, `libsecret` (`secret-tool`, to remember drive passphrases), `polkit` (Open as Administrator)
+
+MTP phones must be unlocked with USB file transfer enabled. Loaf supports file and folder copies and moves in both directions, new folders and files, rename, preview and permanent deletion. Name collisions create a separate copy. Phone roots are protected; MTP has no trash, undo or symbolic links. Cancellation stops further files after the current phone transfer finishes. A failed transfer can leave a partial destination; a failed move retains its source.
+
+Opening or previewing a phone file downloads a private local copy. Editor changes are not uploaded automatically: copy the edited file back to the phone. Loaf's MTP clipboard format supports transfers between Loaf windows.
 
 ```bash
 cargo build --release

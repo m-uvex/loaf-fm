@@ -190,6 +190,7 @@ enum Loc {
     Search { root: PathBuf, query: String, contents: bool },
     /// Browsing inside an archive file (read-only).
     Archive { file: PathBuf, inner: String },
+    Mtp(crate::mtp::Location),
 }
 
 pub const ARCHIVE_SCHEME: &str = "archive://";
@@ -215,6 +216,7 @@ impl Loc {
     fn to_string(&self) -> String {
         match self {
             Loc::Dir(p) => p.to_string_lossy().to_string(),
+            Loc::Mtp(location) => location.url(),
             Loc::Trash => "trash:///".into(),
             Loc::Recent => "recent:///".into(),
             Loc::Starred => "starred:///".into(),
@@ -225,6 +227,9 @@ impl Loc {
 
     fn parse(s: &str) -> Option<Loc> {
         let s = s.trim();
+        if s.starts_with("mtp:") {
+            return crate::mtp::Location::parse(s).map(Loc::Mtp);
+        }
         match s {
             "trash:///" | "trash:" | "trash://" => return Some(Loc::Trash),
             "recent:///" | "recent:" => return Some(Loc::Recent),
@@ -259,6 +264,7 @@ impl Loc {
     fn kind(&self) -> &'static str {
         match self {
             Loc::Dir(_) => "dir",
+            Loc::Mtp(_) => "mtp",
             Loc::Trash => "trash",
             Loc::Recent => "recent",
             Loc::Starred => "starred",
@@ -596,7 +602,7 @@ impl qobject::LoafEngine {
         let filter = listing::lower_filter(&self.filter_text().to_string());
         let show_hidden = *self.show_hidden();
         // Trash, recent and search lists show everything they found.
-        let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. });
+        let honour_hidden = matches!(self.loc, Loc::Dir(_) | Loc::Archive { .. } | Loc::Mtp(_));
         let dir_only = *self.dir_only();
         let mime_patterns = self
             .portal_filter
@@ -661,6 +667,10 @@ impl qobject::LoafEngine {
                 }
                 (name, c)
             }
+            Loc::Mtp(location) => (location.title(), location.breadcrumbs().into_iter()
+                .enumerate().map(|(index, (name, path))| crumb(&name, &path,
+                    if index == 0 { "device-mobile" } else { "folder" },
+                    if index == 0 { "phone-symbolic" } else { "folder" }, index == 0)).collect()),
             Loc::Trash => ("Trash".into(), vec![crumb("Trash", "trash:///", "trash", "user-trash-symbolic", true)]),
             Loc::Recent => ("Recent".into(), vec![crumb("Recent", "recent:///", "clock", "document-open-recent-symbolic", true)]),
             Loc::Starred => ("Starred".into(), vec![crumb("Starred", "starred:///", "star", "starred-symbolic", true)]),
@@ -693,7 +703,8 @@ impl qobject::LoafEngine {
         self.as_mut().set_breadcrumbs_json(QString::from(&*serde_json::to_string(&crumbs).unwrap_or_default()));
         let searching = matches!(loc, Loc::Search { .. });
         self.as_mut().set_is_searching_everywhere(searching);
-        self.as_mut().set_read_only(matches!(loc, Loc::Archive { .. } | Loc::Recent | Loc::Search { .. } | Loc::Starred));
+        self.as_mut().set_read_only(matches!(loc, Loc::Archive { .. } | Loc::Recent | Loc::Search { .. } | Loc::Starred)
+            || matches!(&loc, Loc::Mtp(location) if location.storage().is_none()));
         let (b, f) = (!self.back.is_empty(), !self.forward.is_empty());
         self.as_mut().set_can_go_back(b);
         self.as_mut().set_can_go_forward(f);
@@ -781,6 +792,7 @@ impl qobject::LoafEngine {
                         Some(e)
                     })
                     .collect()),
+                Loc::Mtp(location) => crate::mtp::list(location),
                 Loc::Recent => Ok(listing::entries_for_paths(&xdg::recent_files(300))),
                 Loc::Starred => Ok(listing::entries_for_paths(&xdg::starred())),
                 Loc::Search { .. } => Ok(Vec::new()),
@@ -851,6 +863,7 @@ impl qobject::LoafEngine {
     pub fn navigate_up(self: Pin<&mut Self>) {
         let up = match &self.loc {
             Loc::Dir(p) => p.parent().map(|x| Loc::Dir(x.to_path_buf())),
+            Loc::Mtp(location) => location.parent().map(Loc::Mtp),
             Loc::Archive { file, inner } if inner.is_empty() => file.parent().map(|x| Loc::Dir(x.to_path_buf())),
             Loc::Archive { file, inner } => Some(Loc::Archive {
                 file: file.clone(),
@@ -929,6 +942,11 @@ impl qobject::LoafEngine {
         self.go_to(Loc::Starred, true);
     }
     pub fn search(mut self: Pin<&mut Self>, query: &QString, scope: &QString, contents: bool) {
+        if matches!(self.loc, Loc::Mtp(_)) && scope.to_string() != "home" {
+            self.as_mut().set_filter_text(query.clone());
+            self.refilter(true);
+            return;
+        }
         let q = query.to_string();
         if q.trim().is_empty() {
             return self.clear_search();

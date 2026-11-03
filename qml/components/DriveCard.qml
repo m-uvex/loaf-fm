@@ -83,7 +83,7 @@ Item {
         return d.device ? String(d.device) : "";
     }
 
-    opacity: root.isMounted ? 1.0 : 0.85
+    opacity: root.isMounted || (root.drive && root.drive.provider === "mtp") ? 1.0 : 0.85
     Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140 } }
 
     scale: cardMouse.pressed ? 0.98 : 1.0
@@ -111,7 +111,7 @@ Item {
     Shape {
         id: dashedBorder
         anchors.fill: parent
-        visible: !root.isMounted
+        visible: !root.isMounted && !(root.drive && root.drive.provider === "mtp")
         readonly property real r: theme.radiusXl
 
         ShapePath {
@@ -259,7 +259,7 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
-        text: qsTr("Mount")
+        text: root.drive && root.drive.provider === "mtp" ? qsTr("Browse") : qsTr("Mount")
         variant: "tonal"
         icon: "download-simple"
         onClicked: root.mountRequested()
