@@ -182,7 +182,8 @@ ColumnLayout {
         }
     }
 
-    Component.onCompleted: maybeRefresh()
+    // Only when the About tab is shown: no network requests just for opening Settings.
+    Component.onCompleted: if (visible) maybeRefresh()
     onVisibleChanged: if (visible) maybeRefresh()
 
     Layout.fillWidth: true

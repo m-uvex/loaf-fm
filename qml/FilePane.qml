@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import app.loaf
 
 // One file view (grid + list) bound to its own LoafEngine model. Used for
@@ -510,12 +509,15 @@ Item {
                 }
                 Component.onCompleted: requestPaint()
 
+                // Only rows near the viewport matter for painting: checking those
+                // against the selection set stays cheap even after Ctrl+A in a
+                // huge folder (looking up every selected path was O(selected x rows)).
                 function collectSelection() {
                     var sel = {};
-                    var paths = pane.selectedPaths();
-                    for (var i = 0; i < paths.length; ++i) {
-                        var r = paneEngine.row_of(paths[i]);
-                        if (r >= 0) sel[r] = true;
+                    var visible = visibleIndices();
+                    for (var i = 0; i < visible.length; ++i) {
+                        if (pane.selection[paneEngine.path_at(visible[i])] === true)
+                            sel[visible[i]] = true;
                     }
                     return sel;
                 }
@@ -813,6 +815,8 @@ Item {
                 cellWidth: pane.cellW
                 cellHeight: pane.cellH
                 cacheBuffer: theme.lowPower ? 0 : cellHeight * 2
+                // Recycle cells that scroll out instead of destroying and rebuilding them.
+                reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: true
                 model: visible ? paneEngine : null
@@ -975,6 +979,8 @@ Item {
 
                 delegate: Item {
                     id: card
+                    // A recycled cell must not carry a half-started drag.
+                    GridView.onPooled: cardMouse.dragging = false
                     width: gridView.cellWidth
                     height: gridView.cellHeight
 
@@ -1004,9 +1010,6 @@ Item {
                     Accessible.role: Accessible.ListItem
                     Accessible.name: name
                     Accessible.selected: isSelected
-
-                    property bool entered: !theme.animate
-                    Component.onCompleted: entered = true
 
                     DropArea {
                         id: folderDrop
@@ -1040,9 +1043,10 @@ Item {
                         visible: card.isCursor
                     }
 
-                    scale: !entered ? 0.82
-                        : (cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0))
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                    // No entry animation: cells are created on every scroll step.
+                    // A short tween (not an oscillating spring) keeps hover cheap.
+                    scale: cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0)
+                    Behavior on scale { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
 
                     ColumnLayout {
                         id: cardContentCol
@@ -1091,20 +1095,13 @@ Item {
                                 width: fit > 0 ? Math.round(thumbImg.implicitWidth * fit) : parent.width
                                 height: fit > 0 ? Math.round(thumbImg.implicitHeight * fit) : parent.height
 
-                                Rectangle {
-                                    id: thumbMask
-                                    anchors.fill: parent
-                                    radius: theme.radiusM
-                                    color: theme.surfaceContainerLowest
-                                    visible: false
-                                    layer.enabled: card.thumbable && theme.showThumbnails && !theme.lowPower
-                                }
-
+                                // "/round": the provider rounds the corners once, so no
+                                // offscreen mask layer per thumbnail is needed.
                                 Image {
                                     id: thumbImg
                                     anchors.fill: parent
                                     source: theme.showThumbnails && card.thumbable && card.thumb_id.length > 0
-                                        ? ("image://thumb/" + card.thumb_id + (thumbFrame.square ? "/cover" : "")) : ""
+                                        ? ("image://thumb/" + card.thumb_id + (thumbFrame.square ? "/cover" : "") + "/round") : ""
                                     fillMode: thumbFrame.square ? Image.PreserveAspectCrop : Image.Stretch
                                     sourceSize.width: pane.thumbBox
                                     sourceSize.height: pane.thumbBox
@@ -1112,20 +1109,11 @@ Item {
                                     cache: true
                                     smooth: true
                                     mipmap: true
-                                    // The rounded mask costs an offscreen layer: only for
-                                    // thumbable items, never in low-power mode. Must not
-                                    // depend on image status: toggling the layer while the
-                                    // thumbnail loads crashes Qt during DPI updates.
-                                    layer.enabled: card.thumbable && theme.showThumbnails && !theme.lowPower
-                                    layer.effect: MultiEffect {
-                                        maskEnabled: true
-                                        maskSource: thumbMask
-                                    }
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
-                                    radius: theme.radiusM
+                                    radius: Math.min(width, height) / 6 // same as the provider's "/round"
                                     color: "transparent"
                                     border.color: card.isSelected ? theme.primary : theme.outlineVariant
                                     border.width: 1
@@ -1338,6 +1326,7 @@ Item {
                 spacing: 3
                 clip: true
                 cacheBuffer: theme.lowPower ? 0 : 400
+                reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: visible ? paneEngine : null
                 Accessible.role: Accessible.List
@@ -1496,6 +1485,7 @@ Item {
 
                 delegate: Item {
                     id: row
+                    ListView.onPooled: rowMouse.dragging = false
                     width: listView.width
                     height: Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)))
 
@@ -1576,7 +1566,7 @@ Item {
                                     Image {
                                         id: listThumb
                                         anchors.fill: parent
-                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id + "/cover") : ""
+                                        source: theme.showThumbnails && row.thumbable && row.thumb_id.length > 0 ? ("image://thumb/" + row.thumb_id + "/cover/round") : ""
                                         fillMode: Image.PreserveAspectCrop
                                         sourceSize.width: 24; sourceSize.height: 24
                                         asynchronous: true

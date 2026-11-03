@@ -19,6 +19,8 @@ pub mod qobject {
         #[qproperty(bool, is_dark)]
         #[qproperty(QString, wallpaper_colors_json)]
         #[qproperty(QString, hostname)]
+        /// User-chosen label for the "This PC" page; empty uses the hostname.
+        #[qproperty(QString, pc_name)]
         #[qproperty(QString, device_type)]
         #[qproperty(QString, icon_theme)]
         #[qproperty(QString, drives_json)]
@@ -68,6 +70,9 @@ pub mod qobject {
         fn get_setting(self: &LoafCore, key: &QString) -> QString;
         #[qinvokable]
         fn set_setting(self: Pin<&mut LoafCore>, key: &QString, value: &QString);
+        /// Sets (or clears, with an empty string) the custom "This PC" label.
+        #[qinvokable]
+        fn set_pc_custom_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
         fn refresh_system_theme(self: Pin<&mut LoafCore>);
         #[qinvokable]
@@ -252,7 +257,6 @@ use crate::{apps, drives, icons, info, native, smb, state, theme, trash, util, w
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -340,6 +344,7 @@ pub struct CoreRust {
     is_dark: bool,
     wallpaper_colors_json: QString,
     hostname: QString,
+    pc_name: QString,
     device_type: QString,
     icon_theme: QString,
     drives_json: QString,
@@ -372,11 +377,14 @@ pub struct CoreRust {
 impl Default for CoreRust {
     fn default() -> Self {
         Self {
-            is_dark: theme::detect_system_dark_mode(),
+            // Last known values: detecting them spawns gsettings/gdbus, which must
+            // not block the first frame. refresh_system_theme() corrects them.
+            is_dark: state::get_bool("systemDark", false),
             wallpaper_colors_json: QString::from(&*theme::read_wallpaper_colors()),
             hostname: QString::from(&*theme::read_system_hostname()),
+            pc_name: QString::from(&*state::get("pcName").unwrap_or_default()),
             device_type: QString::from(theme::detect_device_type()),
-            icon_theme: QString::from("hicolor"),
+            icon_theme: QString::from(&*state::get_or("systemIconTheme", "hicolor")),
             drives_json: QString::from("[]"),
             frequent_dirs_json: QString::from("[]"),
             places_json: QString::from("[]"),
@@ -518,7 +526,16 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     let cfg = places_config();
     let mut items: Vec<serde_json::Value> = Vec::new();
     let pc_icon = if device_type == "laptop" { "laptop" } else { "desktop" };
-    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": if hostname.is_empty() { "This PC" } else { hostname }, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
+    let custom_name = state::get("pcName").unwrap_or_default();
+    let custom_name = custom_name.trim();
+    let pc_name = if !custom_name.is_empty() {
+        custom_name
+    } else if hostname.is_empty() {
+        "This PC"
+    } else {
+        hostname
+    };
+    items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": pc_name, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
     items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": "Recent", "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
     items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": "Starred", "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
     // Paths already shown by a built-in place, so a GTK bookmark pointing at
@@ -778,6 +795,13 @@ impl qobject::LoafCore {
         state::set(&key.to_string(), &value.to_string());
     }
 
+    pub fn set_pc_custom_name(mut self: Pin<&mut Self>, name: &QString) {
+        let name = name.to_string().trim().to_string();
+        state::set("pcName", &name);
+        self.as_mut().set_pc_name(q(&name));
+        self.load_places();
+    }
+
     pub fn refresh_system_theme(self: Pin<&mut Self>) {
         let thread = self.qt_thread();
         std::thread::spawn(move || {
@@ -786,8 +810,12 @@ impl qobject::LoafCore {
             let _ = thread.queue(move |mut core| {
                 if *core.is_dark() != dark {
                     core.as_mut().set_is_dark(dark);
+                    state::set_bool("systemDark", dark);
                 }
-                core.as_mut().set_icon_theme(q(&icon_theme));
+                if core.icon_theme().to_string() != icon_theme {
+                    core.as_mut().set_icon_theme(q(&icon_theme));
+                    state::set("systemIconTheme", &icon_theme);
+                }
             });
         });
     }
@@ -1416,7 +1444,7 @@ impl qobject::LoafCore {
     }
 
     fn app_entry(app: &apps::DesktopApp, theme_name: &str) -> serde_json::Value {
-        let icon = if app.icon.starts_with('/') {
+        let icon = if app.icon.starts_with('/') && Path::new(&app.icon).is_file() {
             format!("file://{}", trash::encode_path(Path::new(&app.icon)))
         } else {
             icons::resolve(theme_name, &app.icon, 32)
@@ -1458,19 +1486,14 @@ impl qobject::LoafCore {
         let recent: Vec<&apps::DesktopApp> =
             recent_ids.iter().filter_map(|id| installed.iter().find(|a| &a.id == id)).collect();
 
-        let mut used: HashSet<&str> = HashSet::new();
-        for app in recent.iter().chain(recommended.iter()) {
-            used.insert(app.id.as_str());
-        }
-        let others: Vec<&apps::DesktopApp> =
-            installed.iter().filter(|a| !a.no_display && !used.contains(a.id.as_str())).collect();
-
+        // "Other Applications" is fetched with all_open_with_apps() only when that
+        // submenu opens: resolving ~200 app icons on every right-click is slow.
         let payload = serde_json::json!({
             "mime": mime,
             "defaultId": default_id,
             "recommended": recommended.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
             "recent": recent.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
-            "others": others.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
+            "hasOthers": installed.iter().any(|a| !a.no_display),
         });
         q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()))
     }

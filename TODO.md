@@ -52,7 +52,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
   - Categorized display for internal partitions, external USB drives, and active network mounts.
   - Visual disk usage gauge bars showing used and available capacity at a glance.
   - Quick action buttons to mount, unmount, rename, and safely eject removable storage.
-  - [ ] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
+  - [x] **Custom "This PC" Name**: Allow customizing the label of the "This PC" tab/page alongside the default hostname-based title.
 
 ---
 
