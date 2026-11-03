@@ -29,11 +29,8 @@ ApplicationWindow {
     // Settings and This PC are created the first time they're shown.
     property bool settingsOpened: false
     property bool pcOpened: false
+    readonly property var pcView: pcLoader.item
     property int settingsTab: 0
-    onActiveViewChanged: {
-        if (activeView === "settings") settingsOpened = true;
-        else if (activeView === "pc") pcOpened = true;
-    }
     property bool isEditingPath: false
     property bool keyboardNavActive: false
     property bool splitView: false
@@ -69,6 +66,8 @@ ApplicationWindow {
     }
 
     onActiveViewChanged: {
+        if (activeView === "settings") settingsOpened = true;
+        else if (activeView === "pc") pcOpened = true;
         if (pendingMountDevice.length > 0 && activeView !== pendingMountView)
             cancelDriveOpen();
     }
@@ -2018,10 +2017,13 @@ ApplicationWindow {
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
                         Loader {
+                            id: pcLoader
                             anchors.fill: parent
                             anchors.margins: 22
                             active: window.pcOpened
-                            sourceComponent: PCView {}
+                            sourceComponent: PCView {
+                                id: pcView
+                            }
                         }
                     }
                 }
@@ -2772,7 +2774,10 @@ ApplicationWindow {
             if (place.path && place.path.indexOf("/") === 0)
                 m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
             if (place.kind === "pc")
-                m.push({ text: qsTr("Rename This PC…"), icon: "pencil-simple", action: function() { pcView.requestPcRename(); } });
+                m.push({ text: qsTr("Rename This PC…"), icon: "pencil-simple", action: function() {
+                    if (!window.pcOpened) window.pcOpened = true;
+                    if (window.pcView) window.pcView.requestPcRename();
+                } });
             if (place.kind === "trash")
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
@@ -2791,7 +2796,10 @@ ApplicationWindow {
     function openDriveContextMenu(d, x, y) {
         if (!d)
             return;
-        pcView.openDriveMenu(d, x, y);
+        if (!window.pcOpened)
+            window.pcOpened = true;
+        if (window.pcView)
+            window.pcView.openDriveMenu(d, x, y);
     }
     LoafMenu {
         id: rmbDropMenu
