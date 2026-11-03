@@ -26,10 +26,12 @@ ColumnLayout {
     readonly property bool matchIconStyle: matches("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze")
     readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
     readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
+    readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
     readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
 
     readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
-        + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0) + (matchMenus ? 1 : 0)
+        + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
+        + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0)
 
     Layout.fillWidth: true
     spacing: 16
@@ -344,7 +346,33 @@ ColumnLayout {
         }
     }
 
-    // Category 5: Menus & Sidebar
+    // Category 5: This PC
+    SettingCard {
+        visible: root.matchThisPc
+        title: qsTr("This PC")
+        subtitle: qsTr("Name and identity of the system location")
+        icon: "desktop"
+
+        SettingRow {
+            icon: "desktop"
+            title: qsTr("Display name")
+            subtitle: qsTr("Custom label for the This PC page, tab, and sidebar entry. Leave empty to use the hostname (%1)")
+                .arg((typeof core !== "undefined" && core && core.hostname.length > 0) ? core.hostname : qsTr("This PC"))
+
+            LoafTextField {
+                id: pcNameField
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
+                text: (typeof core !== "undefined" && core) ? core.pc_name : ""
+                placeholderText: (typeof core !== "undefined" && core && core.hostname.length > 0) ? core.hostname : qsTr("This PC")
+                onEditingFinished: if (typeof core !== "undefined" && core && text.trim() !== core.pc_name)
+                    core.set_pc_custom_name(text.trim())
+                onAccepted: if (typeof core !== "undefined" && core)
+                    core.set_pc_custom_name(text.trim())
+            }
+        }
+    }
+
+    // Category 6: Menus & Sidebar
     SettingCard {
         visible: root.matchMenus
         title: qsTr("Menus & Sidebar")
