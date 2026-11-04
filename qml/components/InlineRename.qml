@@ -11,6 +11,7 @@ TextField {
     property bool isDir: false
     property bool horizontal: false
     property bool done: false
+    property bool ready: false
 
     signal commit(string text)
     signal cancel()
@@ -49,10 +50,15 @@ TextField {
             select(0, dot);
         else
             selectAll();
+        Qt.callLater(function() {
+            if (!editor.activeFocus)
+                editor.forceActiveFocus();
+            editor.ready = true;
+        });
     }
 
     Keys.onReturnPressed: function(event) { finish(true); event.accepted = true; }
     Keys.onEnterPressed: function(event) { finish(true); event.accepted = true; }
     Keys.onEscapePressed: function(event) { finish(false); event.accepted = true; }
-    onActiveFocusChanged: if (!activeFocus) finish(true)
+    onActiveFocusChanged: if (ready && !activeFocus) finish(true)
 }
