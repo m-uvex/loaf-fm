@@ -20,14 +20,14 @@ ColumnLayout {
         return true;
     }
 
-    readonly property bool matchSmb: matches("network smb samba nas share server mount connect remote windows keyring")
+    readonly property bool matchNetwork: matches("network smb samba webdav dav nas share server mount connect remote windows cloud keyring")
     readonly property bool matchDiscovery: matches("discover automatic scan lan avahi mdns bonjour netbios ws-discovery smb samba nas network")
-    readonly property int matchCount: (matchSmb ? 1 : 0) + (matchDiscovery ? 1 : 0)
+    readonly property int matchCount: (matchNetwork ? 1 : 0) + (matchDiscovery ? 1 : 0)
 
     readonly property var profiles: {
-        if (typeof core !== "undefined" && core && core.smb_profiles_json) {
+        if (typeof core !== "undefined" && core && (core.network_profiles_json || core.smb_profiles_json)) {
             try {
-                return JSON.parse(core.smb_profiles_json || "[]");
+                return JSON.parse(core.network_profiles_json || core.smb_profiles_json || "[]");
             } catch (e) {
                 return [];
             }
@@ -67,9 +67,9 @@ ColumnLayout {
     spacing: 16
 
     SettingCard {
-        visible: root.matchSmb
-        title: qsTr("Network Storage (SMB / CIFS)")
-        subtitle: qsTr("Connect to remote Windows file shares, home NAS, and Samba servers")
+        visible: root.matchNetwork
+        title: qsTr("Network Drives (SMB & WebDAV)")
+        subtitle: qsTr("Connect to remote Windows file shares, home NAS, Samba, and WebDAV cloud storage")
         icon: "network"
 
         RowLayout {
@@ -77,7 +77,7 @@ ColumnLayout {
             spacing: 10
 
             Text {
-                text: qsTr("Configured Shares")
+                text: qsTr("Configured Drives")
                 color: theme.textMain
                 font.pixelSize: theme.fs(13)
                 font.bold: true
@@ -85,10 +85,10 @@ ColumnLayout {
             }
 
             LoafButton {
-                text: qsTr("Add Share")
+                text: qsTr("Add Drive")
                 icon: "plus"
                 variant: "filled"
-                onClicked: if (typeof window !== "undefined") window.openSmbEditor({})
+                onClicked: if (typeof window !== "undefined") window.openNetworkEditor({})
             }
         }
 
@@ -100,7 +100,7 @@ ColumnLayout {
             wrapMode: Text.Wrap
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: qsTr("No shares saved yet. Add a server host and share name to connect. Mounted shares appear directly in the sidebar navigation and browse identically to local folders.")
+            text: qsTr("No network drives configured yet. Add an SMB share or WebDAV cloud location to connect. Mounted drives appear directly in the sidebar navigation and browse identically to local folders.")
         }
 
         Repeater {
@@ -123,7 +123,7 @@ ColumnLayout {
                     spacing: 12
 
                     LoafIcon {
-                        name: modelData.connected ? "network" : "plug"
+                        name: modelData.icon || (modelData.protocol === "webdav" ? "globe" : "network")
                         size: 20
                         color: modelData.connected ? theme.primary : theme.textMuted
                     }
@@ -133,17 +133,46 @@ ColumnLayout {
                         Layout.minimumWidth: 0
                         spacing: 2
 
-                        Text {
-                            text: modelData.label || ""
-                            color: theme.textMain
-                            font.pixelSize: theme.fs(13)
-                            font.bold: true
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
+                        RowLayout {
+                            spacing: 6
+                            Text {
+                                text: modelData.label || ""
+                                color: theme.textMain
+                                font.pixelSize: theme.fs(13)
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+                            Rectangle {
+                                radius: 4
+                                color: theme.surfaceContainerHighest
+                                implicitWidth: protoLabel.implicitWidth + 8
+                                implicitHeight: protoLabel.implicitHeight + 2
+                                Text {
+                                    id: protoLabel
+                                    anchors.centerIn: parent
+                                    text: (modelData.protocol === "webdav") ? "WebDAV" : "SMB"
+                                    color: theme.textMuted
+                                    font.pixelSize: theme.fs(9)
+                                    font.bold: true
+                                }
+                            }
                         }
 
                         Text {
-                            text: (modelData.username ? modelData.username + "@" : "") + (modelData.server || "") + (modelData.share ? "/" + modelData.share : "")
+                            text: {
+                                var proto = modelData.protocol || "smb";
+                                var prefix = (proto === "webdav") ? (modelData.ssl ? "davs://" : "dav://") : "smb://";
+                                var auth = modelData.username ? (modelData.username + "@") : "";
+                                var srv = modelData.server || "";
+                                if (modelData.port && modelData.port > 0)
+                                    srv += ":" + modelData.port;
+                                var sh = modelData.share || "";
+                                if (sh && sh.indexOf("/") !== 0 && proto === "webdav")
+                                    sh = "/" + sh;
+                                else if (sh && proto !== "webdav")
+                                    sh = "/" + sh;
+                                return prefix + auth + srv + sh;
+                            }
                             color: theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideMiddle
@@ -158,9 +187,9 @@ ColumnLayout {
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
                                 if (modelData.connected)
-                                    core.disconnect_smb(modelData.id);
+                                    core.disconnect_network(modelData.id);
                                 else
-                                    core.connect_smb(modelData.id, "", false);
+                                    core.connect_network(modelData.id, "", false);
                             }
                         }
                     }
@@ -168,15 +197,15 @@ ColumnLayout {
                     LoafButton {
                         icon: "pencil-simple"
                         variant: "ghost"
-                        Accessible.name: qsTr("Edit share")
-                        onClicked: if (typeof window !== "undefined") window.openSmbEditor(modelData)
+                        Accessible.name: qsTr("Edit drive")
+                        onClicked: if (typeof window !== "undefined") window.openNetworkEditor(modelData)
                     }
 
                     LoafButton {
                         icon: "trash"
                         variant: "ghost"
-                        Accessible.name: qsTr("Remove share")
-                        onClicked: if (typeof window !== "undefined") window.removeSmbShare(modelData.id, modelData.label)
+                        Accessible.name: qsTr("Remove drive")
+                        onClicked: if (typeof window !== "undefined") window.removeNetworkDrive(modelData.id, modelData.label)
                     }
                 }
             }
@@ -361,9 +390,9 @@ ColumnLayout {
     }
 
     SettingCard {
-        visible: root.matchSmb
+        visible: root.matchNetwork
         title: qsTr("Authentication & Mounting")
-        subtitle: qsTr("Shares are mounted securely via GVfs. Credentials are saved in the system FreeDesktop secret keyring.")
+        subtitle: qsTr("Network drives are mounted securely via GVfs. Credentials are saved in the system FreeDesktop secret keyring.")
         icon: "lock-key"
     }
 

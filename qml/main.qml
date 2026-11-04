@@ -146,7 +146,7 @@ ApplicationWindow {
     readonly property bool anyModalOpen: inputModal.visible || propsDialog.visible || conflictDialog.visible
         || passwordModal.visible || quickLook.visible || commandModal.visible || batchRename.visible
         || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
-        || smbDialog.visible
+        || networkDialog.visible
         || window.isEditingPath
     readonly property bool gridKeyboardReady: activeView === "files" && !searchInput.activeFocus
         && !sidebar.keyboardHasFocus
@@ -158,21 +158,33 @@ ApplicationWindow {
         toastItem.show(kind, text);
     }
 
-    function openSmbEditor(profile) {
+    function openNetworkEditor(profile) {
         var p = profile || {};
-        smbDialog.editingId = p.profile_id || p.id || "";
-        smbNameField.text = p.name || p.label || "";
-        smbServerField.text = p.server || "";
-        smbShareField.text = p.share || "";
-        smbUserField.text = p.username || "";
-        smbDomainField.text = p.domain || "";
-        smbDialog.open();
+        networkDialog.editingId = p.profile_id || p.id || "";
+        networkDialog.editingProtocol = p.protocol || "smb";
+        networkProtocolSelect.value = networkDialog.editingProtocol;
+        networkNameField.text = p.name || p.label || "";
+        networkServerField.text = p.server || "";
+        networkShareField.text = p.share || "";
+        networkUserField.text = p.username || "";
+        networkDomainField.text = p.domain || "";
+        networkPortField.text = (p.port && p.port > 0) ? p.port.toString() : "";
+        networkSslSwitch.checked = (p.ssl !== undefined) ? p.ssl : true;
+        networkDialog.open();
+    }
+
+    function openSmbEditor(profile) {
+        openNetworkEditor(profile);
+    }
+
+    function removeNetworkDrive(id, label) {
+        confirmDialog.ask(qsTr("Remove “%1”?").arg(label || qsTr("this drive")),
+            qsTr("Any password Loaf saved will also be removed from the keyring."),
+            qsTr("Remove"), function() { core.remove_network_profile(id); });
     }
 
     function removeSmbShare(id, label) {
-        confirmDialog.ask(qsTr("Remove “%1”?").arg(label || qsTr("this share")),
-            qsTr("Any password Loaf saved will also be removed from the keyring."),
-            qsTr("Remove"), function() { core.remove_smb_profile(id); });
+        removeNetworkDrive(id, label);
     }
 
     function systemIcon(name) {
@@ -1719,7 +1731,7 @@ ApplicationWindow {
                         window.openPc();
                         return;
                     }
-                    if (place.kind === "smb") {
+                    if (place.kind === "network" || place.kind === "smb") {
                         if (inNewTab && place.connected && place.path) {
                             window.newTab(place.path);
                             return;
@@ -1729,7 +1741,7 @@ ApplicationWindow {
                         if (place.connected && place.path)
                             engine.set_path(place.path);
                         else
-                            core.connect_smb(place.profile_id, "", false);
+                            core.connect_network(place.profile_id, "", false);
                         return;
                     }
                     if (place.kind === "smb-discovery") {
@@ -2781,18 +2793,18 @@ ApplicationWindow {
             var all = JSON.parse(core.all_places_json() || "[]");
             var idx = all.findIndex(function(p) { return p.id === place.id; });
             var m = [];
-            if (place.kind === "smb") {
+            if (place.kind === "network" || place.kind === "smb") {
                 if (place.path && place.connected)
                     m.push({ text: qsTr("Open in New Tab"), icon: "tabs", action: function() { window.newTab(place.path); } });
                 if (!place.connected)
-                    m.push({ text: qsTr("Connect"), icon: "plug", action: function() { core.connect_smb(place.profile_id, "", false); } });
+                    m.push({ text: qsTr("Connect"), icon: "plug", action: function() { core.connect_network(place.profile_id, "", false); } });
                 if (place.connected)
-                    m.push({ text: qsTr("Disconnect"), icon: "plug-slash", action: function() { core.disconnect_smb(place.profile_id); } });
-                m.push({ text: qsTr("Edit Share…"), icon: "pencil-simple", separatorBefore: true, action: function() { window.openSmbEditor(place); } });
-                m.push({ text: qsTr("Remove Share"), icon: "x", danger: true, action: function() { window.removeSmbShare(place.profile_id, place.name); } });
+                    m.push({ text: qsTr("Disconnect"), icon: "plug-slash", action: function() { core.disconnect_network(place.profile_id); } });
+                m.push({ text: qsTr("Edit Drive…"), icon: "pencil-simple", separatorBefore: true, action: function() { window.openNetworkEditor(place); } });
+                m.push({ text: qsTr("Remove Drive"), icon: "x", danger: true, action: function() { window.removeNetworkDrive(place.profile_id, place.name); } });
                 m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
                 m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
-                m.push({ text: qsTr("Add SMB Share…"), icon: "plus", separatorBefore: true, action: function() { window.openSmbEditor({}); } });
+                m.push({ text: qsTr("Add Network Drive…"), icon: "plus", separatorBefore: true, action: function() { window.openNetworkEditor({}); } });
                 model = m;
                 openAt(x, y);
                 return;
@@ -3015,7 +3027,7 @@ ApplicationWindow {
         dialogWidth: 400
         property var request: ({})
         property bool submitting: false
-        title: request.kind === "luks" ? qsTr("Unlock Drive") : (request.kind === "compress" ? qsTr("Encrypted Archive") : (request.kind === "smb" ? qsTr("Connect to SMB Share") : qsTr("Password Required")))
+        title: request.kind === "luks" ? qsTr("Unlock Drive") : (request.kind === "compress" ? qsTr("Encrypted Archive") : ((request.kind === "network" || request.kind === "smb") ? qsTr("Connect to Network Drive") : qsTr("Password Required")))
 
         function openFor(req) {
             submitting = false;
@@ -3049,8 +3061,8 @@ ApplicationWindow {
                 core.extract(r.archive, r.into_subfolder, pw);
             else if (r.kind === "luks")
                 core.unlock_drive(r.device, pw, rememberBox.checked);
-            else if (r.kind === "smb")
-                core.connect_smb(r.id, pw, rememberBox.checked);
+            else if (r.kind === "network" || r.kind === "smb")
+                core.connect_network(r.id, pw, rememberBox.checked);
         }
 
         function promptText() {
@@ -3059,7 +3071,7 @@ ApplicationWindow {
                 return qsTr("Wrong password, try again.");
             if (r.kind === "luks")
                 return qsTr("Enter the passphrase for %1").arg(r.device || "");
-            if (r.kind === "smb") {
+            if (r.kind === "network" || r.kind === "smb") {
                 var user = r.username ? r.username + "@" : "";
                 return qsTr("Enter the password for %1").arg(user + (r.server || ""));
             }
@@ -3100,35 +3112,85 @@ ApplicationWindow {
         }
         LoafCheckBox {
             id: rememberBox
-            visible: passwordModal.request.kind === "luks" || passwordModal.request.kind === "smb"
+            visible: passwordModal.request.kind === "luks" || passwordModal.request.kind === "smb" || passwordModal.request.kind === "network"
             text: qsTr("Remember in the keyring")
         }
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
             LoafButton { text: qsTr("Cancel"); variant: "text"; onClicked: passwordModal.close() }
-            LoafButton { text: passwordModal.request.kind === "compress" ? qsTr("Create") : (passwordModal.request.kind === "smb" ? qsTr("Connect") : qsTr("Unlock")); variant: "filled"; enabled: passwordModal.canAccept; onClicked: passwordModal.accept() }
+            LoafButton { text: passwordModal.request.kind === "compress" ? qsTr("Create") : ((passwordModal.request.kind === "smb" || passwordModal.request.kind === "network") ? qsTr("Connect") : qsTr("Unlock")); variant: "filled"; enabled: passwordModal.canAccept; onClicked: passwordModal.accept() }
         }
     }
     LoafDialog {
-        id: smbDialog
+        id: networkDialog
         dialogWidth: 460
         property string editingId: ""
-        title: editingId.length > 0 ? qsTr("Edit SMB Share") : qsTr("Add SMB Share")
+        property string editingProtocol: "smb"
+        title: editingId.length > 0 ? qsTr("Edit Network Drive") : qsTr("Add Network Drive")
+
+        LoafSegmented {
+            id: networkProtocolSelect
+            Layout.fillWidth: true
+            options: [
+                { value: "smb", label: qsTr("SMB / CIFS") },
+                { value: "webdav", label: qsTr("WebDAV") }
+            ]
+            value: networkDialog.editingProtocol
+            onSelected: function(v) {
+                networkDialog.editingProtocol = v;
+            }
+        }
 
         Text {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: qsTr("Connect to a Windows, Samba or NAS share with your username and password.")
+            text: networkDialog.editingProtocol === "webdav"
+                ? qsTr("Connect to a WebDAV cloud storage (Nextcloud, ownCloud, Apache) with your credentials.")
+                : qsTr("Connect to a Windows, Samba or NAS share with your username and password.")
         }
+
         Text { text: qsTr("Display name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: qsTr("Studio NAS") }
-        Text { text: qsTr("Server"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "192.168.1.20" }
-        Text { text: qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "media" }
+        LoafTextField { id: networkNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: networkDialog.editingProtocol === "webdav" ? qsTr("My Cloud") : qsTr("Studio NAS") }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text { text: qsTr("Server / Host"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+                LoafTextField { id: networkServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: networkDialog.editingProtocol === "webdav" ? "cloud.example.com" : "192.168.1.20" }
+            }
+            ColumnLayout {
+                Layout.preferredWidth: 90
+                spacing: 6
+                Text { text: qsTr("Port (opt)"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+                LoafTextField { id: networkPortField; Layout.fillWidth: true; color: theme.textMain; placeholderText: networkDialog.editingProtocol === "webdav" ? (networkSslSwitch.checked ? "443" : "80") : "445" }
+            }
+        }
+
+        Text { text: networkDialog.editingProtocol === "webdav" ? qsTr("Remote path") : qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: networkShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: networkDialog.editingProtocol === "webdav" ? "/remote.php/webdav" : "media" }
+
+        RowLayout {
+            visible: networkDialog.editingProtocol === "webdav"
+            Layout.fillWidth: true
+            spacing: 12
+            Text {
+                text: qsTr("Use HTTPS (SSL)")
+                color: theme.textMain
+                font.pixelSize: theme.fs(13)
+                Layout.fillWidth: true
+            }
+            LoafSwitch {
+                id: networkSslSwitch
+                checked: true
+            }
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
@@ -3136,32 +3198,47 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 spacing: 6
                 Text { text: qsTr("Username (optional)"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-                LoafTextField { id: smbUserField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "alice" }
+                LoafTextField { id: networkUserField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "alice" }
             }
             ColumnLayout {
+                visible: networkDialog.editingProtocol === "smb"
                 Layout.fillWidth: true
                 spacing: 6
                 Text { text: qsTr("Domain (optional)"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-                LoafTextField { id: smbDomainField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "WORKGROUP" }
+                LoafTextField { id: networkDomainField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "WORKGROUP" }
             }
         }
+
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
-            LoafButton { text: qsTr("Cancel"); variant: "text"; onClicked: smbDialog.close() }
+            LoafButton { text: qsTr("Cancel"); variant: "text"; onClicked: networkDialog.close() }
             LoafButton {
-                text: smbDialog.editingId.length > 0 ? qsTr("Save") : qsTr("Add")
+                text: networkDialog.editingId.length > 0 ? qsTr("Save") : qsTr("Add")
                 variant: "filled"
-                enabled: smbServerField.text.trim().length > 0 && smbShareField.text.trim().length > 0
+                enabled: networkServerField.text.trim().length > 0 && (networkDialog.editingProtocol === "webdav" || networkShareField.text.trim().length > 0)
                 onClicked: {
-                    var id = core.save_smb_profile(smbDialog.editingId, smbNameField.text, smbServerField.text, smbShareField.text, smbUserField.text, smbDomainField.text);
+                    var portNum = parseInt(networkPortField.text.trim(), 10);
+                    if (isNaN(portNum) || portNum <= 0 || portNum > 65535) portNum = 0;
+                    var proto = networkDialog.editingProtocol;
+                    var id = core.save_network_profile(
+                        networkDialog.editingId,
+                        proto,
+                        networkNameField.text,
+                        networkServerField.text,
+                        networkShareField.text,
+                        networkUserField.text,
+                        networkDomainField.text,
+                        portNum,
+                        networkSslSwitch.checked
+                    );
                     if (id.length === 0) {
-                        window.toast("error", qsTr("A server and share are required"));
+                        window.toast("error", qsTr("Server address is required"));
                         return;
                     }
-                    smbDialog.editingId = id;
-                    smbDialog.close();
-                    window.toast("info", qsTr("SMB share saved"));
+                    networkDialog.editingId = id;
+                    networkDialog.close();
+                    window.toast("info", qsTr("Network drive saved"));
                 }
             }
         }

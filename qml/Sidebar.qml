@@ -322,9 +322,9 @@ Rectangle {
                     showLabel: rail.expanded
                     selected: rail.activeId === entry.modelData.id
                     dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted)
-                        : entry.modelData.missing === true || (entry.modelData.kind === "smb" && entry.modelData.connected !== true)
+                        : entry.modelData.missing === true || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected !== true)
                     dropPath: entry.isDevice ? (entry.modelData.drive.is_mounted ? entry.modelData.path : "")
-                        : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || (entry.modelData.kind === "smb" && entry.modelData.connected === true)) ? entry.modelData.path : "")
+                        : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected === true)) ? entry.modelData.path : "")
                     accessibleName: label + (entry.isDevice && entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted ? " (" + qsTr("unmounted") + ")" : "")
                     onActiveFocusChanged: if (activeFocus) placeList.positionViewAtIndex(entry.index, ListView.Contain)
                     onClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, false) : rail.placeClicked(entry.modelData, false)
