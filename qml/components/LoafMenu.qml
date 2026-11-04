@@ -22,6 +22,14 @@ LoafPopup {
     property int highlightIndex: -1
     property var parentMenu: null
     property var currentSubmenu: null
+    property var pendingAction: null
+
+    function rootMenu() {
+        var m = menu;
+        while (m && m.parentMenu)
+            m = m.parentMenu;
+        return m;
+    }
 
     // Extra widgets appended below the model rows (View menu uses this) land in
     // contentHost via LoafPopup's inherited default property.
@@ -56,6 +64,15 @@ LoafPopup {
         menu.lastClosedTime = Date.now();
         menu.hideSubmenuNow();
         menu.resetRows();
+        if (typeof menu.pendingAction === "function") {
+            var act = menu.pendingAction;
+            menu.pendingAction = null;
+            try {
+                act();
+            } catch (e) {
+                console.warn("LoafMenu: action failed: " + e);
+            }
+        }
     }
 
     TextMetrics { id: tmLabel; font.pixelSize: theme.fs(13) }
@@ -166,10 +183,17 @@ LoafPopup {
         }
         // Close this menu and every parent first, then act: a dialog or an
         // inline editor opened by the action must not lose focus to a menu.
+        // Actions run once the menu finishes closing so Qt Quick's popup focus
+        // restoration cannot steal active focus from newly opened editors.
         var action = it.action;
+        var root = menu.rootMenu();
+        if (typeof action === "function") {
+            if (root && (root.opened || root.visible))
+                root.pendingAction = action;
+            else
+                action();
+        }
         menu.closeChain();
-        if (typeof action === "function")
-            action();
     }
 
     function closeChain() {
