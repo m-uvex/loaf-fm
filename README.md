@@ -176,7 +176,8 @@ Language, or overridden for one launch with `LOAF_LANG` (e.g. `LOAF_LANG=id_ID .
 Contributors: to regenerate the master catalogue, run
 `lupdate cpp qml translations/loaf_<locale>.ts`. Edit translations with Qt Linguist (`linguist`), compile them with
 `lrelease translations/loaf_<locale>.ts -qm loaf_<locale>.qm`, and list each locale in
-`qml/settings/languages.json` so the Language picker shows it. `build.rs` runs `lrelease` at
+`qml/settings/languages.json`. A locale appears in the Language picker only when it is in
+`languages.json` AND has a compiled catalogue embedded under `:/i18n`. `build.rs` runs `lrelease` at
 build time and embeds the `.qm` files under `:/i18n` automatically.
 
 Optional at runtime (features degrade gracefully without them):

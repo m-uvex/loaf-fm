@@ -1,7 +1,4 @@
-{
-  "languages": [
-    { "value": "", "label": "System default" },
-    { "value": "en_US", "label": "English" },
-    { "value": "id_ID", "label": "Bahasa Indonesia" }
-  ]
-}
+[
+  { "value": "en_US", "label": "English" },
+  { "value": "id_ID", "label": "Bahasa Indonesia" }
+]

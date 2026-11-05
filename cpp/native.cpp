@@ -425,7 +425,19 @@ rust::String languages_json()
     QFile file(QStringLiteral(":/loaf/settings/languages.json"));
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return toRust(QStringLiteral("[]"));
-    return toRust(file.readAll());
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+    if (!document.isArray())
+        return toRust(QStringLiteral("[]"));
+    QJsonArray available;
+    for (const QJsonValue &entry : document.array()) {
+        const QString code = entry.toObject().value(QStringLiteral("value")).toString();
+        if (code.isEmpty())
+            continue;
+        if (!QFile::exists(QStringLiteral(":/i18n/loaf_%1.qm").arg(code)))
+            continue;
+        available.append(entry);
+    }
+    return toRust(QString::fromUtf8(QJsonDocument(available).toJson(QJsonDocument::Compact)));
 }
 
 

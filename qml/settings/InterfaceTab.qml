@@ -34,6 +34,8 @@ ColumnLayout {
         + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
         + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0)
 
+    readonly property var languageOptions: [{ value: "", label: qsTr("System default") }].concat(JSON.parse(core.available_languages() || "[]"))
+
 
     Layout.fillWidth: true
     spacing: 16
@@ -122,19 +124,11 @@ ColumnLayout {
             LoafSelect {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
                 accessibleName: qsTr("Language")
-                options: {
-                    try {
-                        var langs = JSON.parse(core.available_languages() || "{}");
-                        if (langs && Array.isArray(langs.languages))
-                            return langs.languages;
-                    } catch (e) {}
-                    return [{ value: "", label: qsTr("System default") }];
-                }
+                options: root.languageOptions
                 value: theme.language
                 onSelected: function(v) {
                     theme.language = v;
-                    if (typeof core !== "undefined" && core && typeof core.set_language === "function")
-                        core.set_language(v);
+                    core.set_language(v);
                 }
             }
         }
