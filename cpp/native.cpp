@@ -34,6 +34,7 @@
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QQmlApplicationEngine>
+#include <QPointer>
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QTimer>
@@ -45,23 +46,38 @@ namespace loaf {
 static const char *kService = "io.github.m_uvex.Loaf";
 static const char *kPath = "/io/github/m_uvex/Loaf";
 
-// Requested override locale (empty = follow the system locale). Set from
-// Rust before the application object exists; consumed by setup_engine().
-static QString pendingLanguage;
-// The currently installed translator, kept alive for the app's lifetime.
-static std::unique_ptr<QTranslator> currentTranslator;
-// The QML engine being served, assigned in setup_engine().
-static QQmlApplicationEngine *activeEngine = nullptr;
+// Single owner of the language state: requested locale name, the installed
+// translator (parented to the QCoreApplication instance), and the QML engine.
+struct LanguageState {
+    QString requestedLocale;
+    QTranslator *translator = nullptr;
+    QPointer<QQmlApplicationEngine> engine;
+};
+static LanguageState languageState;
+
+static QString toQString(rust::Str s)
+{
+    return QString::fromUtf8(s.data(), static_cast<qsizetype>(s.size()));
+}
 
 // The locale to use: the override when valid, else the system locale.
 static QLocale resolvedLocale()
 {
-    if (!pendingLanguage.isEmpty()) {
-        const QLocale locale(pendingLanguage);
+    if (!languageState.requestedLocale.isEmpty()) {
+        const QLocale locale(languageState.requestedLocale);
         if (locale != QLocale::c())
             return locale;
     }
     return QLocale();
+}
+
+// Stores the override locale and makes the resolved locale the default.
+static QLocale storeRequestedLocale(rust::Str localeName)
+{
+    languageState.requestedLocale = toQString(localeName);
+    const QLocale locale = resolvedLocale();
+    QLocale::setDefault(locale);
+    return locale;
 }
 
 // Installs the translator for `locale` in place of the previous one.
@@ -69,24 +85,23 @@ static QLocale resolvedLocale()
 // installed, so source (English) strings render.
 static bool installTranslatorFor(const QLocale &locale)
 {
-    auto candidate = std::make_unique<QTranslator>();
+    auto *candidate = new QTranslator(QCoreApplication::instance());
     if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n"))) {
-        if (currentTranslator) {
-            QCoreApplication::removeTranslator(currentTranslator.get());
-            currentTranslator.reset();
+        if (languageState.translator) {
+            QCoreApplication::removeTranslator(languageState.translator);
+            languageState.translator->deleteLater();
+            languageState.translator = nullptr;
         }
+        delete candidate;
         return false;
     }
-    if (currentTranslator)
-        QCoreApplication::removeTranslator(currentTranslator.get());
-    QCoreApplication::installTranslator(candidate.get());
-    currentTranslator = std::move(candidate);
+    if (languageState.translator) {
+        QCoreApplication::removeTranslator(languageState.translator);
+        languageState.translator->deleteLater();
+    }
+    QCoreApplication::installTranslator(candidate);
+    languageState.translator = candidate;
     return true;
-}
-
-static QString toQString(rust::Str s)
-{
-    return QString::fromUtf8(s.data(), static_cast<qsizetype>(s.size()));
 }
 
 static rust::String toRust(const QString &s)
@@ -382,7 +397,7 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         // one closes and no file manager window was opened meanwhile.
         QGuiApplication::setQuitOnLastWindowClosed(false);
 
-    activeEngine = &engine;
+    languageState.engine = &engine;
     // Fallback when no catalogue matches: no translator, source (English)
     // strings render unchanged.
     installTranslatorFor(resolvedLocale());
@@ -393,19 +408,15 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
 
 void set_application_language(rust::Str localeName)
 {
-    pendingLanguage = toQString(localeName);
-    const QLocale locale = resolvedLocale();
-    QLocale::setDefault(locale);
+    storeRequestedLocale(localeName);
 }
 
 void apply_language(rust::Str localeName)
 {
-    pendingLanguage = toQString(localeName);
-    const QLocale locale = resolvedLocale();
-    QLocale::setDefault(locale);
+    const QLocale locale = storeRequestedLocale(localeName);
     installTranslatorFor(locale);
-    if (activeEngine)
-        activeEngine->retranslate();
+    if (languageState.engine)
+        languageState.engine->retranslate();
 }
 
 rust::Vec<rust::String> available_language_names()
