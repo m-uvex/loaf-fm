@@ -2161,7 +2161,6 @@ Item {
     Component.onCompleted: loadSettings()
 
     onThemeModeChanged: writeSetting("themeMode", themeMode)
-    onLanguageChanged: writeSetting("language", language)
     onBackgroundOpacityChanged: writeSetting("backgroundOpacity", backgroundOpacity)
     onPanelOpacityChanged: writeSetting("panelOpacity", panelOpacity)
     onAccentNameChanged: {

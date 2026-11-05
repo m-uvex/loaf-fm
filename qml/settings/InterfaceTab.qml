@@ -119,13 +119,14 @@ ColumnLayout {
             visible: root.matchLanguage
             icon: "translate"
             title: qsTr("Language")
-            subtitle: qsTr("Applies immediately")
+            subtitle: core.language_overridden_by_env() ? qsTr("Set by the LOAF_LANG environment variable") : qsTr("Applies immediately")
 
             LoafSelect {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
                 accessibleName: qsTr("Language")
                 options: root.languageOptions
                 value: theme.language
+                enabled: !core.language_overridden_by_env()
                 onSelected: function(v) {
                     theme.language = v;
                     core.set_language(v);
