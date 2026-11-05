@@ -169,6 +169,16 @@ Requirements:
   - Fedora: `sudo dnf install qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel qt6-qtsvg-devel qt6-qtwayland-devel`
 - CMake, Ninja, and `pkg-config`
 
+Qt Linguist tools (`lupdate`/`lrelease`) compile the `translations/*.ts` catalogues into the
+binary. The UI language follows the system locale, can be changed in Settings → Interface →
+Language, or overridden for one launch with `LOAF_LANG` (e.g. `LOAF_LANG=id_ID ./target/release/loaf`).
+
+Contributors: to regenerate the master catalogue, run
+`lupdate cpp qml translations/loaf_<locale>.ts`. Edit translations with Qt Linguist (`linguist`), compile them with
+`lrelease translations/loaf_<locale>.ts -qm loaf_<locale>.qm`, and list each locale in
+`qml/settings/languages.json` so the Language picker shows it. `build.rs` runs `lrelease` at
+build time and embeds the `.qm` files under `:/i18n` automatically.
+
 Optional at runtime (features degrade gracefully without them):
 - `7zip`/`p7zip` (zip, 7z, rar, iso, encrypted archives), `tar`, `zstd`, `cpio`
 - `udisks2` (mount, eject, unlock encrypted drives, rename labels)

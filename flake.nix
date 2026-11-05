@@ -6,9 +6,15 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
     let
-      packageBuilder = system:
+      packageBuilder =
+        system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           qtEnv = pkgs.qt6.env "qt6-env" [
@@ -17,7 +23,8 @@
             pkgs.qt6.qtsvg
             pkgs.qt6.qtwayland
           ];
-        in pkgs.rustPlatform.buildRustPackage {
+        in
+        pkgs.rustPlatform.buildRustPackage {
           pname = "loaf";
           version = "0.2.0";
           src = ./.;
@@ -28,6 +35,8 @@
             pkg-config
             cmake
             ninja
+            qt6.qttools
+            qt6.wrapQtAppsHook
           ];
           dontUseCmakeConfigure = true;
           dontUseNinjaBuild = true;
@@ -40,9 +49,15 @@
             pkgs.shared-mime-info
           ];
           QMAKE = "${qtEnv}/bin/qmake";
+          postPatch = ''
+            export QMAKE="${qtEnv}/bin/qmake"
+          '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}";
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
+            qtEnv
+            pkgs.libGL
+          ]}";
           XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share";
           postInstall = ''
             install -Dm644 packaging/assets/loaf.desktop $out/share/applications/loaf.desktop
@@ -55,7 +70,8 @@
           '';
         };
     in
-    (flake-utils.lib.eachDefaultSystem (system:
+    (flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         qtEnv = pkgs.qt6.env "qt6-env" [
@@ -64,7 +80,8 @@
           pkgs.qt6.qtsvg
           pkgs.qt6.qtwayland
         ];
-      in {
+      in
+      {
         packages.default = packageBuilder system;
 
         apps.default = {
@@ -82,6 +99,7 @@
             rustfmt
             clippy
             patchelf
+            qt6.qttools
           ];
 
           buildInputs = [
@@ -93,14 +111,32 @@
           ];
 
           QMAKE = "${qtEnv}/bin/qmake";
+          shellHook = ''
+            # qtbase's setup-hook exports QMAKE=<qtbase>/bin/qmake, which lacks
+            # modules like Qml (no libQt6Qml.prl). qt-build-utils runs qmake with
+            # env cleared, dropping QMAKEPATH, so point QMAKE at the qt6-env
+            # wrapper whose compiled-in prefix contains all modules.
+            export QMAKE="${qtEnv}/bin/qmake"
+          '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LD_LIBRARY_PATH";
-          LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LIBRARY_PATH";
+          LD_LIBRARY_PATH = "${
+            pkgs.lib.makeLibraryPath [
+              qtEnv
+              pkgs.libGL
+            ]
+          }:$LD_LIBRARY_PATH";
+          LIBRARY_PATH = "${
+            pkgs.lib.makeLibraryPath [
+              qtEnv
+              pkgs.libGL
+            ]
+          }:$LIBRARY_PATH";
           XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share:$XDG_DATA_DIRS";
         };
-      })
-    ) // {
+      }
+    ))
+    // {
       overlays.default = final: prev: {
         loaf = packageBuilder final.system;
       };

@@ -76,6 +76,10 @@ pub mod qobject {
         #[qinvokable]
         fn set_pc_custom_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
+        fn set_language(self: Pin<&mut LoafCore>, locale: &QString);
+        #[qinvokable]
+        fn available_languages(self: &LoafCore) -> QString;
+        #[qinvokable]
         fn refresh_system_theme(self: Pin<&mut LoafCore>);
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
@@ -846,6 +850,16 @@ impl qobject::LoafCore {
         state::set("pcName", &name);
         self.as_mut().set_pc_name(q(&name));
         self.load_places();
+    }
+
+    pub fn set_language(self: Pin<&mut Self>, locale: &QString) {
+        let locale = locale.to_string();
+        state::set("language", &locale);
+        crate::native::apply_language(&locale);
+    }
+
+    pub fn available_languages(&self) -> QString {
+        q(&crate::native::languages_json())
     }
 
     pub fn refresh_system_theme(self: Pin<&mut Self>) {

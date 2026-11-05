@@ -1,4 +1,64 @@
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
+use std::path::PathBuf;
+
+// Compiles translations/*.ts to .qm with lrelease and embeds them under :/i18n.
+// Returns None when there is nothing to compile or lrelease is unavailable.
+fn compile_translations() -> Option<PathBuf> {
+    let out_dir = std::env::var("OUT_DIR").ok()?;
+    let mut catalogues: Vec<PathBuf> = Vec::new();
+    let entries = std::fs::read_dir("translations").ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("ts") {
+            println!("cargo:rerun-if-changed={}", path.display());
+            catalogues.push(path);
+        }
+    }
+    if catalogues.is_empty() {
+        return None;
+    }
+    let lrelease_available = std::process::Command::new("lrelease")
+        .arg("--version")
+        .output()
+        .map(|out| {
+            let text = String::from_utf8_lossy(&out.stdout);
+            text.contains("lrelease") || out.status.success()
+        })
+        .unwrap_or(false);
+    if !lrelease_available {
+        println!("cargo:warning=lrelease not found; translations disabled");
+        return None;
+    }
+    let qm_dir = PathBuf::from(&out_dir).join("i18n");
+    std::fs::create_dir_all(&qm_dir).ok()?;
+    let mut qrc = String::from("<RCC>\n  <qresource prefix=\"/i18n\">\n");
+    for catalogue in &catalogues {
+        let stem = catalogue.file_stem()?.to_string_lossy().to_string();
+        let qm = qm_dir.join(format!("{stem}.qm"));
+        let status = std::process::Command::new("lrelease")
+            .arg(catalogue)
+            .arg("-qm")
+            .arg(&qm)
+            .status()
+            .ok()?;
+        if !status.success() {
+            println!(
+                "cargo:warning=lrelease failed for {}; translations disabled",
+                catalogue.display()
+            );
+            return None;
+        }
+        qrc.push_str(&format!(
+            "    <file alias=\"{stem}.qm\">{}</file>\n",
+            qm.display()
+        ));
+    }
+    qrc.push_str("  </qresource>\n</RCC>\n");
+    let qrc_path = PathBuf::from(&out_dir).join("i18n.qrc");
+    std::fs::write(&qrc_path, qrc).ok()?;
+    println!("cargo:rerun-if-changed={}", qrc_path.display());
+    Some(qrc_path)
+}
 
 fn main() {
     let builder = CxxQtBuilder::new_qml_module(
@@ -61,6 +121,10 @@ fn main() {
     .cpp_file("cpp/native.cpp")
     .cpp_file("cpp/portal.cpp")
     .cpp_file("cpp/thumbnails.cpp");
+    let builder = match compile_translations() {
+        Some(qrc) => builder.qrc(qrc),
+        None => builder,
+    };
     // Our own headers live in cpp/ ("loaf/native.h").
     let builder = unsafe {
         builder.cc_builder(|cc| {

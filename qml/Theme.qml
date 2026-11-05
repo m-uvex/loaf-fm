@@ -6,6 +6,8 @@ Item {
 
     property string themeMode: "auto" // "auto", "light", "dark"
 
+    property string language: ""
+
     // How much of the desktop shows through the window itself.
     property real backgroundOpacity: 1.0
     // How solid the surfaces drawn on top of it are: file panes, the sidebar
@@ -2055,6 +2057,8 @@ Item {
 
         value = readSetting("themeMode");
         if (value.length > 0) themeMode = value;
+        value = readSetting("language");
+        if (value.length > 0) language = value;
         value = readSetting("backgroundOpacity");
         if (value.trim().length > 0 && isFinite(Number(value)))
             backgroundOpacity = Math.max(0.0, Math.min(1.0, Number(value)));
@@ -2157,6 +2161,7 @@ Item {
     Component.onCompleted: loadSettings()
 
     onThemeModeChanged: writeSetting("themeMode", themeMode)
+    onLanguageChanged: writeSetting("language", language)
     onBackgroundOpacityChanged: writeSetting("backgroundOpacity", backgroundOpacity)
     onPanelOpacityChanged: writeSetting("panelOpacity", panelOpacity)
     onAccentNameChanged: {

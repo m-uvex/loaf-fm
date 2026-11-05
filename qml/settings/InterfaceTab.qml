@@ -28,17 +28,19 @@ ColumnLayout {
     readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
     readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
     readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
+    readonly property bool matchLanguage: matches("language locale translation bahasa indonesia")
 
     readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
         + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
-        + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0)
+        + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0)
+
 
     Layout.fillWidth: true
     spacing: 16
 
     // Category 1: Appearance
     SettingCard {
-        visible: root.matchTheme || root.matchOpacity
+        visible: root.matchTheme || root.matchOpacity || root.matchLanguage
         title: qsTr("Appearance")
         subtitle: qsTr("Window colors and translucency")
         icon: "palette"
@@ -106,6 +108,34 @@ ColumnLayout {
                 formatPercent: true
                 accessibleName: qsTr("Panel backing opacity")
                 onMoved: function(v) { theme.panelOpacity = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchLanguage }
+
+        SettingRow {
+            visible: root.matchLanguage
+            icon: "translate"
+            title: qsTr("Language")
+            subtitle: qsTr("Applies immediately")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
+                accessibleName: qsTr("Language")
+                options: {
+                    try {
+                        var langs = JSON.parse(core.available_languages() || "{}");
+                        if (langs && Array.isArray(langs.languages))
+                            return langs.languages;
+                    } catch (e) {}
+                    return [{ value: "", label: qsTr("System default") }];
+                }
+                value: theme.language
+                onSelected: function(v) {
+                    theme.language = v;
+                    if (typeof core !== "undefined" && core && typeof core.set_language === "function")
+                        core.set_language(v);
+                }
             }
         }
     }

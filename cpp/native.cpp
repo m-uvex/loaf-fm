@@ -16,6 +16,7 @@
 #include <QFileInfo>
 #include <QMutex>
 #include <QMutexLocker>
+#include <memory>
 #include <QTimer>
 #include <fcntl.h>
 #include <unistd.h>
@@ -43,6 +44,39 @@ namespace loaf {
 
 static const char *kService = "io.github.m_uvex.Loaf";
 static const char *kPath = "/io/github/m_uvex/Loaf";
+
+// Requested override locale (empty = follow the system locale). Set from
+// Rust before the application object exists; consumed by setup_engine().
+static QString pendingLanguage;
+// The currently installed translator, kept alive for the app's lifetime.
+static std::unique_ptr<QTranslator> currentTranslator;
+// The QML engine being served, assigned in setup_engine().
+static QQmlApplicationEngine *activeEngine = nullptr;
+
+// The locale to use: the override when valid, else the system locale.
+static QLocale resolvedLocale()
+{
+    if (!pendingLanguage.isEmpty()) {
+        const QLocale locale(pendingLanguage);
+        if (locale != QLocale::c())
+            return locale;
+    }
+    return QLocale();
+}
+
+// Installs the translator for `locale` in place of the previous one.
+// Returns false (keeping the previous translator) when no catalogue matches.
+static bool installTranslatorFor(const QLocale &locale)
+{
+    auto candidate = std::make_unique<QTranslator>();
+    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n")))
+        return false;
+    if (currentTranslator)
+        QCoreApplication::removeTranslator(currentTranslator.get());
+    QCoreApplication::installTranslator(candidate.get());
+    currentTranslator = std::move(candidate);
+    return true;
+}
 
 static QString toQString(rust::Str s)
 {
@@ -342,12 +376,67 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         // one closes and no file manager window was opened meanwhile.
         QGuiApplication::setQuitOnLastWindowClosed(false);
 
-    auto *translator = new QTranslator(&engine);
-    if (translator->load(QLocale(), QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n")))
-        QCoreApplication::installTranslator(translator);
+    activeEngine = &engine;
+    // Fallback when no catalogue matches: no translator, source (English)
+    // strings render unchanged.
+    installTranslatorFor(resolvedLocale());
 
     engine.rootContext()->setContextProperty(QStringLiteral("nativeBridge"), native);
     engine.addImageProvider(QStringLiteral("thumb"), new ThumbnailProvider);
+}
+
+void set_application_language(rust::Str localeName)
+{
+    pendingLanguage = toQString(localeName);
+    const QLocale locale = resolvedLocale();
+    QLocale::setDefault(locale);
+}
+
+void apply_language(rust::Str localeName)
+{
+    pendingLanguage = toQString(localeName);
+    const QLocale locale = resolvedLocale();
+    QLocale::setDefault(locale);
+    installTranslatorFor(locale);
+    if (activeEngine)
+        activeEngine->retranslate();
+}
+
+rust::Vec<rust::String> available_language_names()
+{
+    QStringList codes;
+    const QStringList files = QDir(QStringLiteral(":/i18n")).entryList(
+        {QStringLiteral("loaf_*.qm")}, QDir::Files, QDir::Name);
+    for (const QString &file : files) {
+        const QString code = file.mid(5, file.size() - 5 - 3);
+        if (!code.isEmpty() && !codes.contains(code))
+            codes << code;
+    }
+    if (!codes.contains(QStringLiteral("en_US")))
+        codes << QStringLiteral("en_US");
+    codes.sort();
+    rust::Vec<rust::String> out;
+    for (const QString &code : codes) {
+        out.push_back(toRust(code));
+        out.push_back(toRust(QLocale(code).nativeLanguageName()));
+    }
+    return out;
+}
+
+rust::String languages_json()
+{
+    QFile file(QStringLiteral(":/loaf/settings/languages.json"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return toRust(QStringLiteral("[]"));
+    return toRust(file.readAll());
+}
+
+rust::String translate(rust::Str source)
+{
+    // The (context, const char *key) overload resolves the 2-arg ambiguity;
+    // source is UTF-8, safe to pass through as a QByteArray key.
+    const QByteArray key = toQString(source).toUtf8();
+    return toRust(QCoreApplication::translate("loaf", key.constData()));
 }
 
 rust::String mime_type_for(rust::Str path, bool sniff)
