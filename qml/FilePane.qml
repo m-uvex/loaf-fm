@@ -406,7 +406,7 @@ Item {
                 Text {
                     id: selLabel
                     anchors.centerIn: parent
-                    text: qsTr("%1 selected").arg(theme.number(pane.selectedCount))
+                    text: theme.plural(pane.selectedCount, qsTr("1 selected"), qsTr("%1 selected"))
                     color: theme.primaryContainerFg
                     font.pixelSize: theme.fs(11)
                     font.bold: true

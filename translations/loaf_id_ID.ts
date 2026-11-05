@@ -24,9 +24,13 @@
         <translation>Tidak dapat membaca daftar kontributor.</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AboutTab.qml" line="258"/>
         <source>Version </source>
-        <translation>Versi </translation>
+        <translation type="vanished">Versi </translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/AboutTab.qml" line="258"/>
+        <source>Version %1</source>
+        <translation>Versi %1</translation>
     </message>
     <message>
         <location filename="../qml/settings/AboutTab.qml" line="289"/>
@@ -203,9 +207,18 @@
 <context>
     <name>BatchRenameDialog</name>
     <message>
-        <location filename="../qml/BatchRenameDialog.qml" line="9"/>
         <source>Rename %1 Items</source>
-        <translation>Ganti nama %1 Item</translation>
+        <translation type="vanished">Ganti nama %1 Item</translation>
+    </message>
+    <message>
+        <location filename="../qml/BatchRenameDialog.qml" line="9"/>
+        <source>Rename 1 item</source>
+        <translation>Ganti nama 1 item</translation>
+    </message>
+    <message>
+        <location filename="../qml/BatchRenameDialog.qml" line="9"/>
+        <source>Rename %1 items</source>
+        <translation>Ganti nama %1 item</translation>
     </message>
     <message>
         <location filename="../qml/BatchRenameDialog.qml" line="19"/>
@@ -564,6 +577,11 @@
         <translation>%1 dipilih</translation>
     </message>
     <message>
+        <location filename="../qml/FilePane.qml" line="409"/>
+        <source>1 selected</source>
+        <translation>1 dipilih</translation>
+    </message>
+    <message>
         <location filename="../qml/FilePane.qml" line="418"/>
         <source>Choose storage</source>
         <translation>Pilih penyimpanan</translation>
@@ -642,7 +660,7 @@
 <context>
     <name>InlineRename</name>
     <message>
-        <location filename="../qml/components/InlineRename.qml" line="26"/>
+        <location filename="../qml/components/InlineRename.qml" line="27"/>
         <source>New name</source>
         <translation>Nama baru</translation>
     </message>
@@ -650,87 +668,87 @@
 <context>
     <name>InterfaceTab</name>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="44"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="46"/>
         <source>Appearance</source>
         <translation>Tampilan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="45"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="47"/>
         <source>Window colors and translucency</source>
         <translation>Warna jendela dan transparansi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="51"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="53"/>
         <source>Color scheme</source>
         <translation>Skema warna</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="52"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="54"/>
         <source>Follow system preferences, or force dark or light theme</source>
         <translation>Ikuti preferensi sistem, atau paksa tema gelap atau terang</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="57"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
         <source>Auto</source>
         <translation>Otomatis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="58"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="298"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="60"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
         <source>Light</source>
         <translation>Terang</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="61"/>
         <source>Dark</source>
         <translation>Gelap</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="71"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="86"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="73"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="88"/>
         <source>Background opacity</source>
         <translation>Opasitas latar</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="73"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="98"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="75"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="100"/>
         <source>Disabled in low-power mode</source>
         <translation>Dinonaktifkan dalam mode hemat daya</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="75"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="77"/>
         <source>Restart Loaf to apply transparency</source>
         <translation>Nyalakan ulang Loaf untuk menerapkan transparansi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="76"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="78"/>
         <source>Fades the window itself so the desktop shows through margins and gaps</source>
         <translation>Memudarkan jendela itu sendiri sehingga desktop terlihat melalui margin dan celah</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="96"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="109"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="98"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="111"/>
         <source>Panel backing opacity</source>
         <translation>Opasitas penyangga panel</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="99"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="101"/>
         <source>Fades file panes, sidebar and cards while keeping text and icons solid</source>
         <translation>Memudarkan panel berkas, bilah sisi, dan kartu sambil menjaga teks dan ikon tetap solid</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="119"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="124"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="121"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="126"/>
         <source>Language</source>
         <translation>Bahasa</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="120"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="122"/>
         <source>Applies immediately</source>
         <translation>Langsung diterapkan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="131"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="37"/>
         <source>System default</source>
         <translation>Default sistem</translation>
     </message>
@@ -739,286 +757,291 @@
         <translation type="vanished">Bahasa Inggris (AS)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="146"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="122"/>
+        <source>Set by the LOAF_LANG environment variable</source>
+        <translation>Diatur oleh variabel lingkungan LOAF_LANG</translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="141"/>
         <source>Color palette</source>
         <translation>Palet warna</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="147"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="142"/>
         <source>Wallpaper color extraction or curated Material 3 palettes</source>
         <translation>Ekstraksi warna wallpaper atau palet Material 3 pilihan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="157"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="152"/>
         <source>Wallpaper</source>
         <translation>Wallpaper</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="158"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="153"/>
         <source>Loaf Violet</source>
         <translation>Loaf Violet</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="159"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="154"/>
         <source>Loaf Amber</source>
         <translation>Loaf Amber</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="160"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="155"/>
         <source>Catppuccin</source>
         <translation>Catppuccin</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="161"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="156"/>
         <source>Nord</source>
         <translation>Nord</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="162"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="157"/>
         <source>Tokyo Night</source>
         <translation>Tokyo Night</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="163"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="158"/>
         <source>Gruvbox</source>
         <translation>Gruvbox</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="164"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="159"/>
         <source>Rosé Pine</source>
         <translation>Rosé Pine</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="238"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="233"/>
         <source>Icons</source>
         <translation>Ikon</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="239"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="234"/>
         <source>Choose icon style and stroke weight</source>
         <translation>Pilih gaya ikon dan ketebalan guratan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="245"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="240"/>
         <source>Icon set</source>
         <translation>Set ikon</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="246"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="241"/>
         <source>Phosphor, system desktop theme, GNOME Adwaita, or installed icon theme</source>
         <translation>Phosphor, tema desktop sistem, GNOME Adwaita, atau tema ikon terinstal</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="251"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="246"/>
         <source>Phosphor</source>
         <translation>Phosphor</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="252"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="247"/>
         <source>System</source>
         <translation>Sistem</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="253"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="248"/>
         <source>Adwaita</source>
         <translation>Adwaita</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="254"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="426"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="249"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
         <source>Custom</source>
         <translation>Kustom</translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="264"/>
         <location filename="../qml/settings/InterfaceTab.qml" line="269"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="274"/>
         <source>Icon theme</source>
         <translation>Tema ikon</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="270"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="265"/>
         <source>Any icon theme installed on this system</source>
         <translation>Tema ikon apa pun yang terinstal di sistem ini</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="291"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="286"/>
         <source>Icon weight</source>
         <translation>Ketebalan ikon</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="287"/>
         <source>Stroke thickness and styling variant for Phosphor icons</source>
         <translation>Ketebalan guratan dan varian gaya untuk ikon Phosphor</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
         <source>Thin</source>
         <translation>Tipis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="299"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
         <source>Regular</source>
         <translation>Reguler</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="300"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
         <source>Bold</source>
         <translation>Tebal</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="301"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
         <source>Fill</source>
         <translation>Isian</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="302"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
         <source>Duotone</source>
         <translation>Duotone</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="313"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="308"/>
         <source>Top Bar &amp; Navigation</source>
         <translation>Bilah Atas &amp; Navigasi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="314"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="309"/>
         <source>Toolbar actions, path display, and tab controls</source>
         <translation>Aksi bilah alat, tampilan path, dan kontrol tab</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="319"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="314"/>
         <source>Back and forward buttons</source>
         <translation>Tombol kembali dan maju</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="315"/>
         <source>Show both navigation arrows, only Forward when available, or hide them</source>
         <translation>Tampilkan kedua panah navigasi, hanya Maju bila tersedia, atau sembunyikan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="325"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
         <source>Automatic</source>
         <translation>Otomatis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="326"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
         <source>Always</source>
         <translation>Selalu</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="327"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
         <source>Hidden</source>
         <translation>Tersembunyi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="338"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="333"/>
         <source>New tab button</source>
         <translation>Tombol tab baru</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="339"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="334"/>
         <source>Show the quick New Tab action on the top bar (Ctrl+T)</source>
         <translation>Tampilkan aksi Tab Baru cepat di bilah atas (Ctrl+T)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="351"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="346"/>
         <source>New window button</source>
         <translation>Tombol jendela baru</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="352"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="347"/>
         <source>Show the quick New Window action on the top bar (Ctrl+N)</source>
         <translation>Tampilkan aksi Jendela Baru cepat di bilah atas (Ctrl+N)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="364"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="359"/>
         <source>Path bar display</source>
         <translation>Tampilan bilah path</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="360"/>
         <source>Choose between clickable breadcrumb chips or raw editable path text</source>
         <translation>Pilih antara chip breadcrumb yang dapat diklik atau teks path mentah yang dapat diedit</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="370"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
         <source>Breadcrumbs</source>
         <translation>Breadcrumb</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="371"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
         <source>Text Only</source>
         <translation>Teks Saja</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="382"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="390"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="396"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="385"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="391"/>
         <source>This PC</source>
         <translation>PC Ini</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="383"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="378"/>
         <source>Name and identity of the system location</source>
         <translation>Nama dan identitas lokasi sistem</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="388"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="383"/>
         <source>Display name</source>
         <translation>Nama tampilan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="389"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="384"/>
         <source>Custom label for the This PC page, tab, and sidebar entry. Leave empty to use the hostname (%1)</source>
         <translation>Label kustom untuk halaman PC Ini, tab, dan entri bilah sisi. Biarkan kosong untuk menggunakan hostname (%1)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="408"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="403"/>
         <source>Menus &amp; Sidebar</source>
         <translation>Menu &amp; Bilah Sisi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="409"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="404"/>
         <source>Context menus and left sidebar rail pins</source>
         <translation>Menu konteks dan pin rel bilah sisi kiri</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="414"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="409"/>
         <source>Context menu layout</source>
         <translation>Tata letak menu konteks</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="415"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="410"/>
         <source>Minimal hides common shortcuts like cut, copy, and delete to keep menus compact</source>
         <translation>Minimal menyembunyikan pintasan umum seperti potong, salin, dan hapus agar menu tetap ringkas</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="424"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
         <source>Full</source>
         <translation>Penuh</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="425"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
         <source>Minimal</source>
         <translation>Minimal</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="439"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="434"/>
         <source>Edit…</source>
         <translation>Edit…</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="451"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="446"/>
         <source>Navigation sidebar</source>
         <translation>Bilah sisi navigasi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="452"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="447"/>
         <source>Reorder, pin, or hide drives, standard locations, and custom bookmarks</source>
         <translation>Tata ulang, sematkan, atau sembunyikan drive, lokasi standar, dan bookmark kustom</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="455"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="450"/>
         <source>Customize Sidebar…</source>
         <translation>Sesuaikan Bilah Sisi…</translation>
     </message>
@@ -1186,6 +1209,11 @@
         <location filename="../qml/OperationsPanel.qml" line="81"/>
         <source>%1 operations</source>
         <translation>%1 operasi</translation>
+    </message>
+    <message>
+        <location filename="../qml/OperationsPanel.qml" line="81"/>
+        <source>1 operation</source>
+        <translation>1 operasi</translation>
     </message>
     <message>
         <location filename="../qml/OperationsPanel.qml" line="109"/>
@@ -1505,6 +1533,11 @@
         <location filename="../qml/PickerWindow.qml" line="835"/>
         <source>%1 of the files already exist in this folder. Replace them?</source>
         <translation>%1 dari berkas sudah ada di folder ini. Ganti?</translation>
+    </message>
+    <message>
+        <location filename="../qml/PickerWindow.qml" line="835"/>
+        <source>1 of the files already exists in this folder. Replace it?</source>
+        <translation>1 dari berkas sudah ada di folder ini. Ganti?</translation>
     </message>
     <message>
         <location filename="../qml/PickerWindow.qml" line="836"/>
@@ -2112,6 +2145,11 @@
         <translation>%1 item ponsel disalin ke clipboard Loaf</translation>
     </message>
     <message>
+        <location filename="../qml/main.qml" line="326"/>
+        <source>1 phone item copied to Loaf&apos;s clipboard</source>
+        <translation>1 item telepon disalin ke clipboard Loaf</translation>
+    </message>
+    <message>
         <location filename="../qml/main.qml" line="330"/>
         <source>1 item cut</source>
         <translation>1 item dipotong</translation>
@@ -2146,6 +2184,11 @@
         <location filename="../qml/main.qml" line="404"/>
         <source>Permanently delete %1 items?</source>
         <translation>Hapus permanen %1 item?</translation>
+    </message>
+    <message>
+        <location filename="../qml/main.qml" line="404"/>
+        <source>Permanently delete 1 item?</source>
+        <translation>Hapus permanen 1 item?</translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="405"/>
@@ -2358,6 +2401,11 @@
         <translation>%1 berkas</translation>
     </message>
     <message>
+        <location filename="../qml/main.qml" line="2161"/>
+        <source>1 file</source>
+        <translation>1 berkas</translation>
+    </message>
+    <message>
         <location filename="../qml/main.qml" line="2186"/>
         <source>Empty the trash?</source>
         <translation>Kosongkan tempat sampah?</translation>
@@ -2528,9 +2576,18 @@
         <translation>Salin Path</translation>
     </message>
     <message>
-        <location filename="../qml/main.qml" line="2405"/>
         <source>Rename %1 Items…</source>
-        <translation>Ganti Nama %1 Item…</translation>
+        <translation type="vanished">Ganti Nama %1 Item…</translation>
+    </message>
+    <message>
+        <location filename="../qml/main.qml" line="2405"/>
+        <source>Rename 1 item…</source>
+        <translation>Ganti nama 1 item…</translation>
+    </message>
+    <message>
+        <location filename="../qml/main.qml" line="2405"/>
+        <source>Rename %1 items…</source>
+        <translation>Ganti nama %1 item…</translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="2407"/>

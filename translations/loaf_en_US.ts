@@ -25,7 +25,7 @@
     </message>
     <message>
         <location filename="../qml/settings/AboutTab.qml" line="258"/>
-        <source>Version </source>
+        <source>Version %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -204,7 +204,12 @@
     <name>BatchRenameDialog</name>
     <message>
         <location filename="../qml/BatchRenameDialog.qml" line="9"/>
-        <source>Rename %1 Items</source>
+        <source>Rename 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BatchRenameDialog.qml" line="9"/>
+        <source>Rename %1 items</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -564,6 +569,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/FilePane.qml" line="409"/>
+        <source>1 selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/FilePane.qml" line="418"/>
         <source>Choose storage</source>
         <translation type="unfinished"></translation>
@@ -642,7 +652,7 @@
 <context>
     <name>InlineRename</name>
     <message>
-        <location filename="../qml/components/InlineRename.qml" line="26"/>
+        <location filename="../qml/components/InlineRename.qml" line="27"/>
         <source>New name</source>
         <translation type="unfinished"></translation>
     </message>
@@ -650,376 +660,376 @@
 <context>
     <name>InterfaceTab</name>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="44"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="46"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="45"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="47"/>
         <source>Window colors and translucency</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="51"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="53"/>
         <source>Color scheme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="52"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="54"/>
         <source>Follow system preferences, or force dark or light theme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="57"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
         <source>Auto</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="58"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="305"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="60"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
         <source>Light</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="61"/>
         <source>Dark</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="71"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="86"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="73"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="88"/>
         <source>Background opacity</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="73"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="98"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="75"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="100"/>
         <source>Disabled in low-power mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="75"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="77"/>
         <source>Restart Loaf to apply transparency</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="76"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="78"/>
         <source>Fades the window itself so the desktop shows through margins and gaps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="96"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="109"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="98"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="111"/>
         <source>Panel backing opacity</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="99"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="101"/>
         <source>Fades file panes, sidebar and cards while keeping text and icons solid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="119"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="124"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="121"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="126"/>
         <source>Language</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="120"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="122"/>
         <source>Applies immediately</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="126"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="37"/>
         <source>System default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="126"/>
-        <source>English (US)</source>
+        <location filename="../qml/settings/InterfaceTab.qml" line="122"/>
+        <source>Set by the LOAF_LANG environment variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="153"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="141"/>
         <source>Color palette</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="154"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="142"/>
         <source>Wallpaper color extraction or curated Material 3 palettes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="164"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="152"/>
         <source>Wallpaper</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="165"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="153"/>
         <source>Loaf Violet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="166"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="154"/>
         <source>Loaf Amber</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="167"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="155"/>
         <source>Catppuccin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="168"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="156"/>
         <source>Nord</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="169"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="157"/>
         <source>Tokyo Night</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="170"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="158"/>
         <source>Gruvbox</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="171"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="159"/>
         <source>Rosé Pine</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="245"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="233"/>
         <source>Icons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="246"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="234"/>
         <source>Choose icon style and stroke weight</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="252"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="240"/>
         <source>Icon set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="253"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="241"/>
         <source>Phosphor, system desktop theme, GNOME Adwaita, or installed icon theme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="258"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="246"/>
         <source>Phosphor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="259"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="247"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="260"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="248"/>
         <source>Adwaita</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="261"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="433"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="249"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
         <source>Custom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="276"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="281"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="264"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="269"/>
         <source>Icon theme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="277"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="265"/>
         <source>Any icon theme installed on this system</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="298"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="286"/>
         <source>Icon weight</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="299"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="287"/>
         <source>Stroke thickness and styling variant for Phosphor icons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="304"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
         <source>Thin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="306"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
         <source>Regular</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="307"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
         <source>Bold</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="308"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
         <source>Fill</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="309"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
         <source>Duotone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="308"/>
         <source>Top Bar &amp; Navigation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="309"/>
         <source>Toolbar actions, path display, and tab controls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="326"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="314"/>
         <source>Back and forward buttons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="327"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="315"/>
         <source>Show both navigation arrows, only Forward when available, or hide them</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="332"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
         <source>Automatic</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="333"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
         <source>Always</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="334"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
         <source>Hidden</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="345"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="333"/>
         <source>New tab button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="346"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="334"/>
         <source>Show the quick New Tab action on the top bar (Ctrl+T)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="358"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="346"/>
         <source>New window button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="359"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="347"/>
         <source>Show the quick New Window action on the top bar (Ctrl+N)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="371"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="359"/>
         <source>Path bar display</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="372"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="360"/>
         <source>Choose between clickable breadcrumb chips or raw editable path text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
         <source>Breadcrumbs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="378"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
         <source>Text Only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="389"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="397"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="403"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="385"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="391"/>
         <source>This PC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="390"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="378"/>
         <source>Name and identity of the system location</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="395"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="383"/>
         <source>Display name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="396"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="384"/>
         <source>Custom label for the This PC page, tab, and sidebar entry. Leave empty to use the hostname (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="415"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="403"/>
         <source>Menus &amp; Sidebar</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="416"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="404"/>
         <source>Context menus and left sidebar rail pins</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="409"/>
         <source>Context menu layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="422"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="410"/>
         <source>Minimal hides common shortcuts like cut, copy, and delete to keep menus compact</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="431"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
         <source>Full</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="432"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
         <source>Minimal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="446"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="434"/>
         <source>Edit…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="458"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="446"/>
         <source>Navigation sidebar</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="459"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="447"/>
         <source>Reorder, pin, or hide drives, standard locations, and custom bookmarks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="462"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="450"/>
         <source>Customize Sidebar…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1186,6 +1196,11 @@
     <message>
         <location filename="../qml/OperationsPanel.qml" line="81"/>
         <source>%1 operations</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/OperationsPanel.qml" line="81"/>
+        <source>1 operation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1505,6 +1520,11 @@
     <message>
         <location filename="../qml/PickerWindow.qml" line="835"/>
         <source>%1 of the files already exist in this folder. Replace them?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/PickerWindow.qml" line="835"/>
+        <source>1 of the files already exists in this folder. Replace it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2113,6 +2133,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/main.qml" line="326"/>
+        <source>1 phone item copied to Loaf&apos;s clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/main.qml" line="330"/>
         <source>1 item cut</source>
         <translation type="unfinished"></translation>
@@ -2146,6 +2171,11 @@
     <message>
         <location filename="../qml/main.qml" line="404"/>
         <source>Permanently delete %1 items?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/main.qml" line="404"/>
+        <source>Permanently delete 1 item?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2359,6 +2389,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/main.qml" line="2161"/>
+        <source>1 file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/main.qml" line="2186"/>
         <source>Empty the trash?</source>
         <translation type="unfinished"></translation>
@@ -2530,7 +2565,12 @@
     </message>
     <message>
         <location filename="../qml/main.qml" line="2405"/>
-        <source>Rename %1 Items…</source>
+        <source>Rename 1 item…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/main.qml" line="2405"/>
+        <source>Rename %1 items…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -323,7 +323,7 @@ ApplicationWindow {
             var selected = {};
             if (cut) paths.forEach(function(path) { selected[path] = true; });
             cutSet = selected;
-            toast("info", qsTr("%1 phone items copied to Loaf's clipboard").arg(paths.length));
+            toast("info", theme.plural(paths.length, qsTr("1 phone item copied to Loaf's clipboard"), qsTr("%1 phone items copied to Loaf's clipboard")))
             return;
         }
         nativeBridge.setClipboardFiles(paths, cut);
@@ -401,7 +401,7 @@ ApplicationWindow {
         var pane = activePane;
         confirmDialog.ask(
             paths.length === 1 ? qsTr("Permanently delete “%1”?").arg(paths[0].split("/").pop())
-                               : qsTr("Permanently delete %1 items?").arg(paths.length),
+                               : theme.plural(paths.length, qsTr("Permanently delete 1 item?"), qsTr("Permanently delete %1 items?")),
             qsTr("Deleted items can't be restored."),
             qsTr("Delete"),
             function() { core.delete_items(JSON.stringify(paths)); pane.clearSelection(); });
@@ -2158,7 +2158,7 @@ ApplicationWindow {
             LoafIcon { anchors.verticalCenter: parent.verticalCenter; name: dragManager.paths.length > 1 ? "files" : "file"; size: 22; color: theme.primary }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: dragManager.paths.length > 1 ? qsTr("%1 files").arg(dragManager.paths.length)
+                text: dragManager.paths.length > 1 ? theme.plural(dragManager.paths.length, qsTr("1 file"), qsTr("%1 files"))
                     : (dragManager.paths.length === 1 ? dragManager.paths[0].split("/").pop() : "")
                 color: theme.textMain
                 font.pixelSize: theme.fs(12)
@@ -2402,7 +2402,7 @@ ApplicationWindow {
             if (single)
                 m.push({ text: qsTr("Rename…"), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { pane.startRename(); } });
             else
-                m.push({ text: qsTr("Rename %1 Items…").arg(paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
+                m.push({ text: theme.plural(paths.length, qsTr("Rename 1 item…"), qsTr("Rename %1 items…")), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
             if (kind === "dir") {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });

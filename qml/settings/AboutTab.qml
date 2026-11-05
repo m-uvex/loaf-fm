@@ -255,7 +255,7 @@ ColumnLayout {
                         Text {
                             id: verTxt
                             anchors.centerIn: parent
-                            text: qsTr("Version ") + Qt.application.version
+                            text: qsTr("Version %1").arg(Qt.application.version)
                             color: theme.secondaryContainerFg
                             font.pixelSize: theme.fs(11)
                             font.bold: true
