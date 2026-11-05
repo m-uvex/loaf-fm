@@ -65,12 +65,18 @@ static QLocale resolvedLocale()
 }
 
 // Installs the translator for `locale` in place of the previous one.
-// Returns false (keeping the previous translator) when no catalogue matches.
+// When no catalogue matches the previous translator is removed and none is
+// installed, so source (English) strings render.
 static bool installTranslatorFor(const QLocale &locale)
 {
     auto candidate = std::make_unique<QTranslator>();
-    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n")))
+    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n"))) {
+        if (currentTranslator) {
+            QCoreApplication::removeTranslator(currentTranslator.get());
+            currentTranslator.reset();
+        }
         return false;
+    }
     if (currentTranslator)
         QCoreApplication::removeTranslator(currentTranslator.get());
     QCoreApplication::installTranslator(candidate.get());
