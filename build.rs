@@ -1,23 +1,46 @@
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
 use std::path::PathBuf;
 
+fn xml_escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 // Compiles translations/*.ts to .qm with lrelease and embeds them under :/i18n.
-// Returns None when there is nothing to compile or lrelease is unavailable.
+// Returns None only when there is nothing to compile.
 fn compile_translations() -> Option<PathBuf> {
+    let is_release = std::env::var("PROFILE").as_deref() == Ok("release");
+    let fail = |step: &str, detail: &str| -> Option<PathBuf> {
+        let message = format!("translations: {step} failed: {detail}");
+        if is_release {
+            panic!("{message}");
+        }
+        println!("cargo:warning={message}");
+        None
+    };
     let out_dir = std::env::var("OUT_DIR").ok()?;
     let mut catalogues: Vec<PathBuf> = Vec::new();
-    let entries = std::fs::read_dir("translations").ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("ts") {
-            println!("cargo:rerun-if-changed={}", path.display());
-            catalogues.push(path);
+    match std::fs::read_dir("translations") {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("ts") {
+                    catalogues.push(path);
+                }
+            }
         }
+        Err(error) => return fail("read translations directory", &error.to_string()),
     }
     if catalogues.is_empty() {
         return None;
     }
-    let lrelease_available = std::process::Command::new("lrelease")
+    let lrelease = std::env::var("LRELEASE")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "lrelease".to_string());
+    let lrelease_available = std::process::Command::new(&lrelease)
         .arg("--version")
         .output()
         .map(|out| {
@@ -26,37 +49,47 @@ fn compile_translations() -> Option<PathBuf> {
         })
         .unwrap_or(false);
     if !lrelease_available {
-        println!("cargo:warning=lrelease not found; translations disabled");
-        return None;
+        return fail("find lrelease", "executable not found or not runnable");
     }
     let qm_dir = PathBuf::from(&out_dir).join("i18n");
-    std::fs::create_dir_all(&qm_dir).ok()?;
+    if let Err(error) = std::fs::create_dir_all(&qm_dir) {
+        return fail("create i18n output directory", &error.to_string());
+    }
     let mut qrc = String::from("<RCC>\n  <qresource prefix=\"/i18n\">\n");
     for catalogue in &catalogues {
-        let stem = catalogue.file_stem()?.to_string_lossy().to_string();
+        let Some(stem) = catalogue.file_stem().and_then(|s| s.to_str()) else {
+            return fail("read catalogue file stem", &catalogue.display().to_string());
+        };
+        let stem = stem.to_string();
         let qm = qm_dir.join(format!("{stem}.qm"));
-        let status = std::process::Command::new("lrelease")
+        let status = match std::process::Command::new(&lrelease)
             .arg(catalogue)
             .arg("-qm")
             .arg(&qm)
             .status()
-            .ok()?;
+        {
+            Ok(status) => status,
+            Err(error) => return fail("run lrelease", &error.to_string()),
+        };
         if !status.success() {
-            println!(
-                "cargo:warning=lrelease failed for {}; translations disabled",
-                catalogue.display()
+            return fail(
+                "compile catalogue",
+                &format!("lrelease failed for {}", catalogue.display()),
             );
-            return None;
         }
         qrc.push_str(&format!(
-            "    <file alias=\"{stem}.qm\">{}</file>\n",
-            qm.display()
+            "    <file alias=\"{}.qm\">{}</file>\n",
+            xml_escape(&stem),
+            xml_escape(&qm.to_string_lossy())
         ));
     }
     qrc.push_str("  </qresource>\n</RCC>\n");
     let qrc_path = PathBuf::from(&out_dir).join("i18n.qrc");
-    std::fs::write(&qrc_path, qrc).ok()?;
-    println!("cargo:rerun-if-changed={}", qrc_path.display());
+    if let Err(error) = std::fs::write(&qrc_path, qrc) {
+        return fail("write i18n qrc", &error.to_string());
+    }
+    println!("cargo:rerun-if-changed=translations");
+    println!("cargo:rerun-if-env-changed=LRELEASE");
     Some(qrc_path)
 }
 
