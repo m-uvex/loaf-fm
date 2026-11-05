@@ -39,14 +39,7 @@ pub mod ffi {
         /// Switches the running UI to the requested locale (empty = system).
         fn apply_language(locale_name: &str);
 
-        /// Interleaved code/name pairs of the embedded translation catalogues,
-        /// sorted by code (e.g. "en_US", "English").
-        fn available_language_names() -> Vec<String>;
         fn languages_json() -> String;
-
-        /// Translates a user-visible string (context "loaf").
-        fn translate(source: &str) -> String;
-
         fn list_kmtp_devices_json() -> String;
         fn list_mtp_directory(url: &str) -> String;
         fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String;
@@ -69,17 +62,11 @@ pub fn apply_language(locale: &str) {
     ffi::apply_language(locale);
 }
 
-pub fn available_language_names() -> Vec<String> {
-    ffi::available_language_names()
-}
 
 pub fn languages_json() -> String {
     ffi::languages_json()
 }
 
-pub fn translate(source: &str) -> String {
-    ffi::translate(source)
-}
 
 pub fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String {
     ffi::mtp_operation_json(action, url, argument)

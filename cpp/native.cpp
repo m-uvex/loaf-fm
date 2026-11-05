@@ -419,26 +419,6 @@ void apply_language(rust::Str localeName)
         languageState.engine->retranslate();
 }
 
-rust::Vec<rust::String> available_language_names()
-{
-    QStringList codes;
-    const QStringList files = QDir(QStringLiteral(":/i18n")).entryList(
-        {QStringLiteral("loaf_*.qm")}, QDir::Files, QDir::Name);
-    for (const QString &file : files) {
-        const QString code = file.mid(5, file.size() - 5 - 3);
-        if (!code.isEmpty() && !codes.contains(code))
-            codes << code;
-    }
-    if (!codes.contains(QStringLiteral("en_US")))
-        codes << QStringLiteral("en_US");
-    codes.sort();
-    rust::Vec<rust::String> out;
-    for (const QString &code : codes) {
-        out.push_back(toRust(code));
-        out.push_back(toRust(QLocale(code).nativeLanguageName()));
-    }
-    return out;
-}
 
 rust::String languages_json()
 {
@@ -448,13 +428,6 @@ rust::String languages_json()
     return toRust(file.readAll());
 }
 
-rust::String translate(rust::Str source)
-{
-    // The (context, const char *key) overload resolves the 2-arg ambiguity;
-    // source is UTF-8, safe to pass through as a QByteArray key.
-    const QByteArray key = toQString(source).toUtf8();
-    return toRust(QCoreApplication::translate("loaf", key.constData()));
-}
 
 rust::String mime_type_for(rust::Str path, bool sniff)
 {

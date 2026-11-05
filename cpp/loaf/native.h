@@ -167,13 +167,9 @@ void set_application_language(rust::Str localeName);
 // catalogue matches.
 void apply_language(rust::Str localeName);
 
-// Interleaved code/name pairs of the embedded translation catalogues
-rust::Vec<rust::String> available_language_names();
 rust::String languages_json();
 
 
-// Translates a user-visible string from Rust (context "loaf").
-rust::String translate(rust::Str source);
 
 // Enumerates MTP devices via KDE kiod6 / kmtpd over D-Bus without blocking the UI thread.
 // Returns a JSON-encoded array of MTP device objects:
