@@ -131,12 +131,12 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
         let status = Command::new(py).args(["-c", &py_script]).status();
         matches!(status, Ok(s) if s.success())
     } else {
-        return Err("Neither curl, wget, nor python3 was found to download cloudflared".into());
+        return Err(crate::util::msg("share.error-tool-missing"));
     };
 
     if !downloaded || !tmp_bin.exists() {
         let _ = std::fs::remove_file(&tmp_bin);
-        return Err("Download failed".into());
+        return Err(crate::util::msg("share.error-download-failed"));
     }
 
     // Set executable permission (0o755)
@@ -226,10 +226,10 @@ where
 
 fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), String> {
     if params.paths.is_empty() {
-        return Err("No files selected".into());
+        return Err(crate::util::msg("share.error-no-files"));
     }
 
-    let cloudflared_bin = find_cloudflared().ok_or("cloudflared is not installed".to_string())?;
+    let cloudflared_bin = find_cloudflared().ok_or_else(|| crate::util::msg("share.error-cloudflared-missing"))?;
 
     // Determine target file to serve
     let single = params.paths.len() == 1;
@@ -419,7 +419,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
             }
         }
         if !found {
-            let _ = url_tx.send(Err("Tunnel did not produce a public URL".into()));
+            let _ = url_tx.send(Err(crate::util::msg("share.error-no-url")));
         }
     });
 
@@ -433,7 +433,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
         Err(_) => {
             let _ = child.kill();
             get_manager().stop_share(&share_id);
-            return Err("Timed out waiting for Cloudflare Tunnel to connect".into());
+            return Err(crate::util::msg("share.error-timeout"));
         }
     };
 

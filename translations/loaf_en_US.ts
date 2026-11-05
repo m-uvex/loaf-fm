@@ -102,11 +102,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="55"/>
+        <source>A</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
         <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
         <source>On</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="57"/>
         <location filename="../qml/settings/AccessibilityTab.qml" line="57"/>
         <source>Off</source>
         <translation type="unfinished"></translation>
@@ -318,10 +325,12 @@
     </message>
     <message>
         <location filename="../qml/settings/BehaviorTab.qml" line="53"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="53"/>
         <source>Current</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/BehaviorTab.qml" line="54"/>
         <location filename="../qml/settings/BehaviorTab.qml" line="54"/>
         <source>Split</source>
         <translation type="unfinished"></translation>
@@ -329,6 +338,11 @@
     <message>
         <location filename="../qml/settings/BehaviorTab.qml" line="55"/>
         <source>New Tab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/BehaviorTab.qml" line="55"/>
+        <source>Tab</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -487,6 +501,16 @@
 </context>
 <context>
     <name>DriveCard</name>
+    <message>
+        <location filename="../qml/components/DriveCard.qml" line="217"/>
+        <source>%1 used</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/components/DriveCard.qml" line="225"/>
+        <source>%1 free of %2</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <location filename="../qml/components/DriveCard.qml" line="262"/>
         <source>Browse</source>
@@ -681,6 +705,7 @@
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
         <source>Auto</source>
         <translation type="unfinished"></translation>
     </message>
@@ -867,8 +892,23 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
+        <source>Th</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
+        <source>Lt</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
         <source>Regular</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
+        <source>Reg</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -877,13 +917,28 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
+        <source>Bd</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
         <source>Fill</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
+        <source>Fil</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
         <source>Duotone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
+        <source>Duo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -917,8 +972,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
+        <source>Show</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
         <source>Hidden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
+        <source>Hide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -957,8 +1022,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
+        <source>Chips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
         <source>Text Only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
+        <source>Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1005,12 +1080,23 @@
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
         <source>Full</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
         <source>Minimal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
+        <source>Min</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
+        <source>Edit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1224,8 +1310,8 @@
     <message>
         <location filename="../qml/PCView.qml" line="260"/>
         <location filename="../qml/PCView.qml" line="418"/>
-        <location filename="../qml/PCView.qml" line="1067"/>
-        <location filename="../qml/PCView.qml" line="1068"/>
+        <location filename="../qml/PCView.qml" line="1070"/>
+        <location filename="../qml/PCView.qml" line="1071"/>
         <source>This PC</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1271,7 +1357,7 @@
     </message>
     <message>
         <location filename="../qml/PCView.qml" line="328"/>
-        <location filename="../qml/PCView.qml" line="1054"/>
+        <location filename="../qml/PCView.qml" line="1057"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1287,131 +1373,141 @@
     </message>
     <message>
         <location filename="../qml/PCView.qml" line="442"/>
+        <source>%1  ·  %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/PCView.qml" line="444"/>
         <source>%1 free of %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="484"/>
+        <location filename="../qml/PCView.qml" line="486"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="484"/>
+        <location filename="../qml/PCView.qml" line="486"/>
         <source>Customize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="510"/>
+        <location filename="../qml/PCView.qml" line="512"/>
         <source>Places</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="511"/>
+        <location filename="../qml/PCView.qml" line="513"/>
         <source>Frequent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="512"/>
+        <location filename="../qml/PCView.qml" line="514"/>
         <source>Internal Storage</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="513"/>
+        <location filename="../qml/PCView.qml" line="515"/>
         <source>External Storage</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="513"/>
+        <location filename="../qml/PCView.qml" line="515"/>
         <source>Network Shares</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="515"/>
+        <location filename="../qml/PCView.qml" line="517"/>
         <source>1 drive connected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="515"/>
+        <location filename="../qml/PCView.qml" line="517"/>
         <source>%1 drives connected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="517"/>
+        <location filename="../qml/PCView.qml" line="519"/>
         <source>1 server found</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="517"/>
+        <location filename="../qml/PCView.qml" line="519"/>
         <source>%1 servers found</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="521"/>
+        <location filename="../qml/PCView.qml" line="523"/>
         <source>Scan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="530"/>
+        <location filename="../qml/PCView.qml" line="532"/>
         <source>Carousel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="530"/>
+        <location filename="../qml/PCView.qml" line="532"/>
         <source>Grid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="553"/>
+        <location filename="../qml/PCView.qml" line="555"/>
         <source>tonal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="570"/>
+        <location filename="../qml/PCView.qml" line="572"/>
         <source>Section hidden</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="575"/>
+        <location filename="../qml/PCView.qml" line="577"/>
         <source>Restore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="851"/>
+        <location filename="../qml/PCView.qml" line="853"/>
         <source>System Drive Pool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1004"/>
+        <location filename="../qml/PCView.qml" line="861"/>
+        <source>%1 used of %2  ·  %3 free</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/PCView.qml" line="1007"/>
         <source>Add Share…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1013"/>
+        <location filename="../qml/PCView.qml" line="1016"/>
         <source>Hide this server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1053"/>
+        <location filename="../qml/PCView.qml" line="1056"/>
         <source>Rename Drive</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1055"/>
+        <location filename="../qml/PCView.qml" line="1058"/>
         <source>Drive name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1066"/>
+        <location filename="../qml/PCView.qml" line="1069"/>
         <source>Rename This PC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1067"/>
+        <location filename="../qml/PCView.qml" line="1070"/>
         <source>Leave empty to use the hostname (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1069"/>
+        <location filename="../qml/PCView.qml" line="1072"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1808,6 +1904,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/SettingsView.qml" line="457"/>
+        <source>%1 found</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/SettingsView.qml" line="492"/>
         <source>No settings found matching &quot;</source>
         <translation type="unfinished"></translation>
@@ -1902,6 +2003,8 @@
     </message>
     <message>
         <location filename="../qml/settings/ShareTab.qml" line="219"/>
+        <location filename="../qml/settings/ShareTab.qml" line="219"/>
+        <location filename="../qml/settings/ShareTab.qml" line="246"/>
         <location filename="../qml/settings/ShareTab.qml" line="246"/>
         <source>Off</source>
         <translation type="unfinished"></translation>
@@ -1992,8 +2095,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/ShareTab.qml" line="346"/>
+        <source>1h</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/ShareTab.qml" line="347"/>
         <source>6 Hours</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/ShareTab.qml" line="347"/>
+        <source>6h</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2002,8 +2115,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/settings/ShareTab.qml" line="348"/>
+        <source>24h</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/settings/ShareTab.qml" line="349"/>
         <source>Never</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/ShareTab.qml" line="349"/>
+        <source>∞</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2019,6 +2142,11 @@
     <message>
         <location filename="../qml/settings/ShareTab.qml" line="369"/>
         <source>Unlimited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/settings/ShareTab.qml" line="377"/>
+        <source>KB/s</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2055,6 +2183,621 @@
         <location filename="../qml/Sidebar.qml" line="423"/>
         <location filename="../qml/Sidebar.qml" line="426"/>
         <source>Settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>Theme</name>
+    <message>
+        <location filename="../qml/Theme.qml" line="135"/>
+        <source>No preview available</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="136"/>
+        <source>This item no longer exists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="137"/>
+        <source>Folder · 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="137"/>
+        <source>Folder · %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="138"/>
+        <source>Archive · %1 files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="139"/>
+        <source>Encrypted archive</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="140"/>
+        <source>Press Enter to open it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="141"/>
+        <source>Binary file · no text preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="142"/>
+        <source>1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="142"/>
+        <source>%1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="143"/>
+        <source>Just now</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="144"/>
+        <source>%1m ago</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="145"/>
+        <source>%1h ago</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="146"/>
+        <source>%1d ago</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="147"/>
+        <location filename="../qml/Theme.qml" line="253"/>
+        <source>Folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="148"/>
+        <source>Root (/)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="149"/>
+        <source>%1 Volume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="151"/>
+        <source>The name can&apos;t be empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="152"/>
+        <source>&quot;.&quot; and &quot;..&quot; are reserved names</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="153"/>
+        <source>Names can&apos;t contain &quot;/&quot;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="154"/>
+        <source>Invalid character in name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="155"/>
+        <source>The name is too long</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="156"/>
+        <source>Home</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="157"/>
+        <source>This PC</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="158"/>
+        <source>Recent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="159"/>
+        <source>Starred</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="160"/>
+        <source>Trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="161"/>
+        <location filename="../qml/Theme.qml" line="234"/>
+        <source>Cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="162"/>
+        <source>Added “%1” to the sidebar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="163"/>
+        <source>That folder doesn&apos;t exist</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="164"/>
+        <source>That SMB share no longer exists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="165"/>
+        <source>Could not save the password in the system keyring</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="166"/>
+        <source>No application can open “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="167"/>
+        <source>That application is no longer installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="168"/>
+        <source>Could not start %1: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="169"/>
+        <source>%1 now opens %2 files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="170"/>
+        <source>Could not run the command: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="171"/>
+        <source>Could not run the script: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="172"/>
+        <source>pkexec (polkit) is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="173"/>
+        <source>Phone files have no trash. Use Delete Permanently.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="174"/>
+        <source>“%1” already exists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="175"/>
+        <source>Could not create “%1”: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="176"/>
+        <source>Renamed 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="177"/>
+        <source>Renamed %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="178"/>
+        <source>Cloudflare Tunnel agent installed successfully</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="179"/>
+        <source>Failed to install cloudflared: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="180"/>
+        <source>Disconnecting from %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="181"/>
+        <source>Connecting to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="182"/>
+        <source>Downloading phone file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="183"/>
+        <source>Opening %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="184"/>
+        <source>Downloading phone preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="185"/>
+        <source>Transferring phone files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="186"/>
+        <source>Moving “%1” to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="187"/>
+        <source>Moving %1 items to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="188"/>
+        <source>Copying “%1” to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="189"/>
+        <source>Copying %1 items to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="190"/>
+        <source>Linking “%1” to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="191"/>
+        <source>Linking %1 items to %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="192"/>
+        <source>Moving “%1” to the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="193"/>
+        <source>Moving %1 items to the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="194"/>
+        <source>Deleting phone files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="195"/>
+        <source>Deleting “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="196"/>
+        <source>Deleting %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="197"/>
+        <source>Restoring %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="198"/>
+        <source>Emptying the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="199"/>
+        <source>Compressing into “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="200"/>
+        <source>Extracting “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="201"/>
+        <source>Creating %1 on phone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="202"/>
+        <source>Renaming phone item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="203"/>
+        <source>Connected to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="204"/>
+        <source>Opened a downloaded copy. Copy changes back to update the phone.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="205"/>
+        <source>Phone transfer complete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="206"/>
+        <source>“%1” moved to the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="207"/>
+        <source>%1 items moved to the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="208"/>
+        <source>Phone files deleted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="209"/>
+        <source>Deleted “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="210"/>
+        <source>Deleted %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="211"/>
+        <source>Could not delete %1 items: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="212"/>
+        <source>“%1” restored</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="213"/>
+        <source>%1 items restored</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="214"/>
+        <source>Trash emptied</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="215"/>
+        <source>Some items could not be deleted: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="216"/>
+        <source>Created “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="217"/>
+        <source>Could not create the archive: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="218"/>
+        <source>Extracted “%1”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="219"/>
+        <source>Extracted “%1” only partly: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="220"/>
+        <source>Could not extract “%1”: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="221"/>
+        <source>Created on phone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="222"/>
+        <source>Renamed on phone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="223"/>
+        <source>Moved 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="224"/>
+        <source>Moved %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="225"/>
+        <source>Copied 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="226"/>
+        <source>Copied %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="227"/>
+        <source>Linked 1 item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="228"/>
+        <source>Linked %1 items</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="229"/>
+        <source>%1 %2 items; %3 failed: %4</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="230"/>
+        <source>You don&apos;t have permission to view this folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="231"/>
+        <source>This folder no longer exists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="232"/>
+        <source>This archive needs a password</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="233"/>
+        <source>&apos;%1&apos; is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="235"/>
+        <source>Nothing to compress</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="236"/>
+        <source>Not an archive</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="237"/>
+        <source>The file was not found in the archive</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="238"/>
+        <source>Neither curl, wget, nor python3 was found to download cloudflared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="239"/>
+        <source>Download failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="240"/>
+        <source>No files selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="241"/>
+        <source>cloudflared is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="242"/>
+        <source>Tunnel did not produce a public URL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="243"/>
+        <source>Timed out waiting for Cloudflare Tunnel to connect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="244"/>
+        <source>This drive has no usable trash folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="245"/>
+        <source>Item is already in the trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="246"/>
+        <source>Unsafe trash directory</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="254"/>
+        <source>Image</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="255"/>
+        <source>Video</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="256"/>
+        <source>Audio</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="257"/>
+        <source>Code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="258"/>
+        <source>Archive</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="259"/>
+        <source>Document</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="260"/>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="261"/>
+        <source>Font</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="262"/>
+        <source>Application</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="263"/>
+        <source>File</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3141,11 +3884,6 @@
     <message>
         <location filename="../qml/main.qml" line="3126"/>
         <source>Display name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="3127"/>
-        <source>Studio NAS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

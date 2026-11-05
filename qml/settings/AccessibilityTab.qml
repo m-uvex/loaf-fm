@@ -52,9 +52,9 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                 options: [
-                    { value: "auto", label: qsTr("Auto"), shortLabel: "A" },
-                    { value: "on", label: qsTr("On"), shortLabel: "On" },
-                    { value: "off", label: qsTr("Off"), shortLabel: "Off" }
+                    { value: "auto", label: qsTr("Auto"), shortLabel: qsTr("A") },
+                    { value: "on", label: qsTr("On"), shortLabel: qsTr("On") },
+                    { value: "off", label: qsTr("Off"), shortLabel: qsTr("Off") }
                 ]
                 value: theme.lowPowerSetting
                 onSelected: function(v) { theme.lowPowerSetting = v; }

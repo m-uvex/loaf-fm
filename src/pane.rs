@@ -393,13 +393,13 @@ pub fn relative_time(ts: i64) -> String {
     let now = unsafe { libc::time(std::ptr::null_mut()) } as i64;
     let elapsed = now - ts;
     if (0..60).contains(&elapsed) {
-        "Just now".into()
+        util::msg("time.just-now")
     } else if (0..3600).contains(&elapsed) {
-        format!("{}m ago", elapsed / 60)
+        util::msg_args("time.minutes-ago", &[&(elapsed / 60).to_string()])
     } else if (0..86400).contains(&elapsed) {
-        format!("{}h ago", elapsed / 3600)
+        util::msg_args("time.hours-ago", &[&(elapsed / 3600).to_string()])
     } else if (0..86400 * 7).contains(&elapsed) {
-        format!("{}d ago", elapsed / 86400)
+        util::msg_args("time.days-ago", &[&(elapsed / 86400).to_string()])
     } else {
         format_date(ts)
     }
@@ -411,8 +411,14 @@ pub fn format_date(ts: i64) -> String {
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }
-    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    format!("{} {}, {}", MONTHS[tm.tm_mon.clamp(0, 11) as usize], tm.tm_mday, tm.tm_year + 1900)
+    util::msg_args(
+        "date.format",
+        &[
+            &tm.tm_mon.to_string(),
+            &tm.tm_mday.to_string(),
+            &(tm.tm_year + 1900).to_string(),
+        ],
+    )
 }
 
 fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
@@ -423,7 +429,7 @@ fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
         "is_symlink": e.is_symlink,
         "is_hidden": e.is_hidden,
         "size": e.size,
-        "size_str": if e.is_dir { "-".to_string() } else { util::format_size(e.size) },
+        "size_str": if e.is_dir { util::msg("size.folder") } else { util::format_size(e.size) },
         "modified": e.modified,
         "modified_str": relative_time(e.modified),
         "icon": e.icon,
@@ -533,7 +539,7 @@ impl qobject::LoafEngine {
             "is_symlink" => QVariant::from(&e.is_symlink),
             "is_hidden" => QVariant::from(&e.is_hidden),
             "size" => QVariant::from(&(e.size as i64)),
-            "size_str" => s(&if e.is_dir { "-".to_string() } else { util::format_size(e.size) }),
+            "size_str" => s(&if e.is_dir { util::msg("size.folder") } else { util::format_size(e.size) }),
             "modified" => QVariant::from(&e.modified),
             "modified_str" => s(&relative_time(e.modified)),
             "icon" => s(e.icon),
@@ -778,8 +784,8 @@ impl qobject::LoafEngine {
             let mut new_cache = None;
             let result: Result<Vec<Entry>, String> = match &loc {
                 Loc::Dir(p) => listing::scan(p, &cancelled).map_err(|e| match e.kind() {
-                    std::io::ErrorKind::PermissionDenied => "You don't have permission to view this folder".to_string(),
-                    std::io::ErrorKind::NotFound => "This folder no longer exists".to_string(),
+                    std::io::ErrorKind::PermissionDenied => util::msg("pane.error-permission"),
+                    std::io::ErrorKind::NotFound => util::msg("pane.error-notfound"),
                     _ => e.to_string(),
                 }),
                 Loc::Trash => Ok(trash::list()

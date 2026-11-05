@@ -122,6 +122,148 @@ Item {
         return n === 1 ? one : many.arg(number(n));
     }
 
+    // Rust emits {key,args} JSON for strings lupdate cannot see.
+    // Non-JSON text (OS/tool errors) is shown verbatim.
+    function resolveRustMessage(text) {
+        if (!text || text.length === 0 || text.charAt(0) !== "{") return text || "";
+        var decoded;
+        try { decoded = JSON.parse(text); } catch (e) { return text; }
+        if (decoded && typeof decoded.raw === "string") return decoded.raw;
+        var key = decoded && decoded.key;
+        var a = (decoded && decoded.args) || [];
+        var out;
+        if (key === "info.no-preview") out = qsTr("No preview available");
+        else if (key === "info.missing") out = qsTr("This item no longer exists");
+        else if (key === "info.folder-items") out = plural(Number(a[0]) || 0, qsTr("Folder · 1 item"), qsTr("Folder · %1 items"));
+        else if (key === "info.archive-files") out = qsTr("Archive · %1 files").arg(number(Number(a[0]) || 0));
+        else if (key === "info.encrypted-archive") out = qsTr("Encrypted archive");
+        else if (key === "info.press-enter") out = qsTr("Press Enter to open it");
+        else if (key === "info.binary-file") out = qsTr("Binary file · no text preview");
+        else if (key === "item.one" || key === "item.many") out = plural(Number(a[0]) || 0, qsTr("1 item"), qsTr("%1 items"));
+        else if (key === "time.just-now") out = qsTr("Just now");
+        else if (key === "time.minutes-ago") out = qsTr("%1m ago").arg(number(Number(a[0]) || 0));
+        else if (key === "time.hours-ago") out = qsTr("%1h ago").arg(number(Number(a[0]) || 0));
+        else if (key === "time.days-ago") out = qsTr("%1d ago").arg(number(Number(a[0]) || 0));
+        else if (key === "size.folder") out = qsTr("Folder");
+        else if (key === "drive.root") out = qsTr("Root (/)");
+        else if (key === "drive.volume") out = qsTr("%1 Volume").arg(a[0] || "");
+        else if (key === "date.format") out = Qt.formatDate(new Date(Number(a[2]), Number(a[0]), Number(a[1])), Qt.LocaleDate);
+        else if (key === "name.empty") out = qsTr("The name can't be empty");
+        else if (key === "name.reserved") out = qsTr("\".\" and \"..\" are reserved names");
+        else if (key === "name.slash") out = qsTr("Names can't contain \"/\"");
+        else if (key === "name.invalid") out = qsTr("Invalid character in name");
+        else if (key === "name.too-long") out = qsTr("The name is too long");
+        else if (key === "place.home") out = qsTr("Home");
+        else if (key === "place.pc") out = qsTr("This PC");
+        else if (key === "place.recent") out = qsTr("Recent");
+        else if (key === "place.starred") out = qsTr("Starred");
+        else if (key === "place.trash") out = qsTr("Trash");
+        else if (key === "notify.cancelled") out = qsTr("Cancelled");
+        else if (key === "notify.bookmark-added") out = qsTr("Added “%1” to the sidebar");
+        else if (key === "notify.folder-missing") out = qsTr("That folder doesn't exist");
+        else if (key === "notify.smb-missing") out = qsTr("That SMB share no longer exists");
+        else if (key === "notify.keyring-error") out = qsTr("Could not save the password in the system keyring");
+        else if (key === "notify.no-app-for-file") out = qsTr("No application can open “%1”");
+        else if (key === "notify.app-missing") out = qsTr("That application is no longer installed");
+        else if (key === "notify.app-start-error") out = qsTr("Could not start %1: %2");
+        else if (key === "notify.app-default-set") out = qsTr("%1 now opens %2 files");
+        else if (key === "notify.cmd-error") out = qsTr("Could not run the command: %1");
+        else if (key === "notify.script-error") out = qsTr("Could not run the script: %1");
+        else if (key === "notify.pkexec-missing") out = qsTr("pkexec (polkit) is not installed");
+        else if (key === "notify.mtp-no-trash") out = qsTr("Phone files have no trash. Use Delete Permanently.");
+        else if (key === "notify.already-exists") out = qsTr("“%1” already exists");
+        else if (key === "notify.create-error") out = qsTr("Could not create “%1”: %2");
+        else if (key === "notify.renamed-one") out = qsTr("Renamed 1 item");
+        else if (key === "notify.renamed-many") out = qsTr("Renamed %1 items");
+        else if (key === "notify.cloudflared-installed") out = qsTr("Cloudflare Tunnel agent installed successfully");
+        else if (key === "notify.cloudflared-install-failed") out = qsTr("Failed to install cloudflared: %1");
+        else if (key === "op.smb-disconnecting") out = qsTr("Disconnecting from %1");
+        else if (key === "op.smb-connecting") out = qsTr("Connecting to %1");
+        else if (key === "op.mtp-downloading") out = qsTr("Downloading phone file");
+        else if (key === "op.opening-member") out = qsTr("Opening %1");
+        else if (key === "op.mtp-previewing") out = qsTr("Downloading phone preview");
+        else if (key === "op.mtp-transferring") out = qsTr("Transferring phone files");
+        else if (key === "op.moving-one") out = qsTr("Moving “%1” to %2");
+        else if (key === "op.moving-many") out = qsTr("Moving %1 items to %2");
+        else if (key === "op.copying-one") out = qsTr("Copying “%1” to %2");
+        else if (key === "op.copying-many") out = qsTr("Copying %1 items to %2");
+        else if (key === "op.linking-one") out = qsTr("Linking “%1” to %2");
+        else if (key === "op.linking-many") out = qsTr("Linking %1 items to %2");
+        else if (key === "op.trashing-one") out = qsTr("Moving “%1” to the trash");
+        else if (key === "op.trashing-many") out = qsTr("Moving %1 items to the trash");
+        else if (key === "op.deleting-phone") out = qsTr("Deleting phone files");
+        else if (key === "op.deleting-one") out = qsTr("Deleting “%1”");
+        else if (key === "op.deleting-many") out = qsTr("Deleting %1 items");
+        else if (key === "op.restoring-many") out = qsTr("Restoring %1 items");
+        else if (key === "op.emptying-trash") out = qsTr("Emptying the trash");
+        else if (key === "op.compressing") out = qsTr("Compressing into “%1”");
+        else if (key === "op.extracting") out = qsTr("Extracting “%1”");
+        else if (key === "op.mtp-creating") out = qsTr("Creating %1 on phone");
+        else if (key === "op.mtp-renaming") out = qsTr("Renaming phone item");
+        else if (key === "outcome.smb-connected") out = qsTr("Connected to %1");
+        else if (key === "outcome.mtp-opened") out = qsTr("Opened a downloaded copy. Copy changes back to update the phone.");
+        else if (key === "outcome.mtp-transfer-complete") out = qsTr("Phone transfer complete");
+        else if (key === "outcome.trashed-one") out = qsTr("“%1” moved to the trash");
+        else if (key === "outcome.trashed-many") out = qsTr("%1 items moved to the trash");
+        else if (key === "outcome.mtp-deleted") out = qsTr("Phone files deleted");
+        else if (key === "outcome.deleted-one") out = qsTr("Deleted “%1”");
+        else if (key === "outcome.deleted-many") out = qsTr("Deleted %1 items");
+        else if (key === "outcome.delete-err") out = qsTr("Could not delete %1 items: %2");
+        else if (key === "outcome.restored-one") out = qsTr("“%1” restored");
+        else if (key === "outcome.restored-many") out = qsTr("%1 items restored");
+        else if (key === "outcome.trash-emptied") out = qsTr("Trash emptied");
+        else if (key === "outcome.trash-partial-err") out = qsTr("Some items could not be deleted: %1");
+        else if (key === "outcome.created-archive") out = qsTr("Created “%1”");
+        else if (key === "outcome.archive-create-err") out = qsTr("Could not create the archive: %1");
+        else if (key === "outcome.extracted") out = qsTr("Extracted “%1”");
+        else if (key === "outcome.extracted-partly") out = qsTr("Extracted “%1” only partly: %2");
+        else if (key === "outcome.extract-err") out = qsTr("Could not extract “%1”: %2");
+        else if (key === "outcome.mtp-created") out = qsTr("Created on phone");
+        else if (key === "outcome.mtp-renamed") out = qsTr("Renamed on phone");
+        else if (key === "outcome.moved-one") out = qsTr("Moved 1 item");
+        else if (key === "outcome.moved-many") out = qsTr("Moved %1 items");
+        else if (key === "outcome.copied-one") out = qsTr("Copied 1 item");
+        else if (key === "outcome.copied-many") out = qsTr("Copied %1 items");
+        else if (key === "outcome.linked-one") out = qsTr("Linked 1 item");
+        else if (key === "outcome.linked-many") out = qsTr("Linked %1 items");
+        else if (key === "outcome.transfer-failed") out = qsTr("%1 %2 items; %3 failed: %4");
+        else if (key === "pane.error-permission") out = qsTr("You don't have permission to view this folder");
+        else if (key === "pane.error-notfound") out = qsTr("This folder no longer exists");
+        else if (key === "archive.error-password") out = qsTr("This archive needs a password");
+        else if (key === "archive.error-missing-tool") out = qsTr("'%1' is not installed");
+        else if (key === "archive.error-cancelled") out = qsTr("Cancelled");
+        else if (key === "archive.error-empty") out = qsTr("Nothing to compress");
+        else if (key === "archive.error-not-archive") out = qsTr("Not an archive");
+        else if (key === "archive.error-not-found") out = qsTr("The file was not found in the archive");
+        else if (key === "share.error-tool-missing") out = qsTr("Neither curl, wget, nor python3 was found to download cloudflared");
+        else if (key === "share.error-download-failed") out = qsTr("Download failed");
+        else if (key === "share.error-no-files") out = qsTr("No files selected");
+        else if (key === "share.error-cloudflared-missing") out = qsTr("cloudflared is not installed");
+        else if (key === "share.error-no-url") out = qsTr("Tunnel did not produce a public URL");
+        else if (key === "share.error-timeout") out = qsTr("Timed out waiting for Cloudflare Tunnel to connect");
+        else if (key === "trash.error-no-usable") out = qsTr("This drive has no usable trash folder");
+        else if (key === "trash.error-already") out = qsTr("Item is already in the trash");
+        else if (key === "trash.error-unsafe") out = qsTr("Unsafe trash directory");
+        else return text;
+        for (var i = 0; i < a.length; ++i) out = out.arg(resolveRustMessage(a[i]));
+        return out;
+    }
+
+    function categoryName(key) {
+        if (key === "folder") return qsTr("Folder");
+        if (key === "image") return qsTr("Image");
+        if (key === "video") return qsTr("Video");
+        if (key === "audio") return qsTr("Audio");
+        if (key === "code") return qsTr("Code");
+        if (key === "archive") return qsTr("Archive");
+        if (key === "document") return qsTr("Document");
+        if (key === "text") return qsTr("Text");
+        if (key === "font") return qsTr("Font");
+        if (key === "application") return qsTr("Application");
+        if (key === "file") return qsTr("File");
+        return key || "";
+    }
+
     // Single click on a selected item's name starts renaming.
     property bool clickToRename: false
     property bool searchContents: false

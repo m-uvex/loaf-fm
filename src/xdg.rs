@@ -80,7 +80,7 @@ pub fn default_places() -> Vec<Place> {
     let home = util::home();
     let mut v = vec![Place {
         id: "home".into(),
-        name: "Home".into(),
+        name: util::msg("place.home"),
         path: home.to_string_lossy().to_string(),
         icon: "house".into(),
         system_icon: "user-home".into(),

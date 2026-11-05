@@ -152,13 +152,13 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         let display = if !label.is_empty() {
             label.to_string()
         } else if mount == "/" {
-            "Root (/)".to_string()
+            util::msg("drive.root")
         } else if mounted {
             Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string())
         } else if !ctx.model.is_empty() {
             format!("{} ({})", ctx.model.trim(), util::format_size(size))
         } else {
-            format!("{} Volume", util::format_size(size))
+            util::msg_args("drive.volume", &[&util::format_size(size)])
         };
         let pct = if total > 0 && mounted { ((used as f64 / total as f64) * 1000.0).round() / 10.0 } else { 0.0 };
         out.push(Drive {

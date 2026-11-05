@@ -289,12 +289,12 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
-                    { value: "thin", label: qsTr("Thin"), shortLabel: "Th" },
-                    { value: "light", label: qsTr("Light"), shortLabel: "Lt" },
-                    { value: "regular", label: qsTr("Regular"), shortLabel: "Reg" },
-                    { value: "bold", label: qsTr("Bold"), shortLabel: "Bd" },
-                    { value: "fill", label: qsTr("Fill"), shortLabel: "Fil" },
-                    { value: "duotone", label: qsTr("Duotone"), shortLabel: "Duo" }
+                    { value: "thin", label: qsTr("Thin"), shortLabel: qsTr("Th") },
+                    { value: "light", label: qsTr("Light"), shortLabel: qsTr("Lt") },
+                    { value: "regular", label: qsTr("Regular"), shortLabel: qsTr("Reg") },
+                    { value: "bold", label: qsTr("Bold"), shortLabel: qsTr("Bd") },
+                    { value: "fill", label: qsTr("Fill"), shortLabel: qsTr("Fil") },
+                    { value: "duotone", label: qsTr("Duotone"), shortLabel: qsTr("Duo") }
                 ]
                 value: theme.phosphorWeight
                 onSelected: function(v) { theme.phosphorWeight = v; }
@@ -317,9 +317,9 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
                 options: [
-                    { value: "auto", label: qsTr("Automatic"), icon: "arrows-clockwise", shortLabel: "Auto" },
-                    { value: "always", label: qsTr("Always"), icon: "arrow-left", shortLabel: "Show" },
-                    { value: "hidden", label: qsTr("Hidden"), icon: "eye-slash", shortLabel: "Hide" }
+                    { value: "auto", label: qsTr("Automatic"), icon: "arrows-clockwise", shortLabel: qsTr("Auto") },
+                    { value: "always", label: qsTr("Always"), icon: "arrow-left", shortLabel: qsTr("Show") },
+                    { value: "hidden", label: qsTr("Hidden"), icon: "eye-slash", shortLabel: qsTr("Hide") }
                 ]
                 value: theme.toolbarOperations
                 onSelected: function(v) { theme.toolbarOperations = v; }
@@ -362,8 +362,8 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                 options: [
-                    { value: "chips", label: qsTr("Breadcrumbs"), icon: "bread", shortLabel: "Chips" },
-                    { value: "text", label: qsTr("Text Only"), icon: "text-t", shortLabel: "Text" }
+                    { value: "chips", label: qsTr("Breadcrumbs"), icon: "bread", shortLabel: qsTr("Chips") },
+                    { value: "text", label: qsTr("Text Only"), icon: "text-t", shortLabel: qsTr("Text") }
                 ]
                 value: theme.pathBarMode
                 onSelected: function(v) { theme.pathBarMode = v; }
@@ -416,9 +416,9 @@ ColumnLayout {
                 LoafSegmented {
                     Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                     options: [
-                        { value: "full", label: qsTr("Full"), shortLabel: "Full" },
-                        { value: "minimal", label: qsTr("Minimal"), shortLabel: "Min" },
-                        { value: "custom", label: qsTr("Custom"), shortLabel: "Edit" }
+                        { value: "full", label: qsTr("Full"), shortLabel: qsTr("Full") },
+                        { value: "minimal", label: qsTr("Minimal"), shortLabel: qsTr("Min") },
+                        { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Edit") }
                     ]
                     value: theme.contextMenuMode
                     onSelected: function(v) {

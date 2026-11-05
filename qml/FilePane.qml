@@ -767,7 +767,7 @@ Item {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: paneEngine.error_text.length > 0 ? paneEngine.error_text
+                    text: paneEngine.error_text.length > 0 ? theme.resolveRustMessage(paneEngine.error_text)
                         : (paneEngine.filter_text.length > 0 ? qsTr("No matching files")
                         : (paneEngine.is_searching_everywhere ? qsTr("No results")
                         : (paneEngine.location_kind === "trash" ? qsTr("Trash is empty")
@@ -1637,7 +1637,7 @@ Item {
                             visible: pane.width >= 560
                             Layout.preferredWidth: 150
                             Layout.minimumWidth: 96
-                            text: row.modified_str
+                            text: theme.resolveRustMessage(row.modified_str)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
@@ -1646,7 +1646,7 @@ Item {
                             visible: pane.width >= 720
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
-                            text: row.category
+                            text: theme.categoryName(row.category)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.outline
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
@@ -1655,7 +1655,7 @@ Item {
                             visible: pane.width >= 640
                             Layout.preferredWidth: 80
                             Layout.minimumWidth: 60
-                            text: row.size_str
+                            text: theme.resolveRustMessage(row.size_str)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight

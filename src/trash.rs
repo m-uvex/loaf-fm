@@ -146,7 +146,7 @@ fn ensure_trash_dirs(root: &Path) -> io::Result<()> {
     if usable_trash(root) {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::PermissionDenied, "unsafe trash directory"))
+        Err(io::Error::new(io::ErrorKind::PermissionDenied, crate::util::msg("trash.error-unsafe")))
     }
 }
 
@@ -197,7 +197,7 @@ fn trash_for(abs: &Path) -> io::Result<(PathBuf, Option<PathBuf>)> {
         Some(t) => Ok((t, Some(top))),
         None => Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "this drive has no usable trash folder",
+            crate::util::msg("trash.error-no-usable"),
         )),
     }
 }
@@ -241,7 +241,7 @@ pub fn trash(path: &Path) -> io::Result<TrashedItem> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
     let (root, topdir) = trash_for(&abs)?;
     if abs.starts_with(&root) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "item is already in the trash"));
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, crate::util::msg("trash.error-already")));
     }
     let shown_path = match &topdir {
         Some(top) => abs.strip_prefix(top).map(|p| p.to_path_buf()).unwrap_or_else(|_| abs.clone()),

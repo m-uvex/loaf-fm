@@ -50,9 +50,9 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
                 options: [
-                    { value: "current", label: qsTr("Current"), icon: "folder", shortLabel: "Current" },
-                    { value: "split", label: qsTr("Split"), icon: "columns", shortLabel: "Split" },
-                    { value: "tab", label: qsTr("New Tab"), icon: "plus-square", shortLabel: "Tab" }
+                    { value: "current", label: qsTr("Current"), icon: "folder", shortLabel: qsTr("Current") },
+                    { value: "split", label: qsTr("Split"), icon: "columns", shortLabel: qsTr("Split") },
+                    { value: "tab", label: qsTr("New Tab"), icon: "plus-square", shortLabel: qsTr("Tab") }
                 ]
                 value: theme.openFolderMode
                 onSelected: function(v) { theme.openFolderMode = v; }

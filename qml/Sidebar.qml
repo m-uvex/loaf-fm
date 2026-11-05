@@ -318,7 +318,7 @@ Rectangle {
                     width: parent.width
                     iconName: entry.modelData.icon
                     systemIcon: entry.modelData.system_icon
-                    label: entry.modelData.name
+                    label: theme.resolveRustMessage(entry.modelData.name)
                     showLabel: rail.expanded
                     selected: rail.activeId === entry.modelData.id
                     dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted)

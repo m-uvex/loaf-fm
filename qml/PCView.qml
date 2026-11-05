@@ -439,9 +439,11 @@ Item {
                             var kind = core.device_type === "laptop" ? qsTr("Laptop") : qsTr("Desktop");
                             if (pcView.totalInternalBytes <= 0)
                                 return kind;
-                            return kind + "  ·  " + qsTr("%1 free of %2")
+                            return qsTr("%1  ·  %2")
+                                .arg(kind)
+                                .arg(qsTr("%1 free of %2")
                                 .arg(pcView.formatBytes(pcView.freeInternalBytes))
-                                .arg(pcView.formatBytes(pcView.totalInternalBytes));
+                                .arg(pcView.formatBytes(pcView.totalInternalBytes)))
                         }
                         color: theme.textMuted
                         font.pixelSize: theme.fs(14)
@@ -629,7 +631,7 @@ Item {
                                             }
                                         }
                                         Text {
-                                            text: modelData.name
+                                            text: theme.resolveRustMessage(modelData.name)
                                             color: theme.textMain
                                             font.pixelSize: theme.fs(13)
                                             font.bold: true
@@ -696,7 +698,7 @@ Item {
                                         }
                                     }
                                     Text {
-                                        text: modelData.name
+                                        text: theme.resolveRustMessage(modelData.name)
                                         color: theme.textMain
                                         font.pixelSize: theme.fs(12)
                                         font.bold: true
@@ -746,7 +748,7 @@ Item {
                                     anchors.centerIn: parent
                                     spacing: 8
                                     LoafIcon { name: modelData.icon || "folder"; size: 16; color: theme.primary }
-                                    Text { text: modelData.name; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
+                                    Text { text: theme.resolveRustMessage(modelData.name); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
                                 }
 
                                 MouseArea {
@@ -786,7 +788,7 @@ Item {
                                         anchors.centerIn: parent
                                         spacing: 8
                                         LoafIcon { name: modelData.icon || "folder"; size: 16; color: theme.primary }
-                                        Text { text: modelData.name; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true; elide: Text.ElideRight }
+                                        Text { text: theme.resolveRustMessage(modelData.name); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true; elide: Text.ElideRight }
                                     }
 
                                     MouseArea {
@@ -856,9 +858,10 @@ Item {
                                             elide: Text.ElideRight
                                         }
                                         Text {
-                                            text: pcView.formatBytes(pcView.usedInternalBytes) + " used of "
-                                                  + pcView.formatBytes(pcView.totalInternalBytes) + "  ·  "
-                                                  + pcView.formatBytes(pcView.freeInternalBytes) + " free"
+                                            text: qsTr("%1 used of %2  ·  %3 free")
+                                                .arg(pcView.formatBytes(pcView.usedInternalBytes))
+                                                .arg(pcView.formatBytes(pcView.totalInternalBytes))
+                                                .arg(pcView.formatBytes(pcView.freeInternalBytes))
                                             color: theme.textMuted
                                             font.pixelSize: theme.fs(12)
                                             Layout.fillWidth: true

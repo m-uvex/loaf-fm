@@ -157,6 +157,17 @@ pub fn format_size(bytes: u64) -> String {
     format!("{:.1} {}", v, UNITS[i])
 }
 
+/// Serializes a translation key for resolution in QML (`theme.resolveRustMessage`).
+pub fn msg(key: &str) -> String {
+    serde_json::json!({ "key": key }).to_string()
+}
+
+/// Serializes a translation key with arguments for resolution in QML.
+pub fn msg_args<T: AsRef<str>>(key: &str, args: &[T]) -> String {
+    let a: Vec<&str> = args.iter().map(|s| s.as_ref()).collect();
+    serde_json::json!({ "key": key, "args": a }).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

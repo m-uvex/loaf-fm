@@ -67,8 +67,8 @@ LoafDialog {
                     ColumnLayout {
                         spacing: 2
                         Text { text: modelData.title; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                        Text { text: modelData.size; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                        Text { text: modelData.date; color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: theme.resolveRustMessage(modelData.size); color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: theme.resolveRustMessage(modelData.date); color: theme.textMuted; font.pixelSize: theme.fs(11) }
                     }
                 }
             }
