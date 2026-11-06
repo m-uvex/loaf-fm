@@ -9,7 +9,7 @@ fn xml_escape(text: &str) -> String {
 }
 
 // Compiles translations/*.ts to .qm with lrelease and embeds them under :/i18n.
-// Returns None only when there is nothing to compile.
+// A missing translations/ directory or failure to compile is a build failure in release mode.
 fn compile_translations() -> Option<PathBuf> {
     let is_release = std::env::var("PROFILE").as_deref() == Ok("release");
     let fail = |step: &str, detail: &str| -> Option<PathBuf> {
@@ -36,21 +36,40 @@ fn compile_translations() -> Option<PathBuf> {
     if catalogues.is_empty() {
         return None;
     }
-    let lrelease = std::env::var("LRELEASE")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "lrelease".to_string());
-    let lrelease_available = std::process::Command::new(&lrelease)
-        .arg("--version")
-        .output()
-        .map(|out| {
-            let text = String::from_utf8_lossy(&out.stdout);
-            text.contains("lrelease") || out.status.success()
-        })
-        .unwrap_or(false);
-    if !lrelease_available {
-        return fail("find lrelease", "executable not found or not runnable");
-    }
+    let check_candidate = |bin: &str| -> bool {
+        std::process::Command::new(bin)
+            .arg("--version")
+            .output()
+            .map(|out| {
+                let text = String::from_utf8_lossy(&out.stdout);
+                text.contains("lrelease") || out.status.success()
+            })
+            .unwrap_or(false)
+    };
+    let lrelease = if let Some(env_lrelease) = std::env::var("LRELEASE").ok().filter(|v| !v.trim().is_empty()) {
+        if !check_candidate(&env_lrelease) {
+            return fail("find lrelease", &format!("LRELEASE='{env_lrelease}' is not runnable"));
+        }
+        env_lrelease
+    } else {
+        const CANDIDATES: &[&str] = &["lrelease", "lrelease-qt6", "lrelease6"];
+        let mut found = None;
+        for &candidate in CANDIDATES {
+            if check_candidate(candidate) {
+                found = Some(candidate.to_string());
+                break;
+            }
+        }
+        match found {
+            Some(binary) => {
+                println!("cargo:warning=translations: using lrelease candidate '{binary}'");
+                binary
+            }
+            None => {
+                return fail("find lrelease", "executable not found or not runnable (tried lrelease, lrelease-qt6, lrelease6)");
+            }
+        }
+    };
     let qm_dir = PathBuf::from(&out_dir).join("i18n");
     if let Err(error) = std::fs::create_dir_all(&qm_dir) {
         return fail("create i18n output directory", &error.to_string());
