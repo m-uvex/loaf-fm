@@ -15,8 +15,9 @@ Item {
 
     signal selected(string value)
 
+    readonly property var optionList: Array.isArray(root.options) ? root.options : []
     readonly property var current: {
-        var list = Array.isArray(root.options) ? root.options : [];
+        var list = optionList;
         for (var i = 0; i < list.length; i++) {
             if (list[i] && list[i].value === root.value)
                 return list[i];
@@ -38,16 +39,15 @@ Item {
     Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
 
     function openMenu() {
-        var list = Array.isArray(root.options) ? root.options : [];
         var p = root.mapToItem(null, 0, root.height + 6);
         menu.menuMinWidth = root.width;
-        menu.model = list.map(function (o) {
+        menu.model = optionList.map(function (o) {
             return {
-                "text": o ? (o.label || "") : "",
-                "iconUrl": o ? (o.iconUrl || "") : "",
+                "text": o.label || "",
+                "iconUrl": o.iconUrl || "",
                 "checkable": true,
-                "checked": o ? o.value === root.value : false,
-                "action": function () { if (o) root.selected(o.value); }
+                "checked": o.value === root.value,
+                "action": function () { root.selected(o.value); }
             };
         });
         menu.openAt(p.x, p.y);

@@ -6,15 +6,9 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }:
+  outputs = { self, nixpkgs, flake-utils }:
     let
-      packageBuilder =
-        system:
+      packageBuilder = system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           qtEnv = pkgs.qt6.env "qt6-env" [
@@ -23,8 +17,7 @@
             pkgs.qt6.qtsvg
             pkgs.qt6.qtwayland
           ];
-        in
-        pkgs.rustPlatform.buildRustPackage {
+        in pkgs.rustPlatform.buildRustPackage {
           pname = "loaf";
           version = "0.2.0";
           src = ./.;
@@ -54,10 +47,7 @@
           '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
-            qtEnv
-            pkgs.libGL
-          ]}";
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}";
           XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share";
           postInstall = ''
             install -Dm644 packaging/assets/loaf.desktop $out/share/applications/loaf.desktop
@@ -70,8 +60,7 @@
           '';
         };
     in
-    (flake-utils.lib.eachDefaultSystem (
-      system:
+    (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         qtEnv = pkgs.qt6.env "qt6-env" [
@@ -80,8 +69,7 @@
           pkgs.qt6.qtsvg
           pkgs.qt6.qtwayland
         ];
-      in
-      {
+      in {
         packages.default = packageBuilder system;
 
         apps.default = {
@@ -120,23 +108,12 @@
           '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
-          LD_LIBRARY_PATH = "${
-            pkgs.lib.makeLibraryPath [
-              qtEnv
-              pkgs.libGL
-            ]
-          }:$LD_LIBRARY_PATH";
-          LIBRARY_PATH = "${
-            pkgs.lib.makeLibraryPath [
-              qtEnv
-              pkgs.libGL
-            ]
-          }:$LIBRARY_PATH";
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LD_LIBRARY_PATH";
+          LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LIBRARY_PATH";
           XDG_DATA_DIRS = "${pkgs.shared-mime-info}/share:$XDG_DATA_DIRS";
         };
-      }
-    ))
-    // {
+      })
+    ) // {
       overlays.default = final: prev: {
         loaf = packageBuilder final.system;
       };

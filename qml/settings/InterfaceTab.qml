@@ -20,15 +20,15 @@ ColumnLayout {
         return true;
     }
 
-    readonly property bool matchTheme: matches("theme appearance light dark auto mode color scheme")
-    readonly property bool matchOpacity: matches("background opacity panel backing transparency translucent translucency frosted blur appearance")
-    readonly property bool matchPalette: matches("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing")
-    readonly property bool matchIconStyle: matches("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze")
-    readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
-    readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
-    readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
-    readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
-    readonly property bool matchLanguage: matches("language locale translation bahasa indonesia")
+    readonly property bool matchTheme: matches(qsTr("theme appearance light dark auto mode color scheme"))
+    readonly property bool matchOpacity: matches(qsTr("background opacity panel backing transparency translucent translucency frosted blur appearance"))
+    readonly property bool matchPalette: matches(qsTr("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing"))
+    readonly property bool matchIconStyle: matches(qsTr("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze"))
+    readonly property bool matchIconWeight: matches(qsTr("phosphor weight variant thin light regular bold fill duotone stroke thickness"))
+    readonly property bool matchTopBar: matches(qsTr("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb"))
+    readonly property bool matchThisPc: matches(qsTr("this pc computer hostname name label device system"))
+    readonly property bool matchMenus: matches(qsTr("menus context menu right click sidebar customize places navigation layout minimal"))
+    readonly property bool matchLanguage: matches(qsTr("language locale translation bahasa indonesia"))
 
     readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
         + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
@@ -36,13 +36,12 @@ ColumnLayout {
 
     readonly property var languageOptions: [{ value: "", label: qsTr("System default") }].concat(JSON.parse(core.available_languages() || "[]"))
 
-
     Layout.fillWidth: true
     spacing: 16
 
     // Category 1: Appearance
     SettingCard {
-        visible: root.matchTheme || root.matchOpacity || root.matchLanguage
+        visible: root.matchTheme || root.matchOpacity
         title: qsTr("Appearance")
         subtitle: qsTr("Window colors and translucency")
         icon: "palette"
@@ -113,10 +112,17 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchLanguage }
+    }
+
+    // Category: Language
+    SettingCard {
+        visible: root.matchLanguage
+        title: qsTr("Language")
+        subtitle: core.language_overridden_by_env() ? qsTr("Set by the LOAF_LANG environment variable") : qsTr("Applies immediately")
+        icon: "translate"
 
         SettingRow {
-            visible: root.matchLanguage
+            visible: true
             icon: "translate"
             title: qsTr("Language")
             subtitle: core.language_overridden_by_env() ? qsTr("Set by the LOAF_LANG environment variable") : qsTr("Applies immediately")
