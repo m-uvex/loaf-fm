@@ -2055,6 +2055,7 @@ impl qobject::LoafCore {
         self.spawn_op("restore", util::msg_args("op.restoring-many", &[&paths.len().to_string()]), move |op| {
             let records = trash::list();
             let mut moved = Vec::new();
+            let mut renamed = 0;
             let mut errors = Vec::new();
             for p in &paths {
                 if op.cancelled() {
@@ -2066,6 +2067,9 @@ impl qobject::LoafCore {
                 };
                 match trash::restore(item) {
                     Ok(to) => {
+                        if to != item.original {
+                            renamed += 1;
+                        }
                         moved.push((item.trashed.clone(), to));
                     }
                     Err(e) => errors.push(util::msg_args("outcome.restore-item-failed", &[&file_name(p), &e.to_string()])),
@@ -2074,13 +2078,13 @@ impl qobject::LoafCore {
             let n = moved.len();
             if !errors.is_empty() {
                 let list = util::msg_list(&errors);
+                if renamed > 0 {
+                    return Outcome::err(util::msg_args("outcome.restore-failed-renamed", &[&n.to_string(), &renamed.to_string(), &list]));
+                }
                 return Outcome::err(util::msg_args("outcome.restore-failed", &[&n.to_string(), &list]));
             }
-            let msg = if n == 1 {
-                util::msg_args("outcome.restored-one", &[&file_name(&moved[0].0)])
-            } else {
-                util::msg_args("outcome.restored-many", &[&n.to_string()])
-            };
+            let single_name = (n == 1).then(|| file_name(&moved[0].0));
+            let msg = restore_success_message(n, renamed, single_name.as_deref());
             Outcome::ok(msg)
         });
     }
@@ -2616,6 +2620,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
     op.total.store(bytes.max(1), Ordering::Relaxed);
     let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
+    let mut skipped = 0;
     for src in &sources {
         if op.cancelled() {
             break;
@@ -2626,7 +2631,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             continue;
         }
         if fsops::is_inside(&dest, src) && mode != "link" {
-            errors.push(format!("Can't put “{}” inside itself", name));
+            errors.push(util::msg_args("outcome.inside-itself", &[&name]));
             continue;
         }
         let plain = dest.join(&name);
@@ -2634,10 +2639,12 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         let (target, overwrite) = if same_dir || (exists && res == "rename") {
             (fsops::unique_name(&dest, &name), false)
         } else if exists && res == "skip" {
+            skipped += 1;
             continue;
         } else if exists && res == "overwrite" {
             (plain, true)
         } else if exists {
+            skipped += 1;
             continue;
         } else {
             (plain, false)
@@ -2673,19 +2680,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         _ => "Copied",
     };
     let mut o = if errors.is_empty() {
-        if n == 0 {
-            Outcome::ok("")
-        } else {
-            let key = match (mode, n) {
-                ("move", 1) => "outcome.moved-one",
-                ("move", _) => "outcome.moved-many",
-                ("link", 1) => "outcome.linked-one",
-                ("link", _) => "outcome.linked-many",
-                (_, 1) => "outcome.copied-one",
-                (_, _) => "outcome.copied-many",
-            };
-            Outcome::ok(util::msg_args(key, &[&n.to_string()]))
-        }
+        Outcome::ok(transfer_success_message(mode, verb, n, skipped))
     } else {
         let list = util::msg_list(&errors);
         Outcome::err(util::msg_args("outcome.transfer-failed", &[verb, &n.to_string(), &errors.len().to_string(), &list]))
@@ -2963,6 +2958,37 @@ impl cxx_qt::Initialize for qobject::LoafCore {
     }
 }
 
+fn restore_success_message(n: usize, renamed: usize, single_name: Option<&str>) -> String {
+    if renamed > 0 {
+        util::msg_args("outcome.restored-renamed", &[&n.to_string(), &renamed.to_string()])
+    } else if n == 1 {
+        util::msg_args("outcome.restored-one", &[single_name.unwrap_or_default()])
+    } else {
+        util::msg_args("outcome.restored-many", &[&n.to_string()])
+    }
+}
+
+fn transfer_success_message(mode: &str, verb: &str, n: usize, skipped: usize) -> String {
+    if n == 0 && skipped > 0 {
+        return util::msg_args("outcome.skipped-only", &[&skipped.to_string()]);
+    }
+    if n == 0 {
+        return String::new();
+    }
+    if skipped > 0 {
+        return util::msg_args("outcome.transferred-skipped", &[verb, &n.to_string(), &skipped.to_string()]);
+    }
+    let key = match (mode, n) {
+        ("move", 1) => "outcome.moved-one",
+        ("move", _) => "outcome.moved-many",
+        ("link", 1) => "outcome.linked-one",
+        ("link", _) => "outcome.linked-many",
+        (_, 1) => "outcome.copied-one",
+        (_, _) => "outcome.copied-many",
+    };
+    util::msg_args(key, &[&n.to_string()])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2973,6 +2999,18 @@ mod tests {
         assert_eq!(paths, vec![PathBuf::from("/tmp/local.txt")]);
     }
 
+    #[test]
+    fn restore_and_transfer_messages_report_counters() {
+        let key = |text: &str| serde_json::from_str::<serde_json::Value>(text).unwrap()["key"].as_str().unwrap().to_string();
+        assert_eq!(key(&restore_success_message(3, 1, None)), "outcome.restored-renamed");
+        assert_eq!(key(&restore_success_message(1, 0, Some("a.txt"))), "outcome.restored-one");
+        assert_eq!(key(&transfer_success_message("move", "Moved", 2, 1)), "outcome.transferred-skipped");
+        assert_eq!(key(&transfer_success_message("move", "Moved", 0, 2)), "outcome.skipped-only");
+        assert_eq!(key(&transfer_success_message("move", "Moved", 2, 0)), "outcome.moved-many");
+        let failed = util::msg_args("outcome.restore-failed-renamed", &["3", "1", &util::msg_list(&[util::msg_args("outcome.item-failed", &["a.txt", "denied"])])]);
+        let parsed: serde_json::Value = serde_json::from_str(&failed).unwrap();
+        assert_eq!(parsed["key"], "outcome.restore-failed-renamed");
+    }
     #[test]
     fn network_bookmark_places() {
         // Non-file bookmarks (e.g. remote URIs) become "network" entries.

@@ -265,6 +265,11 @@ Item {
         else if (key === "op.unlocking") out = qsTr("Unlocking %1");
         else if (key === "op.locking") out = qsTr("Locking %1");
         else if (key === "op.renaming-drive") out = qsTr("Renaming %1");
+        else if (key === "outcome.restored-renamed") out = qsTr("Restored %1 items (%2 renamed because the name was taken)");
+        else if (key === "outcome.restore-failed-renamed") out = qsTr("Restored %1 items (%2 renamed because the name was taken). Failed: %3");
+        else if (key === "outcome.transferred-skipped") out = qsTr("%1 %2 items, %3 skipped");
+        else if (key === "outcome.skipped-only") out = qsTr("%1 skipped");
+        else if (key === "outcome.inside-itself") out = qsTr("Can't put “%1” inside itself");
         else return text;
         for (var i = 0; i < a.length; ++i) out = out.arg(resolveRustMessage(a[i]));
         return out;
