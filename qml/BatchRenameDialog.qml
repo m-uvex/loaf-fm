@@ -6,7 +6,7 @@ import app.loaf
 // Rename several items at once: find & replace, numbered pattern, or case.
 LoafDialog {
     id: dlg
-    title: theme.plural(items.length, qsTr("Rename 1 item"), qsTr("Rename %1 items"))
+    title: qsTr("Rename %n item(s)", "", items.length)
     dialogWidth: Math.min(window.width - 80, 620)
 
     // [{ path, name, is_dir }]

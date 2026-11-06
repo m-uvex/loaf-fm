@@ -406,7 +406,7 @@ Item {
                 Text {
                     id: selLabel
                     anchors.centerIn: parent
-                    text: theme.plural(pane.selectedCount, qsTr("1 selected"), qsTr("%1 selected"))
+                    text: qsTr("%n selected", "", pane.selectedCount)
                     color: theme.primaryContainerFg
                     font.pixelSize: theme.fs(11)
                     font.bold: true
@@ -429,8 +429,8 @@ Item {
                     id: countLabel
                     anchors.centerIn: parent
                     text: paneEngine.is_searching_everywhere
-                        ? theme.plural(paneEngine.item_count, qsTr("1 result"), qsTr("%1 results"))
-                        : theme.plural(paneEngine.item_count, qsTr("1 item"), qsTr("%1 items"))
+                        ? qsTr("%n result(s)", "", paneEngine.item_count)
+                        : qsTr("%n item(s)", "", paneEngine.item_count)
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
                     font.bold: true

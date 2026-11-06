@@ -78,7 +78,7 @@ Item {
             }
         }
         Text {
-            text: panel.ops.length === 1 ? theme.resolveRustMessage(panel.ops[0].title) : theme.plural(panel.ops.length, qsTr("1 operation"), qsTr("%1 operations"))
+            text: panel.ops.length === 1 ? theme.resolveRustMessage(panel.ops[0].title) : qsTr("%n operation(s)", "", panel.ops.length)
             color: theme.textMain
             font.pixelSize: theme.fs(12)
             font.bold: true

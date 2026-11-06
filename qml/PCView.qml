@@ -514,9 +514,9 @@ Item {
                                : (sectionDelegate.secKey === "internal" ? qsTr("Internal Storage")
                                : (sectionDelegate.secKey === "external" ? qsTr("External Storage") : qsTr("Network Shares"))))
                         subtitle: sectionDelegate.secKey === "external"
-                                  ? theme.plural(pcView.externalDrives.length, qsTr("1 drive connected"), qsTr("%1 drives connected"))
+                                  ? qsTr("%n drive(s) connected", "", pcView.externalDrives.length)
                                   : (sectionDelegate.secKey === "network"
-                                     ? theme.plural(pcView.discoveredServers.length, qsTr("1 server found"), qsTr("%1 servers found"))
+                                     ? qsTr("%n server(s) found", "", pcView.discoveredServers.length)
                                      : "")
                         LoafButton {
                             visible: sectionDelegate.secKey === "network" && !pcView.customizing

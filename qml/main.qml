@@ -323,11 +323,11 @@ ApplicationWindow {
             var selected = {};
             if (cut) paths.forEach(function(path) { selected[path] = true; });
             cutSet = selected;
-            toast("info", theme.plural(paths.length, qsTr("1 phone item copied to Loaf's clipboard"), qsTr("%1 phone items copied to Loaf's clipboard")))
+            toast("info", qsTr("%n phone item(s) copied to Loaf's clipboard", "", paths.length))
             return;
         }
         nativeBridge.setClipboardFiles(paths, cut);
-        toast("info", cut ? theme.plural(paths.length, qsTr("1 item cut"), qsTr("%1 items cut")) : theme.plural(paths.length, qsTr("1 item copied"), qsTr("%1 items copied")));
+        toast("info", cut ? qsTr("%n item(s) cut", "", paths.length) : qsTr("%n item(s) copied", "", paths.length));
     }
 
     function copyPathOfSelection() {
@@ -401,7 +401,7 @@ ApplicationWindow {
         var pane = activePane;
         confirmDialog.ask(
             paths.length === 1 ? qsTr("Permanently delete “%1”?").arg(paths[0].split("/").pop())
-                               : theme.plural(paths.length, qsTr("Permanently delete 1 item?"), qsTr("Permanently delete %1 items?")),
+                               : qsTr("Permanently delete %n item(s)?", "", paths.length),
             qsTr("Deleted items can't be restored."),
             qsTr("Delete"),
             function() { core.delete_items(JSON.stringify(paths)); pane.clearSelection(); });
@@ -934,7 +934,7 @@ ApplicationWindow {
             if (kind === "trash" && r && r.failed && r.failed.length > 0) {
                 var failed = r.failed;
                 confirmDialog.ask(qsTr("Can't move to the trash"),
-                    theme.plural(failed.length, qsTr("1 item can't be put in the trash on this drive. Delete it permanently instead?"), qsTr("%1 items can't be put in the trash on this drive. Delete them permanently instead?")),
+                    qsTr("%n item(s) can't be put in the trash on this drive. Delete it permanently instead?", "", failed.length),
                     qsTr("Delete Permanently"),
                     function() { core.delete_items(JSON.stringify(failed)); });
             }
@@ -2158,7 +2158,7 @@ ApplicationWindow {
             LoafIcon { anchors.verticalCenter: parent.verticalCenter; name: dragManager.paths.length > 1 ? "files" : "file"; size: 22; color: theme.primary }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: dragManager.paths.length > 1 ? theme.plural(dragManager.paths.length, qsTr("1 file"), qsTr("%1 files"))
+                text: dragManager.paths.length > 1 ? qsTr("%n file(s)", "", dragManager.paths.length)
                     : (dragManager.paths.length === 1 ? dragManager.paths[0].split("/").pop() : "")
                 color: theme.textMain
                 font.pixelSize: theme.fs(12)
@@ -2402,7 +2402,7 @@ ApplicationWindow {
             if (single)
                 m.push({ text: qsTr("Rename…"), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { pane.startRename(); } });
             else
-                m.push({ text: theme.plural(paths.length, qsTr("Rename 1 item…"), qsTr("Rename %1 items…")), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
+                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
             if (kind === "dir") {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });

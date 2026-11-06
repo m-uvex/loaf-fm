@@ -316,7 +316,7 @@ ColumnLayout {
             text: root.contributorsLoading
                 ? qsTr("Loading contributors…")
                 : (root.contributors.length > 0
-                    ? theme.plural(root.contributors.length, qsTr("1 contributor"), qsTr("%1 contributors"))
+                    ? qsTr("%n contributor(s)", "", root.contributors.length)
                     : (root.contributorsError.length > 0 ? root.contributorsError : qsTr("No contributors listed yet.")))
             color: theme.textMuted
             font.pixelSize: theme.fs(12)

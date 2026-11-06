@@ -21,7 +21,7 @@ LoafDialog {
     readonly property bool multiple: paths.length > 1
     readonly property string sizeKey: "props:" + paths.join("\n")
 
-    title: multiple ? theme.plural(paths.length, qsTr("1 item"), qsTr("%1 items")) : (info.name || qsTr("Properties"))
+    title: multiple ? qsTr("%n item(s)", "", paths.length) : (info.name || qsTr("Properties"))
 
     function showFor(list) {
         paths = list;
@@ -89,7 +89,7 @@ LoafDialog {
         Val { text: dlg.sizeText.length > 0 ? dlg.sizeText : (dlg.info.size_str || "-") }
 
         Key { text: qsTr("Contents"); visible: !dlg.multiple && dlg.info.is_dir === true }
-        Val { text: theme.plural(dlg.info.items || 0, qsTr("1 item"), qsTr("%1 items")); visible: !dlg.multiple && dlg.info.is_dir === true }
+        Val { text: qsTr("%n item(s)", "", dlg.info.items || 0); visible: !dlg.multiple && dlg.info.is_dir === true }
 
         Key { text: qsTr("Location"); visible: !dlg.multiple }
         Val { text: dlg.info.parent || "-"; visible: !dlg.multiple }

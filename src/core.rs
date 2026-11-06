@@ -1926,19 +1926,12 @@ impl qobject::LoafCore {
         if sources.is_empty() || !dest.is_dir() {
             return;
         }
-        let key = match (mode.as_str(), sources.len()) {
-            ("move", 1) => "op.moving-one",
-            ("move", _) => "op.moving-many",
-            ("link", 1) => "op.linking-one",
-            ("link", _) => "op.linking-many",
-            (_, 1) => "op.copying-one",
-            (_, _) => "op.copying-many",
+        let key = match mode.as_str() {
+            "move" => "op.moving",
+            "link" => "op.linking",
+            _ => "op.copying",
         };
-        let title = if sources.len() == 1 {
-            util::msg_args(key, &[util::MessageArg::Text(file_name(&sources[0])), util::MessageArg::Text(file_name(&dest))])
-        } else {
-            util::msg_args(key, &[util::MessageArg::Text(sources.len().to_string()), util::MessageArg::Text(file_name(&dest))])
-        };
+        let title = util::msg_args(key, &[util::MessageArg::Text(sources.len().to_string()), util::MessageArg::Text(file_name(&dest))]);
         let kind = mode.clone();
         self.spawn_op(&kind, title, move |op| run_transfer(op, sources, dest, &mode, &res));
     }
@@ -1953,11 +1946,7 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let title = if paths.len() == 1 {
-            util::msg_args("op.trashing-one", &[util::MessageArg::Text(file_name(&paths[0]))])
-        } else {
-            util::msg_args("op.trashing-many", &[util::MessageArg::Text(paths.len().to_string())])
-        };
+        let title = util::msg_args("op.trashing", &[util::MessageArg::Text(paths.len().to_string())]);
         self.spawn_op("trash", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut done = Vec::new();
@@ -1979,10 +1968,8 @@ impl qobject::LoafCore {
             let n = done.len();
             let mut o = Outcome::ok(if n == 0 {
                 String::new()
-            } else if n == 1 {
-                util::msg_args("outcome.trashed-one", &[util::MessageArg::Text(file_name(&done[0].original))])
             } else {
-                util::msg_args("outcome.trashed-many", &[util::MessageArg::Text(n.to_string())])
+                util::msg_args("outcome.trashed", &[util::MessageArg::Text(n.to_string())])
             });
             if n > 0 {
                 o.undo = Some(UndoEntry { label: "Move to Trash".into(), action: UndoAction::Trash(done) });
@@ -2013,11 +2000,7 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let title = if paths.len() == 1 {
-            util::msg_args("op.deleting-one", &[util::MessageArg::Text(file_name(&paths[0]))])
-        } else {
-            util::msg_args("op.deleting-many", &[util::MessageArg::Text(paths.len().to_string())])
-        };
+        let title = util::msg_args("op.deleting", &[util::MessageArg::Text(paths.len().to_string())]);
         self.spawn_op("delete", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut errors = 0;
@@ -2039,10 +2022,8 @@ impl qobject::LoafCore {
             }
             if errors > 0 {
                 Outcome::err(util::msg_args("outcome.delete-err", &[util::MessageArg::Text(errors.to_string()), util::MessageArg::Message(last.clone())]))
-            } else if paths.len() == 1 {
-                Outcome::ok(util::msg_args("outcome.deleted-one", &[util::MessageArg::Text(file_name(&paths[0]))]))
             } else {
-                Outcome::ok(util::msg_args("outcome.deleted-many", &[util::MessageArg::Text(paths.len().to_string())]))
+                Outcome::ok(util::msg_args("outcome.deleted", &[util::MessageArg::Text(paths.len().to_string())]))
             }
         });
     }
@@ -2052,7 +2033,7 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        self.spawn_op("restore", util::msg_args("op.restoring-many", &[util::MessageArg::Text(paths.len().to_string())]), move |op| {
+        self.spawn_op("restore", util::msg_args("op.restoring", &[util::MessageArg::Text(paths.len().to_string())]), move |op| {
             let records = trash::list();
             let mut moved = Vec::new();
             let mut renamed = 0;
@@ -2353,7 +2334,7 @@ impl qobject::LoafCore {
                 if !pairs.is_empty() {
                     let n = pairs.len();
                     self.as_mut().record_undo(UndoEntry { label: "Rename".into(), action: UndoAction::Rename(pairs) });
-                    self.as_mut().notify(q("undo"), q(&util::msg_args(if n == 1 { "notify.renamed-one" } else { "notify.renamed-many" }, &[util::MessageArg::Text(n.to_string())])));
+                    self.as_mut().notify(q("undo"), q(&util::msg_args("notify.renamed", &[util::MessageArg::Text(n.to_string())])));
                 }
                 QString::default()
             }
@@ -2959,12 +2940,11 @@ impl cxx_qt::Initialize for qobject::LoafCore {
 }
 
 fn restore_success_message(n: usize, renamed: usize, single_name: Option<&str>) -> String {
+    let _ = single_name;
     if renamed > 0 {
         util::msg_args("outcome.restored-renamed", &[util::MessageArg::Text(n.to_string()), util::MessageArg::Text(renamed.to_string())])
-    } else if n == 1 {
-        util::msg_args("outcome.restored-one", &[util::MessageArg::Text(single_name.unwrap_or_default().to_string())])
     } else {
-        util::msg_args("outcome.restored-many", &[util::MessageArg::Text(n.to_string())])
+        util::msg_args("outcome.restored", &[util::MessageArg::Text(n.to_string())])
     }
 }
 
@@ -2978,13 +2958,10 @@ fn transfer_success_message(mode: &str, verb: &str, n: usize, skipped: usize) ->
     if skipped > 0 {
         return util::msg_args("outcome.transferred-skipped", &[util::MessageArg::Text(verb.to_string()), util::MessageArg::Text(n.to_string()), util::MessageArg::Text(skipped.to_string())]);
     }
-    let key = match (mode, n) {
-        ("move", 1) => "outcome.moved-one",
-        ("move", _) => "outcome.moved-many",
-        ("link", 1) => "outcome.linked-one",
-        ("link", _) => "outcome.linked-many",
-        (_, 1) => "outcome.copied-one",
-        (_, _) => "outcome.copied-many",
+    let key = match mode {
+        "move" => "outcome.moved",
+        "link" => "outcome.linked",
+        _ => "outcome.copied",
     };
     util::msg_args(key, &[util::MessageArg::Text(n.to_string())])
 }
@@ -3003,10 +2980,10 @@ mod tests {
     fn restore_and_transfer_messages_report_counters() {
         let key = |text: &str| serde_json::from_str::<serde_json::Value>(text).unwrap()["key"].as_str().unwrap().to_string();
         assert_eq!(key(&restore_success_message(3, 1, None)), "outcome.restored-renamed");
-        assert_eq!(key(&restore_success_message(1, 0, Some("a.txt"))), "outcome.restored-one");
+        assert_eq!(key(&restore_success_message(1, 0, Some("a.txt"))), "outcome.restored");
         assert_eq!(key(&transfer_success_message("move", "Moved", 2, 1)), "outcome.transferred-skipped");
         assert_eq!(key(&transfer_success_message("move", "Moved", 0, 2)), "outcome.skipped-only");
-        assert_eq!(key(&transfer_success_message("move", "Moved", 2, 0)), "outcome.moved-many");
+        assert_eq!(key(&transfer_success_message("move", "Moved", 2, 0)), "outcome.moved");
         let failed = util::msg_args("outcome.restore-failed-renamed", &[util::MessageArg::Text("3".to_string()), util::MessageArg::Text("1".to_string()), util::MessageArg::Message(util::msg_list(&[util::msg_args("outcome.item-failed", &[util::MessageArg::Text("a.txt".to_string()), util::MessageArg::Text("denied".to_string())])]))]);
         let parsed: serde_json::Value = serde_json::from_str(&failed).unwrap();
         assert_eq!(parsed["key"], "outcome.restore-failed-renamed");

@@ -111,16 +111,11 @@ Item {
         return Math.round(px * fontScale);
     }
 
-    // English singular/plural without a translation catalogue loaded:
-    // plural(n, qsTr("1 item"), qsTr("%1 items")).
     // "100,000" (grouped the way the user's locale writes numbers).
     function number(n) {
         return Number(n).toLocaleString(Qt.locale(), "f", 0);
     }
 
-    function plural(n, one, many) {
-        return n === 1 ? one : many.arg(number(n));
-    }
     function relativeTime(timestampSeconds) {
         var ts = Number(timestampSeconds) || 0;
         if (ts <= 0) return "-";
@@ -151,12 +146,11 @@ Item {
         var out;
         if (key === "info.no-preview") out = qsTr("No preview available");
         else if (key === "info.missing") out = qsTr("This item no longer exists");
-        else if (key === "info.folder-items") out = plural(Number(a[0]) || 0, qsTr("Folder · 1 item"), qsTr("Folder · %1 items"));
+        else if (key === "info.folder-items") out = qsTr("Folder · %n item(s)", "", Number(a[0]) || 0);
         else if (key === "info.archive-files") out = qsTr("Archive · %1 files").arg(number(Number(a[0]) || 0));
         else if (key === "info.encrypted-archive") out = qsTr("Encrypted archive");
         else if (key === "info.press-enter") out = qsTr("Press Enter to open it");
         else if (key === "info.binary-file") out = qsTr("Binary file · no text preview");
-        else if (key === "item.one" || key === "item.many") out = plural(Number(a[0]) || 0, qsTr("1 item"), qsTr("%1 items"));
         else if (key === "drive.root") out = qsTr("Root (/)");
         else if (key === "drive.volume") out = qsTr("%1 Volume").arg(a[0] || "");
         else if (key === "name.empty") out = qsTr("The name can't be empty");
@@ -184,8 +178,7 @@ Item {
         else if (key === "notify.mtp-no-trash") out = qsTr("Phone files have no trash. Use Delete Permanently.");
         else if (key === "notify.already-exists") out = qsTr("“%1” already exists");
         else if (key === "notify.create-error") out = qsTr("Could not create “%1”: %2");
-        else if (key === "notify.renamed-one") out = qsTr("Renamed 1 item");
-        else if (key === "notify.renamed-many") out = qsTr("Renamed %1 items");
+        else if (key === "notify.renamed") out = qsTr("%n item(s) renamed", "", Number(a[0]) || 0);
         else if (key === "notify.cloudflared-installed") out = qsTr("Cloudflare Tunnel agent installed successfully");
         else if (key === "notify.cloudflared-install-failed") out = qsTr("Failed to install cloudflared: %1");
         else if (key === "op.smb-disconnecting") out = qsTr("Disconnecting from %1");
@@ -194,18 +187,13 @@ Item {
         else if (key === "op.opening-member") out = qsTr("Opening %1");
         else if (key === "op.mtp-previewing") out = qsTr("Downloading phone preview");
         else if (key === "op.mtp-transferring") out = qsTr("Transferring phone files");
-        else if (key === "op.moving-one") out = qsTr("Moving “%1” to %2");
-        else if (key === "op.moving-many") out = qsTr("Moving %1 items to %2");
-        else if (key === "op.copying-one") out = qsTr("Copying “%1” to %2");
-        else if (key === "op.copying-many") out = qsTr("Copying %1 items to %2");
-        else if (key === "op.linking-one") out = qsTr("Linking “%1” to %2");
-        else if (key === "op.linking-many") out = qsTr("Linking %1 items to %2");
-        else if (key === "op.trashing-one") out = qsTr("Moving “%1” to the trash");
-        else if (key === "op.trashing-many") out = qsTr("Moving %1 items to the trash");
+        else if (key === "op.moving") out = qsTr("Moving %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.copying") out = qsTr("Copying %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.linking") out = qsTr("Linking %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.trashing") out = qsTr("Moving %n item(s) to the trash", "", Number(a[0]) || 0);
         else if (key === "op.deleting-phone") out = qsTr("Deleting phone files");
-        else if (key === "op.deleting-one") out = qsTr("Deleting “%1”");
-        else if (key === "op.deleting-many") out = qsTr("Deleting %1 items");
-        else if (key === "op.restoring-many") out = qsTr("Restoring %1 items");
+        else if (key === "op.deleting") out = qsTr("Deleting %n item(s)", "", Number(a[0]) || 0);
+        else if (key === "op.restoring") out = qsTr("Restoring %n item(s)", "", Number(a[0]) || 0);
         else if (key === "op.emptying-trash") out = qsTr("Emptying the trash");
         else if (key === "op.compressing") out = qsTr("Compressing into “%1”");
         else if (key === "op.extracting") out = qsTr("Extracting “%1”");
@@ -214,14 +202,11 @@ Item {
         else if (key === "outcome.smb-connected") out = qsTr("Connected to %1");
         else if (key === "outcome.mtp-opened") out = qsTr("Opened a downloaded copy. Copy changes back to update the phone.");
         else if (key === "outcome.mtp-transfer-complete") out = qsTr("Phone transfer complete");
-        else if (key === "outcome.trashed-one") out = qsTr("“%1” moved to the trash");
-        else if (key === "outcome.trashed-many") out = qsTr("%1 items moved to the trash");
+        else if (key === "outcome.trashed") out = qsTr("%n item(s) moved to the trash", "", Number(a[0]) || 0);
         else if (key === "outcome.mtp-deleted") out = qsTr("Phone files deleted");
-        else if (key === "outcome.deleted-one") out = qsTr("Deleted “%1”");
-        else if (key === "outcome.deleted-many") out = qsTr("Deleted %1 items");
+        else if (key === "outcome.deleted") out = qsTr("Deleted %n item(s)", "", Number(a[0]) || 0);
         else if (key === "outcome.delete-err") out = qsTr("Could not delete %1 items: %2");
-        else if (key === "outcome.restored-one") out = qsTr("“%1” restored");
-        else if (key === "outcome.restored-many") out = qsTr("%1 items restored");
+        else if (key === "outcome.restored") out = qsTr("%n item(s) restored", "", Number(a[0]) || 0);
         else if (key === "outcome.trash-emptied") out = qsTr("Trash emptied");
         else if (key === "outcome.trash-partial-err") out = qsTr("Some items could not be deleted: %1");
         else if (key === "outcome.created-archive") out = qsTr("Created “%1”");
@@ -231,12 +216,9 @@ Item {
         else if (key === "outcome.extract-err") out = qsTr("Could not extract “%1”: %2");
         else if (key === "outcome.mtp-created") out = qsTr("Created on phone");
         else if (key === "outcome.mtp-renamed") out = qsTr("Renamed on phone");
-        else if (key === "outcome.moved-one") out = qsTr("Moved 1 item");
-        else if (key === "outcome.moved-many") out = qsTr("Moved %1 items");
-        else if (key === "outcome.copied-one") out = qsTr("Copied 1 item");
-        else if (key === "outcome.copied-many") out = qsTr("Copied %1 items");
-        else if (key === "outcome.linked-one") out = qsTr("Linked 1 item");
-        else if (key === "outcome.linked-many") out = qsTr("Linked %1 items");
+        else if (key === "outcome.moved") out = qsTr("%n item(s) moved", "", Number(a[0]) || 0);
+        else if (key === "outcome.copied") out = qsTr("%n item(s) copied", "", Number(a[0]) || 0);
+        else if (key === "outcome.linked") out = qsTr("%n item(s) linked", "", Number(a[0]) || 0);
         else if (key === "outcome.transfer-failed") out = qsTr("%1 %2 items; %3 failed: %4");
         else if (key === "pane.error-permission") out = qsTr("You don't have permission to view this folder");
         else if (key === "pane.error-notfound") out = qsTr("This folder no longer exists");
