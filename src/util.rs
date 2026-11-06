@@ -136,9 +136,8 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
         SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::write(&tmp, data)?;
-    std::fs::rename(&tmp, path).map_err(|e| {
+    std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
-        e
     })
 }
 
