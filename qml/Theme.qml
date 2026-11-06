@@ -121,6 +121,18 @@ Item {
     function plural(n, one, many) {
         return n === 1 ? one : many.arg(number(n));
     }
+    function relativeTime(timestampSeconds) {
+        var ts = Number(timestampSeconds) || 0;
+        if (ts <= 0) return "-";
+        var elapsed = Math.floor(Date.now() / 1000) - ts;
+        if (elapsed < 0) elapsed = 0;
+        if (elapsed < 60) return qsTr("Just now");
+        if (elapsed < 3600) return qsTr("%1m ago").arg(number(Math.floor(elapsed / 60)));
+        if (elapsed < 86400) return qsTr("%1h ago").arg(number(Math.floor(elapsed / 3600)));
+        if (elapsed < 86400 * 7) return qsTr("%1d ago").arg(number(Math.floor(elapsed / 86400)));
+        return Qt.formatDate(new Date(ts * 1000), Qt.locale(), Locale.ShortFormat);
+    }
+
 
     function substitute(template, values) {
         return template.replace(/%(\d+)/g, function (m, index) { var value = values[Number(index) - 1]; return value === undefined || value === null ? m : String(value); });
@@ -145,14 +157,8 @@ Item {
         else if (key === "info.press-enter") out = qsTr("Press Enter to open it");
         else if (key === "info.binary-file") out = qsTr("Binary file · no text preview");
         else if (key === "item.one" || key === "item.many") out = plural(Number(a[0]) || 0, qsTr("1 item"), qsTr("%1 items"));
-        else if (key === "time.just-now") out = qsTr("Just now");
-        else if (key === "time.minutes-ago") out = qsTr("%1m ago").arg(number(Number(a[0]) || 0));
-        else if (key === "time.hours-ago") out = qsTr("%1h ago").arg(number(Number(a[0]) || 0));
-        else if (key === "time.days-ago") out = qsTr("%1d ago").arg(number(Number(a[0]) || 0));
-        else if (key === "size.folder") out = qsTr("Folder");
         else if (key === "drive.root") out = qsTr("Root (/)");
         else if (key === "drive.volume") out = qsTr("%1 Volume").arg(a[0] || "");
-        else if (key === "date.format") out = Qt.formatDate(new Date(Number(a[2]), Number(a[0]), Number(a[1])), Qt.LocaleDate);
         else if (key === "name.empty") out = qsTr("The name can't be empty");
         else if (key === "name.reserved") out = qsTr("\".\" and \"..\" are reserved names");
         else if (key === "name.slash") out = qsTr("Names can't contain \"/\"");

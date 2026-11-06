@@ -355,7 +355,7 @@ impl Default for PaneRust {
 
 // Model roles (Qt::UserRole + n).
 const ROLE_BASE: i32 = 0x0100;
-const ROLES: [&str; 18] = [
+const ROLES: [&str; 17] = [
     "name",
     "path",
     "is_dir",
@@ -364,7 +364,6 @@ const ROLES: [&str; 18] = [
     "size",
     "size_str",
     "modified",
-    "modified_str",
     "icon",
     "system_icon",
     "category",
@@ -385,41 +384,6 @@ pub fn hex_path(p: &str) -> String {
     s
 }
 
-/// "Just now", "5m ago", ... or a date.
-pub fn relative_time(ts: i64) -> String {
-    if ts <= 0 {
-        return "-".into();
-    }
-    let now = unsafe { libc::time(std::ptr::null_mut()) } as i64;
-    let elapsed = now - ts;
-    if (0..60).contains(&elapsed) {
-        util::msg("time.just-now")
-    } else if (0..3600).contains(&elapsed) {
-        util::msg_args("time.minutes-ago", &[util::MessageArg::Text((elapsed / 60).to_string())])
-    } else if (0..86400).contains(&elapsed) {
-        util::msg_args("time.hours-ago", &[util::MessageArg::Text((elapsed / 3600).to_string())])
-    } else if (0..86400 * 7).contains(&elapsed) {
-        util::msg_args("time.days-ago", &[util::MessageArg::Text((elapsed / 86400).to_string())])
-    } else {
-        format_date(ts)
-    }
-}
-
-pub fn format_date(ts: i64) -> String {
-    let t = ts as libc::time_t;
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    unsafe {
-        libc::localtime_r(&t, &mut tm);
-    }
-    util::msg_args(
-        "date.format",
-        &[
-            util::MessageArg::Text(tm.tm_mon.to_string()),
-            util::MessageArg::Text(tm.tm_mday.to_string()),
-            util::MessageArg::Text((tm.tm_year + 1900).to_string()),
-        ],
-    )
-}
 
 fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
     serde_json::json!({
@@ -431,7 +395,6 @@ fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
         "size": e.size,
         "size_str": if e.is_dir { "-".to_string() } else { util::format_size(e.size) },
         "modified": e.modified,
-        "modified_str": relative_time(e.modified),
         "icon": e.icon,
         "system_icon": e.system_icon,
         "category": e.category,
@@ -541,7 +504,6 @@ impl qobject::LoafEngine {
             "size" => QVariant::from(&(e.size as i64)),
             "size_str" => s(&if e.is_dir { "-".to_string() } else { util::format_size(e.size) }),
             "modified" => QVariant::from(&e.modified),
-            "modified_str" => s(&relative_time(e.modified)),
             "icon" => s(e.icon),
             "system_icon" => s(e.system_icon),
             "category" => s(e.category),

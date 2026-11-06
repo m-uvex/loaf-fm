@@ -1887,13 +1887,13 @@ impl qobject::LoafCore {
             let target = dest.join(name);
             let Ok(dmeta) = std::fs::symlink_metadata(&target) else { continue };
             let smeta = std::fs::symlink_metadata(&src).ok();
-            let mtime = |m: &std::fs::Metadata| crate::pane::relative_time(std::os::unix::fs::MetadataExt::mtime(m));
+            let mtime = |m: &std::fs::Metadata| std::os::unix::fs::MetadataExt::mtime(m);
             out.push(serde_json::json!({
                 "name": name.to_string_lossy(),
                 "src_path": src.to_string_lossy(),
                 "dest_path": target.to_string_lossy(),
-                "src_size": smeta.as_ref().map(|m| if m.is_dir() { util::msg("size.folder") } else { util::format_size(m.len()) }).unwrap_or_default(),
-                "dest_size": if dmeta.is_dir() { util::msg("size.folder") } else { util::format_size(dmeta.len()) },
+                "src_size": smeta.as_ref().map(|m| if m.is_dir() { "-".to_string() } else { util::format_size(m.len()) }).unwrap_or_default(),
+                "dest_size": if dmeta.is_dir() { "-".to_string() } else { util::format_size(dmeta.len()) },
                 "src_modified": smeta.as_ref().map(mtime).unwrap_or_default(),
                 "dest_modified": mtime(&dmeta),
                 "is_dir": dmeta.is_dir(),

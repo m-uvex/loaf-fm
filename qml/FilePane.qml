@@ -1498,7 +1498,7 @@ Item {
                     required property string system_icon
                     required property string category
                     required property string size_str
-                    required property string modified_str
+                    required property int modified
                     required property bool thumbable
                     required property string thumb_id
                     required property string detail
@@ -1637,7 +1637,7 @@ Item {
                             visible: pane.width >= 560
                             Layout.preferredWidth: 150
                             Layout.minimumWidth: 96
-                            text: theme.resolveRustMessage(row.modified_str)
+                            text: theme.relativeTime(row.modified)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
@@ -1655,7 +1655,7 @@ Item {
                             visible: pane.width >= 640
                             Layout.preferredWidth: 80
                             Layout.minimumWidth: 60
-                            text: theme.resolveRustMessage(row.size_str)
+                            text: row.size_str
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight

@@ -268,8 +268,8 @@ LoafPopup {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: (theme.resolveRustMessage(quickLook.info.size_str || "-")) + "  ·  "
-                        + (theme.resolveRustMessage(quickLook.info.modified_str || "-")) + "  ·  "
+                    text: (quickLook.info.size_str || "-") + "  ·  "
+                        + theme.relativeTime(quickLook.info.modified || 0) + "  ·  "
                         + (quickLook.info.path || "")
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
