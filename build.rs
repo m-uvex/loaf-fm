@@ -46,9 +46,15 @@ fn compile_translations() -> Option<PathBuf> {
             })
             .unwrap_or(false)
     };
-    let lrelease = if let Some(env_lrelease) = std::env::var("LRELEASE").ok().filter(|v| !v.trim().is_empty()) {
+    let lrelease = if let Some(env_lrelease) = std::env::var("LRELEASE")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
         if !check_candidate(&env_lrelease) {
-            return fail("find lrelease", &format!("LRELEASE='{env_lrelease}' is not runnable"));
+            return fail(
+                "find lrelease",
+                &format!("LRELEASE='{env_lrelease}' is not runnable"),
+            );
         }
         env_lrelease
     } else {
