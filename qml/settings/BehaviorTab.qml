@@ -52,6 +52,7 @@ ColumnLayout {
                 options: [
                     { value: "current", label: qsTr("Current"), icon: "folder", shortLabel: qsTr("Current") },
                     { value: "split", label: qsTr("Split"), icon: "columns", shortLabel: qsTr("Split") },
+                    //: Short label for New Tab in folder opening segment control. Must stay short.
                     { value: "tab", label: qsTr("New Tab"), icon: "plus-square", shortLabel: qsTr("Tab") }
                 ]
                 value: theme.openFolderMode

@@ -439,11 +439,10 @@ Item {
                             var kind = core.device_type === "laptop" ? qsTr("Laptop") : qsTr("Desktop");
                             if (pcView.totalInternalBytes <= 0)
                                 return kind;
-                            return qsTr("%1  ·  %2")
-                                .arg(kind)
-                                .arg(qsTr("%1 free of %2")
+                            var freeStr = qsTr("%1 free of %2")
                                 .arg(pcView.formatBytes(pcView.freeInternalBytes))
-                                .arg(pcView.formatBytes(pcView.totalInternalBytes)))
+                                .arg(pcView.formatBytes(pcView.totalInternalBytes));
+                            return [kind, freeStr].join("  ·  ");
                         }
                         color: theme.textMuted
                         font.pixelSize: theme.fs(14)

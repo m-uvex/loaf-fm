@@ -24,10 +24,6 @@
         <translation>Tidak dapat membaca daftar kontributor.</translation>
     </message>
     <message>
-        <source>Version </source>
-        <translation type="vanished">Versi </translation>
-    </message>
-    <message>
         <location filename="../qml/settings/AboutTab.qml" line="258"/>
         <source>Version %1</source>
         <translation>Versi %1</translation>
@@ -57,15 +53,12 @@
         <source>Loading contributors…</source>
         <translation>Memuat kontributor…</translation>
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/settings/AboutTab.qml" line="319"/>
-        <source>1 contributor</source>
-        <translation>1 kontributor</translation>
-    </message>
-    <message>
-        <location filename="../qml/settings/AboutTab.qml" line="319"/>
-        <source>%1 contributors</source>
-        <translation>%1 kontributor</translation>
+        <source>%n contributor(s)</source>
+        <translation>
+            <numerusform>%n kontributor</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/settings/AboutTab.qml" line="320"/>
@@ -101,131 +94,127 @@
         <translation>Menonaktifkan efek latar, masker blur, dan transisi kompleks untuk mesin lama dan hemat baterai</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="55"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
         <source>Auto</source>
+        <extracomment>Short label for Auto in low-power segment control. Must stay short.</extracomment>
         <translation>Otomatis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="55"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
         <source>A</source>
         <translation>O</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="56"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="58"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="58"/>
         <source>On</source>
+        <extracomment>Short label for On in low-power segment control. Must stay short.</extracomment>
         <translation>Aktif</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="57"/>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="57"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="60"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="60"/>
         <source>Off</source>
+        <extracomment>Short label for Off in low-power segment control. Must stay short.</extracomment>
         <translation>Nonaktif</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="69"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="72"/>
         <source>Reduce motion</source>
         <translation>Kurangi gerakan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="70"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="73"/>
         <source>Disable spring animations, slide transitions, and layout micro-effects</source>
         <translation>Nonaktifkan animasi pegas, transisi geser, dan efek mikro tata letak</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="83"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="86"/>
         <source>Picture thumbnails</source>
         <translation>Thumbnail gambar</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="84"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="87"/>
         <source>Render background thumbnail previews for images, video posters, and SVGs</source>
         <translation>Render pratinjau thumbnail latar untuk gambar, poster video, dan SVG</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="98"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="101"/>
         <source>Background decorative shapes</source>
         <translation>Bentuk dekoratif latar</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="99"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="102"/>
         <source>Display floating ambient gradient shapes in the window background</source>
         <translation>Tampilkan bentuk gradien ambien mengambang di latar jendela</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="111"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="114"/>
         <source>View &amp; Scaling</source>
         <translation>Tampilan &amp; Skala</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="112"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="115"/>
         <source>Text scaling and folder item icon sizes</source>
         <translation>Skala teks dan ukuran ikon item folder</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="118"/>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="128"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="121"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="131"/>
         <source>Text scaling</source>
         <translation>Skala teks</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="119"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="122"/>
         <source>Adjust font sizing proportionally across panes, sidebars, and dialogs</source>
         <translation>Sesuaikan ukuran font secara proporsional di semua panel, bilah sisi, dan dialog</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="138"/>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="152"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="141"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="155"/>
         <source>Icon zoom size</source>
         <translation>Ukuran zoom ikon</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="139"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="142"/>
         <source>Default icon and thumbnail sizing for directory views (Ctrl + Scroll)</source>
         <translation>Ukuran ikon dan thumbnail default untuk tampilan direktori (Ctrl + Scroll)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="179"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="182"/>
         <source>Thumbnail shape</source>
         <translation>Bentuk thumbnail</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="180"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="183"/>
         <source>Crop picture thumbnails to a square, or keep their original aspect ratio</source>
         <translation>Potong thumbnail gambar menjadi persegi, atau pertahankan rasio aspek aslinya</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="186"/>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="186"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="189"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="189"/>
         <source>Square</source>
         <translation>Persegi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="187"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="190"/>
         <source>Original</source>
         <translation>Asli</translation>
     </message>
     <message>
-        <location filename="../qml/settings/AccessibilityTab.qml" line="187"/>
+        <location filename="../qml/settings/AccessibilityTab.qml" line="190"/>
         <source>Orig.</source>
         <translation>Asli</translation>
     </message>
 </context>
 <context>
     <name>BatchRenameDialog</name>
-    <message>
-        <source>Rename %1 Items</source>
-        <translation type="vanished">Ganti nama %1 Item</translation>
-    </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/BatchRenameDialog.qml" line="9"/>
-        <source>Rename 1 item</source>
-        <translation>Ganti nama 1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/BatchRenameDialog.qml" line="9"/>
-        <source>Rename %1 items</source>
-        <translation>Ganti nama %1 item</translation>
+        <source>Rename %n item(s)</source>
+        <translation>
+            <numerusform>Ganti nama %n item</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/BatchRenameDialog.qml" line="19"/>
@@ -344,102 +333,103 @@
         <translation>Terpisah</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="55"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="56"/>
         <source>New Tab</source>
+        <extracomment>Short label for New Tab in folder opening segment control. Must stay short.</extracomment>
         <translation>Tab Baru</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="55"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="56"/>
         <source>Tab</source>
         <translation>Tab</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="67"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="68"/>
         <source>Left-click drag action</source>
         <translation>Aksi seret klik kiri</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="68"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="69"/>
         <source>Choose whether dragging on empty space creates a selection box or pans the view</source>
         <translation>Pilih apakah menyeret pada ruang kosong membuat kotak seleksi atau menggeser tampilan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="73"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="74"/>
         <source>Selection Box</source>
         <translation>Kotak Seleksi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="74"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="75"/>
         <source>Pan View</source>
         <translation>Geser Tampilan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="86"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="87"/>
         <source>Show hidden files</source>
         <translation>Tampilkan berkas tersembunyi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="87"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="88"/>
         <source>Display files and folders prefixed with a dot (Ctrl+H)</source>
         <translation>Tampilkan berkas dan folder yang diawali titik (Ctrl+H)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="101"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="102"/>
         <source>Disambiguate duplicate names</source>
         <translation>Bedakan nama duplikat</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="102"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="103"/>
         <source>Display parent directory prefixes for search results with identical names</source>
         <translation>Tampilkan awalan direktori induk untuk hasil pencarian dengan nama sama</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="115"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="116"/>
         <source>File Operations</source>
         <translation>Operasi Berkas</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="116"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="117"/>
         <source>Inline rename triggers and content search</source>
         <translation>Pemicu ganti nama sebaris dan pencarian isi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="122"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="123"/>
         <source>Click selected item to rename</source>
         <translation>Klik item yang dipilih untuk mengganti nama</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="123"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="124"/>
         <source>Clicking an already selected item triggers inline renaming (F2 always renames)</source>
         <translation>Mengklik item yang sudah dipilih memicu ganti nama sebaris (F2 selalu mengganti nama)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="136"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="137"/>
         <source>Search inside file contents</source>
         <translation>Cari di dalam isi berkas</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="137"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="138"/>
         <source>Match text inside text and code files in subfolder searches (indexed, slightly slower)</source>
         <translation>Cocokkan teks di dalam berkas teks dan kode pada pencarian subfolder (diindeks, sedikit lebih lambat)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="149"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="150"/>
         <source>Session</source>
         <translation>Sesi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="150"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="151"/>
         <source>Window state and startup restoration</source>
         <translation>Status jendela dan pemulihan startup</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="155"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="156"/>
         <source>Restore session on launch</source>
         <translation>Pulihkan sesi saat peluncuran</translation>
     </message>
     <message>
-        <location filename="../qml/settings/BehaviorTab.qml" line="156"/>
+        <location filename="../qml/settings/BehaviorTab.qml" line="157"/>
         <source>Automatically reopen tabs, visited folders, and split panes on startup</source>
         <translation>Otomatis buka kembali tab, folder yang dikunjungi, dan panel terpisah saat startup</translation>
     </message>
@@ -451,15 +441,12 @@
         <source>Replace “%1”?</source>
         <translation>Ganti “%1”?</translation>
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/ConflictDialog.qml" line="9"/>
-        <source>1 item already exists</source>
-        <translation>1 item sudah ada</translation>
-    </message>
-    <message>
-        <location filename="../qml/ConflictDialog.qml" line="9"/>
-        <source>%1 items already exist</source>
-        <translation>%1 item sudah ada</translation>
+        <source>%n item(s) already exist</source>
+        <translation>
+            <numerusform>%n item sudah ada</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/ConflictDialog.qml" line="38"/>
@@ -596,39 +583,30 @@
         <translation>Hasil pencarian</translation>
     </message>
     <message>
-        <location filename="../qml/FilePane.qml" line="409"/>
-        <source>%1 selected</source>
-        <translation>%1 dipilih</translation>
-    </message>
-    <message>
-        <location filename="../qml/FilePane.qml" line="409"/>
-        <source>1 selected</source>
-        <translation>1 dipilih</translation>
-    </message>
-    <message>
         <location filename="../qml/FilePane.qml" line="418"/>
         <source>Choose storage</source>
         <translation>Pilih penyimpanan</translation>
     </message>
-    <message>
+    <message numerus="yes">
+        <location filename="../qml/FilePane.qml" line="409"/>
+        <source>%n selected</source>
+        <translation>
+            <numerusform>%n dipilih</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <location filename="../qml/FilePane.qml" line="432"/>
-        <source>1 result</source>
-        <translation>1 hasil</translation>
+        <source>%n result(s)</source>
+        <translation>
+            <numerusform>%n hasil</numerusform>
+        </translation>
     </message>
-    <message>
-        <location filename="../qml/FilePane.qml" line="432"/>
-        <source>%1 results</source>
-        <translation>%1 hasil</translation>
-    </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/FilePane.qml" line="433"/>
-        <source>1 item</source>
-        <translation>1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/FilePane.qml" line="433"/>
-        <source>%1 items</source>
-        <translation>%1 item</translation>
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n item</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/FilePane.qml" line="771"/>
@@ -713,14 +691,15 @@
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="59"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="327"/>
         <source>Auto</source>
         <translation>Otomatis</translation>
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="60"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
         <source>Light</source>
+        <extracomment>Short label for Light icon weight. Must stay short.</extracomment>
         <translation>Terang</translation>
     </message>
     <message>
@@ -776,10 +755,6 @@
         <location filename="../qml/settings/InterfaceTab.qml" line="37"/>
         <source>System default</source>
         <translation>Default sistem</translation>
-    </message>
-    <message>
-        <source>English (US)</source>
-        <translation type="vanished">Bahasa Inggris (AS)</translation>
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="122"/>
@@ -873,8 +848,9 @@
     </message>
     <message>
         <location filename="../qml/settings/InterfaceTab.qml" line="249"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="434"/>
         <source>Custom</source>
+        <extracomment>Short label for Custom context menu mode. Must stay short.</extracomment>
         <translation>Kustom</translation>
     </message>
     <message>
@@ -899,235 +875,246 @@
         <translation>Ketebalan guratan dan varian gaya untuk ikon Phosphor</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
         <source>Thin</source>
+        <extracomment>Short label for Thin icon weight. Must stay short.</extracomment>
         <translation>Tipis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="292"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
         <source>Th</source>
         <translation>Tip</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="293"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
         <source>Lt</source>
         <translation>Trg</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
         <source>Regular</source>
+        <extracomment>Short label for Regular icon weight. Must stay short.</extracomment>
         <translation>Reguler</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="294"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
         <source>Reg</source>
         <translation>Reg</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="299"/>
         <source>Bold</source>
+        <extracomment>Short label for Bold icon weight. Must stay short.</extracomment>
         <translation>Tebal</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="295"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="299"/>
         <source>Bd</source>
         <translation>Tbl</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="301"/>
         <source>Fill</source>
+        <extracomment>Short label for Fill icon weight. Must stay short.</extracomment>
         <translation>Isian</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="296"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="301"/>
         <source>Fil</source>
         <translation>Isi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="303"/>
         <source>Duotone</source>
+        <extracomment>Short label for Duotone icon weight. Must stay short.</extracomment>
         <translation>Duotone</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="297"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="303"/>
         <source>Duo</source>
         <translation>Duo</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="308"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="314"/>
         <source>Top Bar &amp; Navigation</source>
         <translation>Bilah Atas &amp; Navigasi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="309"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="315"/>
         <source>Toolbar actions, path display, and tab controls</source>
         <translation>Aksi bilah alat, tampilan path, dan kontrol tab</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="314"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
         <source>Back and forward buttons</source>
         <translation>Tombol kembali dan maju</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="315"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
         <source>Show both navigation arrows, only Forward when available, or hide them</source>
         <translation>Tampilkan kedua panah navigasi, hanya Maju bila tersedia, atau sembunyikan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="320"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="327"/>
         <source>Automatic</source>
+        <extracomment>Short label for Automatic toolbar buttons. Must stay short.</extracomment>
         <translation>Otomatis</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="329"/>
         <source>Always</source>
+        <extracomment>Short label for Always toolbar buttons. Must stay short.</extracomment>
         <translation>Selalu</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="321"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="329"/>
         <source>Show</source>
         <translation>Tampil</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="331"/>
         <source>Hidden</source>
+        <extracomment>Short label for Hidden toolbar buttons. Must stay short.</extracomment>
         <translation>Tersembunyi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="322"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="331"/>
         <source>Hide</source>
         <translation>Sembunyi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="333"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="342"/>
         <source>New tab button</source>
         <translation>Tombol tab baru</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="334"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="343"/>
         <source>Show the quick New Tab action on the top bar (Ctrl+T)</source>
         <translation>Tampilkan aksi Tab Baru cepat di bilah atas (Ctrl+T)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="346"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="355"/>
         <source>New window button</source>
         <translation>Tombol jendela baru</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="347"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="356"/>
         <source>Show the quick New Window action on the top bar (Ctrl+N)</source>
         <translation>Tampilkan aksi Jendela Baru cepat di bilah atas (Ctrl+N)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="359"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="368"/>
         <source>Path bar display</source>
         <translation>Tampilan bilah path</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="360"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="369"/>
         <source>Choose between clickable breadcrumb chips or raw editable path text</source>
         <translation>Pilih antara chip breadcrumb yang dapat diklik atau teks path mentah yang dapat diedit</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="375"/>
         <source>Breadcrumbs</source>
+        <extracomment>Short label for Breadcrumbs path bar mode. Must stay short.</extracomment>
         <translation>Breadcrumb</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="365"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="375"/>
         <source>Chips</source>
         <translation>Chip</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
         <source>Text Only</source>
+        <extracomment>Short label for Text Only path bar mode. Must stay short.</extracomment>
         <translation>Teks Saja</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="366"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
         <source>Text</source>
         <translation>Teks</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="377"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="385"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="391"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="388"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="396"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="402"/>
         <source>This PC</source>
         <translation>PC Ini</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="378"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="389"/>
         <source>Name and identity of the system location</source>
         <translation>Nama dan identitas lokasi sistem</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="383"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="394"/>
         <source>Display name</source>
         <translation>Nama tampilan</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="384"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="395"/>
         <source>Custom label for the This PC page, tab, and sidebar entry. Leave empty to use the hostname (%1)</source>
         <translation>Label kustom untuk halaman PC Ini, tab, dan entri bilah sisi. Biarkan kosong untuk menggunakan hostname (%1)</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="403"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="414"/>
         <source>Menus &amp; Sidebar</source>
         <translation>Menu &amp; Bilah Sisi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="404"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="415"/>
         <source>Context menus and left sidebar rail pins</source>
         <translation>Menu konteks dan pin rel bilah sisi kiri</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="409"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
         <source>Context menu layout</source>
         <translation>Tata letak menu konteks</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="410"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
         <source>Minimal hides common shortcuts like cut, copy, and delete to keep menus compact</source>
         <translation>Minimal menyembunyikan pintasan umum seperti potong, salin, dan hapus agar menu tetap ringkas</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
-        <location filename="../qml/settings/InterfaceTab.qml" line="419"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="430"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="430"/>
         <source>Full</source>
         <translation>Penuh</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="432"/>
         <source>Minimal</source>
+        <extracomment>Short label for Minimal context menu mode. Must stay short.</extracomment>
         <translation>Minimal</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="420"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="432"/>
         <source>Min</source>
         <translation>Min</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="421"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="434"/>
         <source>Edit</source>
         <translation>Edit</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="434"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="447"/>
         <source>Edit…</source>
         <translation>Edit…</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="446"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="459"/>
         <source>Navigation sidebar</source>
         <translation>Bilah sisi navigasi</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="447"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="460"/>
         <source>Reorder, pin, or hide drives, standard locations, and custom bookmarks</source>
         <translation>Tata ulang, sematkan, atau sembunyikan drive, lokasi standar, dan bookmark kustom</translation>
     </message>
     <message>
-        <location filename="../qml/settings/InterfaceTab.qml" line="450"/>
+        <location filename="../qml/settings/InterfaceTab.qml" line="463"/>
         <source>Customize Sidebar…</source>
         <translation>Sesuaikan Bilah Sisi…</translation>
     </message>
@@ -1291,15 +1278,12 @@
 </context>
 <context>
     <name>OperationsPanel</name>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/OperationsPanel.qml" line="81"/>
-        <source>%1 operations</source>
-        <translation>%1 operasi</translation>
-    </message>
-    <message>
-        <location filename="../qml/OperationsPanel.qml" line="81"/>
-        <source>1 operation</source>
-        <translation>1 operasi</translation>
+        <source>%n operation(s)</source>
+        <translation>
+            <numerusform>%n operasi</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/OperationsPanel.qml" line="109"/>
@@ -1322,8 +1306,8 @@
     <message>
         <location filename="../qml/PCView.qml" line="260"/>
         <location filename="../qml/PCView.qml" line="418"/>
+        <location filename="../qml/PCView.qml" line="1069"/>
         <location filename="../qml/PCView.qml" line="1070"/>
-        <location filename="../qml/PCView.qml" line="1071"/>
         <source>This PC</source>
         <translation>PC Ini</translation>
     </message>
@@ -1369,7 +1353,7 @@
     </message>
     <message>
         <location filename="../qml/PCView.qml" line="328"/>
-        <location filename="../qml/PCView.qml" line="1057"/>
+        <location filename="../qml/PCView.qml" line="1056"/>
         <source>Rename</source>
         <translation>Ganti Nama</translation>
     </message>
@@ -1385,141 +1369,130 @@
     </message>
     <message>
         <location filename="../qml/PCView.qml" line="442"/>
-        <source>%1  ·  %2</source>
-        <translation>%1  ·  %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/PCView.qml" line="444"/>
         <source>%1 free of %2</source>
         <translation>%1 tersisa dari %2</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="486"/>
+        <location filename="../qml/PCView.qml" line="485"/>
         <source>Done</source>
         <translation>Selesai</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="486"/>
+        <location filename="../qml/PCView.qml" line="485"/>
         <source>Customize</source>
         <translation>Sesuaikan</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="512"/>
+        <location filename="../qml/PCView.qml" line="511"/>
         <source>Places</source>
         <translation>Tempat</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="513"/>
+        <location filename="../qml/PCView.qml" line="512"/>
         <source>Frequent</source>
         <translation>Sering</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="514"/>
+        <location filename="../qml/PCView.qml" line="513"/>
         <source>Internal Storage</source>
         <translation>Penyimpanan Internal</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="515"/>
+        <location filename="../qml/PCView.qml" line="514"/>
         <source>External Storage</source>
         <translation>Penyimpanan Eksternal</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="515"/>
+        <location filename="../qml/PCView.qml" line="514"/>
         <source>Network Shares</source>
         <translation>Berbagi Jaringan</translation>
     </message>
-    <message>
-        <location filename="../qml/PCView.qml" line="517"/>
-        <source>1 drive connected</source>
-        <translation>1 drive terhubung</translation>
+    <message numerus="yes">
+        <location filename="../qml/PCView.qml" line="516"/>
+        <source>%n drive(s) connected</source>
+        <translation>
+            <numerusform>%n drive terhubung</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PCView.qml" line="518"/>
+        <source>%n server(s) found</source>
+        <translation>
+            <numerusform>%n server ditemukan</numerusform>
+        </translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="517"/>
-        <source>%1 drives connected</source>
-        <translation>%1 drive terhubung</translation>
-    </message>
-    <message>
-        <location filename="../qml/PCView.qml" line="519"/>
-        <source>1 server found</source>
-        <translation>1 server ditemukan</translation>
-    </message>
-    <message>
-        <location filename="../qml/PCView.qml" line="519"/>
-        <source>%1 servers found</source>
-        <translation>%1 server ditemukan</translation>
-    </message>
-    <message>
-        <location filename="../qml/PCView.qml" line="523"/>
+        <location filename="../qml/PCView.qml" line="522"/>
         <source>Scan</source>
         <translation>Pindai</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="532"/>
+        <location filename="../qml/PCView.qml" line="531"/>
         <source>Carousel</source>
         <translation>Korsel</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="532"/>
+        <location filename="../qml/PCView.qml" line="531"/>
         <source>Grid</source>
         <translation>Kisi</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="555"/>
+        <location filename="../qml/PCView.qml" line="554"/>
         <source>tonal</source>
         <translation>tonal</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="572"/>
+        <location filename="../qml/PCView.qml" line="571"/>
         <source>Section hidden</source>
         <translation>Bagian disembunyikan</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="577"/>
+        <location filename="../qml/PCView.qml" line="576"/>
         <source>Restore</source>
         <translation>Pulihkan</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="853"/>
+        <location filename="../qml/PCView.qml" line="852"/>
         <source>System Drive Pool</source>
         <translation>Kumpulan Drive Sistem</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="861"/>
+        <location filename="../qml/PCView.qml" line="860"/>
         <source>%1 used of %2  ·  %3 free</source>
         <translation>%1 terpakai dari %2  ·  %3 bebas</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1007"/>
+        <location filename="../qml/PCView.qml" line="1006"/>
         <source>Add Share…</source>
         <translation>Tambah Berbagi…</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1016"/>
+        <location filename="../qml/PCView.qml" line="1015"/>
         <source>Hide this server</source>
         <translation>Sembunyikan server ini</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1056"/>
+        <location filename="../qml/PCView.qml" line="1055"/>
         <source>Rename Drive</source>
         <translation>Ganti Nama Drive</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1058"/>
+        <location filename="../qml/PCView.qml" line="1057"/>
         <source>Drive name</source>
         <translation>Nama drive</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1069"/>
+        <location filename="../qml/PCView.qml" line="1068"/>
         <source>Rename This PC</source>
         <translation>Ganti Nama PC Ini</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1070"/>
+        <location filename="../qml/PCView.qml" line="1069"/>
         <source>Leave empty to use the hostname (%1)</source>
         <translation>Biarkan kosong untuk menggunakan hostname (%1)</translation>
     </message>
     <message>
-        <location filename="../qml/PCView.qml" line="1072"/>
+        <location filename="../qml/PCView.qml" line="1071"/>
         <source>Save</source>
         <translation>Simpan</translation>
     </message>
@@ -1625,15 +1598,12 @@
         <source>Replace file?</source>
         <translation>Ganti berkas?</translation>
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/PickerWindow.qml" line="835"/>
-        <source>%1 of the files already exist in this folder. Replace them?</source>
-        <translation>%1 dari berkas sudah ada di folder ini. Ganti?</translation>
-    </message>
-    <message>
-        <location filename="../qml/PickerWindow.qml" line="835"/>
-        <source>1 of the files already exists in this folder. Replace it?</source>
-        <translation>1 dari berkas sudah ada di folder ini. Ganti?</translation>
+        <source>%n of the files already exists in this folder. Replace it?</source>
+        <translation>
+            <numerusform>%n dari berkas sudah ada di folder ini. Ganti?</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PickerWindow.qml" line="836"/>
@@ -1650,20 +1620,16 @@
     <name>PropertiesDialog</name>
     <message>
         <location filename="../qml/PropertiesDialog.qml" line="24"/>
-        <location filename="../qml/PropertiesDialog.qml" line="92"/>
-        <source>1 item</source>
-        <translation>1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/PropertiesDialog.qml" line="24"/>
-        <location filename="../qml/PropertiesDialog.qml" line="92"/>
-        <source>%1 items</source>
-        <translation>%1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/PropertiesDialog.qml" line="24"/>
         <source>Properties</source>
         <translation>Properti</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PropertiesDialog.qml" line="24"/>
+        <location filename="../qml/PropertiesDialog.qml" line="92"/>
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n item</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PropertiesDialog.qml" line="41"/>
@@ -2102,63 +2068,68 @@
         <translation>Otomatis akhiri streaming dan cabut tautan setelah periode ini</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="346"/>
+        <location filename="../qml/settings/ShareTab.qml" line="347"/>
         <source>1 Hour</source>
+        <extracomment>Short label for 1 Hour expiration. Must stay short.</extracomment>
         <translation>1 Jam</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="346"/>
+        <location filename="../qml/settings/ShareTab.qml" line="347"/>
         <source>1h</source>
         <translation>1j</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="347"/>
+        <location filename="../qml/settings/ShareTab.qml" line="349"/>
         <source>6 Hours</source>
+        <extracomment>Short label for 6 Hours expiration. Must stay short.</extracomment>
         <translation>6 Jam</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="347"/>
+        <location filename="../qml/settings/ShareTab.qml" line="349"/>
         <source>6h</source>
         <translation>6j</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="348"/>
+        <location filename="../qml/settings/ShareTab.qml" line="351"/>
         <source>24 Hours</source>
+        <extracomment>Short label for 24 Hours expiration. Must stay short.</extracomment>
         <translation>24 Jam</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="348"/>
+        <location filename="../qml/settings/ShareTab.qml" line="351"/>
         <source>24h</source>
         <translation>24j</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="349"/>
+        <location filename="../qml/settings/ShareTab.qml" line="353"/>
         <source>Never</source>
+        <extracomment>Short label for Never expiring (infinity symbol). Must stay short.</extracomment>
         <translation>Tidak pernah</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="349"/>
+        <location filename="../qml/settings/ShareTab.qml" line="353"/>
         <source>∞</source>
         <translation>∞</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="360"/>
+        <location filename="../qml/settings/ShareTab.qml" line="364"/>
         <source>Bandwidth upload throttle</source>
         <translation>Pelambatan unggah bandwidth</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="361"/>
+        <location filename="../qml/settings/ShareTab.qml" line="365"/>
         <source>Limit upload rate to prevent saturating your local internet connection</source>
         <translation>Batasi laju unggah untuk mencegah pemenuhan koneksi internet lokal Anda</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="369"/>
+        <location filename="../qml/settings/ShareTab.qml" line="373"/>
         <source>Unlimited</source>
         <translation>Tidak terbatas</translation>
     </message>
     <message>
-        <location filename="../qml/settings/ShareTab.qml" line="377"/>
+        <location filename="../qml/settings/ShareTab.qml" line="382"/>
         <source>KB/s</source>
+        <extracomment>Unit label for kilobytes per second. Must stay short.</extracomment>
         <translation>KB/s</translation>
     </message>
 </context>
@@ -2201,306 +2172,334 @@
 <context>
     <name>Theme</name>
     <message>
-        <location filename="../qml/Theme.qml" line="135"/>
+        <location filename="../qml/Theme.qml" line="147"/>
         <source>No preview available</source>
         <translation>Pratinjau tidak tersedia</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="136"/>
+        <location filename="../qml/Theme.qml" line="148"/>
         <source>This item no longer exists</source>
         <translation>Item ini sudah tidak ada</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="137"/>
-        <source>Folder · 1 item</source>
-        <translation>Folder · 1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="137"/>
-        <source>Folder · %1 items</source>
-        <translation>Folder · %1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="138"/>
+        <location filename="../qml/Theme.qml" line="150"/>
         <source>Archive · %1 files</source>
         <translation>Arsip · %1 berkas</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="139"/>
+        <location filename="../qml/Theme.qml" line="151"/>
         <source>Encrypted archive</source>
         <translation>Arsip terenkripsi</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="140"/>
+        <location filename="../qml/Theme.qml" line="152"/>
         <source>Press Enter to open it</source>
         <translation>Tekan Enter untuk membukanya</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="141"/>
+        <location filename="../qml/Theme.qml" line="153"/>
         <source>Binary file · no text preview</source>
         <translation>Berkas biner · tanpa pratinjau teks</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="142"/>
-        <source>1 item</source>
-        <translation>1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="142"/>
-        <source>%1 items</source>
-        <translation>%1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="143"/>
+        <location filename="../qml/Theme.qml" line="124"/>
         <source>Just now</source>
         <translation>Baru saja</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="144"/>
+        <location filename="../qml/Theme.qml" line="125"/>
         <source>%1m ago</source>
         <translation>%1m yang lalu</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="145"/>
+        <location filename="../qml/Theme.qml" line="126"/>
         <source>%1h ago</source>
         <translation>%1j yang lalu</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="146"/>
+        <location filename="../qml/Theme.qml" line="127"/>
         <source>%1d ago</source>
         <translation>%1h yang lalu</translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="181"/>
+        <source>%n item(s) renamed</source>
+        <translation>
+            <numerusform>%n item diganti namanya</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="190"/>
+        <source>Moving %n item(s) to %1</source>
+        <translation>
+            <numerusform>Memindahkan %n item ke %1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="191"/>
+        <source>Copying %n item(s) to %1</source>
+        <translation>
+            <numerusform>Menyalin %n item ke %1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="192"/>
+        <source>Linking %n item(s) to %1</source>
+        <translation>
+            <numerusform>Membuat tautan %n item ke %1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="193"/>
+        <source>Moving %n item(s) to the trash</source>
+        <translation>
+            <numerusform>Memindahkan %n item ke sampah</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="195"/>
+        <source>Deleting %n item(s)</source>
+        <translation>
+            <numerusform>Menghapus %n item</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="196"/>
+        <source>Restoring %n item(s)</source>
+        <translation>
+            <numerusform>Memulihkan %n item</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="205"/>
+        <source>%n item(s) moved to the trash</source>
+        <translation>
+            <numerusform>%n item dipindahkan ke sampah</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="207"/>
+        <source>Deleted %n item(s)</source>
+        <translation>
+            <numerusform>Dihapus %n item</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="209"/>
+        <source>%n item(s) restored</source>
+        <translation>
+            <numerusform>%n item dipulihkan</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="219"/>
+        <source>%n item(s) moved</source>
+        <translation>
+            <numerusform>%n item dipindahkan</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="220"/>
+        <source>%n item(s) copied</source>
+        <translation>
+            <numerusform>%n item disalin</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Theme.qml" line="221"/>
+        <source>%n item(s) linked</source>
+        <translation>
+            <numerusform>%n item ditautkan</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/Theme.qml" line="147"/>
-        <location filename="../qml/Theme.qml" line="253"/>
+        <location filename="../qml/Theme.qml" line="272"/>
         <source>Folder</source>
         <translation>Folder</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="148"/>
+        <location filename="../qml/Theme.qml" line="154"/>
         <source>Root (/)</source>
         <translation>Root (/)</translation>
     </message>
-    <message>
+    <message numerus="yes">
         <location filename="../qml/Theme.qml" line="149"/>
+        <source>Folder · %n item(s)</source>
+        <translation>
+            <numerusform>Folder · %n item</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="155"/>
         <source>%1 Volume</source>
         <translation>Volume %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="151"/>
+        <location filename="../qml/Theme.qml" line="156"/>
         <source>The name can&apos;t be empty</source>
         <translation>Nama tidak boleh kosong</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="152"/>
+        <location filename="../qml/Theme.qml" line="157"/>
         <source>&quot;.&quot; and &quot;..&quot; are reserved names</source>
         <translation>&quot;.&quot; dan &quot;..&quot; adalah nama yang dicadangkan</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="153"/>
+        <location filename="../qml/Theme.qml" line="158"/>
         <source>Names can&apos;t contain &quot;/&quot;</source>
         <translation>Nama tidak boleh mengandung &quot;/&quot;</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="154"/>
+        <location filename="../qml/Theme.qml" line="159"/>
         <source>Invalid character in name</source>
         <translation>Karakter tidak valid dalam nama</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="155"/>
+        <location filename="../qml/Theme.qml" line="160"/>
         <source>The name is too long</source>
         <translation>Nama terlalu panjang</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="156"/>
+        <location filename="../qml/Theme.qml" line="161"/>
         <source>Home</source>
         <translation>Beranda</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="157"/>
+        <location filename="../qml/Theme.qml" line="162"/>
         <source>This PC</source>
         <translation>PC Ini</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="158"/>
+        <location filename="../qml/Theme.qml" line="163"/>
         <source>Recent</source>
         <translation>Terkini</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="159"/>
+        <location filename="../qml/Theme.qml" line="164"/>
         <source>Starred</source>
         <translation>Berbintang</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="160"/>
+        <location filename="../qml/Theme.qml" line="165"/>
         <source>Trash</source>
         <translation>Tempat Sampah</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="161"/>
-        <location filename="../qml/Theme.qml" line="234"/>
+        <location filename="../qml/Theme.qml" line="166"/>
+        <location filename="../qml/Theme.qml" line="227"/>
         <source>Cancelled</source>
         <translation>Dibatalkan</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="162"/>
+        <location filename="../qml/Theme.qml" line="167"/>
         <source>Added “%1” to the sidebar</source>
         <translation>Menambahkan “%1” ke bilah sisi</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="163"/>
+        <location filename="../qml/Theme.qml" line="168"/>
         <source>That folder doesn&apos;t exist</source>
         <translation>Folder tersebut tidak ada</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="164"/>
+        <location filename="../qml/Theme.qml" line="169"/>
         <source>That SMB share no longer exists</source>
         <translation>Berbagi SMB tersebut sudah tidak ada</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="165"/>
+        <location filename="../qml/Theme.qml" line="170"/>
         <source>Could not save the password in the system keyring</source>
         <translation>Tidak dapat menyimpan kata sandi di keyring sistem</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="166"/>
+        <location filename="../qml/Theme.qml" line="171"/>
         <source>No application can open “%1”</source>
         <translation>Tidak ada aplikasi yang dapat membuka “%1”</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="167"/>
+        <location filename="../qml/Theme.qml" line="172"/>
         <source>That application is no longer installed</source>
         <translation>Aplikasi tersebut sudah tidak terinstal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="168"/>
+        <location filename="../qml/Theme.qml" line="173"/>
         <source>Could not start %1: %2</source>
         <translation>Tidak dapat memulai %1: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="169"/>
+        <location filename="../qml/Theme.qml" line="174"/>
         <source>%1 now opens %2 files</source>
         <translation>%1 sekarang membuka berkas %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="170"/>
+        <location filename="../qml/Theme.qml" line="175"/>
         <source>Could not run the command: %1</source>
         <translation>Tidak dapat menjalankan perintah: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="171"/>
+        <location filename="../qml/Theme.qml" line="176"/>
         <source>Could not run the script: %1</source>
         <translation>Tidak dapat menjalankan skrip: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="172"/>
+        <location filename="../qml/Theme.qml" line="177"/>
         <source>pkexec (polkit) is not installed</source>
         <translation>pkexec (polkit) tidak terinstal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="173"/>
+        <location filename="../qml/Theme.qml" line="178"/>
         <source>Phone files have no trash. Use Delete Permanently.</source>
         <translation>Berkas ponsel tidak memiliki tempat sampah. Gunakan Hapus Permanen.</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="174"/>
+        <location filename="../qml/Theme.qml" line="179"/>
+        <location filename="../qml/Theme.qml" line="247"/>
         <source>“%1” already exists</source>
         <translation>“%1” sudah ada</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="175"/>
+        <location filename="../qml/Theme.qml" line="180"/>
         <source>Could not create “%1”: %2</source>
         <translation>Tidak dapat membuat “%1”: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="176"/>
-        <source>Renamed 1 item</source>
-        <translation>1 item diganti nama</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="177"/>
-        <source>Renamed %1 items</source>
-        <translation>%1 item diganti nama</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="178"/>
+        <location filename="../qml/Theme.qml" line="182"/>
         <source>Cloudflare Tunnel agent installed successfully</source>
         <translation>Agen Cloudflare Tunnel berhasil diinstal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="179"/>
+        <location filename="../qml/Theme.qml" line="183"/>
         <source>Failed to install cloudflared: %1</source>
         <translation>Gagal menginstal cloudflared: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="180"/>
+        <location filename="../qml/Theme.qml" line="184"/>
         <source>Disconnecting from %1</source>
         <translation>Memutuskan sambungan dari %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="181"/>
+        <location filename="../qml/Theme.qml" line="185"/>
         <source>Connecting to %1</source>
         <translation>Menghubungkan ke %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="182"/>
+        <location filename="../qml/Theme.qml" line="186"/>
         <source>Downloading phone file</source>
         <translation>Mengunduh berkas ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="183"/>
+        <location filename="../qml/Theme.qml" line="187"/>
         <source>Opening %1</source>
         <translation>Membuka %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="184"/>
+        <location filename="../qml/Theme.qml" line="188"/>
         <source>Downloading phone preview</source>
         <translation>Mengunduh pratinjau ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="185"/>
+        <location filename="../qml/Theme.qml" line="189"/>
         <source>Transferring phone files</source>
         <translation>Mentransfer berkas ponsel</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="186"/>
-        <source>Moving “%1” to %2</source>
-        <translation>Memindahkan “%1” ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="187"/>
-        <source>Moving %1 items to %2</source>
-        <translation>Memindahkan %1 item ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="188"/>
-        <source>Copying “%1” to %2</source>
-        <translation>Menyalin “%1” ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="189"/>
-        <source>Copying %1 items to %2</source>
-        <translation>Menyalin %1 item ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="190"/>
-        <source>Linking “%1” to %2</source>
-        <translation>Membuat tautan “%1” ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="191"/>
-        <source>Linking %1 items to %2</source>
-        <translation>Membuat tautan %1 item ke %2</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="192"/>
-        <source>Moving “%1” to the trash</source>
-        <translation>Memindahkan “%1” ke tempat sampah</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="193"/>
-        <source>Moving %1 items to the trash</source>
-        <translation>Memindahkan %1 item ke tempat sampah</translation>
     </message>
     <message>
         <location filename="../qml/Theme.qml" line="194"/>
@@ -2508,307 +2507,344 @@
         <translation>Menghapus berkas ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="195"/>
-        <source>Deleting “%1”</source>
-        <translation>Menghapus “%1”</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="196"/>
-        <source>Deleting %1 items</source>
-        <translation>Menghapus %1 item</translation>
-    </message>
-    <message>
         <location filename="../qml/Theme.qml" line="197"/>
-        <source>Restoring %1 items</source>
-        <translation>Memulihkan %1 item</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="198"/>
         <source>Emptying the trash</source>
         <translation>Mengosongkan tempat sampah</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="199"/>
+        <location filename="../qml/Theme.qml" line="198"/>
         <source>Compressing into “%1”</source>
         <translation>Mengompresi ke dalam “%1”</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="200"/>
+        <location filename="../qml/Theme.qml" line="199"/>
         <source>Extracting “%1”</source>
         <translation>Mengekstrak “%1”</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="201"/>
+        <location filename="../qml/Theme.qml" line="200"/>
         <source>Creating %1 on phone</source>
         <translation>Membuat %1 di ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="202"/>
+        <location filename="../qml/Theme.qml" line="201"/>
         <source>Renaming phone item</source>
         <translation>Mengganti nama item ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="203"/>
+        <location filename="../qml/Theme.qml" line="202"/>
         <source>Connected to %1</source>
         <translation>Terhubung ke %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="204"/>
+        <location filename="../qml/Theme.qml" line="203"/>
         <source>Opened a downloaded copy. Copy changes back to update the phone.</source>
         <translation>Membuka salinan yang diunduh. Salin kembali perubahan untuk memperbarui ponsel.</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="205"/>
+        <location filename="../qml/Theme.qml" line="204"/>
         <source>Phone transfer complete</source>
         <translation>Transfer ponsel selesai</translation>
     </message>
     <message>
         <location filename="../qml/Theme.qml" line="206"/>
-        <source>“%1” moved to the trash</source>
-        <translation>“%1” dipindahkan ke tempat sampah</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="207"/>
-        <source>%1 items moved to the trash</source>
-        <translation>%1 item dipindahkan ke tempat sampah</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="208"/>
         <source>Phone files deleted</source>
         <translation>Berkas ponsel dihapus</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="209"/>
-        <source>Deleted “%1”</source>
-        <translation>“%1” dihapus</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="210"/>
-        <source>Deleted %1 items</source>
-        <translation>%1 item dihapus</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="211"/>
+        <location filename="../qml/Theme.qml" line="208"/>
         <source>Could not delete %1 items: %2</source>
         <translation>Tidak dapat menghapus %1 item: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="212"/>
-        <source>“%1” restored</source>
-        <translation>“%1” dipulihkan</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="213"/>
-        <source>%1 items restored</source>
-        <translation>%1 item dipulihkan</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="214"/>
+        <location filename="../qml/Theme.qml" line="210"/>
         <source>Trash emptied</source>
         <translation>Tempat sampah dikosongkan</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="215"/>
+        <location filename="../qml/Theme.qml" line="211"/>
         <source>Some items could not be deleted: %1</source>
         <translation>Beberapa item tidak dapat dihapus: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="216"/>
+        <location filename="../qml/Theme.qml" line="212"/>
         <source>Created “%1”</source>
         <translation>“%1” dibuat</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="217"/>
+        <location filename="../qml/Theme.qml" line="213"/>
+        <location filename="../qml/Theme.qml" line="245"/>
         <source>Could not create the archive: %1</source>
         <translation>Tidak dapat membuat arsip: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="218"/>
+        <location filename="../qml/Theme.qml" line="214"/>
         <source>Extracted “%1”</source>
         <translation>“%1” diekstrak</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="219"/>
+        <location filename="../qml/Theme.qml" line="215"/>
         <source>Extracted “%1” only partly: %2</source>
         <translation>“%1” hanya diekstrak sebagian: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="220"/>
+        <location filename="../qml/Theme.qml" line="216"/>
         <source>Could not extract “%1”: %2</source>
         <translation>Tidak dapat mengekstrak “%1”: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="221"/>
+        <location filename="../qml/Theme.qml" line="217"/>
         <source>Created on phone</source>
         <translation>Dibuat di ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="222"/>
+        <location filename="../qml/Theme.qml" line="218"/>
         <source>Renamed on phone</source>
         <translation>Diganti nama di ponsel</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="223"/>
-        <source>Moved 1 item</source>
-        <translation>1 item dipindahkan</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="224"/>
-        <source>Moved %1 items</source>
-        <translation>%1 item dipindahkan</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="225"/>
-        <source>Copied 1 item</source>
-        <translation>1 item disalin</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="226"/>
-        <source>Copied %1 items</source>
-        <translation>%1 item disalin</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="227"/>
-        <source>Linked 1 item</source>
-        <translation>1 tautan dibuat</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="228"/>
-        <source>Linked %1 items</source>
-        <translation>%1 tautan dibuat</translation>
-    </message>
-    <message>
-        <location filename="../qml/Theme.qml" line="229"/>
+        <location filename="../qml/Theme.qml" line="222"/>
         <source>%1 %2 items; %3 failed: %4</source>
         <translation>%1 %2 item; %3 gagal: %4</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="230"/>
+        <location filename="../qml/Theme.qml" line="223"/>
         <source>You don&apos;t have permission to view this folder</source>
         <translation>Anda tidak memiliki izin untuk melihat folder ini</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="231"/>
+        <location filename="../qml/Theme.qml" line="224"/>
         <source>This folder no longer exists</source>
         <translation>Folder ini sudah tidak ada</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="232"/>
+        <location filename="../qml/Theme.qml" line="225"/>
         <source>This archive needs a password</source>
         <translation>Arsip ini memerlukan kata sandi</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="233"/>
+        <location filename="../qml/Theme.qml" line="226"/>
         <source>&apos;%1&apos; is not installed</source>
         <translation>&apos;%1&apos; tidak terinstal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="235"/>
+        <location filename="../qml/Theme.qml" line="228"/>
         <source>Nothing to compress</source>
         <translation>Tidak ada yang dapat dikompresi</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="236"/>
+        <location filename="../qml/Theme.qml" line="229"/>
         <source>Not an archive</source>
         <translation>Bukan arsip</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="237"/>
+        <location filename="../qml/Theme.qml" line="230"/>
         <source>The file was not found in the archive</source>
         <translation>Berkas tidak ditemukan di dalam arsip</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="238"/>
+        <location filename="../qml/Theme.qml" line="231"/>
         <source>Neither curl, wget, nor python3 was found to download cloudflared</source>
         <translation>curl, wget, maupun python3 tidak ditemukan untuk mengunduh cloudflared</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="239"/>
+        <location filename="../qml/Theme.qml" line="232"/>
         <source>Download failed</source>
         <translation>Pengunduhan gagal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="240"/>
+        <location filename="../qml/Theme.qml" line="233"/>
         <source>No files selected</source>
         <translation>Tidak ada berkas yang dipilih</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="241"/>
+        <location filename="../qml/Theme.qml" line="234"/>
         <source>cloudflared is not installed</source>
         <translation>cloudflared tidak terinstal</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="242"/>
+        <location filename="../qml/Theme.qml" line="235"/>
         <source>Tunnel did not produce a public URL</source>
         <translation>Tunnel tidak menghasilkan URL publik</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="243"/>
+        <location filename="../qml/Theme.qml" line="236"/>
         <source>Timed out waiting for Cloudflare Tunnel to connect</source>
         <translation>Waktu habis saat menunggu Cloudflare Tunnel terhubung</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="244"/>
+        <location filename="../qml/Theme.qml" line="237"/>
         <source>This drive has no usable trash folder</source>
         <translation>Drive ini tidak memiliki folder tempat sampah yang dapat digunakan</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="245"/>
+        <location filename="../qml/Theme.qml" line="238"/>
         <source>Item is already in the trash</source>
         <translation>Item sudah berada di tempat sampah</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="246"/>
+        <location filename="../qml/Theme.qml" line="239"/>
         <source>Unsafe trash directory</source>
         <translation>Direktori tempat sampah tidak aman</translation>
     </message>
     <message>
+        <location filename="../qml/Theme.qml" line="241"/>
+        <source>Restored %1 items. Failed: %2</source>
+        <translation>Dipulihkan %1 item. Gagal: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="242"/>
+        <source>%1: no trash record</source>
+        <translation>%1: tidak ada catatan sampah</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="243"/>
+        <location filename="../qml/Theme.qml" line="244"/>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="246"/>
+        <source>Two items would be named “%1”</source>
+        <translation>Dua item akan dinamai “%1”</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="248"/>
+        <source>“%1” exists again at its old place</source>
+        <translation>“%1” sudah ada lagi di tempat lamanya</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="249"/>
+        <source>Undoing %1</source>
+        <translation>Membatalkan %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="250"/>
+        <source>Redoing %1</source>
+        <translation>Mengulang %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="251"/>
+        <source>Undid %1</source>
+        <translation>Dibatalkan %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="252"/>
+        <source>Redid %1</source>
+        <translation>Diulang %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="253"/>
+        <source>Could not undo %1: %2</source>
+        <translation>Tidak dapat membatalkan %1: %2</translation>
+    </message>
+    <message>
         <location filename="../qml/Theme.qml" line="254"/>
+        <source>Could not redo %1: %2</source>
+        <translation>Tidak dapat mengulang %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="255"/>
+        <source>Mounting %1</source>
+        <translation>Memasang %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="256"/>
+        <source>Unmounting %1</source>
+        <translation>Melepas %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="257"/>
+        <source>Ejecting %1</source>
+        <translation>Mengeluarkan %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="258"/>
+        <source>Unlocking %1</source>
+        <translation>Membuka kunci %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="259"/>
+        <source>Locking %1</source>
+        <translation>Mengunci %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="260"/>
+        <source>Renaming %1</source>
+        <translation>Mengganti nama %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="261"/>
+        <source>Restored %1 items (%2 renamed because the name was taken)</source>
+        <translation>Dipulihkan %1 item (%2 dinamai ulang karena nama sudah dipakai)</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="262"/>
+        <source>Restored %1 items (%2 renamed because the name was taken). Failed: %3</source>
+        <translation>Dipulihkan %1 item (%2 dinamai ulang karena nama sudah dipakai). Gagal: %3</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="263"/>
+        <source>%1 %2 items, %3 skipped</source>
+        <translation>%1 %2 item, %3 dilewati</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="264"/>
+        <source>%1 skipped</source>
+        <translation>%1 dilewati</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="265"/>
+        <source>Can&apos;t put “%1” inside itself</source>
+        <translation>Tidak dapat menaruh “%1” di dalam dirinya sendiri</translation>
+    </message>
+    <message>
+        <location filename="../qml/Theme.qml" line="273"/>
         <source>Image</source>
         <translation>Gambar</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="255"/>
+        <location filename="../qml/Theme.qml" line="274"/>
         <source>Video</source>
         <translation>Video</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="256"/>
+        <location filename="../qml/Theme.qml" line="275"/>
         <source>Audio</source>
         <translation>Audio</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="257"/>
+        <location filename="../qml/Theme.qml" line="276"/>
         <source>Code</source>
         <translation>Kode</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="258"/>
+        <location filename="../qml/Theme.qml" line="277"/>
         <source>Archive</source>
         <translation>Arsip</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="259"/>
+        <location filename="../qml/Theme.qml" line="278"/>
         <source>Document</source>
         <translation>Dokumen</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="260"/>
+        <location filename="../qml/Theme.qml" line="279"/>
         <source>Text</source>
         <translation>Teks</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="261"/>
+        <location filename="../qml/Theme.qml" line="280"/>
         <source>Font</source>
         <translation>Font</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="262"/>
+        <location filename="../qml/Theme.qml" line="281"/>
         <source>Application</source>
         <translation>Aplikasi</translation>
     </message>
     <message>
-        <location filename="../qml/Theme.qml" line="263"/>
+        <location filename="../qml/Theme.qml" line="282"/>
         <source>File</source>
         <translation>Berkas</translation>
     </message>
@@ -2883,36 +2919,6 @@
         <translation>Hapus</translation>
     </message>
     <message>
-        <location filename="../qml/main.qml" line="326"/>
-        <source>%1 phone items copied to Loaf&apos;s clipboard</source>
-        <translation>%1 item ponsel disalin ke clipboard Loaf</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="326"/>
-        <source>1 phone item copied to Loaf&apos;s clipboard</source>
-        <translation>1 item telepon disalin ke clipboard Loaf</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="330"/>
-        <source>1 item cut</source>
-        <translation>1 item dipotong</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="330"/>
-        <source>%1 items cut</source>
-        <translation>%1 item dipotong</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="330"/>
-        <source>1 item copied</source>
-        <translation>1 item disalin</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="330"/>
-        <source>%1 items copied</source>
-        <translation>%1 item disalin</translation>
-    </message>
-    <message>
         <location filename="../qml/main.qml" line="338"/>
         <location filename="../qml/main.qml" line="2555"/>
         <source>Path copied</source>
@@ -2922,16 +2928,6 @@
         <location filename="../qml/main.qml" line="403"/>
         <source>Permanently delete “%1”?</source>
         <translation>Hapus permanen “%1”?</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="404"/>
-        <source>Permanently delete %1 items?</source>
-        <translation>Hapus permanen %1 item?</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="404"/>
-        <source>Permanently delete 1 item?</source>
-        <translation>Hapus permanen 1 item?</translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="405"/>
@@ -2969,16 +2965,6 @@
         <translation>Tidak dapat dipindahkan ke tempat sampah</translation>
     </message>
     <message>
-        <location filename="../qml/main.qml" line="937"/>
-        <source>1 item can&apos;t be put in the trash on this drive. Delete it permanently instead?</source>
-        <translation>1 item tidak dapat dimasukkan ke tempat sampah di drive ini. Hapus permanen saja?</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="937"/>
-        <source>%1 items can&apos;t be put in the trash on this drive. Delete them permanently instead?</source>
-        <translation>%1 item tidak dapat dimasukkan ke tempat sampah di drive ini. Hapus permanen saja?</translation>
-    </message>
-    <message>
         <location filename="../qml/main.qml" line="938"/>
         <location filename="../qml/main.qml" line="2348"/>
         <location filename="../qml/main.qml" line="2358"/>
@@ -2995,7 +2981,7 @@
     <message>
         <location filename="../qml/main.qml" line="1004"/>
         <source>Could not share via link: </source>
-        <translation>Tidak dapat berbagi via tautan:</translation>
+        <translation>Tidak dapat berbagi via tautan: </translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="1053"/>
@@ -3137,16 +3123,6 @@
         <location filename="../qml/main.qml" line="1924"/>
         <source>New tab</source>
         <translation>Tab baru</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="2161"/>
-        <source>%1 files</source>
-        <translation>%1 berkas</translation>
-    </message>
-    <message>
-        <location filename="../qml/main.qml" line="2161"/>
-        <source>1 file</source>
-        <translation>1 berkas</translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="2186"/>
@@ -3318,19 +3294,54 @@
         <source>Copy Path</source>
         <translation>Salin Path</translation>
     </message>
-    <message>
-        <source>Rename %1 Items…</source>
-        <translation type="vanished">Ganti Nama %1 Item…</translation>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="326"/>
+        <source>%n phone item(s) copied to Loaf&apos;s clipboard</source>
+        <translation>
+            <numerusform>%n item ponsel disalin ke papan klip Loaf</numerusform>
+        </translation>
     </message>
-    <message>
-        <location filename="../qml/main.qml" line="2405"/>
-        <source>Rename 1 item…</source>
-        <translation>Ganti nama 1 item…</translation>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="330"/>
+        <source>%n item(s) cut</source>
+        <translation>
+            <numerusform>%n item dipotong</numerusform>
+        </translation>
     </message>
-    <message>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="330"/>
+        <source>%n item(s) copied</source>
+        <translation>
+            <numerusform>%n item disalin</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="404"/>
+        <source>Permanently delete %n item(s)?</source>
+        <translation>
+            <numerusform>Hapus permanen %n item?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="937"/>
+        <source>%n item(s) can&apos;t be put in the trash on this drive. Delete it permanently instead?</source>
+        <translation>
+            <numerusform>%n item tidak dapat dipindahkan ke sampah di drive ini. Hapus permanen?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/main.qml" line="2161"/>
+        <source>%n file(s)</source>
+        <translation>
+            <numerusform>%n berkas</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <location filename="../qml/main.qml" line="2405"/>
-        <source>Rename %1 items…</source>
-        <translation>Ganti nama %1 item…</translation>
+        <source>Rename %n item(s)…</source>
+        <translation>
+            <numerusform>Ganti nama %n item…</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="2407"/>
@@ -3901,10 +3912,6 @@
         <location filename="../qml/main.qml" line="3126"/>
         <source>Display name</source>
         <translation>Nama tampilan</translation>
-    </message>
-    <message>
-        <source>Studio NAS</source>
-        <translation type="vanished">NAS Studio</translation>
     </message>
     <message>
         <location filename="../qml/main.qml" line="3128"/>

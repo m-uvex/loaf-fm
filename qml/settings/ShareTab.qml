@@ -343,9 +343,13 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 160 : 320
                 options: [
+                    //: Short label for 1 Hour expiration. Must stay short.
                     { value: 1, label: qsTr("1 Hour"), shortLabel: qsTr("1h") },
+                    //: Short label for 6 Hours expiration. Must stay short.
                     { value: 6, label: qsTr("6 Hours"), shortLabel: qsTr("6h") },
+                    //: Short label for 24 Hours expiration. Must stay short.
                     { value: 24, label: qsTr("24 Hours"), shortLabel: qsTr("24h") },
+                    //: Short label for Never expiring (infinity symbol). Must stay short.
                     { value: 0, label: qsTr("Never"), shortLabel: qsTr("∞") }
                 ]
                 value: theme.shareExpirationHours
@@ -373,6 +377,7 @@ ColumnLayout {
                         theme.shareThrottleKbps = val;
                     }
                 }
+                //: Unit label for kilobytes per second. Must stay short.
                 Text {
                     text: qsTr("KB/s")
                     color: theme.textMuted

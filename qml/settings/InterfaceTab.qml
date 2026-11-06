@@ -289,11 +289,17 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
+                    //: Short label for Thin icon weight. Must stay short.
                     { value: "thin", label: qsTr("Thin"), shortLabel: qsTr("Th") },
+                    //: Short label for Light icon weight. Must stay short.
                     { value: "light", label: qsTr("Light"), shortLabel: qsTr("Lt") },
+                    //: Short label for Regular icon weight. Must stay short.
                     { value: "regular", label: qsTr("Regular"), shortLabel: qsTr("Reg") },
+                    //: Short label for Bold icon weight. Must stay short.
                     { value: "bold", label: qsTr("Bold"), shortLabel: qsTr("Bd") },
+                    //: Short label for Fill icon weight. Must stay short.
                     { value: "fill", label: qsTr("Fill"), shortLabel: qsTr("Fil") },
+                    //: Short label for Duotone icon weight. Must stay short.
                     { value: "duotone", label: qsTr("Duotone"), shortLabel: qsTr("Duo") }
                 ]
                 value: theme.phosphorWeight
@@ -317,8 +323,11 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
                 options: [
+                    //: Short label for Automatic toolbar buttons. Must stay short.
                     { value: "auto", label: qsTr("Automatic"), icon: "arrows-clockwise", shortLabel: qsTr("Auto") },
+                    //: Short label for Always toolbar buttons. Must stay short.
                     { value: "always", label: qsTr("Always"), icon: "arrow-left", shortLabel: qsTr("Show") },
+                    //: Short label for Hidden toolbar buttons. Must stay short.
                     { value: "hidden", label: qsTr("Hidden"), icon: "eye-slash", shortLabel: qsTr("Hide") }
                 ]
                 value: theme.toolbarOperations
@@ -362,7 +371,9 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                 options: [
+                    //: Short label for Breadcrumbs path bar mode. Must stay short.
                     { value: "chips", label: qsTr("Breadcrumbs"), icon: "bread", shortLabel: qsTr("Chips") },
+                    //: Short label for Text Only path bar mode. Must stay short.
                     { value: "text", label: qsTr("Text Only"), icon: "text-t", shortLabel: qsTr("Text") }
                 ]
                 value: theme.pathBarMode
@@ -417,7 +428,9 @@ ColumnLayout {
                     Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                     options: [
                         { value: "full", label: qsTr("Full"), shortLabel: qsTr("Full") },
+                        //: Short label for Minimal context menu mode. Must stay short.
                         { value: "minimal", label: qsTr("Minimal"), shortLabel: qsTr("Min") },
+                        //: Short label for Custom context menu mode. Must stay short.
                         { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Edit") }
                     ]
                     value: theme.contextMenuMode
