@@ -82,6 +82,7 @@ pub mod qobject {
         #[qinvokable]
         fn language_overridden_by_env(self: &LoafCore) -> bool;
         #[qinvokable]
+        fn effective_language(self: &LoafCore) -> QString;
         fn refresh_system_theme(self: Pin<&mut LoafCore>);
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
@@ -865,9 +866,14 @@ impl qobject::LoafCore {
     }
 
     pub fn language_overridden_by_env(&self) -> bool {
-        std::env::var("LOAF_LANG")
-            .map(|value| !value.trim().is_empty())
-            .unwrap_or(false)
+        crate::env_language().is_some()
+    }
+
+    pub fn effective_language(&self) -> QString {
+        q(&crate::resolve_language(
+            crate::env_language().as_deref(),
+            state::get("language").as_deref(),
+        ))
     }
 
     pub fn refresh_system_theme(self: Pin<&mut Self>) {

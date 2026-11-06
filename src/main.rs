@@ -46,7 +46,14 @@ Options:
 /// Window class (Wayland app id / WM_CLASS) used when `--class` is not given.
 const DEFAULT_CLASS: &str = "loaf";
 
-fn resolve_language(env_value: Option<&str>, stored_value: Option<&str>) -> String {
+pub(crate) fn env_language() -> Option<String> {
+    std::env::var("LOAF_LANG")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub(crate) fn resolve_language(env_value: Option<&str>, stored_value: Option<&str>) -> String {
     let clean = |v: Option<&str>| {
         v.map(str::trim)
             .filter(|s| !s.is_empty())
@@ -128,8 +135,9 @@ fn main() {
         }
     };
     native::ffi::set_application_identity(env!("CARGO_PKG_VERSION"), &args.class);
+    let env_lang = env_language();
     let language = resolve_language(
-        std::env::var("LOAF_LANG").ok().as_deref(),
+        env_lang.as_deref(),
         state::get("language").as_deref(),
     );
     native::set_application_language(&language);

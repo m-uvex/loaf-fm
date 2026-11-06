@@ -125,7 +125,7 @@ ColumnLayout {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
                 accessibleName: qsTr("Language")
                 options: root.languageOptions
-                value: theme.language
+                value: core.language_overridden_by_env() ? core.effective_language() : theme.language
                 enabled: !core.language_overridden_by_env()
                 onSelected: function(v) {
                     theme.language = v;
