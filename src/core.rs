@@ -1113,7 +1113,7 @@ impl qobject::LoafCore {
     pub fn mount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Mounting {}", dev), dev, move || {
+        self.drive_job(util::msg_args("op.mounting", &[&dev]), dev, move || {
             match drives::mount(&dev_clone) {
                 Ok(path) => Ok(serde_json::json!({
                     "action": "mount",
@@ -1131,7 +1131,7 @@ impl qobject::LoafCore {
     pub fn unmount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Unmounting {}", dev), dev, move || {
+        self.drive_job(util::msg_args("op.unmounting", &[&dev]), dev, move || {
             match drives::unmount(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "unmount",
@@ -1149,7 +1149,7 @@ impl qobject::LoafCore {
         let disk = disk.to_string();
         let disk_clone = disk.clone();
         let snapshot = self.drives.clone();
-        self.drive_job(format!("Ejecting {}", disk), disk, move || {
+        self.drive_job(util::msg_args("op.ejecting", &[&disk]), disk, move || {
             match drives::eject(&disk_clone, &snapshot) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "eject",
@@ -1176,7 +1176,7 @@ impl qobject::LoafCore {
         }
         let thread = self.qt_thread();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Unlocking {}", dev.clone()), dev, move || match drives::unlock(&dev_clone, &pass) {
+        self.drive_job(util::msg_args("op.unlocking", &[&dev]), dev, move || match drives::unlock(&dev_clone, &pass) {
             Ok(clear) => {
                 if remember {
                     secret_store(&format!("luks:{}", dev_clone), &format!("Loaf: encrypted drive {}", dev_clone), &pass);
@@ -1211,7 +1211,7 @@ impl qobject::LoafCore {
     pub fn lock_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Locking {}", dev), dev, move || {
+        self.drive_job(util::msg_args("op.locking", &[&dev]), dev, move || {
             match drives::lock(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "lock",
@@ -1229,7 +1229,7 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let dev_clone = dev.clone();
         let name = name.to_string();
-        self.drive_job(format!("Renaming {}", dev), dev, move || {
+        self.drive_job(util::msg_args("op.renaming-drive", &[&dev]), dev, move || {
             match drives::set_label(&dev_clone, &name) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "rename",
@@ -2061,19 +2061,20 @@ impl qobject::LoafCore {
                     break;
                 }
                 let Some(item) = records.iter().find(|r| r.trashed == *p) else {
-                    errors.push(format!("{}: no trash record", file_name(p)));
+                    errors.push(util::msg_args("outcome.restore-no-record", &[&file_name(p)]));
                     continue;
                 };
                 match trash::restore(item) {
                     Ok(to) => {
                         moved.push((item.trashed.clone(), to));
                     }
-                    Err(e) => errors.push(format!("{}: {}", file_name(p), e)),
+                    Err(e) => errors.push(util::msg_args("outcome.restore-item-failed", &[&file_name(p), &e.to_string()])),
                 }
             }
             let n = moved.len();
             if !errors.is_empty() {
-                return Outcome::err(format!("{}: {}", util::msg_args("outcome.restored-many", &[&n.to_string()]), errors.join("; ")));
+                let list = util::msg_list(&errors);
+                return Outcome::err(util::msg_args("outcome.restore-failed", &[&n.to_string(), &list]));
             }
             let msg = if n == 1 {
                 util::msg_args("outcome.restored-one", &[&file_name(&moved[0].0)])
@@ -2137,7 +2138,7 @@ impl qobject::LoafCore {
             let name = file_name(&target);
             let staging = parent.join(format!(".loaf-compress-{}-{}", std::process::id(), op.id));
             if let Err(e) = std::fs::create_dir(&staging) {
-                return Outcome::err(format!("Could not create the archive: {}", e));
+                return Outcome::err(util::msg_args("outcome.archive-create-failed", &[&e.to_string()]));
             }
             let built = archive::compress(&staging.join(&name), &items, &fmt, &pass, &|| op.cancelled())
                 .and_then(|()| fsops::place_unique(&staging.join(&name), &parent, &name).map_err(|e| ArchiveError::Failed(e.to_string())));
@@ -2336,7 +2337,7 @@ impl qobject::LoafCore {
             let from = PathBuf::from(&r.path);
             let name = match validate_name(&r.name) {
                 Ok(n) => n,
-                Err(e) => return q(&format!("{}: {}", r.name, e)),
+                Err(e) => return q(&util::msg_args("outcome.item-failed", &[&r.name, &e])),
             };
             let to = from.parent().unwrap_or(Path::new("/")).join(name);
             if to != from {
@@ -2375,16 +2376,17 @@ impl qobject::LoafCore {
         self.as_mut().rust_mut().history_running = true;
         self.as_mut().sync_undo_props();
         let label = entry.label.clone();
-        let (kind, doing, did, fail) = if is_undo {
-            ("undo", "Undoing", "Undid", "Could not undo")
+        let (kind, doing_key, done_key, fail_key) = if is_undo {
+            ("undo", "notify.undoing", "notify.undone", "notify.undo-failed")
         } else {
-            ("redo", "Redoing", "Redid", "Could not redo")
+            ("redo", "notify.redoing", "notify.redone", "notify.redo-failed")
         };
-        self.spawn_op(kind, format!("{} {}", doing, label), move |op| {
+        let doing = util::msg_args(doing_key, &[&label]);
+        self.spawn_op(kind, doing, move |op| {
             let p = if is_undo { invert(&entry.action, op) } else { replay(&entry.action, op) };
             let mut o = match &p.error {
-                None => Outcome::ok(format!("{} {}", did, label)),
-                Some(e) => Outcome::err(format!("{} {}: {}", fail, label, e)),
+                None => Outcome::ok(util::msg_args(done_key, &[&label])),
+                Some(e) => Outcome::err(util::msg_args(fail_key, &[&label, e])),
             };
             o.undo = p.reverse.map(|a| UndoEntry { label: label.clone(), action: a });
             o.requeue = p.rest.map(|a| UndoEntry { label: label.clone(), action: a });
@@ -2548,7 +2550,7 @@ fn extract_safely(
     let mut place = |from: &Path, name: &str| match fsops::place_unique(from, parent, name) {
         Ok(to) => created.push(to),
         Err(e) => {
-            failed.get_or_insert(format!("{}: {}", name, e));
+            failed.get_or_insert(util::msg_args("outcome.item-failed", &[name, &e.to_string()]));
         }
     };
     if into_subfolder && !(entries.len() == 1 && entries[0].is_dir()) {
@@ -2573,10 +2575,10 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     let mut targets = std::collections::HashSet::new();
     for (_, to) in pairs {
         if !targets.insert(to) {
-            return Err(format!("Two items would be named “{}”", file_name(to)));
+            return Err(util::msg_args("outcome.rename-duplicate", &[&file_name(to)]));
         }
         if std::fs::symlink_metadata(to).is_ok() && !sources.contains(to) {
-            return Err(format!("“{}” already exists", file_name(to)));
+            return Err(util::msg_args("outcome.rename-exists", &[&file_name(to)]));
         }
     }
     let mut staged: Vec<(PathBuf, PathBuf, PathBuf)> = Vec::new();
@@ -2586,7 +2588,7 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
             for (f, t, _) in staged.iter().rev() {
                 let _ = std::fs::rename(t, f);
             }
-            return Err(format!("{}: {}", file_name(from), e));
+            return Err(util::msg_args("outcome.item-failed", &[&file_name(from), &e.to_string()]));
         }
         staged.push((from.clone(), tmp, to.clone()));
     }
@@ -2602,7 +2604,7 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
                     let _ = std::fs::rename(t, f);
                 }
             }
-            return Err(format!("{}: {}", file_name(from), e));
+            return Err(util::msg_args("outcome.item-failed", &[&file_name(from), &e.to_string()]));
         }
         finished.push((from.clone(), to.clone()));
     }
@@ -2655,7 +2657,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => break,
-            Err(e) => errors.push(format!("{}: {}", name, e)),
+            Err(e) => errors.push(util::msg_args("outcome.item-failed", &[&name, &e.to_string()])),
         }
     }
     if mode != "link" && !pairs.is_empty() && needs_sync(&dest) {
@@ -2685,7 +2687,8 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             Outcome::ok(util::msg_args(key, &[&n.to_string()]))
         }
     } else {
-        Outcome::err(util::msg_args("outcome.transfer-failed", &[verb, &n.to_string(), &errors.len().to_string(), &errors.join("; ")]))
+        let list = util::msg_list(&errors);
+        Outcome::err(util::msg_args("outcome.transfer-failed", &[verb, &n.to_string(), &errors.len().to_string(), &list]))
     };
     if n > 0 {
         let action = match mode {
@@ -2744,7 +2747,7 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(paths[..i].to_vec(), UndoAction::Create),
                             some_if(paths[i..].to_vec(), UndoAction::Create),
-                            format!("{}: {}", file_name(p), e),
+                            util::msg_args("outcome.item-failed", &[&file_name(p), &e.to_string()]),
                         );
                     }
                 }
@@ -2758,7 +2761,7 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(pairs[..i].to_vec(), UndoAction::Copy),
                             some_if(pairs[i..].to_vec(), UndoAction::Copy),
-                            format!("{}: {}", file_name(t), e),
+                            util::msg_args("outcome.item-failed", &[&file_name(t), &e.to_string()]),
                         );
                     }
                 }
@@ -2769,9 +2772,9 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
             for idx in (0..pairs.len()).rev() {
                 let (from, to) = &pairs[idx];
                 let err = if std::fs::symlink_metadata(from).is_ok() {
-                    Some(format!("“{}” exists again at its old place", file_name(from)))
+                    Some(util::msg_args("outcome.exists-again", &[&file_name(from)]))
                 } else {
-                    fsops::move_path(to, from, op).err().map(|e| format!("{}: {}", file_name(to), e))
+                    fsops::move_path(to, from, op).err().map(|e| util::msg_args("outcome.item-failed", &[&file_name(to), &e.to_string()]))
                 };
                 if let Some(e) = err {
                     return Partial::stopped(
@@ -2795,7 +2798,7 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(restored, UndoAction::Trash),
                             some_if(items[i..].to_vec(), UndoAction::Trash),
-                            format!("{}: {}", file_name(&it.original), e),
+                            util::msg_args("outcome.item-failed", &[&file_name(&it.original), &e.to_string()]),
                         )
                     }
                 }

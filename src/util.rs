@@ -168,6 +168,15 @@ pub fn msg_args<T: AsRef<str>>(key: &str, args: &[T]) -> String {
     serde_json::json!({ "key": key, "args": a }).to_string()
 }
 
+/// Serializes several messages or plain texts joined with "; " in QML.
+pub fn msg_list(items: &[String]) -> String {
+    let values: Vec<serde_json::Value> = items
+        .iter()
+        .map(|item| serde_json::from_str(item).unwrap_or_else(|_| serde_json::Value::String(item.clone())))
+        .collect();
+    serde_json::json!({ "key": "list.join", "args": values }).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +201,29 @@ mod tests {
         write_atomic(&p, b"two").unwrap();
         assert_eq!(std::fs::read(&p).unwrap(), b"two");
         std::fs::remove_file(&p).unwrap();
+    }
+    #[test]
+    fn messages_parse_as_single_json_object() {
+        for (text, key) in [
+            (msg("example.key"), "example.key"),
+            (msg_args("example.key", &["one", "two"]), "example.key"),
+            (msg_list(&[msg("example.key")]), "list.join"),
+        ] {
+            let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+            assert!(parsed.is_object());
+            assert_eq!(parsed["key"], key);
+        }
+        let parsed: serde_json::Value = serde_json::from_str(&msg_args("example.key", &["one"])).unwrap();
+        assert_eq!(parsed["args"], serde_json::json!(["one"]));
+    }
+
+    #[test]
+    fn message_list_nests_messages_and_plain_text() {
+        let items = [msg("first.key"), "plain text".to_string(), msg_args("second.key", &["arg"])];
+        let parsed: serde_json::Value = serde_json::from_str(&msg_list(&items)).unwrap();
+        assert_eq!(parsed["key"], "list.join");
+        assert_eq!(parsed["args"][0]["key"], "first.key");
+        assert_eq!(parsed["args"][1], "plain text");
+        assert_eq!(parsed["args"][2]["key"], "second.key");
     }
 }
