@@ -59,7 +59,7 @@ Rectangle {
             color: toast.kind === "error" ? theme.danger : theme.primary
         }
         Text {
-            text: toast.message
+            text: theme.resolveRustMessage(toast.message)
             color: toast.kind === "error" ? theme.danger : theme.textMain
             font.pixelSize: theme.fs(12)
             elide: Text.ElideRight

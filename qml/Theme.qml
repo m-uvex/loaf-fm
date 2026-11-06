@@ -6,6 +6,8 @@ Item {
 
     property string themeMode: "auto" // "auto", "light", "dark"
 
+    property string language: ""
+
     // How much of the desktop shows through the window itself.
     property real backgroundOpacity: 1.0
     // How solid the surfaces drawn on top of it are: file panes, the sidebar
@@ -109,15 +111,176 @@ Item {
         return Math.round(px * fontScale);
     }
 
-    // English singular/plural without a translation catalogue loaded:
-    // plural(n, qsTr("1 item"), qsTr("%1 items")).
     // "100,000" (grouped the way the user's locale writes numbers).
     function number(n) {
         return Number(n).toLocaleString(Qt.locale(), "f", 0);
     }
 
-    function plural(n, one, many) {
-        return n === 1 ? one : many.arg(number(n));
+    function relativeTime(timestampSeconds) {
+        var ts = Number(timestampSeconds) || 0;
+        if (ts <= 0) return "-";
+        var elapsed = Math.floor(Date.now() / 1000) - ts;
+        if (elapsed < 0) elapsed = 0;
+        if (elapsed < 60) return qsTr("Just now");
+        if (elapsed < 3600) return qsTr("%1m ago").arg(number(Math.floor(elapsed / 60)));
+        if (elapsed < 86400) return qsTr("%1h ago").arg(number(Math.floor(elapsed / 3600)));
+        if (elapsed < 86400 * 7) return qsTr("%1d ago").arg(number(Math.floor(elapsed / 86400)));
+        return Qt.formatDate(new Date(ts * 1000), Qt.locale(), Locale.ShortFormat);
+    }
+
+
+    function substitute(template, values) {
+        return template.replace(/%(\d+)/g, function (m, index) { var value = values[Number(index) - 1]; return value === undefined || value === null ? m : String(value); });
+    }
+
+    // Rust emits {key,args} JSON for strings lupdate cannot see.
+    // Non-JSON text (OS/tool errors) is shown verbatim.
+    function resolveRustMessage(text) {
+        if (!text || text.length === 0 || text.charAt(0) !== "{") return text || "";
+        var decoded;
+        try { decoded = JSON.parse(text); } catch (e) { return text; }
+        if (!decoded || decoded.v !== 1) return text;
+        if (typeof decoded.raw === "string") return decoded.raw;
+        var key = decoded && decoded.key;
+        var a = (decoded && decoded.args) || [];
+        var out;
+        if (key === "info.no-preview") out = qsTr("No preview available");
+        else if (key === "info.missing") out = qsTr("This item no longer exists");
+        else if (key === "info.folder-items") out = qsTr("Folder · %n item(s)", "", Number(a[0]) || 0);
+        else if (key === "info.archive-files") out = qsTr("Archive · %1 files").arg(number(Number(a[0]) || 0));
+        else if (key === "info.encrypted-archive") out = qsTr("Encrypted archive");
+        else if (key === "info.press-enter") out = qsTr("Press Enter to open it");
+        else if (key === "info.binary-file") out = qsTr("Binary file · no text preview");
+        else if (key === "drive.root") out = qsTr("Root (/)");
+        else if (key === "drive.volume") out = qsTr("%1 Volume").arg(a[0] || "");
+        else if (key === "name.empty") out = qsTr("The name can't be empty");
+        else if (key === "name.reserved") out = qsTr("\".\" and \"..\" are reserved names");
+        else if (key === "name.slash") out = qsTr("Names can't contain \"/\"");
+        else if (key === "name.invalid") out = qsTr("Invalid character in name");
+        else if (key === "name.too-long") out = qsTr("The name is too long");
+        else if (key === "place.home") out = qsTr("Home");
+        else if (key === "place.pc") out = qsTr("This PC");
+        else if (key === "place.recent") out = qsTr("Recent");
+        else if (key === "place.starred") out = qsTr("Starred");
+        else if (key === "place.trash") out = qsTr("Trash");
+        else if (key === "notify.cancelled") out = qsTr("Cancelled");
+        else if (key === "notify.bookmark-added") out = qsTr("Added “%1” to the sidebar");
+        else if (key === "notify.folder-missing") out = qsTr("That folder doesn't exist");
+        else if (key === "notify.smb-missing") out = qsTr("That SMB share no longer exists");
+        else if (key === "notify.keyring-error") out = qsTr("Could not save the password in the system keyring");
+        else if (key === "notify.no-app-for-file") out = qsTr("No application can open “%1”");
+        else if (key === "notify.app-missing") out = qsTr("That application is no longer installed");
+        else if (key === "notify.app-start-error") out = qsTr("Could not start %1: %2");
+        else if (key === "notify.app-default-set") out = qsTr("%1 now opens %2 files");
+        else if (key === "notify.cmd-error") out = qsTr("Could not run the command: %1");
+        else if (key === "notify.script-error") out = qsTr("Could not run the script: %1");
+        else if (key === "notify.pkexec-missing") out = qsTr("pkexec (polkit) is not installed");
+        else if (key === "notify.mtp-no-trash") out = qsTr("Phone files have no trash. Use Delete Permanently.");
+        else if (key === "notify.already-exists") out = qsTr("“%1” already exists");
+        else if (key === "notify.create-error") out = qsTr("Could not create “%1”: %2");
+        else if (key === "notify.renamed") out = qsTr("%n item(s) renamed", "", Number(a[0]) || 0);
+        else if (key === "notify.cloudflared-installed") out = qsTr("Cloudflare Tunnel agent installed successfully");
+        else if (key === "notify.cloudflared-install-failed") out = qsTr("Failed to install cloudflared: %1");
+        else if (key === "op.smb-disconnecting") out = qsTr("Disconnecting from %1");
+        else if (key === "op.smb-connecting") out = qsTr("Connecting to %1");
+        else if (key === "op.mtp-downloading") out = qsTr("Downloading phone file");
+        else if (key === "op.opening-member") out = qsTr("Opening %1");
+        else if (key === "op.mtp-previewing") out = qsTr("Downloading phone preview");
+        else if (key === "op.mtp-transferring") out = qsTr("Transferring phone files");
+        else if (key === "op.moving") out = qsTr("Moving %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.copying") out = qsTr("Copying %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.linking") out = qsTr("Linking %n item(s) to %1", "", Number(a[0]) || 0).arg(a[1] || "");
+        else if (key === "op.trashing") out = qsTr("Moving %n item(s) to the trash", "", Number(a[0]) || 0);
+        else if (key === "op.deleting-phone") out = qsTr("Deleting phone files");
+        else if (key === "op.deleting") out = qsTr("Deleting %n item(s)", "", Number(a[0]) || 0);
+        else if (key === "op.restoring") out = qsTr("Restoring %n item(s)", "", Number(a[0]) || 0);
+        else if (key === "op.emptying-trash") out = qsTr("Emptying the trash");
+        else if (key === "op.compressing") out = qsTr("Compressing into “%1”");
+        else if (key === "op.extracting") out = qsTr("Extracting “%1”");
+        else if (key === "op.mtp-creating") out = qsTr("Creating %1 on phone");
+        else if (key === "op.mtp-renaming") out = qsTr("Renaming phone item");
+        else if (key === "outcome.smb-connected") out = qsTr("Connected to %1");
+        else if (key === "outcome.mtp-opened") out = qsTr("Opened a downloaded copy. Copy changes back to update the phone.");
+        else if (key === "outcome.mtp-transfer-complete") out = qsTr("Phone transfer complete");
+        else if (key === "outcome.trashed") out = qsTr("%n item(s) moved to the trash", "", Number(a[0]) || 0);
+        else if (key === "outcome.mtp-deleted") out = qsTr("Phone files deleted");
+        else if (key === "outcome.deleted") out = qsTr("Deleted %n item(s)", "", Number(a[0]) || 0);
+        else if (key === "outcome.delete-err") out = qsTr("Could not delete %1 items: %2");
+        else if (key === "outcome.restored") out = qsTr("%n item(s) restored", "", Number(a[0]) || 0);
+        else if (key === "outcome.trash-emptied") out = qsTr("Trash emptied");
+        else if (key === "outcome.trash-partial-err") out = qsTr("Some items could not be deleted: %1");
+        else if (key === "outcome.created-archive") out = qsTr("Created “%1”");
+        else if (key === "outcome.archive-create-err") out = qsTr("Could not create the archive: %1");
+        else if (key === "outcome.extracted") out = qsTr("Extracted “%1”");
+        else if (key === "outcome.extracted-partly") out = qsTr("Extracted “%1” only partly: %2");
+        else if (key === "outcome.extract-err") out = qsTr("Could not extract “%1”: %2");
+        else if (key === "outcome.mtp-created") out = qsTr("Created on phone");
+        else if (key === "outcome.mtp-renamed") out = qsTr("Renamed on phone");
+        else if (key === "outcome.moved") out = qsTr("%n item(s) moved", "", Number(a[0]) || 0);
+        else if (key === "outcome.copied") out = qsTr("%n item(s) copied", "", Number(a[0]) || 0);
+        else if (key === "outcome.linked") out = qsTr("%n item(s) linked", "", Number(a[0]) || 0);
+        else if (key === "outcome.transfer-failed") out = qsTr("%1 %2 items; %3 failed: %4");
+        else if (key === "pane.error-permission") out = qsTr("You don't have permission to view this folder");
+        else if (key === "pane.error-notfound") out = qsTr("This folder no longer exists");
+        else if (key === "archive.error-password") out = qsTr("This archive needs a password");
+        else if (key === "archive.error-missing-tool") out = qsTr("'%1' is not installed");
+        else if (key === "archive.error-cancelled") out = qsTr("Cancelled");
+        else if (key === "archive.error-empty") out = qsTr("Nothing to compress");
+        else if (key === "archive.error-not-archive") out = qsTr("Not an archive");
+        else if (key === "archive.error-not-found") out = qsTr("The file was not found in the archive");
+        else if (key === "share.error-tool-missing") out = qsTr("Neither curl, wget, nor python3 was found to download cloudflared");
+        else if (key === "share.error-download-failed") out = qsTr("Download failed");
+        else if (key === "share.error-no-files") out = qsTr("No files selected");
+        else if (key === "share.error-cloudflared-missing") out = qsTr("cloudflared is not installed");
+        else if (key === "share.error-no-url") out = qsTr("Tunnel did not produce a public URL");
+        else if (key === "share.error-timeout") out = qsTr("Timed out waiting for Cloudflare Tunnel to connect");
+        else if (key === "trash.error-no-usable") out = qsTr("This drive has no usable trash folder");
+        else if (key === "trash.error-already") out = qsTr("Item is already in the trash");
+        else if (key === "trash.error-unsafe") out = qsTr("Unsafe trash directory");
+        else if (key === "list.join") out = a.map(function (item) { return resolveRustMessage(item); }).join("; ");
+        else if (key === "outcome.restore-failed") out = qsTr("Restored %1 items. Failed: %2");
+        else if (key === "outcome.restore-no-record") out = qsTr("%1: no trash record");
+        else if (key === "outcome.restore-item-failed") out = qsTr("%1: %2");
+        else if (key === "outcome.item-failed") out = qsTr("%1: %2");
+        else if (key === "outcome.archive-create-failed") out = qsTr("Could not create the archive: %1");
+        else if (key === "outcome.rename-duplicate") out = qsTr("Two items would be named “%1”");
+        else if (key === "outcome.rename-exists") out = qsTr("“%1” already exists");
+        else if (key === "outcome.exists-again") out = qsTr("“%1” exists again at its old place");
+        else if (key === "notify.undoing") out = qsTr("Undoing %1");
+        else if (key === "notify.redoing") out = qsTr("Redoing %1");
+        else if (key === "notify.undone") out = qsTr("Undid %1");
+        else if (key === "notify.redone") out = qsTr("Redid %1");
+        else if (key === "notify.undo-failed") out = qsTr("Could not undo %1: %2");
+        else if (key === "notify.redo-failed") out = qsTr("Could not redo %1: %2");
+        else if (key === "op.mounting") out = qsTr("Mounting %1");
+        else if (key === "op.unmounting") out = qsTr("Unmounting %1");
+        else if (key === "op.ejecting") out = qsTr("Ejecting %1");
+        else if (key === "op.unlocking") out = qsTr("Unlocking %1");
+        else if (key === "op.locking") out = qsTr("Locking %1");
+        else if (key === "op.renaming-drive") out = qsTr("Renaming %1");
+        else if (key === "outcome.restored-renamed") out = qsTr("Restored %1 items (%2 renamed because the name was taken)");
+        else if (key === "outcome.restore-failed-renamed") out = qsTr("Restored %1 items (%2 renamed because the name was taken). Failed: %3");
+        else if (key === "outcome.transferred-skipped") out = qsTr("%1 %2 items, %3 skipped");
+        else if (key === "outcome.skipped-only") out = qsTr("%1 skipped");
+        else if (key === "outcome.inside-itself") out = qsTr("Can't put “%1” inside itself");
+        else return text;
+        var resolvedArgs = a.map(function (item) { return (item !== null && typeof item === "object") ? resolveRustMessage(JSON.stringify(item)) : item; });
+        return substitute(out, resolvedArgs);
+    }
+
+    function categoryName(key) {
+        if (key === "folder") return qsTr("Folder");
+        if (key === "image") return qsTr("Image");
+        if (key === "video") return qsTr("Video");
+        if (key === "audio") return qsTr("Audio");
+        if (key === "code") return qsTr("Code");
+        if (key === "archive") return qsTr("Archive");
+        if (key === "document") return qsTr("Document");
+        if (key === "text") return qsTr("Text");
+        if (key === "font") return qsTr("Font");
+        if (key === "application") return qsTr("Application");
+        if (key === "file") return qsTr("File");
+        return key || "";
     }
 
     // Single click on a selected item's name starts renaming.
@@ -2055,6 +2218,8 @@ Item {
 
         value = readSetting("themeMode");
         if (value.length > 0) themeMode = value;
+        value = readSetting("language");
+        if (value.length > 0) language = value;
         value = readSetting("backgroundOpacity");
         if (value.trim().length > 0 && isFinite(Number(value)))
             backgroundOpacity = Math.max(0.0, Math.min(1.0, Number(value)));

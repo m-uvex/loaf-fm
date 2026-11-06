@@ -832,7 +832,7 @@ Window {
             color: theme.textMain
             font.pixelSize: theme.fs(13)
             text: overwriteDialog.many
-                ? qsTr("%1 of the files already exist in this folder. Replace them?").arg(overwriteDialog.existingCount)
+                ? qsTr("%n of the files already exists in this folder. Replace it?", "", overwriteDialog.existingCount)
                 : qsTr("“%1” already exists. Replace it?").arg(overwriteDialog.targets.length > 0 ? overwriteDialog.targets[0].split("/").pop() : "")
         }
 

@@ -80,7 +80,7 @@ pub fn default_places() -> Vec<Place> {
     let home = util::home();
     let mut v = vec![Place {
         id: "home".into(),
-        name: "Home".into(),
+        name: util::msg("place.home"),
         path: home.to_string_lossy().to_string(),
         icon: "house".into(),
         system_icon: "user-home".into(),
@@ -101,7 +101,7 @@ pub fn default_places() -> Vec<Place> {
         }
         v.push(Place {
             id: key.into(),
-            name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| key.into()),
+            name: util::raw(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| key.into())),
             path: p.to_string_lossy().to_string(),
             icon: icon.into(),
             system_icon: sys.into(),
@@ -118,7 +118,7 @@ pub fn default_places() -> Vec<Place> {
         if p.is_dir() {
             v.push(Place {
                 id: "PROJECTS".into(),
-                name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Projects".into()),
+                name: util::raw(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Projects".into())),
                 path: p.to_string_lossy().to_string(),
                 icon: "code".into(),
                 system_icon: "folder-development".into(),
@@ -136,7 +136,7 @@ pub fn default_places() -> Vec<Place> {
         if p.is_dir() {
             v.push(Place {
                 id: "GAMES".into(),
-                name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Games".into()),
+                name: util::raw(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Games".into())),
                 path: p.to_string_lossy().to_string(),
                 icon: "game-controller".into(),
                 system_icon: "applications-games".into(),

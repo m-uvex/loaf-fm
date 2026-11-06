@@ -149,16 +149,23 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         let (total, free) = if mounted { (ctx.usage)(&mount).unwrap_or((size, 0)) } else { (size, size) };
         let used = total.saturating_sub(free);
         let label = s(v, "label");
+        let as_user_text = |text: &str| -> String {
+            if text.starts_with('{') {
+                util::raw(text)
+            } else {
+                text.to_string()
+            }
+        };
         let display = if !label.is_empty() {
-            label.to_string()
+            as_user_text(label)
         } else if mount == "/" {
-            "Root (/)".to_string()
+            util::msg("drive.root")
         } else if mounted {
-            Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string())
+            as_user_text(&Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string()))
         } else if !ctx.model.is_empty() {
-            format!("{} ({})", ctx.model.trim(), util::format_size(size))
+            as_user_text(&format!("{} ({})", ctx.model.trim(), util::format_size(size)))
         } else {
-            format!("{} Volume", util::format_size(size))
+            util::msg_args("drive.volume", &[util::MessageArg::Text(util::format_size(size))])
         };
         let pct = if total > 0 && mounted { ((used as f64 / total as f64) * 1000.0).round() / 10.0 } else { 0.0 };
         out.push(Drive {

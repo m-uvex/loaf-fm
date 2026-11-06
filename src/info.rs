@@ -23,7 +23,7 @@ pub struct QuickLook {
     /// For "thumbnail" kind: id for image://thumb/ (video, pdf, font...).
     pub thumb_id: String,
     pub size_str: String,
-    pub modified_str: String,
+    pub modified: i64,
     pub mime: String,
     pub note: String,
 }
@@ -80,18 +80,18 @@ pub fn quick_look(path: &Path) -> QuickLook {
         name: name.clone(),
         path: path.to_string_lossy().to_string(),
         kind: "none".into(),
-        note: "No preview available".into(),
+        note: util::msg("info.no-preview"),
         ..Default::default()
     };
     let Some(meta) = meta else {
-        q.note = "This item no longer exists".into();
+        q.note = util::msg("info.missing");
         return q;
     };
-    q.modified_str = crate::pane::relative_time(meta.mtime());
+    q.modified = meta.mtime();
     if meta.is_dir() {
         let n = fs::read_dir(path).map(|r| r.count()).unwrap_or(0);
         q.kind = "folder".into();
-        q.note = format!("Folder · {} item{}", n, if n == 1 { "" } else { "s" });
+        q.note = util::msg_args("info.folder-items", &[util::MessageArg::Text(n.to_string())]);
         return q;
     }
     q.size_str = util::format_size(meta.len());
@@ -118,9 +118,9 @@ pub fn quick_look(path: &Path) -> QuickLook {
                 lines.sort();
                 q.text = lines.join("\n");
                 q.truncated = entries.len() > 400;
-                q.note = format!("Archive · {} files", total);
+                q.note = util::msg_args("info.archive-files", &[util::MessageArg::Text(total.to_string())]);
             }
-            Err(archive::ArchiveError::NeedPassword) => q.note = "Encrypted archive".into(),
+            Err(archive::ArchiveError::NeedPassword) => q.note = util::msg("info.encrypted-archive"),
             Err(e) => q.note = e.to_string(),
         }
         return q;
@@ -129,12 +129,12 @@ pub fn quick_look(path: &Path) -> QuickLook {
     if listing::is_video_ext(&ext) || listing::is_audio_ext(&ext) || thumbable {
         q.kind = if thumbable { "thumbnail" } else { "media" }.into();
         q.thumb_id = format!("{}-{}", crate::pane::hex_path(&q.path), meta.mtime());
-        q.note = "Press Enter to open it".into();
+        q.note = util::msg("info.press-enter");
         return q;
     }
     let (text, truncated, binary) = read_head(path);
     if binary {
-        q.note = "Binary file · no text preview".into();
+        q.note = util::msg("info.binary-file");
         return q;
     }
     q.kind = "text".into();
@@ -188,25 +188,7 @@ pub fn item_info(path: &Path) -> serde_json::Value {
     let meta = if is_link { fs::metadata(path).unwrap_or(lmeta.clone()) } else { lmeta.clone() };
     let is_dir = meta.is_dir();
     let mime = if is_dir { "inode/directory".to_string() } else { native::mime_type(path, true) };
-    let created = meta
-        .created()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| crate::pane::format_date(d.as_secs() as i64))
-        .unwrap_or_else(|| "-".into());
-    let fmt_full = |ts: i64| {
-        let t = ts as libc::time_t;
-        let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-        unsafe {
-            libc::localtime_r(&t, &mut tm);
-        }
-        format!(
-            "{} {:02}:{:02}",
-            crate::pane::format_date(ts),
-            tm.tm_hour,
-            tm.tm_min
-        )
-    };
+    let created = "-".to_string();
     let free = path
         .parent()
         .and_then(|p| crate::drives::statvfs(&p.to_string_lossy()))
@@ -224,10 +206,13 @@ pub fn item_info(path: &Path) -> serde_json::Value {
         "size": if is_dir { 0 } else { meta.len() },
         "size_str": if is_dir { "-".to_string() } else { format!("{} ({} bytes)", util::format_size(meta.len()), meta.len()) },
         "items": if is_dir { fs::read_dir(path).map(|r| r.count()).unwrap_or(0) } else { 0 },
+        "modified_ts": meta.mtime(),
+        "accessed_ts": meta.atime(),
+        "created_ts": meta.created().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs() as i64).unwrap_or(0),
         "mime": mime,
         "type": if is_dir { "Folder".to_string() } else { native::mime_comment(&mime) },
-        "modified": fmt_full(meta.mtime()),
-        "accessed": fmt_full(meta.atime()),
+        "modified": String::new(),
+        "accessed": String::new(),
         "created": created,
         "mode": format!("{:o}", mode),
         "mode_bits": mode,

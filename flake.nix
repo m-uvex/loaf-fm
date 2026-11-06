@@ -28,6 +28,8 @@
             pkg-config
             cmake
             ninja
+            qt6.qttools
+            qt6.wrapQtAppsHook
           ];
           dontUseCmakeConfigure = true;
           dontUseNinjaBuild = true;
@@ -40,6 +42,9 @@
             pkgs.shared-mime-info
           ];
           QMAKE = "${qtEnv}/bin/qmake";
+          postPatch = ''
+            export QMAKE="${qtEnv}/bin/qmake"
+          '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}";
@@ -82,6 +87,7 @@
             rustfmt
             clippy
             patchelf
+            qt6.qttools
           ];
 
           buildInputs = [
@@ -93,6 +99,13 @@
           ];
 
           QMAKE = "${qtEnv}/bin/qmake";
+          shellHook = ''
+            # qtbase's setup-hook exports QMAKE=<qtbase>/bin/qmake, which lacks
+            # modules like Qml (no libQt6Qml.prl). qt-build-utils runs qmake with
+            # env cleared, dropping QMAKEPATH, so point QMAKE at the qt6-env
+            # wrapper whose compiled-in prefix contains all modules.
+            export QMAKE="${qtEnv}/bin/qmake"
+          '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ qtEnv pkgs.libGL ]}:$LD_LIBRARY_PATH";

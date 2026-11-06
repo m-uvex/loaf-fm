@@ -2,51 +2,96 @@
 #include "loaf/portal.h"
 #include "loaf/thumbnails.h"
 
+#include <fcntl.h>
+#include <memory>
+#include <unistd.h>
+
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
 #include <QDBusReply>
-#include <QDBusArgument>
 #include <QDBusUnixFileDescriptor>
+#include <QDir>
 #include <QEventLoop>
 #include <QFile>
-#include <QDir>
 #include <QFileInfo>
-#include <QMutex>
-#include <QMutexLocker>
-#include <QTimer>
-#include <fcntl.h>
-#include <unistd.h>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonValue>
 #include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QLocale>
 #include <QMimeData>
 #include <QMimeDatabase>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QPointer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QTimer>
 #include <QTranslator>
 #include <QUrl>
-
 namespace loaf {
 
 static const char *kService = "io.github.m_uvex.Loaf";
 static const char *kPath = "/io/github/m_uvex/Loaf";
 
+// Single owner of the language state: requested locale name, the installed
+// translator (parented to the QCoreApplication instance), and the QML engine.
+struct LanguageState {
+    QString requestedLocale;
+    QTranslator *translator = nullptr;
+    QPointer<QQmlApplicationEngine> engine;
+};
+static LanguageState languageState;
+
 static QString toQString(rust::Str s)
 {
     return QString::fromUtf8(s.data(), static_cast<qsizetype>(s.size()));
+}
+
+// The locale to use: the override when valid, else the system locale.
+static QLocale resolvedLocale()
+{
+    if (!languageState.requestedLocale.isEmpty()) {
+        const QLocale locale(languageState.requestedLocale);
+        if (locale != QLocale::c())
+            return locale;
+    }
+    return QLocale();
+}
+
+// Stores the override locale and makes the resolved locale the default.
+static QLocale storeRequestedLocale(rust::Str localeName)
+{
+    languageState.requestedLocale = toQString(localeName);
+    const QLocale locale = resolvedLocale();
+    QLocale::setDefault(locale);
+    return locale;
+}
+
+// Installs the translator for `locale` in place of the previous one.
+// When no catalogue matches the previous translator is removed and none is
+// installed, so source (English) strings render.
+static bool installTranslatorFor(const QLocale &locale)
+{
+    if (languageState.translator) {
+        QCoreApplication::removeTranslator(languageState.translator);
+        languageState.translator->deleteLater();
+        languageState.translator = nullptr;
+    }
+    auto *candidate = new QTranslator(QCoreApplication::instance());
+    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n"))) {
+        delete candidate;
+        return false;
+    }
+    QCoreApplication::installTranslator(candidate);
+    languageState.translator = candidate;
+    return true;
 }
 
 static rust::String toRust(const QString &s)
@@ -229,7 +274,6 @@ bool LoafNative::isDirectory(const QString &path) const
     return QFileInfo(path).isDir();
 }
 
-
 void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
 {
     if (!window)
@@ -342,12 +386,46 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         // one closes and no file manager window was opened meanwhile.
         QGuiApplication::setQuitOnLastWindowClosed(false);
 
-    auto *translator = new QTranslator(&engine);
-    if (translator->load(QLocale(), QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n")))
-        QCoreApplication::installTranslator(translator);
+    languageState.engine = &engine;
+    // Fallback when no catalogue matches: no translator, source (English)
+    // strings render unchanged.
+    installTranslatorFor(resolvedLocale());
 
     engine.rootContext()->setContextProperty(QStringLiteral("nativeBridge"), native);
     engine.addImageProvider(QStringLiteral("thumb"), new ThumbnailProvider);
+}
+
+void set_application_language(rust::Str localeName)
+{
+    storeRequestedLocale(localeName);
+}
+
+void apply_language(rust::Str localeName)
+{
+    const QLocale locale = storeRequestedLocale(localeName);
+    installTranslatorFor(locale);
+    if (languageState.engine)
+        languageState.engine->retranslate();
+}
+
+rust::String languages_json()
+{
+    QFile file(QStringLiteral(":/loaf/settings/languages.json"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return toRust(QStringLiteral("[]"));
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+    if (!document.isArray())
+        return toRust(QStringLiteral("[]"));
+    QJsonArray available;
+    for (const QJsonValue &entry : document.array()) {
+        const QString code = entry.toObject().value(QStringLiteral("value")).toString();
+        if (code.isEmpty())
+            continue;
+        if (!QFile::exists(QStringLiteral(":/i18n/loaf_%1.qm").arg(code)))
+            continue;
+        available.append(entry);
+    }
+    return toRust(QString::fromUtf8(QJsonDocument(available).toJson(QJsonDocument::Compact)));
 }
 
 rust::String mime_type_for(rust::Str path, bool sniff)
@@ -938,7 +1016,6 @@ rust::String mtp_operation_json(rust::Str action, rust::Str url, rust::Str argum
             return toRust(QString::fromUtf8(QJsonDocument(err).toJson(QJsonDocument::Compact)));
         }
 
-
         const QByteArray localPathBytes = argStr.toUtf8();
         const int rawFd = ::open(localPathBytes.constData(), O_CREAT | O_EXCL | O_WRONLY, 0644);
         if (rawFd < 0) {
@@ -1056,7 +1133,6 @@ rust::String mtp_operation_json(rust::Str action, rust::Str url, rust::Str argum
             const QJsonObject err{{QStringLiteral("error"), QStringLiteral("Destination path must include a filename")}};
             return toRust(QString::fromUtf8(QJsonDocument(err).toJson(QJsonDocument::Compact)));
         }
-
 
         const QByteArray localPathBytes = argStr.toUtf8();
         const int rawFd = ::open(localPathBytes.constData(), O_RDONLY);

@@ -269,7 +269,7 @@ LoafPopup {
                 Text {
                     Layout.fillWidth: true
                     text: (quickLook.info.size_str || "-") + "  ·  "
-                        + (quickLook.info.modified_str || "-") + "  ·  "
+                        + theme.relativeTime(quickLook.info.modified || 0) + "  ·  "
                         + (quickLook.info.path || "")
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
@@ -366,7 +366,7 @@ LoafPopup {
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: true
-                text: quickLook.info.note || ""
+                text: theme.resolveRustMessage(quickLook.info.note || "")
                 color: theme.textMuted
                 font.pixelSize: theme.fs(13)
                 horizontalAlignment: Text.AlignHCenter

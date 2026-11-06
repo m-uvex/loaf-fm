@@ -28,9 +28,9 @@ pub enum ArchiveError {
 impl std::fmt::Display for ArchiveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArchiveError::NeedPassword => write!(f, "This archive needs a password"),
-            ArchiveError::MissingTool(t) => write!(f, "'{}' is not installed", t),
-            ArchiveError::Cancelled => write!(f, "Cancelled"),
+            ArchiveError::NeedPassword => write!(f, "{}", crate::util::msg("archive.error-password")),
+            ArchiveError::MissingTool(t) => write!(f, "{}", crate::util::msg_args("archive.error-missing-tool", &[crate::util::MessageArg::from(*t)])),
+            ArchiveError::Cancelled => write!(f, "{}", crate::util::msg("archive.error-cancelled")),
             ArchiveError::Failed(m) => write!(f, "{}", m),
         }
     }
@@ -211,7 +211,7 @@ pub fn compress(
     let parent = items
         .first()
         .and_then(|p| p.parent())
-        .ok_or_else(|| ArchiveError::Failed("nothing to compress".into()))?
+        .ok_or_else(|| ArchiveError::Failed(crate::util::msg("archive.error-empty")))?
         .to_path_buf();
     let members = member_args(items, &parent);
     let pw = if password.is_empty() { None } else { Some(format!("{}\n{}\n", password, password)) };
@@ -308,7 +308,7 @@ pub fn compress(
 /// `NeedPassword` when the archive is encrypted and `password` is empty or
 /// wrong, so the caller can ask and try again.
 pub fn extract(archive: &Path, target: &Path, password: &str, cancelled: &dyn Fn() -> bool) -> Result<(), ArchiveError> {
-    let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
+    let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed(crate::util::msg("archive.error-not-archive")))?;
     fs::create_dir_all(target).map_err(|e| ArchiveError::Failed(e.to_string()))?;
     let (ok, output) = match kind {
         Kind::Tar | Kind::TarGz | Kind::TarXz | Kind::TarBz2 | Kind::TarZst => {
@@ -568,7 +568,7 @@ pub fn extract_member(archive: &Path, member: &str, target_dir: &Path, password:
     if fs::symlink_metadata(&out).is_ok() {
         Ok(out)
     } else {
-        Err(ArchiveError::Failed("the file was not found in the archive".into()))
+        Err(ArchiveError::Failed(crate::util::msg("archive.error-not-found")))
     }
 }
 

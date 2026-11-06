@@ -78,7 +78,7 @@ Item {
             }
         }
         Text {
-            text: panel.ops.length === 1 ? panel.ops[0].title : qsTr("%1 operations").arg(panel.ops.length)
+            text: panel.ops.length === 1 ? theme.resolveRustMessage(panel.ops[0].title) : qsTr("%n operation(s)", "", panel.ops.length)
             color: theme.textMain
             font.pixelSize: theme.fs(12)
             font.bold: true
@@ -119,7 +119,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: modelData.title
+                        text: theme.resolveRustMessage(modelData.title)
                         color: theme.textMain
                         font.pixelSize: theme.fs(12)
                         elide: Text.ElideMiddle

@@ -6,7 +6,7 @@ import app.loaf
 // Shown when pasting / dropping onto names that already exist.
 LoafDialog {
     id: dlg
-    title: conflicts.length === 1 ? qsTr("Replace “%1”?").arg(conflicts[0].name) : theme.plural(conflicts.length, qsTr("1 item already exists"), qsTr("%1 items already exist"))
+    title: conflicts.length === 1 ? qsTr("Replace “%1”?").arg(conflicts[0].name) : qsTr("%n item(s) already exist", "", conflicts.length)
     dialogWidth: Math.min(window.width - 80, 480)
 
     property var conflicts: []
@@ -67,8 +67,8 @@ LoafDialog {
                     ColumnLayout {
                         spacing: 2
                         Text { text: modelData.title; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                        Text { text: modelData.size; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                        Text { text: modelData.date; color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: modelData.size || "-"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: theme.relativeTime(modelData.date || 0); color: theme.textMuted; font.pixelSize: theme.fs(11) }
                     }
                 }
             }
