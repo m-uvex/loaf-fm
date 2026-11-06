@@ -122,13 +122,18 @@ Item {
         return n === 1 ? one : many.arg(number(n));
     }
 
+    function substitute(template, values) {
+        return template.replace(/%(\d+)/g, function (m, index) { var value = values[Number(index) - 1]; return value === undefined || value === null ? m : String(value); });
+    }
+
     // Rust emits {key,args} JSON for strings lupdate cannot see.
     // Non-JSON text (OS/tool errors) is shown verbatim.
     function resolveRustMessage(text) {
         if (!text || text.length === 0 || text.charAt(0) !== "{") return text || "";
         var decoded;
         try { decoded = JSON.parse(text); } catch (e) { return text; }
-        if (decoded && typeof decoded.raw === "string") return decoded.raw;
+        if (!decoded || decoded.v !== 1) return text;
+        if (typeof decoded.raw === "string") return decoded.raw;
         var key = decoded && decoded.key;
         var a = (decoded && decoded.args) || [];
         var out;
@@ -271,8 +276,8 @@ Item {
         else if (key === "outcome.skipped-only") out = qsTr("%1 skipped");
         else if (key === "outcome.inside-itself") out = qsTr("Can't put “%1” inside itself");
         else return text;
-        for (var i = 0; i < a.length; ++i) out = out.arg(resolveRustMessage(a[i]));
-        return out;
+        var resolvedArgs = a.map(function (item) { return (item !== null && typeof item === "object") ? resolveRustMessage(JSON.stringify(item)) : item; });
+        return substitute(out, resolvedArgs);
     }
 
     function categoryName(key) {

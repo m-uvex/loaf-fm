@@ -395,11 +395,11 @@ pub fn relative_time(ts: i64) -> String {
     if (0..60).contains(&elapsed) {
         util::msg("time.just-now")
     } else if (0..3600).contains(&elapsed) {
-        util::msg_args("time.minutes-ago", &[&(elapsed / 60).to_string()])
+        util::msg_args("time.minutes-ago", &[util::MessageArg::Text((elapsed / 60).to_string())])
     } else if (0..86400).contains(&elapsed) {
-        util::msg_args("time.hours-ago", &[&(elapsed / 3600).to_string()])
+        util::msg_args("time.hours-ago", &[util::MessageArg::Text((elapsed / 3600).to_string())])
     } else if (0..86400 * 7).contains(&elapsed) {
-        util::msg_args("time.days-ago", &[&(elapsed / 86400).to_string()])
+        util::msg_args("time.days-ago", &[util::MessageArg::Text((elapsed / 86400).to_string())])
     } else {
         format_date(ts)
     }
@@ -414,9 +414,9 @@ pub fn format_date(ts: i64) -> String {
     util::msg_args(
         "date.format",
         &[
-            &tm.tm_mon.to_string(),
-            &tm.tm_mday.to_string(),
-            &(tm.tm_year + 1900).to_string(),
+            util::MessageArg::Text(tm.tm_mon.to_string()),
+            util::MessageArg::Text(tm.tm_mday.to_string()),
+            util::MessageArg::Text((tm.tm_year + 1900).to_string()),
         ],
     )
 }

@@ -150,15 +150,15 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         let used = total.saturating_sub(free);
         let label = s(v, "label");
         let display = if !label.is_empty() {
-            label.to_string()
+            util::raw(label)
         } else if mount == "/" {
             util::msg("drive.root")
         } else if mounted {
-            Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string())
+            util::raw(Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string()).as_str())
         } else if !ctx.model.is_empty() {
-            format!("{} ({})", ctx.model.trim(), util::format_size(size))
+            util::raw(format!("{} ({})", ctx.model.trim(), util::format_size(size)).as_str())
         } else {
-            util::msg_args("drive.volume", &[&util::format_size(size)])
+            util::msg_args("drive.volume", &[util::MessageArg::Text(util::format_size(size))])
         };
         let pct = if total > 0 && mounted { ((used as f64 / total as f64) * 1000.0).round() / 10.0 } else { 0.0 };
         out.push(Drive {

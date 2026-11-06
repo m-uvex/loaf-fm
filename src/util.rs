@@ -157,24 +157,66 @@ pub fn format_size(bytes: u64) -> String {
     format!("{:.1} {}", v, UNITS[i])
 }
 
-/// Serializes a translation key for resolution in QML (`theme.resolveRustMessage`).
-pub fn msg(key: &str) -> String {
-    serde_json::json!({ "key": key }).to_string()
+/// A typed argument to `msg_args`: plain user text or a nested message.
+pub enum MessageArg {
+    Text(String),
+    Message(String),
 }
 
-/// Serializes a translation key with arguments for resolution in QML.
-pub fn msg_args<T: AsRef<str>>(key: &str, args: &[T]) -> String {
-    let a: Vec<&str> = args.iter().map(|s| s.as_ref()).collect();
-    serde_json::json!({ "key": key, "args": a }).to_string()
+impl From<&str> for MessageArg {
+    fn from(text: &str) -> Self {
+        MessageArg::Text(text.to_string())
+    }
+}
+
+impl From<String> for MessageArg {
+    fn from(text: String) -> Self {
+        MessageArg::Text(text)
+    }
+}
+
+impl From<&String> for MessageArg {
+    fn from(text: &String) -> Self {
+        MessageArg::Text(text.clone())
+    }
+}
+
+/// Serializes a translation key for resolution in QML (`theme.resolveRustMessage`).
+pub fn msg(key: &str) -> String {
+    serde_json::json!({ "v": 1, "key": key }).to_string()
+}
+
+/// Wraps user-controlled text so QML shows it literally, never as a key.
+pub fn raw(text: &str) -> String {
+    serde_json::json!({ "v": 1, "raw": text }).to_string()
+}
+
+/// Serializes a translation key with typed arguments for resolution in QML.
+pub fn msg_args(key: &str, args: &[MessageArg]) -> String {
+    let values: Vec<serde_json::Value> = args
+        .iter()
+        .map(|arg| match arg {
+            MessageArg::Text(text) => serde_json::Value::String(text.clone()),
+            MessageArg::Message(message) => serde_json::from_str(message).unwrap_or_else(|_| serde_json::Value::String(message.clone())),
+        })
+        .collect();
+    serde_json::json!({ "v": 1, "key": key, "args": values }).to_string()
 }
 
 /// Serializes several messages or plain texts joined with "; " in QML.
 pub fn msg_list(items: &[String]) -> String {
     let values: Vec<serde_json::Value> = items
         .iter()
-        .map(|item| serde_json::from_str(item).unwrap_or_else(|_| serde_json::Value::String(item.clone())))
+        .map(|item| {
+            let parsed: serde_json::Value = serde_json::from_str(item).unwrap_or_else(|_| serde_json::Value::String(item.clone()));
+            if parsed.is_object() && parsed.get("v") == Some(&serde_json::json!(1)) {
+                parsed
+            } else {
+                serde_json::Value::String(item.clone())
+            }
+        })
         .collect();
-    serde_json::json!({ "key": "list.join", "args": values }).to_string()
+    serde_json::json!({ "v": 1, "key": "list.join", "args": values }).to_string()
 }
 
 #[cfg(test)]
@@ -206,24 +248,36 @@ mod tests {
     fn messages_parse_as_single_json_object() {
         for (text, key) in [
             (msg("example.key"), "example.key"),
-            (msg_args("example.key", &["one", "two"]), "example.key"),
+            (msg_args("example.key", &[MessageArg::Text("one".to_string()), MessageArg::Text("two".to_string())]), "example.key"),
             (msg_list(&[msg("example.key")]), "list.join"),
         ] {
             let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
             assert!(parsed.is_object());
             assert_eq!(parsed["key"], key);
+            assert_eq!(parsed["v"], 1);
         }
-        let parsed: serde_json::Value = serde_json::from_str(&msg_args("example.key", &["one"])).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&msg_args("example.key", &[MessageArg::Text("one".to_string())])).unwrap();
         assert_eq!(parsed["args"], serde_json::json!(["one"]));
     }
 
     #[test]
+    fn raw_text_round_trips_literally() {
+        let parsed: serde_json::Value = serde_json::from_str(&raw("{\"key\":\"notify.cancelled\"}")).unwrap();
+        assert_eq!(parsed["v"], 1);
+        assert_eq!(parsed["raw"], "{\"key\":\"notify.cancelled\"}");
+    }
+
+    #[test]
     fn message_list_nests_messages_and_plain_text() {
-        let items = [msg("first.key"), "plain text".to_string(), msg_args("second.key", &["arg"])];
+        let items = [msg("first.key"), "plain text".to_string(), msg_args("second.key", &[MessageArg::Text("arg".to_string())])];
         let parsed: serde_json::Value = serde_json::from_str(&msg_list(&items)).unwrap();
         assert_eq!(parsed["key"], "list.join");
         assert_eq!(parsed["args"][0]["key"], "first.key");
         assert_eq!(parsed["args"][1], "plain text");
         assert_eq!(parsed["args"][2]["key"], "second.key");
+        let nested = msg_args("outer.key", &[MessageArg::Message(msg("inner.key")), MessageArg::Text("100%2.txt".to_string())]);
+        let outer: serde_json::Value = serde_json::from_str(&nested).unwrap();
+        assert_eq!(outer["args"][0]["key"], "inner.key");
+        assert_eq!(outer["args"][1], "100%2.txt");
     }
 }

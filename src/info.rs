@@ -91,7 +91,7 @@ pub fn quick_look(path: &Path) -> QuickLook {
     if meta.is_dir() {
         let n = fs::read_dir(path).map(|r| r.count()).unwrap_or(0);
         q.kind = "folder".into();
-        q.note = util::msg_args("info.folder-items", &[&n.to_string()]);
+        q.note = util::msg_args("info.folder-items", &[util::MessageArg::Text(n.to_string())]);
         return q;
     }
     q.size_str = util::format_size(meta.len());
@@ -118,7 +118,7 @@ pub fn quick_look(path: &Path) -> QuickLook {
                 lines.sort();
                 q.text = lines.join("\n");
                 q.truncated = entries.len() > 400;
-                q.note = util::msg_args("info.archive-files", &[&total.to_string()]);
+                q.note = util::msg_args("info.archive-files", &[util::MessageArg::Text(total.to_string())]);
             }
             Err(archive::ArchiveError::NeedPassword) => q.note = util::msg("info.encrypted-archive"),
             Err(e) => q.note = e.to_string(),

@@ -29,7 +29,7 @@ impl std::fmt::Display for ArchiveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ArchiveError::NeedPassword => write!(f, "{}", crate::util::msg("archive.error-password")),
-            ArchiveError::MissingTool(t) => write!(f, "{}", crate::util::msg_args("archive.error-missing-tool", &[t])),
+            ArchiveError::MissingTool(t) => write!(f, "{}", crate::util::msg_args("archive.error-missing-tool", &[crate::util::MessageArg::Text(t.clone())])),
             ArchiveError::Cancelled => write!(f, "{}", crate::util::msg("archive.error-cancelled")),
             ArchiveError::Failed(m) => write!(f, "{}", m),
         }
