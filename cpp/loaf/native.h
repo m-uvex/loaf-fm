@@ -31,7 +31,6 @@ private:
 
 std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes);
 
-
 class LoafNative : public QObject
 {
     Q_OBJECT
@@ -168,8 +167,6 @@ void set_application_language(rust::Str localeName);
 void apply_language(rust::Str localeName);
 
 rust::String languages_json();
-
-
 
 // Enumerates MTP devices via KDE kiod6 / kmtpd over D-Bus without blocking the UI thread.
 // Returns a JSON-encoded array of MTP device objects:

@@ -62,11 +62,9 @@ pub fn apply_language(locale: &str) {
     ffi::apply_language(locale);
 }
 
-
 pub fn languages_json() -> String {
     ffi::languages_json()
 }
-
 
 pub fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String {
     ffi::mtp_operation_json(action, url, argument)

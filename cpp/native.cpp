@@ -2,45 +2,39 @@
 #include "loaf/portal.h"
 #include "loaf/thumbnails.h"
 
+#include <fcntl.h>
+#include <memory>
+#include <unistd.h>
+
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
 #include <QDBusReply>
-#include <QDBusArgument>
 #include <QDBusUnixFileDescriptor>
+#include <QDir>
 #include <QEventLoop>
 #include <QFile>
-#include <QDir>
 #include <QFileInfo>
-#include <QMutex>
-#include <QMutexLocker>
-#include <memory>
-#include <QTimer>
-#include <fcntl.h>
-#include <unistd.h>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonValue>
 #include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QLocale>
 #include <QMimeData>
 #include <QMimeDatabase>
-#include <QQmlApplicationEngine>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QPointer>
+#include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QTimer>
 #include <QTranslator>
 #include <QUrl>
-
 namespace loaf {
 
 static const char *kService = "io.github.m_uvex.Loaf";
@@ -85,19 +79,15 @@ static QLocale storeRequestedLocale(rust::Str localeName)
 // installed, so source (English) strings render.
 static bool installTranslatorFor(const QLocale &locale)
 {
-    auto *candidate = new QTranslator(QCoreApplication::instance());
-    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n"))) {
-        if (languageState.translator) {
-            QCoreApplication::removeTranslator(languageState.translator);
-            languageState.translator->deleteLater();
-            languageState.translator = nullptr;
-        }
-        delete candidate;
-        return false;
-    }
     if (languageState.translator) {
         QCoreApplication::removeTranslator(languageState.translator);
         languageState.translator->deleteLater();
+        languageState.translator = nullptr;
+    }
+    auto *candidate = new QTranslator(QCoreApplication::instance());
+    if (!candidate->load(locale, QStringLiteral("loaf"), QStringLiteral("_"), QStringLiteral(":/i18n"))) {
+        delete candidate;
+        return false;
     }
     QCoreApplication::installTranslator(candidate);
     languageState.translator = candidate;
@@ -284,7 +274,6 @@ bool LoafNative::isDirectory(const QString &path) const
     return QFileInfo(path).isDir();
 }
 
-
 void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
 {
     if (!window)
@@ -419,7 +408,6 @@ void apply_language(rust::Str localeName)
         languageState.engine->retranslate();
 }
 
-
 rust::String languages_json()
 {
     QFile file(QStringLiteral(":/loaf/settings/languages.json"));
@@ -439,7 +427,6 @@ rust::String languages_json()
     }
     return toRust(QString::fromUtf8(QJsonDocument(available).toJson(QJsonDocument::Compact)));
 }
-
 
 rust::String mime_type_for(rust::Str path, bool sniff)
 {
@@ -1029,7 +1016,6 @@ rust::String mtp_operation_json(rust::Str action, rust::Str url, rust::Str argum
             return toRust(QString::fromUtf8(QJsonDocument(err).toJson(QJsonDocument::Compact)));
         }
 
-
         const QByteArray localPathBytes = argStr.toUtf8();
         const int rawFd = ::open(localPathBytes.constData(), O_CREAT | O_EXCL | O_WRONLY, 0644);
         if (rawFd < 0) {
@@ -1147,7 +1133,6 @@ rust::String mtp_operation_json(rust::Str action, rust::Str url, rust::Str argum
             const QJsonObject err{{QStringLiteral("error"), QStringLiteral("Destination path must include a filename")}};
             return toRust(QString::fromUtf8(QJsonDocument(err).toJson(QJsonDocument::Compact)));
         }
-
 
         const QByteArray localPathBytes = argStr.toUtf8();
         const int rawFd = ::open(localPathBytes.constData(), O_RDONLY);
