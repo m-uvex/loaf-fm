@@ -149,14 +149,21 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         let (total, free) = if mounted { (ctx.usage)(&mount).unwrap_or((size, 0)) } else { (size, size) };
         let used = total.saturating_sub(free);
         let label = s(v, "label");
+        let as_user_text = |text: &str| -> String {
+            if text.starts_with('{') {
+                util::raw(text)
+            } else {
+                text.to_string()
+            }
+        };
         let display = if !label.is_empty() {
-            util::raw(label)
+            as_user_text(label)
         } else if mount == "/" {
             util::msg("drive.root")
         } else if mounted {
-            util::raw(Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string()).as_str())
+            as_user_text(&Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string()))
         } else if !ctx.model.is_empty() {
-            util::raw(format!("{} ({})", ctx.model.trim(), util::format_size(size)).as_str())
+            as_user_text(&format!("{} ({})", ctx.model.trim(), util::format_size(size)))
         } else {
             util::msg_args("drive.volume", &[util::MessageArg::Text(util::format_size(size))])
         };
