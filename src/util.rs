@@ -280,4 +280,96 @@ mod tests {
         assert_eq!(outer["args"][0]["key"], "inner.key");
         assert_eq!(outer["args"][1], "100%2.txt");
     }
+
+    fn looks_like_key(key: &str) -> bool {
+        const PREFIXES: &[&str] = &["archive", "drive", "info", "list", "name", "notify", "op", "outcome", "pane", "place", "share", "trash"];
+        let mut parts = key.split('.');
+        if !parts.next().map(|value| PREFIXES.contains(&value)).unwrap_or(false) {
+            return false;
+        }
+        let rest: Vec<&str> = parts.collect();
+        !rest.is_empty() && rest.iter().all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'))
+    }
+
+    fn string_literals(source: &str) -> Vec<String> {
+        let mut literals = Vec::new();
+        let bytes: Vec<char> = source.chars().collect();
+        let mut index = 0usize;
+        while index < bytes.len() {
+            if bytes[index] != '"' {
+                index += 1;
+                continue;
+            }
+            index += 1;
+            let mut literal = String::new();
+            while index < bytes.len() {
+                let current = bytes[index];
+                index += 1;
+                if current == '\\' {
+                    if index < bytes.len() {
+                        let escaped = bytes[index];
+                        index += 1;
+                        match escaped {
+                            'n' => literal.push('\n'),
+                            't' => literal.push('\t'),
+                            '"' => literal.push('"'),
+                            '\\' => literal.push('\\'),
+                            other => {
+                                literal.push('\\');
+                                literal.push(other);
+                            }
+                        }
+                    }
+                } else if current == '"' {
+                    break;
+                } else {
+                    literal.push(current);
+                }
+            }
+            literals.push(literal);
+        }
+        literals
+    }
+
+    #[test]
+    fn rust_and_qml_message_keys_match() {
+        use std::collections::{BTreeMap, BTreeSet};
+        use std::path::{Path, PathBuf};
+        fn visit(directory: &Path, keys: &mut BTreeMap<String, Vec<String>>) {
+            let Ok(entries) = std::fs::read_dir(directory) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    visit(&path, keys);
+                } else if path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
+                    if let Ok(source) = std::fs::read_to_string(&path) {
+                        let code = &source[..source.find("#[cfg(test)]").unwrap_or(source.len())];
+                        let code = code.replace(r#".trim_matches('"')"#, "").replace("'/'", "\"/\"").replace("'\\n'", "\"\\n\"");
+                        for literal in string_literals(&code) {
+                            if looks_like_key(&literal) {
+                                keys.entry(literal).or_default().push(path.display().to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut rust_keys: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        visit(&root.join("src"), &mut rust_keys);
+        let mut qml_keys: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let theme = std::fs::read_to_string(root.join("qml/Theme.qml")).expect("qml/Theme.qml");
+        for literal in string_literals(&theme) {
+            if looks_like_key(&literal) {
+                qml_keys.entry(literal).or_default().push("qml/Theme.qml".to_string());
+            }
+        }
+        let rust_set: BTreeSet<&String> = rust_keys.keys().collect();
+        let qml_set: BTreeSet<&String> = qml_keys.keys().collect();
+        let only_rust: Vec<&String> = rust_set.difference(&qml_set).copied().collect();
+        let only_qml: Vec<&String> = qml_set.difference(&rust_set).copied().collect();
+        assert!(only_rust.is_empty() && only_qml.is_empty(), "message key mismatch\nRust-only keys:\n{}\nQML-only keys:\n{}", only_rust.iter().map(|key| format!("  {key}  <- {:?}", rust_keys.get(*key).unwrap())).collect::<Vec<_>>().join("\n"), only_qml.iter().map(|key| format!("  {key}  <- {:?}", qml_keys.get(*key).unwrap())).collect::<Vec<_>>().join("\n"));
+    }
 }
