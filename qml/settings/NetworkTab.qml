@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
 
@@ -20,10 +21,10 @@ ColumnLayout {
         return true;
     }
 
-    readonly property bool matchNetwork: matches("network smb samba webdav dav nas share server mount connect remote windows cloud keyring")
-    readonly property bool matchDiscovery: matches("discover automatic scan lan avahi mdns bonjour netbios ws-discovery smb samba nas network")
+    readonly property bool matchSaved: matches("saved drives network shares storage connect mount remote host server edit rename remove")
+    readonly property bool matchDiscovery: matches("auto discovery scan network servers find detect lan avahi mdns bonjour netbios ws-discovery")
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
-        ? ((matchNetwork ? 1 : 0) + (matchDiscovery ? 1 : 0))
+        ? ((matchSaved ? 1 : 0) + (matchDiscovery ? 1 : 0))
         : 0
 
     readonly property var profiles: {
@@ -55,7 +56,7 @@ ColumnLayout {
         var parts = [];
         if (entry.server && entry.server !== entry.name)
             parts.push(entry.server);
-        if (entry.address)
+        if (entry.address && entry.address !== entry.server)
             parts.push(entry.address);
         return parts.join("  ·  ");
     }
@@ -65,21 +66,40 @@ ColumnLayout {
             core.add_smb_discovered(server, share);
     }
 
+    function connectDiscovered(entry) {
+        if (!entry) return;
+        if (entry.shares && entry.shares.length > 0) {
+            addShare(entry.server, entry.shares[0]);
+        } else if (typeof window !== "undefined") {
+            window.openNetworkEditor({
+                server: entry.server || "",
+                name: entry.name || entry.server || ""
+            });
+        }
+    }
+
+    function openRename(drive) {
+        renamePrompt.targetDrive = drive;
+        renamePrompt.initialText = drive.label || drive.name || "";
+        renamePrompt.open();
+    }
+
     Layout.fillWidth: true
     spacing: 16
 
+    // ---- Group 1: Saved Drives ------------------------------------------
     SettingCard {
-        visible: root.matchNetwork
-        title: qsTr("Network Drives (SMB & WebDAV)")
-        subtitle: qsTr("Connect to remote Windows file shares, home NAS, Samba, and WebDAV cloud storage")
-        icon: "network"
+        visible: root.matchSaved
+        title: qsTr("Saved Drives")
+        subtitle: qsTr("Network storage locations and mounted remote drives")
+        icon: "hard-drives"
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
 
             Text {
-                text: qsTr("Configured Drives")
+                text: qsTr("Configured Network Drives")
                 color: theme.textMain
                 font.pixelSize: theme.fs(13)
                 font.bold: true
@@ -102,30 +122,31 @@ ColumnLayout {
             wrapMode: Text.Wrap
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: qsTr("No network drives configured yet. Add an SMB share or WebDAV cloud location to connect. Mounted drives appear directly in the sidebar navigation and browse identically to local folders.")
+            text: qsTr("No network drives configured yet. Add a remote drive or cloud storage to connect. Mounted drives appear directly in the sidebar navigation.")
         }
 
         Repeater {
             model: root.profiles
 
             delegate: Rectangle {
+                id: savedDriveCard
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                implicitHeight: shareRow.implicitHeight + 20
+                implicitHeight: driveRow.implicitHeight + 20
                 radius: theme.radiusM
                 color: theme.surfaceContainerHigh
                 border.width: 1
                 border.color: theme.borderSubtle
 
                 RowLayout {
-                    id: shareRow
+                    id: driveRow
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 12
 
                     LoafIcon {
-                        name: modelData.icon || (modelData.protocol === "webdav" ? "globe" : "network")
+                        name: modelData.icon || "hard-drives"
                         size: 20
                         color: modelData.connected ? theme.primary : theme.textMuted
                     }
@@ -133,27 +154,29 @@ ColumnLayout {
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
-                        spacing: 2
+                        spacing: 3
 
                         RowLayout {
-                            spacing: 6
+                            spacing: 8
                             Text {
-                                text: modelData.label || ""
+                                text: modelData.label || qsTr("Network Drive")
                                 color: theme.textMain
                                 font.pixelSize: theme.fs(13)
                                 font.bold: true
                                 elide: Text.ElideRight
                             }
+
                             Rectangle {
-                                radius: 4
-                                color: theme.surfaceContainerHighest
-                                implicitWidth: protoLabel.implicitWidth + 8
-                                implicitHeight: protoLabel.implicitHeight + 2
+                                radius: theme.radiusFull
+                                color: modelData.connected ? theme.primaryContainer : theme.surfaceContainerHighest
+                                implicitWidth: statusTxt.implicitWidth + 10
+                                implicitHeight: 18
+
                                 Text {
-                                    id: protoLabel
+                                    id: statusTxt
                                     anchors.centerIn: parent
-                                    text: (modelData.protocol === "webdav") ? "WebDAV" : "SMB"
-                                    color: theme.textMuted
+                                    text: modelData.connected ? qsTr("Connected") : qsTr("Offline")
+                                    color: modelData.connected ? theme.primaryContainerFg : theme.textMuted
                                     font.pixelSize: theme.fs(9)
                                     font.bold: true
                                 }
@@ -162,18 +185,14 @@ ColumnLayout {
 
                         Text {
                             text: {
-                                var proto = modelData.protocol || "smb";
-                                var prefix = (proto === "webdav") ? (modelData.ssl ? "davs://" : "dav://") : "smb://";
-                                var auth = modelData.username ? (modelData.username + "@") : "";
                                 var srv = modelData.server || "";
                                 if (modelData.port && modelData.port > 0)
                                     srv += ":" + modelData.port;
                                 var sh = modelData.share || "";
-                                if (sh && sh.indexOf("/") !== 0 && proto === "webdav")
+                                if (sh && sh.indexOf("/") !== 0)
                                     sh = "/" + sh;
-                                else if (sh && proto !== "webdav")
-                                    sh = "/" + sh;
-                                return prefix + auth + srv + sh;
+                                var user = modelData.username ? (modelData.username + "@") : "";
+                                return "//" + user + srv + sh;
                             }
                             color: theme.textMuted
                             font.pixelSize: theme.fs(11)
@@ -197,9 +216,20 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        icon: "tag"
+                        variant: "ghost"
+                        Accessible.name: qsTr("Rename drive")
+                        ToolTip.visible: containsMouse
+                        ToolTip.text: qsTr("Rename")
+                        onClicked: root.openRename(modelData)
+                    }
+
+                    LoafButton {
                         icon: "pencil-simple"
                         variant: "ghost"
                         Accessible.name: qsTr("Edit drive")
+                        ToolTip.visible: containsMouse
+                        ToolTip.text: qsTr("Edit")
                         onClicked: if (typeof window !== "undefined") window.openNetworkEditor(modelData)
                     }
 
@@ -207,6 +237,8 @@ ColumnLayout {
                         icon: "trash"
                         variant: "ghost"
                         Accessible.name: qsTr("Remove drive")
+                        ToolTip.visible: containsMouse
+                        ToolTip.text: qsTr("Remove")
                         onClicked: if (typeof window !== "undefined") window.removeNetworkDrive(modelData.id, modelData.label)
                     }
                 }
@@ -214,46 +246,56 @@ ColumnLayout {
         }
     }
 
+    // ---- Group 2: Auto Discovery ----------------------------------------
     SettingCard {
         visible: root.matchDiscovery
-        title: qsTr("Automatic Discovery")
-        subtitle: qsTr("Find Windows, Samba, and NAS shares on this local network")
+        title: qsTr("Auto Discovery")
+        subtitle: qsTr("Scan and detect shared network drives across the local network")
         icon: "broadcast"
-
-        SettingRow {
-            icon: "broadcast"
-            title: qsTr("Discover network shares")
-            subtitle: qsTr("Scan in the background with mDNS/Avahi, NetBIOS, and GVfs, and show new servers in the sidebar")
-
-            LoafSwitch {
-                id: discoverySwitch
-                checked: theme.smbAutoDiscovery
-                onToggled: theme.smbAutoDiscovery = checked
-            }
-        }
-
-        SettingDivider {}
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: 12
+
+            LoafSwitch {
+                id: autoDiscoverySwitch
+                checked: theme.smbAutoDiscovery
+                onToggled: function(c) { theme.smbAutoDiscovery = c; }
+            }
+
+            LoafButton {
+                id: refreshDiscoveryBtn
+                icon: "arrows-clockwise"
+                variant: "tonal"
+                enabled: root.discoveryEnabled && !root.scanning
+                Accessible.name: qsTr("Scan network now")
+                ToolTip.visible: containsMouse
+                ToolTip.text: qsTr("Re-discover drives")
+                onClicked: if (typeof core !== "undefined" && core) core.refresh_smb_discovery()
+
+                RotationAnimation {
+                    target: refreshDiscoveryBtn
+                    property: "rotation"
+                    from: 0
+                    to: 360
+                    duration: 800
+                    loops: Animation.Infinite
+                    running: root.scanning
+                }
+            }
 
             Text {
-                text: root.scanning ? qsTr("Scanning the local network…") : qsTr("Discovered on this network")
+                text: root.scanning
+                    ? qsTr("Scanning the local network…")
+                    : (root.discoveryEnabled ? qsTr("Auto discovery active") : qsTr("Auto discovery disabled"))
                 color: theme.textMain
                 font.pixelSize: theme.fs(13)
                 font.bold: true
                 Layout.fillWidth: true
             }
-
-            LoafButton {
-                text: qsTr("Scan Now")
-                icon: "arrows-clockwise"
-                variant: "tonal"
-                enabled: root.discoveryEnabled && !root.scanning
-                onClicked: if (typeof core !== "undefined" && core) core.refresh_smb_discovery()
-            }
         }
+
+        SettingDivider {}
 
         Text {
             visible: !root.discoveryEnabled
@@ -261,7 +303,16 @@ ColumnLayout {
             wrapMode: Text.Wrap
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: qsTr("Automatic discovery is off. Saved shares still appear in the sidebar; turn discovery on to scan again.")
+            text: qsTr("Auto discovery is off. Turn the toggle on to scan for network storage shared on your LAN.")
+        }
+
+        Text {
+            visible: root.discoveryEnabled && root.scanning && root.discovered.length === 0
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: theme.textMuted
+            font.pixelSize: theme.fs(12)
+            text: qsTr("Looking for network storage and shared drives on this network…")
         }
 
         Text {
@@ -270,7 +321,7 @@ ColumnLayout {
             wrapMode: Text.Wrap
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
-            text: qsTr("No shared disks found yet. Make sure the NAS or Windows PC is on the same network, then scan again.")
+            text: qsTr("No network drives discovered yet. Make sure file sharing is active on your NAS or server, then click the retry icon above to scan again.")
         }
 
         Repeater {
@@ -282,7 +333,7 @@ ColumnLayout {
 
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                implicitHeight: discoveryRow.implicitHeight + 20
+                implicitHeight: discRow.implicitHeight + 20
                 radius: theme.radiusM
                 color: theme.surfaceContainerHigh
                 border.width: 1
@@ -290,7 +341,7 @@ ColumnLayout {
                 opacity: entry.ignored ? 0.55 : 1.0
 
                 RowLayout {
-                    id: discoveryRow
+                    id: discRow
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 12
@@ -304,10 +355,10 @@ ColumnLayout {
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
-                        spacing: 6
+                        spacing: 4
 
                         Text {
-                            text: entry.name || entry.server || ""
+                            text: entry.name || entry.server || qsTr("Network Device")
                             color: theme.textMain
                             font.pixelSize: theme.fs(13)
                             font.bold: true
@@ -327,7 +378,7 @@ ColumnLayout {
                         Flow {
                             Layout.fillWidth: true
                             spacing: 6
-                            visible: !entry.ignored
+                            visible: !entry.ignored && entry.shares && entry.shares.length > 0
 
                             Repeater {
                                 model: entry.shares || []
@@ -344,65 +395,59 @@ ColumnLayout {
                     }
 
                     LoafButton {
-                        visible: !entry.ignored
-                        text: qsTr("Add Share…")
-                        icon: "plus"
-                        variant: "outlined"
-                        onClicked: if (typeof window !== "undefined") window.openSmbEditor({ server: entry.server, name: entry.name, share: "" })
+                        text: qsTr("Connect")
+                        icon: "plug"
+                        variant: "filled"
+                        visible: !entry.ignored && (!entry.shares || entry.shares.length === 0)
+                        onClicked: root.connectDiscovered(entry)
                     }
 
                     LoafButton {
-                        visible: !entry.ignored
-                        icon: "eye-slash"
+                        icon: entry.ignored ? "eye" : "eye-slash"
                         variant: "ghost"
-                        Accessible.name: qsTr("Hide this server")
-                        onClicked: if (typeof core !== "undefined" && core) core.ignore_smb_server(entry.server)
-                    }
-
-                    LoafButton {
-                        visible: entry.ignored
-                        text: qsTr("Unhide")
-                        icon: "eye"
-                        variant: "tonal"
-                        onClicked: if (typeof core !== "undefined" && core) core.unignore_smb_server(entry.server)
+                        Accessible.name: entry.ignored ? qsTr("Show drive") : qsTr("Ignore drive")
+                        ToolTip.visible: containsMouse
+                        ToolTip.text: entry.ignored ? qsTr("Restore") : qsTr("Ignore")
+                        onClicked: {
+                            if (typeof core !== "undefined" && core) {
+                                if (entry.ignored)
+                                    core.unignore_smb_discovered(entry.server);
+                                else
+                                    core.ignore_smb_discovered(entry.server);
+                            }
+                        }
                     }
                 }
             }
         }
-
-        RowLayout {
-            visible: root.discovered.some(function(d) { return d.ignored; })
-            Layout.fillWidth: true
-            spacing: 10
-
-            Text {
-                text: qsTr("Hidden servers are still remembered above.")
-                color: theme.textMuted
-                font.pixelSize: theme.fs(11)
-                Layout.fillWidth: true
-            }
-
-            LoafButton {
-                text: qsTr("Unhide All")
-                icon: "eye"
-                variant: "text"
-                onClicked: if (typeof core !== "undefined" && core) core.clear_ignored_smb_servers()
-            }
-        }
     }
 
-    SettingCard {
-        visible: root.matchNetwork
-        title: qsTr("Authentication & Mounting")
-        subtitle: qsTr("Network drives are mounted securely via GVfs. Credentials are saved in the system FreeDesktop secret keyring.")
-        icon: "lock-key"
-    }
+    // Single dialog for quick rename
+    LoafTextPrompt {
+        id: renamePrompt
+        title: qsTr("Rename Drive")
+        label: qsTr("Display name:")
+        confirmText: qsTr("Save")
+        property var targetDrive: null
 
-    Connections {
-        target: theme
-        function onSmbAutoDiscoveryChanged() {
-            if (discoverySwitch.checked !== theme.smbAutoDiscovery)
-                discoverySwitch.checked = theme.smbAutoDiscovery;
+        onAccepted: function(newName) {
+            if (!targetDrive || !newName.trim()) return;
+            var d = targetDrive;
+            if (typeof core !== "undefined" && core) {
+                core.save_network_profile(
+                    d.id,
+                    d.protocol || "smb",
+                    newName.trim(),
+                    d.server || "",
+                    d.share || "",
+                    d.username || "",
+                    d.domain || "",
+                    d.port || 0,
+                    d.ssl !== undefined ? d.ssl : true
+                );
+            }
+            if (typeof window !== "undefined" && window.toast)
+                window.toast("info", qsTr("Drive renamed"));
         }
     }
 }

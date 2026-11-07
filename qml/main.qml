@@ -2592,9 +2592,9 @@ ApplicationWindow {
                     action: function() { customizePlaces.open(); }
                 },
                 {
-                    text: qsTr("Add SMB Share…"),
+                    text: qsTr("Add Network Share…"),
                     icon: "network",
-                    action: function() { window.openSmbEditor({}); }
+                    action: function() { window.openNetworkEditor({}); }
                 },
                 {
                     text: qsTr("Scan for Network Shares"),
@@ -2807,7 +2807,7 @@ ApplicationWindow {
                 m.push({ text: qsTr("Remove Drive"), icon: "x", danger: true, action: function() { window.removeNetworkDrive(place.profile_id, place.name); } });
                 m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
                 m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
-                m.push({ text: qsTr("Add Network Drive…"), icon: "plus", separatorBefore: true, action: function() { window.openNetworkEditor({}); } });
+                m.push({ text: qsTr("Add Network Share…"), icon: "plus", separatorBefore: true, action: function() { window.openNetworkEditor({}); } });
                 model = m;
                 openAt(x, y);
                 return;
