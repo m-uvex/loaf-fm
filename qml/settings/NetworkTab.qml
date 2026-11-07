@@ -7,6 +7,8 @@ ColumnLayout {
     id: root
 
     property string searchQuery: ""
+    signal openNetworkEditorRequested(var profile)
+    signal removeNetworkDriveRequested(string id, string label)
 
     function matches(keywords) {
         if (!searchQuery || searchQuery.trim().length === 0) return true;
@@ -70,8 +72,8 @@ ColumnLayout {
         if (!entry) return;
         if (entry.shares && entry.shares.length > 0) {
             addShare(entry.server, entry.shares[0]);
-        } else if (typeof window !== "undefined") {
-            window.openNetworkEditor({
+        } else {
+            root.openNetworkEditorRequested({
                 server: entry.server || "",
                 name: entry.name || entry.server || ""
             });
@@ -110,7 +112,7 @@ ColumnLayout {
                 text: qsTr("Add Drive")
                 icon: "plus"
                 variant: "filled"
-                onClicked: if (typeof window !== "undefined") window.openNetworkEditor({})
+                onClicked: root.openNetworkEditorRequested({})
             }
         }
 
@@ -230,7 +232,7 @@ ColumnLayout {
                         Accessible.name: qsTr("Edit drive")
                         ToolTip.visible: containsMouse
                         ToolTip.text: qsTr("Edit")
-                        onClicked: if (typeof window !== "undefined") window.openNetworkEditor(modelData)
+                        onClicked: root.openNetworkEditorRequested(modelData)
                     }
 
                     LoafButton {
@@ -239,7 +241,7 @@ ColumnLayout {
                         Accessible.name: qsTr("Remove drive")
                         ToolTip.visible: containsMouse
                         ToolTip.text: qsTr("Remove")
-                        onClicked: if (typeof window !== "undefined") window.removeNetworkDrive(modelData.id, modelData.label)
+                        onClicked: root.removeNetworkDriveRequested(modelData.id, modelData.label)
                     }
                 }
             }

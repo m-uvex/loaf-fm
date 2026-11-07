@@ -9,6 +9,8 @@ Item {
     property int activeTab: 0
     property string searchQuery: ""
     signal searchCleared()
+    signal openNetworkEditorRequested(var profile)
+    signal removeNetworkDriveRequested(string id, string label)
 
     readonly property bool isCompact: width < 660
 
@@ -594,6 +596,8 @@ Item {
                     NetworkTab {
                         id: tabNetwork
                         searchQuery: settingsView.searchQuery
+                        onOpenNetworkEditorRequested: function(p) { settingsView.openNetworkEditorRequested(p); }
+                        onRemoveNetworkDriveRequested: function(id, l) { settingsView.removeNetworkDriveRequested(id, l); }
                         visible: settingsView.searchQuery.length > 0
                             ? (tabNetwork.matchCount > 0)
                             : (settingsView.activeTab === 6)

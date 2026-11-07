@@ -2037,6 +2037,8 @@ ApplicationWindow {
                                 Component.onCompleted: activeTab = window.settingsTab
                                 onActiveTabChanged: window.settingsTab = activeTab
                                 onSearchCleared: searchInput.text = ""
+                                onOpenNetworkEditorRequested: function(p) { window.openNetworkEditor(p); }
+                                onRemoveNetworkDriveRequested: function(id, l) { window.removeNetworkDrive(id, l); }
                             }
                         }
                     }
