@@ -11,6 +11,7 @@ Rectangle {
     property string icon: ""
     property bool collapsible: root.title.length > 0
     property bool collapsed: false
+    property alias headerActions: headerActionsSlot.data
 
     readonly property bool isCompact: (typeof settingsView !== "undefined" && settingsView.isCompact) || root.width < 460
     property real padding: isCompact ? 16 : 22
@@ -51,8 +52,21 @@ Rectangle {
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
             }
 
+            MouseArea {
+                id: headerMouse
+                anchors.fill: parent
+                enabled: root.collapsible
+                hoverEnabled: root.collapsible
+                cursorShape: root.collapsible ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: {
+                    if (root.collapsible)
+                        root.collapsed = !root.collapsed;
+                }
+            }
+
             RowLayout {
                 id: headerRow
+                z: 1
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: 0
@@ -95,6 +109,12 @@ Rectangle {
                     }
                 }
 
+                RowLayout {
+                    id: headerActionsSlot
+                    spacing: 8
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
                 LoafIcon {
                     visible: root.collapsible
                     name: "caret-down"
@@ -105,18 +125,6 @@ Rectangle {
 
                     Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                }
-            }
-
-            MouseArea {
-                id: headerMouse
-                anchors.fill: parent
-                enabled: root.collapsible
-                hoverEnabled: root.collapsible
-                cursorShape: root.collapsible ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    if (root.collapsible)
-                        root.collapsed = !root.collapsed;
                 }
             }
         }

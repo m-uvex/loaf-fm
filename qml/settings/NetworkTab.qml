@@ -96,27 +96,14 @@ ColumnLayout {
         subtitle: qsTr("Network storage locations and mounted remote drives")
         icon: "hard-drives"
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Text {
-                text: qsTr("Configured Network Drives")
-                color: theme.textMain
-                font.pixelSize: theme.fs(13)
-                font.bold: true
-                Layout.fillWidth: true
-            }
-
+        headerActions: [
             LoafButton {
                 text: qsTr("Add Drive")
                 icon: "plus"
                 variant: "filled"
                 onClicked: root.openNetworkEditorRequested({})
             }
-        }
-
-        SettingDivider {}
+        ]
 
         Text {
             visible: root.profiles.length === 0
@@ -255,16 +242,12 @@ ColumnLayout {
         subtitle: qsTr("Scan and detect shared network drives across the local network")
         icon: "broadcast"
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 12
-
+        headerActions: [
             LoafSwitch {
                 id: autoDiscoverySwitch
                 checked: theme.smbAutoDiscovery
                 onToggled: function(c) { theme.smbAutoDiscovery = c; }
-            }
-
+            },
             LoafButton {
                 id: refreshDiscoveryBtn
                 icon: "arrows-clockwise"
@@ -285,19 +268,7 @@ ColumnLayout {
                     running: root.scanning
                 }
             }
-
-            Text {
-                text: root.scanning
-                    ? qsTr("Scanning the local network…")
-                    : (root.discoveryEnabled ? qsTr("Auto discovery active") : qsTr("Auto discovery disabled"))
-                color: theme.textMain
-                font.pixelSize: theme.fs(13)
-                font.bold: true
-                Layout.fillWidth: true
-            }
-        }
-
-        SettingDivider {}
+        ]
 
         Text {
             visible: !root.discoveryEnabled
