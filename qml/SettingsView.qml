@@ -23,7 +23,7 @@ Item {
         if (theme.shareViaLinkEnabled) {
             t.push({ id: "share", index: 5, name: qsTr("Share"), iconName: "share-network", subtitle: qsTr("Cloudflare tunnel file hosting and active streams") });
         }
-        t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("SMB and Samba network share storage profiles") });
+        t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("SMB, Samba, and WebDAV network storage profiles") });
         return t;
     }
 
@@ -293,6 +293,10 @@ Item {
                             ToolTip.text: modelData.name
                             ToolTip.delay: 250
                             onClicked: {
+                                if (settingsView.searchQuery.length > 0) {
+                                    settingsView.searchCleared();
+                                    settingsView.searchQuery = "";
+                                }
                                 settingsView.activeTab = modelData.index;
                             }
                         }
@@ -386,6 +390,10 @@ Item {
                         ToolTip.text: qsTr("About Loaf")
                         ToolTip.delay: 250
                         onClicked: {
+                            if (settingsView.searchQuery.length > 0) {
+                                settingsView.searchCleared();
+                                settingsView.searchQuery = "";
+                            }
                             settingsView.activeTab = 4;
                         }
                     }

@@ -8,7 +8,7 @@ ColumnLayout {
     property string searchQuery: ""
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -28,8 +28,10 @@ ColumnLayout {
     readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
 
-    readonly property int matchCount: (matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
-        + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
+            + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0))
+        : 0
 
     Layout.fillWidth: true
     spacing: 16

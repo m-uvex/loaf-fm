@@ -66,8 +66,10 @@ ApplicationWindow {
     }
 
     onActiveViewChanged: {
+        searchInput.text = "";
         if (activeView === "settings") settingsOpened = true;
         else if (activeView === "pc") pcOpened = true;
+        else if (activeView === "files") searchRow.syncSearchBox();
         if (pendingMountDevice.length > 0 && activeView !== pendingMountView)
             cancelDriveOpen();
     }
@@ -2034,6 +2036,7 @@ ApplicationWindow {
                                 searchQuery: window.activeView === "settings" ? searchInput.text : ""
                                 Component.onCompleted: activeTab = window.settingsTab
                                 onActiveTabChanged: window.settingsTab = activeTab
+                                onSearchCleared: searchInput.text = ""
                             }
                         }
                     }

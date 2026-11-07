@@ -8,7 +8,7 @@ ColumnLayout {
     property string searchQuery: ""
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -22,7 +22,9 @@ ColumnLayout {
 
     readonly property bool matchNetwork: matches("network smb samba webdav dav nas share server mount connect remote windows cloud keyring")
     readonly property bool matchDiscovery: matches("discover automatic scan lan avahi mdns bonjour netbios ws-discovery smb samba nas network")
-    readonly property int matchCount: (matchNetwork ? 1 : 0) + (matchDiscovery ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchNetwork ? 1 : 0) + (matchDiscovery ? 1 : 0))
+        : 0
 
     readonly property var profiles: {
         if (typeof core !== "undefined" && core && (core.network_profiles_json || core.smb_profiles_json)) {

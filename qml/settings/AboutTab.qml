@@ -23,7 +23,7 @@ ColumnLayout {
     readonly property string repoUrl: "https://github.com/m-uvex/loaf-fm"
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -37,7 +37,9 @@ ColumnLayout {
 
     readonly property bool matchAbout: matches("about loaf version credits github contributors license repo description")
     readonly property bool matchContributors: matches("contributors people team authors credits github")
-    readonly property int matchCount: (matchAbout ? 1 : 0) + (matchContributors ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchAbout ? 1 : 0) + (matchContributors ? 1 : 0))
+        : 0
 
     Timer {
         id: requestTimeout
