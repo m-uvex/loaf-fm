@@ -32,6 +32,9 @@ cp "$DIR/packaging/assets/loaf.desktop" "$APPDIR/usr/share/applications/loaf.des
 cp "$DIR/packaging/assets/loaf.desktop" "$APPDIR/loaf.desktop"
 cp -r "$DIR/packaging/assets/icons/hicolor/." "$APPDIR/usr/share/icons/hicolor/"
 cp "$DIR/packaging/assets/icons/hicolor/scalable/apps/loaf.svg" "$APPDIR/loaf.svg"
+if [ -f "$DIR/packaging/assets/icons/hicolor/256x256/apps/loaf.png" ]; then
+    cp "$DIR/packaging/assets/icons/hicolor/256x256/apps/loaf.png" "$APPDIR/loaf.png"
+fi
 
 if [ -f "$DIR/LICENSE" ]; then
     cp "$DIR/LICENSE" "$APPDIR/usr/share/licenses/loaf/LICENSE"
@@ -48,6 +51,7 @@ mkdir -p "$TOOLS_DIR"
 
 LINUXDEPLOY="$TOOLS_DIR/linuxdeploy-x86_64.AppImage"
 LINUXDEPLOY_QT="$TOOLS_DIR/linuxdeploy-plugin-qt-x86_64.AppImage"
+APPIMAGE_RUNTIME="$TOOLS_DIR/runtime-x86_64"
 
 download_tool() {
     local target="$1"
@@ -87,6 +91,11 @@ if [ ! -f "$LINUXDEPLOY_QT" ]; then
     download_tool "$LINUXDEPLOY_QT" "linuxdeploy/linuxdeploy-plugin-qt" "linuxdeploy-plugin-qt-x86_64.AppImage"
 fi
 
+if [ ! -f "$APPIMAGE_RUNTIME" ]; then
+    download_tool "$APPIMAGE_RUNTIME" "AppImage/type2-runtime" "runtime-x86_64"
+fi
+
+export LDAI_RUNTIME_FILE="$APPIMAGE_RUNTIME"
 export QML_SOURCES_PATHS="$DIR/qml"
 export LDA_NO_COPY_COPYRIGHT_FILES=1
 
