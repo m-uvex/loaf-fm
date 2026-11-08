@@ -208,7 +208,7 @@ ColumnLayout {
                 && theme.availableWallpaperPaletteSources.length > 0
             icon: "image"
             title: qsTr("Wallpaper palette source")
-            subtitle: qsTr("Extract wallpaper colors from a specific provider")
+            subtitle: qsTr("Read generated palette JSON or KDE accent colors on startup")
 
             LoafSelect {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact)

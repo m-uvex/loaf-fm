@@ -43,7 +43,7 @@ Item {
     }
     property string accentName: "wallpaper" // "wallpaper", "lavender", "amber", "catppuccin", "nord", "tokyonight", "gruvbox", "rosepine"
     // Which wallpaper palette source to extract colors from when accentName is "wallpaper".
-    // "auto" uses the first detected source; otherwise picks a named provider (hyprpaper, awww, …).
+    // "auto" uses the first detected generated palette or KDE accent source.
     property string wallpaperPaletteSource: "auto"
     // Detected wallpaper palette sources: [{ id, label, path }]. Populated from core.
     property var availableWallpaperPaletteSources: []

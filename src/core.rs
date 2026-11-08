@@ -416,7 +416,6 @@ pub struct CoreRust {
     drive_generation: Arc<AtomicU64>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
-    color_watcher: Option<watcher::DirWatcher>,
 }
 
 impl Default for CoreRust {
@@ -455,7 +454,6 @@ impl Default for CoreRust {
             drive_generation: Arc::new(AtomicU64::new(0)),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
-            color_watcher: None,
         }
     }
 }
@@ -706,16 +704,6 @@ fn secret_get(key: &str) -> String {
     } else {
         String::new()
     }
-}
-
-/// Wallpaper color files live in these folders; watched for changes.
-fn wallpaper_dirs() -> Vec<PathBuf> {
-    let h = util::home();
-    [".local/state/quickshell/user/generated", ".local/state/caelestia", ".cache/caelestia", ".cache/wal", ".cache/wallust", ".cache/hellwal", ".cache/matugen", ".config/matugen", ".local/state/matugen", ".local/share/matugen", ".cache/ags/user/generated", ".local/state/ags/user/generated", ".cache/DankMaterialShell", ".config/hypr", ".cache/awww", ".cache/swww", ".config/mango", ".config", ".cache"]
-        .iter()
-        .map(|d| h.join(d))
-        .filter(|d| d.is_dir())
-        .collect()
 }
 
 impl qobject::LoafCore {
@@ -2972,24 +2960,6 @@ impl cxx_qt::Initialize for qobject::LoafCore {
         // Populate the sidebar on a fresh launch, before the first hotplug or
         // mount-table event. Discovery runs off the GUI thread.
         self.as_mut().load_drives();
-        // Follow wallpaper palette changes without polling.
-        let t2 = self.qt_thread();
-        let cw = watcher::DirWatcher::new(move || {
-            let _ = t2.queue(|core| {
-                core.reload_wallpaper_colors();
-            });
-        });
-        if let Some(w) = cw.as_ref() {
-            let preferred = state::get("wallpaperPaletteSource").unwrap_or_default();
-            if let Some(dir) = theme::read_wallpaper_colors_source_for(&preferred)
-                .and_then(|(p, _, _)| Path::new(&p).parent().map(|x| x.to_path_buf()))
-                .or_else(|| wallpaper_dirs().into_iter().next())
-            {
-                w.watch(&dir);
-            }
-        }
-        self.as_mut().rust_mut().color_watcher = cw;
-
         // Monitor real-time system color-scheme changes (desktop portal & gsettings)
         let t_portal = self.qt_thread();
         std::thread::Builder::new()

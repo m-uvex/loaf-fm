@@ -28,8 +28,6 @@ pub mod ffi {
         /// Human readable description of a MIME type ("PNG image").
         fn mime_comment_for(mime: &str) -> String;
 
-        fn image_palette_json(path: &str) -> String;
-
         /// Sets the application name / desktop file id (Wayland app id, X11
         /// WM_CLASS) to `window_class`.
         fn set_application_identity(version: &str, window_class: &str);
@@ -58,10 +56,6 @@ pub fn mime_type(path: &std::path::Path, sniff: bool) -> String {
 
 pub fn mime_comment(mime: &str) -> String {
     ffi::mime_comment_for(mime)
-}
-
-pub fn image_palette_json(path: &std::path::Path) -> String {
-    ffi::image_palette_json(&path.to_string_lossy())
 }
 
 #[cfg(test)]
