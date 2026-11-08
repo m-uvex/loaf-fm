@@ -188,7 +188,7 @@ pub fn set_remember(id: &str, remember: bool) {
     }
 }
 
-const GVFS_SCHEMA: &str = "org.gnome.keyring.NetworkPassword";
+pub(crate) const GVFS_SCHEMA: &str = "org.gnome.keyring.NetworkPassword";
 
 fn secret_tool() -> Option<PathBuf> {
     util::which("secret-tool")
@@ -212,7 +212,7 @@ pub fn split_server(value: &str) -> (&str, Option<u16>) {
     (value, None)
 }
 
-fn keyring_attributes(profile: &NetworkProfile) -> Vec<String> {
+pub(crate) fn keyring_attributes(profile: &NetworkProfile) -> Vec<String> {
     let (host, host_port) = split_server(&profile.server);
     let port = profile.port.or(host_port);
 
@@ -405,15 +405,15 @@ pub fn uri(profile: &NetworkProfile) -> String {
     }
 }
 
-struct SmbMountEntry {
-    server: String,
-    share: String,
-    user: String,
-    domain: String,
-    port: Option<u16>,
+pub(crate) struct SmbMountEntry {
+    pub(crate) server: String,
+    pub(crate) share: String,
+    pub(crate) user: String,
+    pub(crate) domain: String,
+    pub(crate) port: Option<u16>,
 }
 
-fn parse_smb_mount_entry(name: &str) -> Option<SmbMountEntry> {
+pub(crate) fn parse_smb_mount_entry(name: &str) -> Option<SmbMountEntry> {
     let rest = name.strip_prefix("smb-share:")?;
     let mut server = String::new();
     let mut share = String::new();

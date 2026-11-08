@@ -506,11 +506,14 @@ mod tests {
     fn profile() -> Profile {
         Profile {
             id: "one".into(),
+            protocol: Protocol::Smb,
             name: "Media".into(),
             server: "nas.local".into(),
             share: "media/movies".into(),
             username: "alice".into(),
             domain: "WORKGROUP".into(),
+            port: None,
+            ssl: false,
             remember: false,
         }
     }
@@ -547,14 +550,14 @@ mod tests {
 
     #[test]
     fn reads_mount_entries() {
-        let entry = parse_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
+        let entry = parse_smb_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
         assert_eq!(entry.server, "nas.local");
         assert_eq!(entry.share, "media");
         assert_eq!(entry.user, "alice");
         assert_eq!(entry.domain, "");
         assert_eq!(entry.port, None);
-        assert!(parse_mount_entry("smb-share:share=media").is_none());
-        let entry = parse_mount_entry("smb-share:domain=WORKGROUP,port=4455,server=127.0.0.1,share=media,user=archy").unwrap();
+        assert!(parse_smb_mount_entry("smb-share:share=media").is_none());
+        let entry = parse_smb_mount_entry("smb-share:domain=WORKGROUP,port=4455,server=127.0.0.1,share=media,user=archy").unwrap();
         assert_eq!(entry.port, Some(4455));
     }
 
