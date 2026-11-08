@@ -1036,7 +1036,7 @@ impl qobject::LoafEngine {
         let v = !*self.show_hidden();
         self.as_mut().set_show_hidden(v);
         state::set_bool("show_hidden", v);
-        self.refilter(false);
+        self.refilter(true);
     }
 
     fn resort(mut self: Pin<&mut Self>) {
