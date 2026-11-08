@@ -9,6 +9,8 @@ Item {
     property int activeTab: 0
     property string searchQuery: ""
     signal searchCleared()
+    signal openNetworkEditorRequested(var profile)
+    signal removeNetworkDriveRequested(string id, string label)
 
     readonly property bool isCompact: width < 660
 
@@ -23,7 +25,7 @@ Item {
         if (theme.shareViaLinkEnabled) {
             t.push({ id: "share", index: 5, name: qsTr("Share"), iconName: "share-network", subtitle: qsTr("Cloudflare tunnel file hosting and active streams") });
         }
-        t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("SMB and Samba network share storage profiles") });
+        t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("Saved network drives and auto discovery") });
         return t;
     }
 
@@ -293,6 +295,10 @@ Item {
                             ToolTip.text: modelData.name
                             ToolTip.delay: 250
                             onClicked: {
+                                if (settingsView.searchQuery.length > 0) {
+                                    settingsView.searchCleared();
+                                    settingsView.searchQuery = "";
+                                }
                                 settingsView.activeTab = modelData.index;
                             }
                         }
@@ -386,6 +392,10 @@ Item {
                         ToolTip.text: qsTr("About Loaf")
                         ToolTip.delay: 250
                         onClicked: {
+                            if (settingsView.searchQuery.length > 0) {
+                                settingsView.searchCleared();
+                                settingsView.searchQuery = "";
+                            }
                             settingsView.activeTab = 4;
                         }
                     }
@@ -586,6 +596,8 @@ Item {
                     NetworkTab {
                         id: tabNetwork
                         searchQuery: settingsView.searchQuery
+                        onOpenNetworkEditorRequested: function(p) { settingsView.openNetworkEditorRequested(p); }
+                        onRemoveNetworkDriveRequested: function(id, l) { settingsView.removeNetworkDriveRequested(id, l); }
                         visible: settingsView.searchQuery.length > 0
                             ? (tabNetwork.matchCount > 0)
                             : (settingsView.activeTab === 6)

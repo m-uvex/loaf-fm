@@ -9,7 +9,7 @@ ColumnLayout {
     property string searchQuery: ""
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -26,8 +26,10 @@ ColumnLayout {
     readonly property bool matchCompression: matches("compression archive format zip 7z tar gz password folders files")
     readonly property bool matchAdvanced: matches("advanced cloudflare tunnel agent daemon expiration throttle bandwidth rate limit")
 
-    readonly property int matchCount: (matchProvider ? 1 : 0) + (matchActive ? 1 : 0)
-        + (matchCompression ? 1 : 0) + (matchAdvanced ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchProvider ? 1 : 0) + (matchActive ? 1 : 0)
+            + (matchCompression ? 1 : 0) + (matchAdvanced ? 1 : 0))
+        : 0
 
     readonly property bool passwordSupported: {
         var fmt = theme.shareCompressFormat;

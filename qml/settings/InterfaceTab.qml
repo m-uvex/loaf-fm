@@ -8,7 +8,7 @@ ColumnLayout {
     property string searchQuery: ""
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -29,9 +29,11 @@ ColumnLayout {
     readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
     readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
 
-    readonly property int matchCount: (matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
-        + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
-        + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
+            + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
+            + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0))
+        : 0
 
     Layout.fillWidth: true
     spacing: 16

@@ -9,6 +9,7 @@ pub mod listing;
 pub mod mtp;
 pub mod mtp_ops;
 pub mod native;
+pub mod network;
 pub mod pane;
 pub mod portal;
 pub mod portal_bridge;

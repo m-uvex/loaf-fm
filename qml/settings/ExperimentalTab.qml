@@ -8,7 +8,7 @@ ColumnLayout {
     property string searchQuery: ""
 
     function matches(keywords) {
-        if (!searchQuery || searchQuery.length === 0) return true;
+        if (!searchQuery || searchQuery.trim().length === 0) return true;
         var q = searchQuery.toLowerCase().trim();
         var parts = q.split(/\s+/);
         var kw = keywords.toLowerCase();
@@ -25,7 +25,9 @@ ColumnLayout {
     readonly property bool matchPcCustom: matches("experimental pc customization dashboard layout sections this pc")
     readonly property bool matchShareLink: matches("experimental share via link cloudflare tunnel p2p host local send")
 
-    readonly property int matchCount: (matchIcons ? 1 : 0) + (matchArchives ? 1 : 0) + (matchPcCustom ? 1 : 0) + (matchShareLink ? 1 : 0)
+    readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
+        ? ((matchIcons ? 1 : 0) + (matchArchives ? 1 : 0) + (matchPcCustom ? 1 : 0) + (matchShareLink ? 1 : 0))
+        : 0
 
     Layout.fillWidth: true
     spacing: 16
