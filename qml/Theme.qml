@@ -42,6 +42,11 @@ Item {
         return Qt.rgba(color.r, color.g, color.b, effectivePanelOpacity);
     }
     property string accentName: "wallpaper" // "wallpaper", "lavender", "amber", "catppuccin", "nord", "tokyonight", "gruvbox", "rosepine"
+    // Which wallpaper palette source to extract colors from when accentName is "wallpaper".
+    // "auto" uses the first detected source; otherwise picks a named provider (hyprpaper, awww, …).
+    property string wallpaperPaletteSource: "auto"
+    // Detected wallpaper palette sources: [{ id, label, path }]. Populated from core.
+    property var availableWallpaperPaletteSources: []
     property string iconSource: "phosphor" // "phosphor", "system", "adwaita" or "custom"
     property string customIconTheme: "" // icon theme folder name used when iconSource is "custom"
     property string phosphorWeight: "regular" // "regular", "bold", "fill", "duotone", "light", "thin"
@@ -2065,6 +2070,16 @@ Item {
         if (value.length > 0) accentName = value;
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
             core.reload_wallpaper_colors();
+        value = readSetting("wallpaperPaletteSource");
+        if (value.length > 0) wallpaperPaletteSource = value;
+        if (typeof core !== "undefined" && core) {
+            try {
+                availableWallpaperPaletteSources =
+                    JSON.parse(core.wallpaperPaletteSourcesJson() || "[]");
+            } catch (e) {
+                availableWallpaperPaletteSources = [];
+            }
+        }
         value = readSetting("iconSource");
         if (value.length > 0) iconSource = value;
         value = readSetting("customIconTheme");
@@ -2161,6 +2176,11 @@ Item {
     onPanelOpacityChanged: writeSetting("panelOpacity", panelOpacity)
     onAccentNameChanged: {
         writeSetting("accentName", accentName);
+        if (accentName === "wallpaper" && typeof core !== "undefined" && core)
+            core.reload_wallpaper_colors();
+    }
+    onWallpaperPaletteSourceChanged: {
+        writeSetting("wallpaperPaletteSource", wallpaperPaletteSource);
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
             core.reload_wallpaper_colors();
     }

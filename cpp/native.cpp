@@ -25,7 +25,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QColor>
 #include <QGuiApplication>
+#include <QImage>
+#include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -384,6 +387,106 @@ rust::String mime_comment_for(rust::Str mime)
 {
     static QMimeDatabase db;
     return toRust(db.mimeTypeForName(toQString(mime)).comment());
+}
+
+rust::String image_palette_json(rust::Str path)
+{
+    if (!QCoreApplication::instance())
+        return toRust(QStringLiteral("{}"));
+
+    QImageReader reader(toQString(path));
+    reader.setAutoTransform(true);
+    const QSize sourceSize = reader.size();
+    if (sourceSize.isValid() && !sourceSize.isEmpty())
+        reader.setScaledSize(sourceSize.scaled(QSize(96, 96), Qt::KeepAspectRatio));
+
+    QImage image = reader.read();
+    if (image.isNull())
+        return toRust(QStringLiteral("{}"));
+    if (image.format() != QImage::Format_RGB32 && image.format() != QImage::Format_ARGB32)
+        image = image.convertToFormat(QImage::Format_RGB32);
+    if (image.width() <= 0 || image.height() <= 0)
+        return toRust(QStringLiteral("{}"));
+
+    constexpr int kHueBins = 24;
+    double weights[kHueBins] = {};
+    double reds[kHueBins] = {};
+    double greens[kHueBins] = {};
+    double blues[kHueBins] = {};
+    double totalR = 0.0;
+    double totalG = 0.0;
+    double totalB = 0.0;
+    qint64 totalPixels = 0;
+
+    for (int y = 0; y < image.height(); ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const int r = qRed(line[x]);
+            const int g = qGreen(line[x]);
+            const int b = qBlue(line[x]);
+            totalR += r;
+            totalG += g;
+            totalB += b;
+            ++totalPixels;
+
+            const QColor color(r, g, b);
+            const double hue = color.hslHueF();
+            const double saturation = color.hslSaturationF();
+            const double value = color.valueF();
+            if (hue < 0.0 || saturation < 0.12 || value < 0.10 || value > 0.97)
+                continue;
+            const int bin = qMin(kHueBins - 1, static_cast<int>(hue * kHueBins));
+            const double weight = saturation * (0.35 + value * 0.65);
+            weights[bin] += weight;
+            reds[bin] += r * weight;
+            greens[bin] += g * weight;
+            blues[bin] += b * weight;
+        }
+    }
+
+    if (totalPixels == 0)
+        return toRust(QStringLiteral("{}"));
+
+    int bestBin = -1;
+    for (int i = 0; i < kHueBins; ++i) {
+        if (bestBin < 0 || weights[i] > weights[bestBin])
+            bestBin = i;
+    }
+
+    double primaryR = totalR / totalPixels;
+    double primaryG = totalG / totalPixels;
+    double primaryB = totalB / totalPixels;
+    if (bestBin >= 0 && weights[bestBin] > 0.0) {
+        primaryR = reds[bestBin] / weights[bestBin];
+        primaryG = greens[bestBin] / weights[bestBin];
+        primaryB = blues[bestBin] / weights[bestBin];
+    }
+
+    QColor primary = QColor::fromRgbF(primaryR / 255.0, primaryG / 255.0, primaryB / 255.0);
+    qreal primaryHue = primary.hslHueF();
+    qreal primarySaturation = primary.hslSaturationF();
+    qreal primaryLightness = primary.lightnessF();
+    if (primaryHue < 0.0)
+        primaryHue = 0.0;
+    primarySaturation = qBound(0.45, primarySaturation, 0.85);
+    primaryLightness = qBound(0.52, primaryLightness, 0.70);
+    primary = QColor::fromHslF(primaryHue, primarySaturation, primaryLightness);
+
+    QColor average = QColor::fromRgbF(totalR / totalPixels / 255.0, totalG / totalPixels / 255.0,
+                                     totalB / totalPixels / 255.0);
+    qreal averageHue = average.hslHueF();
+    qreal averageSaturation = average.hslSaturationF();
+    if (averageHue < 0.0)
+        averageHue = primaryHue;
+    const QColor background = QColor::fromHslF(averageHue, qBound(0.04, averageSaturation, 0.22), 0.075);
+    const QColor onSurface = QColor::fromHslF(primaryHue, 0.08, 0.92);
+
+    const QJsonObject result{
+        {QStringLiteral("primary"), primary.name()},
+        {QStringLiteral("background"), background.name()},
+        {QStringLiteral("on_surface"), onSurface.name()},
+    };
+    return toRust(QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact)));
 }
 
 // True when the saved window opacity is below 1. Only then does the window

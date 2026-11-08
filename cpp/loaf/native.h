@@ -204,6 +204,8 @@ public:
 rust::String mime_type_for(rust::Str path, bool sniff);
 rust::String mime_comment_for(rust::Str mime);
 
+rust::String image_palette_json(rust::Str path);
+
 // Sets the application name / desktop file id (Wayland app id, X11 window
 // class) from `window_class`.
 void set_application_identity(rust::Str version, rust::Str window_class);

@@ -2,6 +2,7 @@
 //! (matugen / pywal / quickshell), plus host information. Moved unchanged
 //! from the original bridge.rs.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -778,58 +779,563 @@ fn kde_accent_palette() -> Option<String> {
     Some(normalize_wallpaper_colors(&serde_json::Value::Object(flat).to_string()))
 }
 
-/// Returns (source_path, content, mtime_secs) for the first readable color source.
-pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.local/state/quickshell/user/generated/colors.json", home),
-        format!("{}/.local/state/caelestia/scheme.json", home),
-        format!("{}/.cache/caelestia/scheme.json", home),
-        format!("{}/.cache/wal/colors.json", home),
-        format!("{}/.cache/wallust/colors.json", home),
-        format!("{}/.cache/hellwal/colors.json", home),
-        format!("{}/.cache/matugen/colors.json", home),
-        format!("{}/.config/matugen/colors.json", home),
-        format!("{}/.config/matugen/generated/colors.json", home),
-        format!("{}/.local/state/matugen/colors.json", home),
-        format!("{}/.local/share/matugen/colors.json", home),
-        format!("{}/.cache/ags/user/generated/colors.json", home),
-        format!("{}/.local/state/ags/user/generated/colors.json", home),
-        format!("{}/.cache/DankMaterialShell/dms-colors.json", home),
-        format!("{}/.cache/current_wallpaper_palette.json", home),
-        format!("{}/.cache/wallpaper_colors.json", home),
-    ];
-
-    for path_str in candidates {
-        let path = Path::new(&path_str);
-        let Ok(raw_content) = fs::read_to_string(path) else { continue };
-        let is_object = serde_json::from_str::<serde_json::Value>(&raw_content)
-            .ok()
-            .map(|v| v.is_object() && v.as_object().map(|o| !o.is_empty()).unwrap_or(false))
-            .unwrap_or(false);
-        if !is_object {
-            continue;
-        }
-        let content = normalize_caelestia_scheme(&raw_content)
-            .unwrap_or_else(|| normalize_wallpaper_colors(&raw_content));
-        let mtime = fs::metadata(path)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        return Some((path_str, content, mtime));
-    }
-
-    let kde_path = format!("{}/.config/kdeglobals", home);
-    let content = kde_accent_palette()?;
-    let mtime = fs::metadata(&kde_path)
+fn wallpaper_mtime(path: &Path) -> u64 {
+    fs::metadata(path)
         .and_then(|m| m.modified())
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs())
-        .unwrap_or(0);
-    Some((kde_path, content, mtime))
+        .unwrap_or(0)
+}
+
+fn looks_like_image(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "bmp" | "gif" | "avif" | "jxl" | "tif" | "tiff" | "pnm" | "heic"
+    )
+}
+
+fn resolve_wallpaper_path(raw: &str, base: &Path) -> Option<PathBuf> {
+    let raw = raw.trim().trim_end_matches([';', ',']);
+    let raw = raw.trim_matches(|c| c == '"' || c == '\'');
+    if raw.is_empty() {
+        return None;
+    }
+    let home = std::env::var("HOME").ok()?;
+    let path = if raw == "~" {
+        PathBuf::from(&home)
+    } else if let Some(rest) = raw.strip_prefix("~/") {
+        Path::new(&home).join(rest)
+    } else {
+        let path = PathBuf::from(raw);
+        if path.is_absolute() {
+            path
+        } else {
+            base.join(path)
+        }
+    };
+    path.is_file().then_some(path)
+}
+
+fn quoted_image_path(command: &str, base: &Path) -> Option<PathBuf> {
+    for quote in ['"', '\''] {
+        let mut rest = command;
+        while let Some(start) = rest.find(quote) {
+            let after = &rest[start + 1..];
+            let Some(end) = after.find(quote) else { break };
+            if let Some(path) = resolve_wallpaper_path(&after[..end], base) {
+                if looks_like_image(&path) {
+                    return Some(path);
+                }
+            }
+            rest = &after[end + 1..];
+        }
+    }
+    None
+}
+
+fn image_path_in_command(command: &str, base: &Path) -> Option<PathBuf> {
+    if let Some(path) = quoted_image_path(command, base) {
+        return Some(path);
+    }
+    for token in command.split_whitespace() {
+        if let Some(path) = resolve_wallpaper_path(token, base) {
+            if looks_like_image(&path) {
+                return Some(path);
+            }
+        }
+        if let Some((_, value)) = token.split_once('=') {
+            if let Some(path) = resolve_wallpaper_path(value, base) {
+                if looks_like_image(&path) {
+                    return Some(path);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn wallpaper_command_image(content: &str, base: &Path) -> Option<PathBuf> {
+    const WALLPAPER_COMMANDS: &[&str] =
+        &["swaybg", "swww", "awww", "hyprpaper", "feh", "wallpaper", "wbg", "hsetroot", "xwallpaper"];
+    let mut fallback = None;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some(image) = image_path_in_command(line, base) else { continue };
+        let lower = line.to_ascii_lowercase();
+        if WALLPAPER_COMMANDS.iter().any(|command| lower.contains(command)) {
+            return Some(image);
+        }
+        fallback.get_or_insert(image);
+    }
+    fallback
+}
+
+fn awww_cached_wallpaper(home: &Path) -> Option<(String, PathBuf, u64)> {
+    let mut best: Option<(String, PathBuf, u64)> = None;
+    for dir in [home.join(".cache/awww"), home.join(".cache/swww")] {
+        let Ok(versions) = fs::read_dir(&dir) else { continue };
+        for version in versions.flatten() {
+            let version_dir = version.path();
+            if !version_dir.is_dir() {
+                continue;
+            }
+            let Ok(files) = fs::read_dir(&version_dir) else { continue };
+            for file in files.flatten() {
+                let cache_file = file.path();
+                if !cache_file.is_file() {
+                    continue;
+                }
+                let Ok(data) = fs::read(&cache_file) else { continue };
+                let fields: Vec<&[u8]> = data.split(|byte| *byte == 0).collect();
+                let mut image = None;
+                for entry in fields.chunks_exact(4) {
+                    let Ok(raw) = std::str::from_utf8(entry[3]) else { continue };
+                    if let Some(path) = resolve_wallpaper_path(raw, &version_dir) {
+                        if looks_like_image(&path) {
+                            image = Some(path);
+                        }
+                    }
+                }
+                let Some(image) = image else { continue };
+                let mtime = wallpaper_mtime(&cache_file);
+                if best.as_ref().map(|(_, _, seen)| mtime >= *seen).unwrap_or(true) {
+                    best = Some((cache_file.to_string_lossy().into_owned(), image, mtime));
+                }
+            }
+        }
+    }
+    best
+}
+
+fn hyprpaper_wallpaper(home: &Path) -> Option<(String, PathBuf, u64)> {
+    let config = home.join(".config/hypr/hyprpaper.conf");
+    let content = fs::read_to_string(&config).ok()?;
+    let base = config.parent().unwrap_or(home);
+    let mut wallpaper = None;
+    let mut preload = None;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else { continue };
+        match key.trim() {
+            "wallpaper" => {
+                let raw = value.split_once(',').map(|(_, path)| path).unwrap_or(value);
+                if let Some(path) = resolve_wallpaper_path(raw, base) {
+                    if looks_like_image(&path) {
+                        wallpaper = Some(path);
+                    }
+                }
+            }
+            "preload" => {
+                if let Some(path) = resolve_wallpaper_path(value, base) {
+                    if looks_like_image(&path) {
+                        preload = Some(path);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let image = wallpaper.or(preload)?;
+    Some((
+        config.to_string_lossy().into_owned(),
+        image,
+        wallpaper_mtime(&config),
+    ))
+}
+
+fn mango_config_files(home: &Path) -> Vec<PathBuf> {
+    let dir = home.join(".config/mango");
+    let Some(start) = [dir.join("config.conf"), dir.join("config.toml")]
+        .into_iter()
+        .find(|path| path.is_file())
+    else {
+        return Vec::new();
+    };
+    let mut seen = HashSet::new();
+    let mut pending = vec![start];
+    let mut files = Vec::new();
+    while let Some(path) = pending.pop() {
+        if files.len() >= 32 || !seen.insert(path.clone()) {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&path) else { continue };
+        let base = path.parent().unwrap_or(&dir).to_path_buf();
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else { continue };
+            if matches!(key.trim(), "source" | "source_optional") {
+                if let Some(include) = resolve_wallpaper_path(value, &base) {
+                    pending.push(include);
+                }
+            }
+        }
+        files.push(path);
+    }
+    files
+}
+
+fn mango_wallpaper(home: &Path) -> Option<(String, PathBuf, u64)> {
+    let configs = mango_config_files(home);
+    for path in &configs {
+        let Ok(content) = fs::read_to_string(path) else { continue };
+        let base = path.parent().unwrap_or(home);
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else { continue };
+            if !matches!(key.trim(), "exec" | "exec_once" | "exec-once" | "startup") {
+                continue;
+            }
+            if let Some(image) = wallpaper_command_image(value, base) {
+                return Some((path.to_string_lossy().into_owned(), image, wallpaper_mtime(path)));
+            }
+        }
+    }
+    for path in &configs {
+        let Ok(content) = fs::read_to_string(path) else { continue };
+        let base = path.parent().unwrap_or(home);
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else { continue };
+            if !matches!(key.trim(), "exec" | "exec_once" | "exec-once" | "startup") {
+                continue;
+            }
+            for token in value.split_whitespace() {
+                let Some(script) = resolve_wallpaper_path(token, base) else { continue };
+                if looks_like_image(&script) {
+                    continue;
+                }
+                let Ok(script_content) = fs::read_to_string(&script) else { continue };
+                if let Some(image) = wallpaper_command_image(&script_content, home) {
+                    return Some((
+                        script.to_string_lossy().into_owned(),
+                        image,
+                        wallpaper_mtime(&script),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn parse_mango_color(value: &str) -> Option<String> {
+    let value = value.trim().trim_matches(|c| c == '"' || c == '\'');
+    let hex = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+        .or_else(|| value.strip_prefix('#'))?;
+    if hex.len() < 6 {
+        return None;
+    }
+    parse_hex(&hex[..6]).map(to_hex)
+}
+
+fn mango_theme_palette(home: &Path) -> Option<(String, String)> {
+    let mut primary = None;
+    let mut background = None;
+    let mut source = None;
+    for path in mango_config_files(home) {
+        let Ok(content) = fs::read_to_string(&path) else { continue };
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else { continue };
+            let Some(color) = parse_mango_color(value) else { continue };
+            match key.trim() {
+                "focus_color" => {
+                    primary = Some(color);
+                    source = Some(path.clone());
+                }
+                "border_color" | "global_color" if primary.is_none() => {
+                    primary = Some(color);
+                    source = Some(path.clone());
+                }
+                "root_color" => background = Some(color),
+                _ => {}
+            }
+        }
+    }
+    let primary = primary?;
+    let source = source?;
+    let mut flat = serde_json::Map::new();
+    flat.insert("primary".to_string(), serde_json::json!(primary));
+    if let Some(background) = background {
+        flat.insert("background".to_string(), serde_json::json!(background));
+    }
+    flat.insert("on_surface".to_string(), serde_json::json!("#e6e2dd"));
+    Some((
+        source.to_string_lossy().into_owned(),
+        normalize_wallpaper_colors(&serde_json::Value::Object(flat).to_string()),
+    ))
+}
+
+fn wallpaper_tool_sources(home: &Path) -> Vec<(String, PathBuf, u64)> {
+    let mut sources = Vec::new();
+    if let Some(source) = awww_cached_wallpaper(home) {
+        sources.push(source);
+    }
+    if let Some(source) = hyprpaper_wallpaper(home) {
+        sources.push(source);
+    }
+    if let Some(source) = mango_wallpaper(home) {
+        sources.push(source);
+    }
+    sources.sort_by(|a, b| b.2.cmp(&a.2));
+    sources
+}
+
+/// How a single wallpaper palette source yields its colors.
+enum SourceKind {
+    /// A JSON palette file read from disk.
+    JsonFile,
+    /// An image file decoded through the C++ `QImageReader` bridge.
+    Image(PathBuf),
+    /// Mangowm explicit theme colors (`focus_color`/`root_color`/…).
+    MangoTheme,
+    /// KDE `kdeglobals` accent / window colors.
+    Kde,
+}
+
+/// A single detected wallpaper palette source.
+pub struct WallpaperSourceEntry {
+    pub id: String,
+    pub label: String,
+    /// Config/cache file path followed by `DirWatcher` for changes.
+    pub path: String,
+    pub mtime: u64,
+    kind: SourceKind,
+}
+
+/// Every wallpaper palette source detected on this host, in preference order.
+pub fn wallpaper_color_sources(home: &Path) -> Vec<WallpaperSourceEntry> {
+    let mut out: Vec<WallpaperSourceEntry> = Vec::new();
+
+    // JSON palette files, grouped by family so the list stays short.
+    let json_families: &[(&str, &str, &[&str])] = &[
+        ("quickshell", "Quickshell", &[".local/state/quickshell/user/generated/colors.json"]),
+        ("caelestia", "Caelestia", &[
+            ".local/state/caelestia/scheme.json",
+            ".cache/caelestia/scheme.json",
+        ]),
+        ("wal", "pywal / Wal", &[".cache/wal/colors.json"]),
+        ("wallust", "Wallust", &[".cache/wallust/colors.json"]),
+        ("hellwal", "Hellwal", &[".cache/hellwal/colors.json"]),
+        (
+            "matugen",
+            "Matugen",
+            &[
+                ".cache/matugen/colors.json",
+                ".config/matugen/colors.json",
+                ".config/matugen/generated/colors.json",
+                ".local/state/matugen/colors.json",
+                ".local/share/matugen/colors.json",
+            ],
+        ),
+        (
+            "ags",
+            "AGS",
+            &[
+                ".cache/ags/user/generated/colors.json",
+                ".local/state/ags/user/generated/colors.json",
+            ],
+        ),
+        (
+            "dms",
+            "Dank Material Shell",
+            &[".cache/DankMaterialShell/dms-colors.json"],
+        ),
+        (
+            "current-wallpaper-palette",
+            "Current Wallpaper Palette",
+            &[".cache/current_wallpaper_palette.json"],
+        ),
+        ("wallpaper-colors", "Wallpaper Colors", &[".cache/wallpaper_colors.json"]),
+    ];
+    for (id, label, rel_paths) in json_families {
+        for rel in rel_paths.iter().copied() {
+            let path = home.join(rel);
+            if !path.is_file() {
+                continue;
+            }
+            let valid = fs::read_to_string(&path)
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .map(|v| {
+                    v.is_object()
+                        && v.as_object()
+                            .map(|o| !o.is_empty())
+                            .unwrap_or(false)
+                })
+                .unwrap_or(false);
+            if valid {
+                out.push(WallpaperSourceEntry {
+                    id: id.to_string(),
+                    label: label.to_string(),
+                    path: path.to_string_lossy().into_owned(),
+                    mtime: wallpaper_mtime(&path),
+                    kind: SourceKind::JsonFile,
+                });
+                break; // only the first existing path per family
+            }
+        }
+    }
+
+    // Tool sources: hyprpaper, awww/swww cache, mangowm wallpaper command.
+    for (source_path, image_path, mtime) in wallpaper_tool_sources(home) {
+        let (id, label) = if source_path.contains("/hypr/") {
+            ("hyprpaper", "Hyprpaper")
+        } else if source_path.contains("/awww/") || source_path.contains("/swww/") {
+            ("awww", "awww")
+        } else if source_path.contains("/mango/") {
+            ("mango-wallpaper", "Mango (wallpaper command)")
+        } else {
+            ("wallpaper-tool", "Wallpaper tool")
+        };
+        out.push(WallpaperSourceEntry {
+            id: id.to_string(),
+            label: label.to_string(),
+            path: source_path,
+            mtime,
+            kind: SourceKind::Image(image_path),
+        });
+    }
+
+    // Mangowm explicit theme colors.
+    if mango_theme_palette(home).is_some() {
+        if let Some(first) = mango_config_files(home).first() {
+            out.push(WallpaperSourceEntry {
+                id: "mango-theme".to_string(),
+                label: "Mango (theme colors)".to_string(),
+                path: first.to_string_lossy().into_owned(),
+                mtime: wallpaper_mtime(first),
+                kind: SourceKind::MangoTheme,
+            });
+        }
+    }
+
+    // KDE fallback.
+    let kde_path = home.join(".config/kdeglobals");
+    if kde_path.is_file() {
+        out.push(WallpaperSourceEntry {
+            id: "kde".to_string(),
+            label: "KDE".to_string(),
+            path: kde_path.to_string_lossy().into_owned(),
+            mtime: wallpaper_mtime(&kde_path),
+            kind: SourceKind::Kde,
+        });
+    }
+
+    out
+}
+
+/// Load and normalize the colors for a single source entry.
+fn load_source(entry: &WallpaperSourceEntry, home: &Path) -> Option<String> {
+    match &entry.kind {
+        SourceKind::JsonFile => {
+            let path = Path::new(&entry.path);
+            let raw_content = fs::read_to_string(path).ok()?;
+            let is_object = serde_json::from_str::<serde_json::Value>(&raw_content)
+                .ok()
+                .map(|v| {
+                    v.is_object()
+                        && v.as_object()
+                            .map(|o| !o.is_empty())
+                            .unwrap_or(false)
+                })
+                .unwrap_or(false);
+            if !is_object {
+                return None;
+            }
+            Some(
+                normalize_caelestia_scheme(&raw_content)
+                    .unwrap_or_else(|| normalize_wallpaper_colors(&raw_content)),
+            )
+        }
+        SourceKind::Image(img) => {
+            let content = crate::native::image_palette_json(img);
+            let content = content.trim();
+            if content.is_empty() || content == "{}" {
+                return None;
+            }
+            let content = normalize_wallpaper_colors(content);
+            if content.trim() == "{}" {
+                return None;
+            }
+            Some(content)
+        }
+        SourceKind::MangoTheme => mango_theme_palette(home).map(|(_, content)| content),
+        SourceKind::Kde => kde_accent_palette(),
+    }
+}
+
+/// Returns (source_path, content, mtime_secs) for the first readable color source.
+pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
+    read_wallpaper_colors_source_for("auto")
+}
+
+/// Returns (source_path, content, mtime_secs) for `preferred`, falling back to
+/// the first available source when it is missing or `preferred` is "auto"/empty.
+pub fn read_wallpaper_colors_source_for(preferred: &str) -> Option<(String, String, u64)> {
+    let home_string = std::env::var("HOME").unwrap_or_default();
+    let home = Path::new(&home_string);
+    let sources = wallpaper_color_sources(home);
+    if sources.is_empty() {
+        return None;
+    }
+    let preferred = preferred.trim();
+    let want_auto = preferred.is_empty() || preferred == "auto";
+
+    // Order candidates so a named provider is tried first, then every source
+    // in preference order as a graceful fallback (e.g. an image that cannot
+    // be decoded without a running Qt application is skipped).
+    let mut candidates: Vec<&WallpaperSourceEntry> = Vec::new();
+    if !want_auto {
+        if let Some(chosen) = sources.iter().find(|s| s.id == preferred) {
+            candidates.push(chosen);
+        }
+    }
+    candidates.extend(sources.iter());
+
+    for entry in candidates {
+        if let Some(content) = load_source(entry, home) {
+            return Some((entry.path.clone(), content, entry.mtime));
+        }
+    }
+    None
+}
+
+/// JSON array of `{ id, label, path }` for every detected wallpaper palette source.
+pub fn wallpaper_color_sources_json() -> String {
+    let home_string = std::env::var("HOME").unwrap_or_default();
+    let home = Path::new(&home_string);
+    let sources = wallpaper_color_sources(home);
+    let arr: Vec<serde_json::Value> = sources
+        .into_iter()
+        .map(|s| serde_json::json!({ "id": s.id, "label": s.label, "path": s.path }))
+        .collect();
+    serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
 }
 
 pub fn read_wallpaper_colors() -> String {

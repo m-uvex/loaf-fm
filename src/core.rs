@@ -83,6 +83,8 @@ pub mod qobject {
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
         #[qinvokable]
+        fn wallpaperPaletteSourcesJson(self: &LoafCore) -> QString;
+        #[qinvokable]
         fn resolve_icon(self: &LoafCore, theme: &QString, name: &QString) -> QString;
         #[qinvokable]
         fn icon_themes_json(self: &LoafCore) -> QString;
@@ -709,7 +711,7 @@ fn secret_get(key: &str) -> String {
 /// Wallpaper color files live in these folders; watched for changes.
 fn wallpaper_dirs() -> Vec<PathBuf> {
     let h = util::home();
-    [".local/state/quickshell/user/generated", ".local/state/caelestia", ".cache/caelestia", ".cache/wal", ".cache/wallust", ".cache/hellwal", ".cache/matugen", ".config/matugen", ".local/state/matugen", ".local/share/matugen", ".cache/ags/user/generated", ".local/state/ags/user/generated", ".cache/DankMaterialShell", ".config", ".cache"]
+    [".local/state/quickshell/user/generated", ".local/state/caelestia", ".cache/caelestia", ".cache/wal", ".cache/wallust", ".cache/hellwal", ".cache/matugen", ".config/matugen", ".local/state/matugen", ".local/share/matugen", ".cache/ags/user/generated", ".local/state/ags/user/generated", ".cache/DankMaterialShell", ".config/hypr", ".cache/awww", ".cache/swww", ".config/mango", ".config", ".cache"]
         .iter()
         .map(|d| h.join(d))
         .filter(|d| d.is_dir())
@@ -897,12 +899,20 @@ impl qobject::LoafCore {
 
     pub fn reload_wallpaper_colors(mut self: Pin<&mut Self>) -> bool {
         icons::reload_system_theme();
-        let Some((_, content, _)) = theme::read_wallpaper_colors_source() else { return false };
+        let preferred = state::get("wallpaperPaletteSource").unwrap_or_default();
+        let Some((_, content, _)) = theme::read_wallpaper_colors_source_for(&preferred) else {
+            return false;
+        };
         if content == self.wallpaper_colors_json().to_string() {
             return false;
         }
         self.as_mut().set_wallpaper_colors_json(q(&content));
         true
+    }
+
+    #[allow(non_snake_case)]
+    pub fn wallpaperPaletteSourcesJson(&self) -> QString {
+        q(&theme::wallpaper_color_sources_json())
     }
 
     pub fn resolve_icon(&self, theme_name: &QString, name: &QString) -> QString {
@@ -2970,7 +2980,8 @@ impl cxx_qt::Initialize for qobject::LoafCore {
             });
         });
         if let Some(w) = cw.as_ref() {
-            if let Some(dir) = theme::read_wallpaper_colors_source()
+            let preferred = state::get("wallpaperPaletteSource").unwrap_or_default();
+            if let Some(dir) = theme::read_wallpaper_colors_source_for(&preferred)
                 .and_then(|(p, _, _)| Path::new(&p).parent().map(|x| x.to_path_buf()))
                 .or_else(|| wallpaper_dirs().into_iter().next())
             {
