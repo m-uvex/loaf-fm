@@ -91,12 +91,12 @@ sudo apt-get install -f
 
 ### 3. Arch and Arch-based (Manjaro, CachyOS, etc.)
 
-Install from the AUR (`loaf-fm`) with your AUR helper:
+Install from the AUR (`loaf-fm`) with your AUR helper (Community maintained!):
 
 ```bash
-yay -S loaf-fm
+yay -S loaf-fm-bin
 # or
-paru -S loaf-fm
+paru -S loaf-fm-bin
 ```
 
 Or download the `.pkg.tar.zst` package from the release page and install it using `pacman`:
