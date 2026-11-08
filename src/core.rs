@@ -709,7 +709,7 @@ fn secret_get(key: &str) -> String {
 /// Wallpaper color files live in these folders; watched for changes.
 fn wallpaper_dirs() -> Vec<PathBuf> {
     let h = util::home();
-    [".local/state/quickshell/user/generated", ".cache/wal", ".cache/matugen", ".config/matugen", ".cache/DankMaterialShell", ".cache"]
+    [".local/state/quickshell/user/generated", ".local/state/caelestia", ".cache/caelestia", ".cache/wal", ".cache/wallust", ".cache/hellwal", ".cache/matugen", ".config/matugen", ".local/state/matugen", ".local/share/matugen", ".cache/ags/user/generated", ".local/state/ags/user/generated", ".cache/DankMaterialShell", ".config", ".cache"]
         .iter()
         .map(|d| h.join(d))
         .filter(|d| d.is_dir())
