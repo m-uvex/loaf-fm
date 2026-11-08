@@ -1,124 +1,84 @@
-# Loaf as an xdg-desktop-portal file chooser
+# File Chooser Portal (`xdg-desktop-portal`)
 
-Loaf can act as the **backend** for `org.freedesktop.impl.portal.FileChooser`:
-apps that open files through xdg-desktop-portal (Firefox, Chromium, Flatpak
-apps, GTK/Qt dialogs, `zenity --file-selection`, …) then use a Loaf picker
-window instead of a GTK or Qt dialog.
+Loaf can serve as the system backend for `org.freedesktop.impl.portal.FileChooser`. When enabled, applications that request files via portals (Firefox, Chrome, Flatpaks, `zenity`, etc.) use a Loaf picker window instead of standard GTK or Qt dialogs.
 
-## How it works
+---
 
-- Loaf exports `org.freedesktop.impl.portal.FileChooser` (interface version 4)
-  on `/org/freedesktop/portal/desktop` under the bus name
-  `org.freedesktop.impl.portal.desktop.loaf`.
-- Every request opens a dedicated picker window (the normal sidebar + file
-  views, a filter dropdown, choice widgets and an accept button labelled with
-  the app's `accept_label`), with its own state keyed by the request handle.
-- Each request also exports an `org.freedesktop.impl.portal.Request` object at
-  the handle path; `Close()` dismisses the dialog and answers the request with
-  response code 2. Cancelling in the UI answers 1, picking answers 0.
-- `loaf --portal` starts a picker-only instance for D-Bus activation: no main
-  window until a normal `loaf <path>` request arrives, and the process exits
-  once the last picker is answered. The regular file manager flow is
-  unaffected.
+## How It Works
 
-## Installation
+* **D-Bus Activation**: When an app triggers a file chooser, D-Bus invokes `loaf --portal`. It runs headlessly until a request arrives and automatically terminates after the last dialog closes.
+* **Full File Manager Experience**: Each request opens a dedicated picker window with your customized sidebar, view modes, search filters, and file previews.
+* **Sandboxing**: Runs outside sandbox restrictions on the host session to securely pass selected file URIs back to calling apps.
 
-The files below ship with every package and land in the standard paths:
-
-| File | Installed to |
-| --- | --- |
-| `loaf.portal` | `/usr/share/xdg-desktop-portal/portals/loaf.portal` |
-| `org.freedesktop.impl.portal.desktop.loaf.service` | `/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.loaf.service` |
-
-- **Arch (AUR `loaf-fm` / release PKGBUILD)**, **.deb**, **.rpm**, **AppImage-adjacent
-  tarballs via `install.sh`**: nothing to do, both files are installed for you.
-  Tarball installs into a custom `PREFIX` get the `Exec=` path of the service
-  file rewritten automatically.
-- **Nix (flake)**: `loaf.portal` and the service file are part of the package
-  output; use it through `xdg.portal.extraPortals` (see below).
-- **Flatpak**: not supported — a sandboxed build cannot serve the host
-  session's portal backend; install Loaf on the host instead.
+---
 
 ## Configuration
 
-`loaf.portal` lists `UseIn=Hyprland;` only, so on Hyprland Loaf becomes an
-eligible FileChooser backend out of the box. Which backend actually wins is
-decided by xdg-desktop-portal's configuration:
+Pre-built packages (`.deb`, `.rpm`, Arch AUR, and `install.sh`) install the required `.portal` and D-Bus `.service` files automatically to `/usr/share/`.
 
-**Hyprland / any distro** — `~/.config/xdg-desktop-portal/hyprland-portals.conf`:
+To set Loaf as your preferred picker, configure your desktop portal preference:
 
-```ini
-[preferred]
-org.freedesktop.impl.portal.FileChooser=loaf
-org.freedesktop.impl.portal.ScreenCast=hyprland
-# ... keep your other per-interface choices
-```
+### Hyprland / Sway / Wayland Compositors
 
-or a generic `~/.config/xdg-desktop-portal/portals.conf` with a
-`[preferred]` section per desktop. A bare
+Add or edit `~/.config/xdg-desktop-portal/portals.conf` (or compositor-specific configs like `hyprland-portals.conf`):
 
 ```ini
 [preferred]
 org.freedesktop.impl.portal.FileChooser=loaf
+
 ```
 
-routes just the file chooser to Loaf and leaves everything else at the
-defaults. Opting in on other desktops (sway, river, niri, …) works the same
-way — the `UseIn` list is deliberately limited to Hyprland so Loaf never
-takes over a desktop by surprise.
+> **Note:** By default, `loaf.portal` sets `UseIn=Hyprland;` so it does not override file choosers on other desktops unexpectedly. Setting it explicitly in `portals.conf` enables it across any compositor (Sway, River, Niri, etc.).
 
-**NixOS** (24.05+):
+### NixOS (24.05+)
+
+Add the package to `extraPortals` and define the preferred interface in your `configuration.nix`:
 
 ```nix
 xdg.portal = {
   enable = true;
-  extraPortals = [ pkgs.loaf-fm ];   # or your own package/overlay input
-  config.hyprland."org.freedesktop.impl.portal.FileChooser" = "loaf";
+  extraPortals = [ pkgs.loaf ];
+  config.common."org.freedesktop.impl.portal.FileChooser" = "loaf";
 };
+
 ```
 
-Restart `xdg-desktop-portal` (or log back in) after changing the config:
-`systemctl --user restart xdg-desktop-portal xdg-desktop-portal-gtk`.
+### Apply Changes
 
-## Verifying it works
+Restart the portal services or log out and back in:
 
-```sh
-# The backend interface must show up:
-busctl --user introspect org.freedesktop.impl.portal.desktop.loaf \
-    /org/freedesktop/portal/desktop
+```bash
+systemctl --user restart xdg-desktop-portal
 
-# A quick OpenFile round trip against the backend directly (opens a picker;
-# cancel it in the UI):
+```
+
+---
+
+## Testing & Verification
+
+1. **Verify D-Bus Registration:**
+```bash
+busctl --user introspect org.freedesktop.impl.portal.desktop.loaf /org/freedesktop/portal/desktop
+
+```
+
+2. **Trigger a Test Picker Dialog:**
+```bash
 gdbus call --session \
     --dest org.freedesktop.impl.portal.desktop.loaf \
     --object-path /org/freedesktop/portal/desktop \
     --method org.freedesktop.impl.portal.FileChooser.OpenFile \
     /org/freedesktop/portal/desktop/request/test/h1 com.example.app "" "Open" "{}"
+
 ```
 
-End to end: configure `portals.conf` as above, then use Firefox
-("Open file" / "Save as"), a Flatpak app, or `zenity --file-selection` —
-the picker window should appear. Things worth trying: cancel, directory
-selection (`--directory`), filter switching, multiple selection, save with
-overwrite confirmation, and several dialogs at once (each gets its own
-window).
+3. **End-to-End Test:**
+Open any file prompt (`Ctrl+O` in Firefox or run `zenity --file-selection`). The Loaf picker interface should appear.
 
-## Known limitations
+---
 
-- **Transient parent / modality on Wayland**: making one window transient
-  for another needs xdg-foreign, which Qt Quick does not expose. On X11
-  (`x11:<window-id>` handles) the picker is made transient and modal for the
-  caller; on Wayland it appears as its own toplevel and `modal` is best
-  effort. Functionally everything works — the dialog just is not attached to
-  the caller's window.
-- **Interface version 4**: the `writable` result of newer FileChooser drafts
-  is not implemented; `directory` (v3) is.
-- **Byte-string paths**: `current_folder`/`current_file`/`files` are accepted
-  as raw bytes with the trailing NUL stripped; non-UTF-8 paths are handled
-  lossily for display, and the returned URIs are strictly percent-encoded
-  `file://` URIs.
-- **Special locations**: Recent, Starred and Trash are no longer offered in the
-  picker; only real filesystem folders can be browsed and returned.
-- The C++ D-Bus marshaling layer is exercised by the manual `gdbus` /
-  end-to-end tests above rather than unit tests; the filter matching, request
-  validation and URI encoding have Rust unit tests (`cargo test`).
+## Known Behaviors
+
+* **Wayland Modality**: On Wayland, pickers appear as independent top-level windows rather than attached modal dialogs due to `xdg-foreign` limitations in Qt Quick. On X11, windows are strictly modal and parented.
+* **Sandboxed Packaging**: Flatpak builds cannot act as host portal providers; Loaf must be installed on the host system.
+* **Special Locations**: Virtual directories (Recent, Starred, Trash) are hidden in the picker to ensure valid, accessible filesystem paths are returned.
