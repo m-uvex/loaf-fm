@@ -49,18 +49,42 @@ mkdir -p "$TOOLS_DIR"
 LINUXDEPLOY="$TOOLS_DIR/linuxdeploy-x86_64.AppImage"
 LINUXDEPLOY_QT="$TOOLS_DIR/linuxdeploy-plugin-qt-x86_64.AppImage"
 
+download_tool() {
+    local target="$1"
+    local repo="$2"
+    local filename="$3"
+
+    echo "Fetching $filename..."
+    # 1. Try direct GitHub release download
+    if curl -fsSL --retry 3 --max-time 60 -o "$target" \
+        "https://github.com/$repo/releases/download/continuous/$filename" 2>/dev/null; then
+        chmod +x "$target"
+        return 0
+    fi
+
+    # 2. Fallback: resolve asset via GitHub API (bypasses fastly/cloudflare 504 on direct release downloads)
+    echo "Direct download failed, resolving asset ID via GitHub API for $filename..."
+    local asset_id
+    asset_id=$(curl -sL "https://api.github.com/repos/$repo/releases/tags/continuous" | \
+        grep -B2 "\"$filename\"" | grep '"id":' | head -1 | tr -dc '0-9')
+    if [ -n "$asset_id" ]; then
+        if curl -fsSL --retry 3 --max-time 90 -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/$repo/releases/assets/$asset_id" -o "$target"; then
+            chmod +x "$target"
+            return 0
+        fi
+    fi
+
+    echo "Failed to fetch $filename" >&2
+    return 1
+}
+
 if [ ! -f "$LINUXDEPLOY" ]; then
-    echo "Fetching linuxdeploy..."
-    curl -fsSL --max-time 60 -o "$LINUXDEPLOY" \
-        "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-    chmod +x "$LINUXDEPLOY"
+    download_tool "$LINUXDEPLOY" "linuxdeploy/linuxdeploy" "linuxdeploy-x86_64.AppImage"
 fi
 
 if [ ! -f "$LINUXDEPLOY_QT" ]; then
-    echo "Fetching linuxdeploy-plugin-qt..."
-    curl -fsSL --max-time 60 -o "$LINUXDEPLOY_QT" \
-        "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
-    chmod +x "$LINUXDEPLOY_QT"
+    download_tool "$LINUXDEPLOY_QT" "linuxdeploy/linuxdeploy-plugin-qt" "linuxdeploy-plugin-qt-x86_64.AppImage"
 fi
 
 export QML_SOURCES_PATHS="$DIR/qml"
