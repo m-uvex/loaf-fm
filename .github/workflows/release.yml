@@ -43,13 +43,14 @@ jobs:
             qml6-module-qtquick \
             qml6-module-qtquick-controls \
             qml6-module-qtquick-layouts \
-            qml6-module-qtquick-templates2 \
-            qml6-module-qtquick-effects \
+            qml6-module-qtquick-templates \
             qml6-module-qtquick-shapes \
+            qml6-module-qtquick-window \
             libgl1-mesa-dev \
             libxkbcommon-dev \
             libvulkan-dev \
             libfuse2 \
+            desktop-file-utils \
             rpm \
             dpkg-dev \
             zstd
@@ -83,7 +84,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            packaging/dist/loaf-*.deb
+            packaging/dist/loaf_*.deb
             packaging/dist/loaf-*.rpm
             packaging/dist/loaf-*.pkg.tar.zst
             packaging/dist/loaf-*.tar.gz
