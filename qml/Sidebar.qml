@@ -42,28 +42,43 @@ Rectangle {
     }
 
     readonly property var entries: {
-        var basePlaces = places.filter(function(p) {
+        var standardPlaces = [];
+        var networkPlaces = [];
+
+        for (var i = 0; i < places.length; ++i) {
+            var p = places[i];
             if (p.id === "trash")
-                return false;
+                continue;
             // The picker can only return real files and folders.
             if (rail.pickerMode && (p.kind === "pc" || p.kind === "recent" || p.kind === "starred" || p.kind === "smb-discovery"))
-                return false;
-            return true;
-        });
+                continue;
+            if (p.kind === "network" || p.kind === "smb" || p.kind === "smb-discovery") {
+                networkPlaces.push(p);
+            } else {
+                standardPlaces.push(p);
+            }
+        }
+
         var availableDrives = drives.filter(function(d) {
             if (rail.pickerMode && d.provider === "mtp")
                 return false;
             return true;
+        }).map(function(d) {
+            var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
+            var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
+            return {
+                id: "device:" + d.device,
+                kind: "device",
+                name: d.name,
+                icon: iconName,
+                system_icon: sysIcon,
+                path: d.mount_point,
+                drive: d
+            };
         });
-        return basePlaces.concat(
-            availableDrives.map(function(d) {
-                var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
-                var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
-                return { id: "device:" + d.device, kind: "device", name: d.name,
-                    icon: iconName,
-                    system_icon: sysIcon,
-                    path: d.mount_point, drive: d };
-            }));
+
+        // Order: regular places, then storage drives, then network shares directly under them
+        return standardPlaces.concat(availableDrives).concat(networkPlaces);
     }
 
     readonly property var trashPlace: {
@@ -296,7 +311,9 @@ Rectangle {
                 required property var modelData
                 required property int index
                 readonly property bool isDevice: modelData.kind === "device"
-                readonly property real headerHeight: isDevice && (index === 0 || placeList.model[index - 1].kind !== "device")
+                readonly property bool isStorage: isDevice || (modelData.kind === "network" || modelData.kind === "smb" || modelData.kind === "smb-discovery")
+                readonly property bool prevIsStorage: index > 0 && (placeList.model[index - 1].kind === "device" || placeList.model[index - 1].kind === "network" || placeList.model[index - 1].kind === "smb" || placeList.model[index - 1].kind === "smb-discovery")
+                readonly property real headerHeight: isStorage && !prevIsStorage && index > 0
                     ? 12 : 0
                 property alias button: entryButton
                 height: 44 + headerHeight
