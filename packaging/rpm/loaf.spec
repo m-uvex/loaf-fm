@@ -13,7 +13,7 @@
 %define _prefix /usr
 
 Name:           loaf
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        Material 3 Expressive file manager built with Rust and Qt 6
 License:        MIT
