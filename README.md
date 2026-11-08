@@ -4,7 +4,7 @@
 
 **A beautiful and fast Rust-based Material 3 Expressive file manager for Linux.**
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ad2768e4-8a4c-4bf0-ae3c-7565732e2be2" />
+<img width="1918" height="1078" alt="image" src="https://github.com/user-attachments/assets/3966949b-121a-4d59-90d5-9abcec449c21" />
 
 <br/>
 
