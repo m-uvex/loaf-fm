@@ -42,7 +42,9 @@ fn drain_events(fd: i32, wd: i32) -> bool {
         let n = n as usize;
         let mut off = 0;
         while off + header <= n {
-            let ev: libc::inotify_event = unsafe { std::ptr::read_unaligned(buf[off..].as_ptr() as *const libc::inotify_event) };
+            let ev: libc::inotify_event = unsafe {
+                std::ptr::read_unaligned(buf[off..].as_ptr() as *const libc::inotify_event)
+            };
             if ev.wd == wd && ev.mask & libc::IN_IGNORED == 0 {
                 relevant = true;
             }
@@ -76,7 +78,11 @@ fn wake(efd: i32) {
 
 /// poll() timeout: sleep until an event arrives, but tick while a change is pending.
 fn timeout_ms(pending: bool) -> i32 {
-    if pending { 50 } else { -1 }
+    if pending {
+        50
+    } else {
+        -1
+    }
 }
 
 pub struct DirWatcher {
@@ -114,11 +120,24 @@ impl DirWatcher {
                 let mut last_fire = Instant::now() - Duration::from_secs(10);
                 while !stop_t.load(Ordering::Relaxed) {
                     let mut fds = [
-                        libc::pollfd { fd, events: libc::POLLIN, revents: 0 },
-                        libc::pollfd { fd: efd, events: libc::POLLIN, revents: 0 },
+                        libc::pollfd {
+                            fd,
+                            events: libc::POLLIN,
+                            revents: 0,
+                        },
+                        libc::pollfd {
+                            fd: efd,
+                            events: libc::POLLIN,
+                            revents: 0,
+                        },
                     ];
-                    let ready = unsafe { libc::poll(fds.as_mut_ptr(), 2, timeout_ms(first_dirty.is_some())) };
-                    if ready > 0 && fds[0].revents & libc::POLLIN != 0 && drain_events(fd, wd_t.load(Ordering::SeqCst)) {
+                    let ready = unsafe {
+                        libc::poll(fds.as_mut_ptr(), 2, timeout_ms(first_dirty.is_some()))
+                    };
+                    if ready > 0
+                        && fds[0].revents & libc::POLLIN != 0
+                        && drain_events(fd, wd_t.load(Ordering::SeqCst))
+                    {
                         last_event = Instant::now();
                         first_dirty.get_or_insert(last_event);
                     }
@@ -136,7 +155,14 @@ impl DirWatcher {
                 }
             })
             .ok()?;
-        Some(DirWatcher { fd, efd, wd, stop, min_interval_ms: min_interval, thread: Some(thread) })
+        Some(DirWatcher {
+            fd,
+            efd,
+            wd,
+            stop,
+            min_interval_ms: min_interval,
+            thread: Some(thread),
+        })
     }
 
     /// Switches the watch to `dir` (only one folder is watched at a time).
@@ -147,7 +173,9 @@ impl DirWatcher {
                 libc::inotify_rm_watch(self.fd, old);
             }
         }
-        let Ok(c) = CString::new(dir.as_os_str().as_bytes()) else { return };
+        let Ok(c) = CString::new(dir.as_os_str().as_bytes()) else {
+            return;
+        };
         let wd = unsafe { libc::inotify_add_watch(self.fd, c.as_ptr(), DIR_MASK) };
         self.wd.store(wd, Ordering::SeqCst);
     }
@@ -193,7 +221,11 @@ impl DeviceWatcher {
         for dir in ["/dev/disk/by-uuid", "/dev/disk/by-id", "/dev"] {
             if let Ok(c) = CString::new(dir) {
                 let wd = unsafe {
-                    libc::inotify_add_watch(ino, c.as_ptr(), libc::IN_CREATE | libc::IN_DELETE | libc::IN_ONLYDIR)
+                    libc::inotify_add_watch(
+                        ino,
+                        c.as_ptr(),
+                        libc::IN_CREATE | libc::IN_DELETE | libc::IN_ONLYDIR,
+                    )
                 };
                 if wd >= 0 {
                     break;
@@ -221,12 +253,25 @@ impl DeviceWatcher {
                 while !stop_t.load(Ordering::Relaxed) {
                     // A negative fd is ignored by poll(), so a missing mountinfo is fine.
                     let mut fds = [
-                        libc::pollfd { fd: ino, events: libc::POLLIN, revents: 0 },
-                        libc::pollfd { fd: mfd, events: libc::POLLPRI, revents: 0 },
-                        libc::pollfd { fd: efd, events: libc::POLLIN, revents: 0 },
+                        libc::pollfd {
+                            fd: ino,
+                            events: libc::POLLIN,
+                            revents: 0,
+                        },
+                        libc::pollfd {
+                            fd: mfd,
+                            events: libc::POLLPRI,
+                            revents: 0,
+                        },
+                        libc::pollfd {
+                            fd: efd,
+                            events: libc::POLLIN,
+                            revents: 0,
+                        },
                     ];
                     let n = if mfd >= 0 { 2 } else { 1 };
-                    let ready = unsafe { libc::poll(fds.as_mut_ptr(), 3, timeout_ms(dirty.is_some())) };
+                    let ready =
+                        unsafe { libc::poll(fds.as_mut_ptr(), 3, timeout_ms(dirty.is_some())) };
                     if ready > 0 {
                         if fds[0].revents & libc::POLLIN != 0 {
                             drain(ino);
@@ -238,12 +283,18 @@ impl DeviceWatcher {
                                 libc::lseek(mfd, 0, libc::SEEK_SET);
                             }
                             let mut buf = [0u8; 4096];
-                            while unsafe { libc::read(mfd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) } > 0 {}
+                            while unsafe {
+                                libc::read(mfd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
+                            } > 0
+                            {}
                             dirty.get_or_insert(Instant::now());
                         }
                     }
                     // udev creates several nodes per drive: wait a moment.
-                    if dirty.map(|d| d.elapsed() >= Duration::from_millis(400)).unwrap_or(false) {
+                    if dirty
+                        .map(|d| d.elapsed() >= Duration::from_millis(400))
+                        .unwrap_or(false)
+                    {
                         dirty = None;
                         on_change();
                     }
@@ -256,7 +307,11 @@ impl DeviceWatcher {
                 }
             })
             .ok()?;
-        Some(DeviceWatcher { efd, stop, thread: Some(thread) })
+        Some(DeviceWatcher {
+            efd,
+            stop,
+            thread: Some(thread),
+        })
     }
 }
 
@@ -295,7 +350,11 @@ mod tests {
         }
         std::thread::sleep(Duration::from_millis(600));
         let n = hits.load(Ordering::SeqCst);
-        assert!(n >= 1 && n <= 2, "50 writes coalesce into one or two refreshes, got {}", n);
+        assert!(
+            n >= 1 && n <= 2,
+            "50 writes coalesce into one or two refreshes, got {}",
+            n
+        );
 
         // After switching folders, changes in the old one are ignored.
         let other = d.join("sub");

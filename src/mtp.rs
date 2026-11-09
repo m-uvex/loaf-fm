@@ -21,7 +21,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.is_empty() || s.len() % 2 != 0 {
+    if s.is_empty() || (s.len() & 1) != 0 {
         return None;
     }
     let mut out = Vec::with_capacity(s.len() / 2);

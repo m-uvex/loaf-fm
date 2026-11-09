@@ -41,7 +41,9 @@ pub fn measure(paths: &[PathBuf], mon: &dyn Monitor) -> (u64, u64) {
         if mon.cancelled() {
             break;
         }
-        let Ok(meta) = fs::symlink_metadata(&p) else { continue };
+        let Ok(meta) = fs::symlink_metadata(&p) else {
+            continue;
+        };
         count += 1;
         if meta.is_dir() {
             if let Ok(rd) = fs::read_dir(&p) {
@@ -70,8 +72,14 @@ pub fn is_inside(inner: &Path, outer: &Path) -> bool {
 
 fn set_times(fd: i32, meta: &fs::Metadata) {
     let times = [
-        libc::timespec { tv_sec: meta.atime() as libc::time_t, tv_nsec: meta.atime_nsec() as _ },
-        libc::timespec { tv_sec: meta.mtime() as libc::time_t, tv_nsec: meta.mtime_nsec() as _ },
+        libc::timespec {
+            tv_sec: meta.atime() as libc::time_t,
+            tv_nsec: meta.atime_nsec() as _,
+        },
+        libc::timespec {
+            tv_sec: meta.mtime() as libc::time_t,
+            tv_nsec: meta.mtime_nsec() as _,
+        },
     ];
     unsafe {
         libc::futimens(fd, times.as_ptr());
@@ -79,13 +87,26 @@ fn set_times(fd: i32, meta: &fs::Metadata) {
 }
 
 fn set_path_times(path: &Path, meta: &fs::Metadata) {
-    let Ok(c) = CString::new(path.as_os_str().as_bytes()) else { return };
+    let Ok(c) = CString::new(path.as_os_str().as_bytes()) else {
+        return;
+    };
     let times = [
-        libc::timespec { tv_sec: meta.atime() as libc::time_t, tv_nsec: meta.atime_nsec() as _ },
-        libc::timespec { tv_sec: meta.mtime() as libc::time_t, tv_nsec: meta.mtime_nsec() as _ },
+        libc::timespec {
+            tv_sec: meta.atime() as libc::time_t,
+            tv_nsec: meta.atime_nsec() as _,
+        },
+        libc::timespec {
+            tv_sec: meta.mtime() as libc::time_t,
+            tv_nsec: meta.mtime_nsec() as _,
+        },
     ];
     unsafe {
-        libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), libc::AT_SYMLINK_NOFOLLOW);
+        libc::utimensat(
+            libc::AT_FDCWD,
+            c.as_ptr(),
+            times.as_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        );
     }
 }
 
@@ -94,7 +115,12 @@ const CHUNK: usize = 8 * 1024 * 1024;
 /// Copies the contents of `src` into `dst`, using `copy_file_range` (which
 /// lets the kernel/filesystem do server-side or reflink copies) and falling
 /// back to a plain read/write loop when the kernel refuses.
-fn copy_data(src: &mut fs::File, dst: &mut fs::File, path: &Path, mon: &dyn Monitor) -> io::Result<()> {
+fn copy_data(
+    src: &mut fs::File,
+    dst: &mut fs::File,
+    path: &Path,
+    mon: &dyn Monitor,
+) -> io::Result<()> {
     let mut use_range = true;
     let mut buf: Vec<u8> = Vec::new();
     loop {
@@ -121,7 +147,10 @@ fn copy_data(src: &mut fs::File, dst: &mut fs::File, path: &Path, mon: &dyn Moni
             }
             let err = io::Error::last_os_error();
             match err.raw_os_error() {
-                Some(libc::EXDEV) | Some(libc::ENOSYS) | Some(libc::EINVAL) | Some(libc::EOPNOTSUPP)
+                Some(libc::EXDEV)
+                | Some(libc::ENOSYS)
+                | Some(libc::EINVAL)
+                | Some(libc::EOPNOTSUPP)
                 | Some(libc::EPERM) => {
                     use_range = false;
                     buf.resize(1024 * 1024, 0);
@@ -167,7 +196,10 @@ fn copy_file(src: &Path, dst: &Path, meta: &fs::Metadata, mon: &dyn Monitor) -> 
 /// (sockets, fifos, devices) are skipped.
 pub fn copy_tree(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> {
     if is_inside(dst, src) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "cannot copy a folder into itself"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "cannot copy a folder into itself",
+        ));
     }
     let result = copy_tree_inner(src, dst, mon);
     if result.is_err() {
@@ -219,7 +251,11 @@ pub fn remove_tree(path: &Path) -> io::Result<()> {
 /// Flushes the filesystem that holds `path` so the data is really on the
 /// device (important before a USB stick is pulled out).
 pub fn sync_filesystem(path: &Path) {
-    let dir = if path.is_dir() { path } else { path.parent().unwrap_or(path) };
+    let dir = if path.is_dir() {
+        path
+    } else {
+        path.parent().unwrap_or(path)
+    };
     if let Ok(f) = fs::File::open(dir) {
         unsafe {
             libc::syncfs(f.as_raw_fd());
@@ -239,10 +275,16 @@ fn same_device(a: &Path, b_parent: &Path) -> bool {
 /// deletes the source, so an interrupted move never loses data.
 pub fn move_path(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> {
     if is_inside(dst, src) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "cannot move a folder into itself"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "cannot move a folder into itself",
+        ));
     }
     if fs::symlink_metadata(dst).is_ok() {
-        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "destination exists"));
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "destination exists",
+        ));
     }
     match fs::rename(src, dst) {
         Ok(()) => {
@@ -267,7 +309,10 @@ pub fn move_path(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> {
 /// A sibling name of `dst` that does not exist yet, for staging.
 fn staging_name(dst: &Path, tag: &str) -> PathBuf {
     let parent = dst.parent().unwrap_or(Path::new("."));
-    let base = dst.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let base = dst
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let pid = std::process::id();
     for i in 0u32.. {
         let cand = parent.join(format!(".loaf-{}-{}-{}-{}", tag, pid, i, base));
@@ -287,7 +332,10 @@ pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::
         return Ok(());
     }
     if is_inside(dst, src) || is_inside(src, dst) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "source and destination overlap"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source and destination overlap",
+        ));
     }
     let staged = staging_name(dst, "new");
     if is_move {
@@ -323,7 +371,10 @@ pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::
 pub fn replace_with_link(src: &Path, dst: &Path) -> io::Result<()> {
     if let (Ok(a), Ok(b)) = (fs::canonicalize(src), fs::canonicalize(dst)) {
         if a == b {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "source and destination are the same item"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "source and destination are the same item",
+            ));
         }
     }
     let staged = staging_name(dst, "new");
@@ -348,7 +399,15 @@ pub fn rename_noreplace(from: &Path, to: &Path) -> io::Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let a = std::ffi::CString::new(from.as_os_str().as_bytes())?;
     let b = std::ffi::CString::new(to.as_os_str().as_bytes())?;
-    let r = unsafe { libc::renameat2(libc::AT_FDCWD, a.as_ptr(), libc::AT_FDCWD, b.as_ptr(), libc::RENAME_NOREPLACE) };
+    let r = unsafe {
+        libc::renameat2(
+            libc::AT_FDCWD,
+            a.as_ptr(),
+            libc::AT_FDCWD,
+            b.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
     if r == 0 {
         return Ok(());
     }
@@ -444,9 +503,19 @@ mod tests {
         copy_tree(&src, &d.join("dst"), &Silent).unwrap();
         let dst = d.join("dst");
         assert_eq!(fs::read(dst.join("a.txt")).unwrap(), b"hello");
-        assert_eq!(fs::read(dst.join("sub/b.bin")).unwrap().len(), 3 * 1024 * 1024);
-        assert_eq!(fs::read_link(dst.join("link")).unwrap(), PathBuf::from("a.txt"));
-        let mode = fs::metadata(dst.join("a.txt")).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            fs::read(dst.join("sub/b.bin")).unwrap().len(),
+            3 * 1024 * 1024
+        );
+        assert_eq!(
+            fs::read_link(dst.join("link")).unwrap(),
+            PathBuf::from("a.txt")
+        );
+        let mode = fs::metadata(dst.join("a.txt"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(mode, 0o640);
         let src_m = fs::metadata(src.join("a.txt")).unwrap().mtime();
         assert_eq!(fs::metadata(dst.join("a.txt")).unwrap().mtime(), src_m);
@@ -486,7 +555,11 @@ mod tests {
         for i in 0..4 {
             fs::write(d.join(format!("src/f{}", i)), vec![1u8; 9 * 1024 * 1024]).unwrap();
         }
-        let mon = CancelAfter { limit: 10 * 1024 * 1024, seen: AtomicU64::new(0), flag: AtomicBool::new(false) };
+        let mon = CancelAfter {
+            limit: 10 * 1024 * 1024,
+            seen: AtomicU64::new(0),
+            flag: AtomicBool::new(false),
+        };
         let err = copy_tree(&d.join("src"), &d.join("dst"), &mon).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::Interrupted);
         assert!(!d.join("dst").exists());

@@ -92,7 +92,9 @@ pub fn local_timestamp() -> String {
 /// The absolute path of `p` with its parent resolved but the last component
 /// left alone (so a symlink stays a symlink).
 pub fn absolute_no_follow(p: &Path) -> io::Result<PathBuf> {
-    let name = p.file_name().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
+    let name = p
+        .file_name()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
     let parent = match p.parent() {
         Some(x) if !x.as_os_str().is_empty() => x.to_path_buf(),
         _ => std::env::current_dir()?,
@@ -118,7 +120,9 @@ pub fn topdir_of(p: &Path) -> Option<PathBuf> {
 
 fn is_sticky_real_dir(p: &Path) -> bool {
     match fs::symlink_metadata(p) {
-        Ok(m) => m.is_dir() && (m.mode() & libc::S_ISVTX as u32) != 0,
+        // Explicit cast ensures target portability across platforms where libc::mode_t may differ from u32.
+        #[allow(clippy::unnecessary_cast)]
+        Ok(m) => m.is_dir() && (m.mode() & (libc::S_ISVTX as u32)) != 0,
         Err(_) => false,
     }
 }
@@ -127,7 +131,9 @@ fn is_sticky_real_dir(p: &Path) -> bool {
 /// drives are untrusted: a planted `files -> ~/Documents` link must never be
 /// followed by Empty Trash.
 fn owned_real_dir(p: &Path) -> bool {
-    fs::symlink_metadata(p).map(|m| m.is_dir() && m.uid() == uid()).unwrap_or(false)
+    fs::symlink_metadata(p)
+        .map(|m| m.is_dir() && m.uid() == uid())
+        .unwrap_or(false)
 }
 
 /// Whether `root/files` and `root/info` are safe to read and delete from.
@@ -146,7 +152,10 @@ fn ensure_trash_dirs(root: &Path) -> io::Result<()> {
     if usable_trash(root) {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::PermissionDenied, "unsafe trash directory"))
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "unsafe trash directory",
+        ))
     }
 }
 
@@ -156,10 +165,10 @@ fn topdir_trash(topdir: &Path, create: bool) -> Option<PathBuf> {
     let shared = topdir.join(".Trash");
     if is_sticky_real_dir(&shared) {
         let mine = shared.join(uid().to_string());
-        if owned_real_dir(&mine) || (create && fs::create_dir(&mine).is_ok()) {
-            if !create || ensure_trash_dirs(&mine).is_ok() {
-                return Some(mine);
-            }
+        if (owned_real_dir(&mine) || (create && fs::create_dir(&mine).is_ok()))
+            && (!create || ensure_trash_dirs(&mine).is_ok())
+        {
+            return Some(mine);
         }
     }
     let personal = topdir.join(format!(".Trash-{}", uid()));
@@ -192,7 +201,7 @@ fn trash_for(abs: &Path) -> io::Result<(PathBuf, Option<PathBuf>)> {
         ensure_trash_dirs(&home)?;
         return Ok((home, None));
     }
-    let top = topdir_of(abs).ok_or_else(|| io::Error::new(io::ErrorKind::Other, "no mount point"))?;
+    let top = topdir_of(abs).ok_or_else(|| io::Error::other("no mount point"))?;
     match topdir_trash(&top, true) {
         Some(t) => Ok((t, Some(top))),
         None => Err(io::Error::new(
@@ -208,10 +217,20 @@ fn reserve_info(root: &Path, name: &str, contents: &str) -> io::Result<String> {
     let info_dir = root.join("info");
     let files_dir = root.join("files");
     let path = Path::new(name);
-    let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string());
-    let ext = path.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| name.to_string());
+    let ext = path
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
     for i in 0u32.. {
-        let cand = if i == 0 { name.to_string() } else { format!("{}.{}{}", stem, i, ext) };
+        let cand = if i == 0 {
+            name.to_string()
+        } else {
+            format!("{}.{}{}", stem, i, ext)
+        };
         if fs::symlink_metadata(files_dir.join(&cand)).is_ok() {
             continue;
         }
@@ -241,14 +260,24 @@ pub fn trash(path: &Path) -> io::Result<TrashedItem> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
     let (root, topdir) = trash_for(&abs)?;
     if abs.starts_with(&root) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "item is already in the trash"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "item is already in the trash",
+        ));
     }
     let shown_path = match &topdir {
-        Some(top) => abs.strip_prefix(top).map(|p| p.to_path_buf()).unwrap_or_else(|_| abs.clone()),
+        Some(top) => abs
+            .strip_prefix(top)
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|_| abs.clone()),
         None => abs.clone(),
     };
     let deleted = local_timestamp();
-    let contents = format!("[Trash Info]\nPath={}\nDeletionDate={}\n", encode_path(&shown_path), deleted);
+    let contents = format!(
+        "[Trash Info]\nPath={}\nDeletionDate={}\n",
+        encode_path(&shown_path),
+        deleted
+    );
     let chosen = reserve_info(&root, &name, &contents)?;
     let info = root.join("info").join(format!("{}.trashinfo", chosen));
     let trashed = root.join("files").join(&chosen);
@@ -256,7 +285,12 @@ pub fn trash(path: &Path) -> io::Result<TrashedItem> {
         let _ = fs::remove_file(&info);
         return Err(e);
     }
-    Ok(TrashedItem { original: abs, trashed, info, deleted })
+    Ok(TrashedItem {
+        original: abs,
+        trashed,
+        info,
+        deleted,
+    })
 }
 
 /// Parses a `.trashinfo` body into (Path, DeletionDate).
@@ -279,7 +313,8 @@ pub fn parse_info(content: &str) -> Option<(PathBuf, String)> {
             date = v.to_string();
         }
     }
-    path.filter(|p| !p.as_os_str().is_empty()).map(|p| (p, date))
+    path.filter(|p| !p.as_os_str().is_empty())
+        .map(|p| (p, date))
 }
 
 /// Every trash directory currently reachable: home plus one per mounted
@@ -289,7 +324,10 @@ pub fn all_trash_dirs() -> Vec<PathBuf> {
     let mounts = fs::read_to_string("/proc/self/mounts").unwrap_or_default();
     for line in mounts.lines() {
         let mut parts = line.split_whitespace();
-        let (Some(_dev), Some(mnt), Some(fstype)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let (Some(_dev), Some(mnt), Some(fstype)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
         if is_virtual_fs(fstype) {
             continue;
         }
@@ -306,10 +344,33 @@ pub fn all_trash_dirs() -> Vec<PathBuf> {
 pub fn is_virtual_fs(fstype: &str) -> bool {
     matches!(
         fstype,
-        "proc" | "sysfs" | "devtmpfs" | "devpts" | "tmpfs" | "cgroup" | "cgroup2" | "securityfs" | "pstore"
-            | "debugfs" | "tracefs" | "configfs" | "fusectl" | "mqueue" | "hugetlbfs" | "bpf" | "autofs"
-            | "binfmt_misc" | "efivarfs" | "ramfs" | "rpc_pipefs" | "nsfs" | "overlay" | "squashfs"
-            | "fuse.portal" | "fuse.gvfsd-fuse" | "selinuxfs"
+        "proc"
+            | "sysfs"
+            | "devtmpfs"
+            | "devpts"
+            | "tmpfs"
+            | "cgroup"
+            | "cgroup2"
+            | "securityfs"
+            | "pstore"
+            | "debugfs"
+            | "tracefs"
+            | "configfs"
+            | "fusectl"
+            | "mqueue"
+            | "hugetlbfs"
+            | "bpf"
+            | "autofs"
+            | "binfmt_misc"
+            | "efivarfs"
+            | "ramfs"
+            | "rpc_pipefs"
+            | "nsfs"
+            | "overlay"
+            | "squashfs"
+            | "fuse.portal"
+            | "fuse.gvfsd-fuse"
+            | "selinuxfs"
     )
 }
 
@@ -319,8 +380,13 @@ pub fn unescape_mount(s: &str) -> String {
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'\\' && i + 3 < b.len() && b[i + 1..i + 4].iter().all(|c| (b'0'..=b'7').contains(c)) {
-            let v = b[i + 1..i + 4].iter().fold(0u16, |acc, c| acc * 8 + (c - b'0') as u16);
+        if b[i] == b'\\'
+            && i + 3 < b.len()
+            && b[i + 1..i + 4].iter().all(|c| (b'0'..=b'7').contains(c))
+        {
+            let v = b[i + 1..i + 4]
+                .iter()
+                .fold(0u16, |acc, c| acc * 8 + (c - b'0') as u16);
             if v <= 255 {
                 out.push(v as u8);
                 i += 4;
@@ -346,16 +412,24 @@ fn list_in(roots: &[PathBuf]) -> Vec<TrashedItem> {
         if !usable_trash(root) {
             continue;
         }
-        let Ok(rd) = fs::read_dir(root.join("info")) else { continue };
+        let Ok(rd) = fs::read_dir(root.join("info")) else {
+            continue;
+        };
         for entry in rd.flatten() {
             let fname = entry.file_name().to_string_lossy().to_string();
-            let Some(stem) = fname.strip_suffix(".trashinfo") else { continue };
+            let Some(stem) = fname.strip_suffix(".trashinfo") else {
+                continue;
+            };
             let trashed = root.join("files").join(stem);
             if fs::symlink_metadata(&trashed).is_err() {
                 continue; // orphaned info file
             }
-            let Ok(content) = fs::read_to_string(entry.path()) else { continue };
-            let Some((p, deleted)) = parse_info(&content) else { continue };
+            let Ok(content) = fs::read_to_string(entry.path()) else {
+                continue;
+            };
+            let Some((p, deleted)) = parse_info(&content) else {
+                continue;
+            };
             // Never let a record restore outside its own drive (or, for
             // the home trash, use a relative path with `..` tricks).
             if p.components().any(|c| c == std::path::Component::ParentDir) {
@@ -368,7 +442,12 @@ fn list_in(roots: &[PathBuf]) -> Vec<TrashedItem> {
                 (Some(t), true) if p.starts_with(t) => p,
                 (Some(_), true) => continue,
             };
-            out.push(TrashedItem { original, trashed, info: entry.path(), deleted });
+            out.push(TrashedItem {
+                original,
+                trashed,
+                info: entry.path(),
+                deleted,
+            });
         }
     }
     out
@@ -384,7 +463,9 @@ fn root_topdir(root: &Path) -> Option<PathBuf> {
         root.parent().map(|p| p.to_path_buf())
     } else {
         // .Trash/$uid
-        root.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf())
+        root.parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
     }
 }
 
@@ -399,7 +480,11 @@ pub fn lookup(trashed: &Path) -> Option<TrashedItem> {
 pub fn restore(item: &TrashedItem) -> io::Result<PathBuf> {
     let parent = item.original.parent().unwrap_or(Path::new("/"));
     fs::create_dir_all(parent)?;
-    let name = item.original.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let name = item
+        .original
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let target = crate::fsops::unique_name(parent, &name);
     crate::fsops::move_path(&item.trashed, &target, &crate::fsops::Silent)?;
     let _ = fs::remove_file(&item.info);
@@ -425,7 +510,9 @@ fn empty_in(roots: &[PathBuf]) -> io::Result<()> {
             continue;
         }
         for sub in ["files", "info"] {
-            let Ok(rd) = fs::read_dir(root.join(sub)) else { continue };
+            let Ok(rd) = fs::read_dir(root.join(sub)) else {
+                continue;
+            };
             for e in rd.flatten() {
                 if let Err(err) = crate::fsops::remove_tree(&e.path()) {
                     first_err.get_or_insert(err);
@@ -442,7 +529,9 @@ fn empty_in(roots: &[PathBuf]) -> io::Result<()> {
 
 /// Whether `p` lies inside any trash `files/` directory.
 pub fn is_in_trash(p: &Path) -> bool {
-    all_trash_dirs().iter().any(|t| p.starts_with(t.join("files")))
+    all_trash_dirs()
+        .iter()
+        .any(|t| p.starts_with(t.join("files")))
 }
 
 #[cfg(test)]
@@ -468,7 +557,8 @@ mod tests {
 
     #[test]
     fn parses_info() {
-        let (p, d) = parse_info("[Trash Info]\nPath=/a/b%20c\nDeletionDate=2026-01-02T03:04:05\n").unwrap();
+        let (p, d) =
+            parse_info("[Trash Info]\nPath=/a/b%20c\nDeletionDate=2026-01-02T03:04:05\n").unwrap();
         assert_eq!(p, PathBuf::from("/a/b c"));
         assert_eq!(d, "2026-01-02T03:04:05");
         assert!(parse_info("[Other]\nPath=/x\n").is_none());
@@ -476,7 +566,10 @@ mod tests {
 
     #[test]
     fn unescapes_mount_points() {
-        assert_eq!(unescape_mount("/run/media/u/Extra\\040Volume"), "/run/media/u/Extra Volume");
+        assert_eq!(
+            unescape_mount("/run/media/u/Extra\\040Volume"),
+            "/run/media/u/Extra Volume"
+        );
         assert_eq!(unescape_mount("/a\\04"), "/a\\04");
         assert_eq!(unescape_mount("/a\\777b"), "/a\\777b");
     }
@@ -492,7 +585,11 @@ mod tests {
         let root = d.join(format!(".Trash-{}", uid()));
         fs::create_dir_all(root.join("info")).unwrap();
         std::os::unix::fs::symlink(&victim, root.join("files")).unwrap();
-        fs::write(root.join("info/docs.trashinfo"), "[Trash Info]\nPath=docs\n").unwrap();
+        fs::write(
+            root.join("info/docs.trashinfo"),
+            "[Trash Info]\nPath=docs\n",
+        )
+        .unwrap();
         assert!(list_in(&[root.clone()]).is_empty());
         empty_in(&[root.clone()]).unwrap();
         assert!(victim.join("docs/keep.txt").exists());
@@ -500,7 +597,11 @@ mod tests {
         let root2 = d.join("t2");
         fs::create_dir_all(root2.join("files/x")).unwrap();
         fs::create_dir_all(root2.join("info")).unwrap();
-        fs::write(root2.join("info/x.trashinfo"), "[Trash Info]\nPath=../../etc/x\n").unwrap();
+        fs::write(
+            root2.join("info/x.trashinfo"),
+            "[Trash Info]\nPath=../../etc/x\n",
+        )
+        .unwrap();
         assert!(list_in(&[root2]).is_empty());
         let _ = fs::remove_dir_all(&d);
     }
@@ -523,7 +624,10 @@ mod tests {
 
         let item = trash(&d.join("link")).unwrap();
         assert!(d.join("target.txt").exists(), "symlink target must survive");
-        assert!(fs::symlink_metadata(&item.trashed).unwrap().file_type().is_symlink());
+        assert!(fs::symlink_metadata(&item.trashed)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(item.original, fs::canonicalize(&d).unwrap().join("link"));
 
         // Something new now lives at the original spot: restore must not clobber it.
@@ -542,7 +646,10 @@ mod tests {
         let only_home = [home_trash()];
         assert!(list_in(&only_home).iter().any(|i| i.trashed == b.trashed));
         empty_in(&only_home).unwrap();
-        assert!(fs::read_dir(home_trash().join("files")).unwrap().next().is_none());
+        assert!(fs::read_dir(home_trash().join("files"))
+            .unwrap()
+            .next()
+            .is_none());
         std::env::remove_var("XDG_DATA_HOME");
         fs::remove_dir_all(&d).unwrap();
     }

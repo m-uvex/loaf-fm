@@ -375,7 +375,7 @@ pub fn transfer(
 
             if mode == "move" {
                 check_move_source(src_url, &before, mon)?;
-                remove(&[src_url.clone()], mon)?;
+                remove(std::slice::from_ref(src_url), mon)?;
             }
             completed.push(target_item.to_str().unwrap().to_string());
         }
@@ -435,7 +435,7 @@ pub fn transfer(
 
             if mode == "move" {
                 check_move_source(src_url, &before, mon)?;
-                remove(&[src_url.clone()], mon)?;
+                remove(std::slice::from_ref(src_url), mon)?;
             }
             completed.push(item_url);
         }

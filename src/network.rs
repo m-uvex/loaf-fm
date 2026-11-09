@@ -3,17 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
+    #[default]
     Smb,
     Webdav,
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Protocol::Smb
-    }
 }
 
 impl Protocol {
@@ -270,7 +265,9 @@ pub fn saved_password(profile: &NetworkProfile) -> String {
     if profile.username.trim().is_empty() {
         return String::new();
     }
-    let Some(tool) = secret_tool() else { return String::new() };
+    let Some(tool) = secret_tool() else {
+        return String::new();
+    };
     let mut cmd = Command::new(tool);
     cmd.arg("lookup");
     cmd.args(keyring_attributes(profile));
@@ -286,12 +283,18 @@ pub fn store_password(profile: &NetworkProfile, password: &str) -> bool {
     if profile.username.trim().is_empty() || password.is_empty() {
         return false;
     }
-    let Some(tool) = secret_tool() else { return false };
+    let Some(tool) = secret_tool() else {
+        return false;
+    };
     let mut clear = Command::new(&tool);
     clear.arg("clear");
     clear.args(keyring_attributes(profile));
     let _ = util::run_capture(clear, None);
-    let label = format!("Loaf: {} share {}", profile.protocol.display_name(), profile.label());
+    let label = format!(
+        "Loaf: {} share {}",
+        profile.protocol.display_name(),
+        profile.label()
+    );
     let mut cmd = Command::new(tool);
     cmd.args(["store", "--label", &label, "--collection", "default"]);
     cmd.args(keyring_attributes(profile));
@@ -321,7 +324,9 @@ fn encode(value: &str) -> String {
     let mut out = String::new();
     for b in value.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{:02X}", b)),
         }
     }
@@ -399,7 +404,10 @@ pub fn uri(profile: &NetworkProfile) -> String {
             if encoded_path.is_empty() {
                 format!("{}://{}{}/", scheme, userinfo, host_port_str)
             } else {
-                format!("{}://{}{}/{}", scheme, userinfo, host_port_str, encoded_path)
+                format!(
+                    "{}://{}{}/{}",
+                    scheme, userinfo, host_port_str, encoded_path
+                )
             }
         }
     }
@@ -421,7 +429,9 @@ pub(crate) fn parse_smb_mount_entry(name: &str) -> Option<SmbMountEntry> {
     let mut domain = String::new();
     let mut port = None;
     for part in rest.split(',') {
-        let Some((key, value)) = part.split_once('=') else { continue };
+        let Some((key, value)) = part.split_once('=') else {
+            continue;
+        };
         match key {
             "server" => server = value.to_string(),
             "share" => share = value.to_string(),
@@ -434,7 +444,13 @@ pub(crate) fn parse_smb_mount_entry(name: &str) -> Option<SmbMountEntry> {
     if server.is_empty() {
         return None;
     }
-    Some(SmbMountEntry { server, share, user, domain, port })
+    Some(SmbMountEntry {
+        server,
+        share,
+        user,
+        domain,
+        port,
+    })
 }
 
 struct DavMountEntry {
@@ -453,7 +469,9 @@ fn parse_dav_mount_entry(name: &str) -> Option<DavMountEntry> {
     let mut user = String::new();
     let mut port = None;
     for part in rest.split(',') {
-        let Some((key, value)) = part.split_once('=') else { continue };
+        let Some((key, value)) = part.split_once('=') else {
+            continue;
+        };
         match key {
             "host" => host = value.to_string(),
             "ssl" => ssl = value.eq_ignore_ascii_case("true"),
@@ -466,7 +484,13 @@ fn parse_dav_mount_entry(name: &str) -> Option<DavMountEntry> {
     if host.is_empty() {
         return None;
     }
-    Some(DavMountEntry { host, ssl, prefix, user, port })
+    Some(DavMountEntry {
+        host,
+        ssl,
+        prefix,
+        user,
+        port,
+    })
 }
 
 fn same(a: &str, b: &str) -> bool {
@@ -495,7 +519,9 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
             let want_domain = profile.domain.trim();
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let Some(found) = parse_smb_mount_entry(&name) else { continue };
+                let Some(found) = parse_smb_mount_entry(&name) else {
+                    continue;
+                };
                 if !same(&found.server, want_host) {
                     continue;
                 }
@@ -505,10 +531,14 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
                 if !same(found.share.trim_matches('/'), want_share) {
                     continue;
                 }
-                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user) {
+                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user)
+                {
                     continue;
                 }
-                if !want_domain.is_empty() && !found.domain.is_empty() && !same(&found.domain, want_domain) {
+                if !want_domain.is_empty()
+                    && !found.domain.is_empty()
+                    && !same(&found.domain, want_domain)
+                {
                     continue;
                 }
                 let path = entry.path();
@@ -521,7 +551,9 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
             let want_prefix = normalize_path_prefix(&profile.share);
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let Some(found) = parse_dav_mount_entry(&name) else { continue };
+                let Some(found) = parse_dav_mount_entry(&name) else {
+                    continue;
+                };
                 let found_host = found.host.trim_matches('[').trim_matches(']');
                 let target_host = want_host.trim_matches('[').trim_matches(']');
                 if !same(found_host, target_host) {
@@ -537,7 +569,8 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
                 if !same(&found_prefix, &want_prefix) {
                     continue;
                 }
-                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user) {
+                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user)
+                {
                     continue;
                 }
                 let path = entry.path();
@@ -559,8 +592,8 @@ fn run_gio(args: &[String]) -> Result<String, String> {
     if ok {
         Ok(out)
     } else {
-        let stderr_line = err.lines().map(str::trim).filter(|line| !line.is_empty()).last();
-        let stdout_line = out.lines().map(str::trim).filter(|line| !line.is_empty()).last();
+        let stderr_line = err.lines().map(str::trim).rfind(|line| !line.is_empty());
+        let stdout_line = out.lines().map(str::trim).rfind(|line| !line.is_empty());
         let message = stderr_line
             .or(stdout_line)
             .unwrap_or("the share could not be mounted")
@@ -598,13 +631,20 @@ pub fn mount(profile: &NetworkProfile) -> Result<String, MountError> {
     }
     Err(MountError {
         needs_password: false,
-        message: format!("{} mounted, but its local folder was not found", profile.label()),
+        message: format!(
+            "{} mounted, but its local folder was not found",
+            profile.label()
+        ),
     })
 }
 
 pub fn unmount(profile: &NetworkProfile) -> Result<(), String> {
     if let Some(path) = connected_path(profile) {
-        run_gio(&["mount".to_string(), "-u".to_string(), path.to_string_lossy().to_string()])?;
+        run_gio(&[
+            "mount".to_string(),
+            "-u".to_string(),
+            path.to_string_lossy().to_string(),
+        ])?;
         return Ok(());
     }
     let target = uri(profile);
@@ -628,7 +668,9 @@ pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
         port: profile.port,
         ssl: profile.ssl,
         connected: path.is_some(),
-        path: path.map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+        path: path
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default(),
         label: profile.label(),
         icon: profile.protocol.icon().to_string(),
     }
@@ -663,7 +705,10 @@ mod tests {
             port: Some(445),
             ..p.clone()
         };
-        assert_eq!(uri(&p_port), "smb://WORKGROUP;alice@nas.local:445/media/movies");
+        assert_eq!(
+            uri(&p_port),
+            "smb://WORKGROUP;alice@nas.local:445/media/movies"
+        );
     }
 
     #[test]
@@ -680,7 +725,10 @@ mod tests {
             ssl: true,
             remember: false,
         };
-        assert_eq!(uri(&p), "davs://alice@cloud.example.com/remote.php/dav/files/alice");
+        assert_eq!(
+            uri(&p),
+            "davs://alice@cloud.example.com/remote.php/dav/files/alice"
+        );
 
         let p_insecure = NetworkProfile {
             ssl: false,
@@ -694,12 +742,16 @@ mod tests {
 
     #[test]
     fn parse_mount_entries() {
-        let smb_entry = parse_smb_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
+        let smb_entry =
+            parse_smb_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
         assert_eq!(smb_entry.server, "nas.local");
         assert_eq!(smb_entry.share, "media");
         assert_eq!(smb_entry.user, "alice");
 
-        let dav_entry = parse_dav_mount_entry("dav:host=cloud.example.com,ssl=true,prefix=/remote.php/webdav,user=alice").unwrap();
+        let dav_entry = parse_dav_mount_entry(
+            "dav:host=cloud.example.com,ssl=true,prefix=/remote.php/webdav,user=alice",
+        )
+        .unwrap();
         assert_eq!(dav_entry.host, "cloud.example.com");
         assert!(dav_entry.ssl);
         assert_eq!(dav_entry.prefix, "/remote.php/webdav");

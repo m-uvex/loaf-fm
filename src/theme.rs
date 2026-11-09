@@ -14,7 +14,10 @@ fn run_cmd_stdout(cmd: &str, args: &[&str]) -> Option<String> {
 }
 
 fn dark_from_gsettings() -> Option<bool> {
-    let out = run_cmd_stdout("gsettings", &["get", "org.gnome.desktop.interface", "color-scheme"])?;
+    let out = run_cmd_stdout(
+        "gsettings",
+        &["get", "org.gnome.desktop.interface", "color-scheme"],
+    )?;
     let s = out.to_lowercase();
     if s.contains("prefer-dark") {
         Some(true)
@@ -55,17 +58,25 @@ fn dark_from_portal() -> Option<bool> {
 fn dark_from_gtk_settings() -> Option<bool> {
     let home = std::env::var("HOME").unwrap_or_default();
     let candidates = [
-        std::env::var("XDG_CONFIG_HOME").ok().map(|c| PathBuf::from(c).join("gtk-3.0/settings.ini")),
-        std::env::var("XDG_CONFIG_HOME").ok().map(|c| PathBuf::from(c).join("gtk-4.0/settings.ini")),
+        std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .map(|c| PathBuf::from(c).join("gtk-3.0/settings.ini")),
+        std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .map(|c| PathBuf::from(c).join("gtk-4.0/settings.ini")),
         Some(PathBuf::from(&home).join(".config/gtk-3.0/settings.ini")),
         Some(PathBuf::from(&home).join(".config/gtk-4.0/settings.ini")),
     ];
 
     for candidate in candidates.into_iter().flatten() {
-        let Ok(content) = fs::read_to_string(&candidate) else { continue };
+        let Ok(content) = fs::read_to_string(&candidate) else {
+            continue;
+        };
         for line in content.lines() {
             let line = line.trim();
-            let Some((key, value)) = line.split_once('=') else { continue };
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
             if key.trim() != "gtk-application-prefer-dark-theme" {
                 continue;
             }
@@ -137,7 +148,11 @@ fn rgb_to_hsl((r, g, b): (u8, u8, u8)) -> (f32, f32, f32) {
     if d.abs() < 1e-4 {
         return (0.0, 0.0, l);
     }
-    let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+    let s = if l > 0.5 {
+        d / (2.0 - max - min)
+    } else {
+        d / (max + min)
+    };
     let mut h = if (max - rf).abs() < 1e-4 {
         (gf - bf) / d + (if gf < bf { 6.0 } else { 0.0 })
     } else if (max - gf).abs() < 1e-4 {
@@ -150,11 +165,21 @@ fn rgb_to_hsl((r, g, b): (u8, u8, u8)) -> (f32, f32, f32) {
 }
 
 fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
-    if t < 0.0 { t += 1.0; }
-    if t > 1.0 { t -= 1.0; }
-    if t < 1.0 / 6.0 { return p + (q - p) * 6.0 * t; }
-    if t < 1.0 / 2.0 { return q; }
-    if t < 2.0 / 3.0 { return p + (q - p) * (2.0 / 3.0 - t) * 6.0; }
+    if t < 0.0 {
+        t += 1.0;
+    }
+    if t > 1.0 {
+        t -= 1.0;
+    }
+    if t < 1.0 / 6.0 {
+        return p + (q - p) * 6.0 * t;
+    }
+    if t < 1.0 / 2.0 {
+        return q;
+    }
+    if t < 2.0 / 3.0 {
+        return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    }
     p
 }
 
@@ -164,7 +189,11 @@ fn hsl_to_rgb((h, s, l): (f32, f32, f32)) -> (u8, u8, u8) {
         let val = (l_clamped * 255.0).round() as u8;
         return (val, val, val);
     }
-    let q = if l_clamped < 0.5 { l_clamped * (1.0 + s) } else { l_clamped + s - l_clamped * s };
+    let q = if l_clamped < 0.5 {
+        l_clamped * (1.0 + s)
+    } else {
+        l_clamped + s - l_clamped * s
+    };
     let p = 2.0 * l_clamped - q;
     let h_norm = (h.rem_euclid(360.0)) / 360.0;
     let r = (hue_to_rgb(p, q, h_norm + 1.0 / 3.0).clamp(0.0, 1.0) * 255.0).round() as u8;
@@ -194,8 +223,12 @@ fn contrast_ratio(c1: (u8, u8, u8), c2: (u8, u8, u8)) -> f32 {
 }
 
 fn ensure_contrast(text_hex: &str, bg_hex: &str, min_contrast: f32, prefer_light: bool) -> String {
-    let Some(bg_rgb) = parse_hex(bg_hex) else { return text_hex.to_string(); };
-    let Some(text_rgb) = parse_hex(text_hex) else { return text_hex.to_string(); };
+    let Some(bg_rgb) = parse_hex(bg_hex) else {
+        return text_hex.to_string();
+    };
+    let Some(text_rgb) = parse_hex(text_hex) else {
+        return text_hex.to_string();
+    };
     if contrast_ratio(text_rgb, bg_rgb) >= min_contrast {
         return text_hex.to_string();
     }
@@ -225,22 +258,32 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     };
 
     // If source already has nested colors.dark and colors.light (e.g. DMS / Matugen multi-mode)
-    let nested_dark = val.get("colors").and_then(|c| c.get("dark")).and_then(|d| d.as_object());
-    let nested_light = val.get("colors").and_then(|c| c.get("light")).and_then(|l| l.as_object());
+    let nested_dark = val
+        .get("colors")
+        .and_then(|c| c.get("dark"))
+        .and_then(|d| d.as_object());
+    let nested_light = val
+        .get("colors")
+        .and_then(|c| c.get("light"))
+        .and_then(|l| l.as_object());
 
     // Fallback pywal 16 colors
     let pywal_colors = val.get("colors").and_then(|c| c.as_object());
     let pywal_special = val.get("special").and_then(|s| s.as_object());
 
     // Extract seed primary and background
-    let raw_primary = val.get("primary").and_then(|v| v.as_str())
+    let raw_primary = val
+        .get("primary")
+        .and_then(|v| v.as_str())
         .or_else(|| nested_dark.and_then(|d| str_from(d, "primary")))
         .or_else(|| nested_light.and_then(|l| str_from(l, "primary")))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color4")))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color1")))
         .unwrap_or("#cfc6ab");
 
-    let raw_bg = val.get("background").and_then(|v| v.as_str())
+    let raw_bg = val
+        .get("background")
+        .and_then(|v| v.as_str())
         .or_else(|| nested_dark.and_then(|d| str_from(d, "background")))
         .or_else(|| pywal_special.and_then(|s| str_from(s, "background")))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color0")))
@@ -260,7 +303,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     // Build dark palette:
     // If source is light, do NOT reuse light surfaces for dark mode! Invert or derive proper dark tones.
     let dark_bg = if source_is_light {
-        val.get("inverse_surface").and_then(|v| v.as_str())
+        val.get("inverse_surface")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "background")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.07))))
@@ -271,7 +315,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_surf_lowest = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.04)))
     } else {
-        val.get("surface_container_lowest").and_then(|v| v.as_str())
+        val.get("surface_container_lowest")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container_lowest")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s, 0.04))))
@@ -280,19 +325,22 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_surf_low = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.09)))
     } else {
-        val.get("surface_container_low").and_then(|v| v.as_str())
+        val.get("surface_container_low")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container_low")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s, 0.09))))
     };
 
     let dark_surf = if source_is_light {
-        val.get("inverse_surface").and_then(|v| v.as_str())
+        val.get("inverse_surface")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.13))))
     } else {
-        val.get("surface_container").and_then(|v| v.as_str())
+        val.get("surface_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s, 0.13))))
@@ -301,7 +349,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_surf_high = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.17)))
     } else {
-        val.get("surface_container_high").and_then(|v| v.as_str())
+        val.get("surface_container_high")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container_high")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s, 0.17))))
@@ -310,14 +359,16 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_surf_highest = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, tint_s * 0.8, 0.22)))
     } else {
-        val.get("surface_container_highest").and_then(|v| v.as_str())
+        val.get("surface_container_highest")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "surface_container_highest")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s, 0.22))))
     };
 
     let dark_primary = if source_is_light {
-        val.get("inverse_primary").and_then(|v| v.as_str())
+        val.get("inverse_primary")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "primary")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, p_s.max(0.4), 0.76))))
@@ -328,7 +379,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_on_primary = if source_is_light {
         to_hex(hsl_to_rgb((p_h, p_s * 0.7, 0.14)))
     } else {
-        val.get("on_primary").and_then(|v| v.as_str())
+        val.get("on_primary")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_primary")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, p_s * 0.7, 0.14))))
@@ -337,7 +389,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_container = if source_is_light {
         to_hex(hsl_to_rgb((p_h, p_s * 0.6, 0.28)))
     } else {
-        val.get("primary_container").and_then(|v| v.as_str())
+        val.get("primary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "primary_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, p_s * 0.6, 0.28))))
@@ -346,45 +399,81 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_on_container = if source_is_light {
         to_hex(hsl_to_rgb((p_h, p_s * 0.5, 0.92)))
     } else {
-        val.get("on_primary_container").and_then(|v| v.as_str())
+        val.get("on_primary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_primary_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, p_s * 0.5, 0.92))))
     };
 
     let dark_sec_container = if source_is_light {
-        to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.5).max(0.12), 0.24)))
+        to_hex(hsl_to_rgb((
+            (p_h + 25.0) % 360.0,
+            (p_s * 0.5).max(0.12),
+            0.24,
+        )))
     } else {
-        val.get("secondary_container").and_then(|v| v.as_str())
+        val.get("secondary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "secondary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.5).max(0.12), 0.24))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.5).max(0.12),
+                    0.24,
+                )))
+            })
     };
 
     let dark_on_sec_container = if source_is_light {
-        to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.4).max(0.1), 0.90)))
+        to_hex(hsl_to_rgb((
+            (p_h + 25.0) % 360.0,
+            (p_s * 0.4).max(0.1),
+            0.90,
+        )))
     } else {
-        val.get("on_secondary_container").and_then(|v| v.as_str())
+        val.get("on_secondary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_secondary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.4).max(0.1), 0.90))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.4).max(0.1),
+                    0.90,
+                )))
+            })
     };
 
     let dark_tertiary_container = if source_is_light {
-        to_hex(hsl_to_rgb(((p_h + 50.0) % 360.0, (p_s * 0.4).max(0.1), 0.22)))
+        to_hex(hsl_to_rgb((
+            (p_h + 50.0) % 360.0,
+            (p_s * 0.4).max(0.1),
+            0.22,
+        )))
     } else {
-        val.get("tertiary_container").and_then(|v| v.as_str())
+        val.get("tertiary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "tertiary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 50.0) % 360.0, (p_s * 0.4).max(0.1), 0.22))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 50.0) % 360.0,
+                    (p_s * 0.4).max(0.1),
+                    0.22,
+                )))
+            })
     };
 
     let raw_dark_text = if source_is_light {
-        val.get("inverse_on_surface").and_then(|v| v.as_str())
+        val.get("inverse_on_surface")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_surface")))
             .unwrap_or("#e6e2dd")
     } else {
-        val.get("on_surface").and_then(|v| v.as_str())
+        val.get("on_surface")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_surface")))
             .or_else(|| pywal_special.and_then(|s| str_from(s, "foreground")))
             .unwrap_or("#e6e2dd")
@@ -393,7 +482,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let raw_dark_muted = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, 0.12, 0.72)))
     } else {
-        val.get("on_surface_variant").and_then(|v| v.as_str())
+        val.get("on_surface_variant")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_surface_variant")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.12, 0.72))))
@@ -405,7 +495,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_outline = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, 0.10, 0.56)))
     } else {
-        val.get("outline").and_then(|v| v.as_str())
+        val.get("outline")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "outline")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.10, 0.56))))
@@ -414,7 +505,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let dark_outline_variant = if source_is_light {
         to_hex(hsl_to_rgb((tint_h, 0.15, 0.28)))
     } else {
-        val.get("outline_variant").and_then(|v| v.as_str())
+        val.get("outline_variant")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "outline_variant")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.15, 0.28))))
@@ -423,67 +515,79 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     // Build light palette:
     // If source is already light, use its native light tokens directly!
     let light_bg = if source_is_light {
-        val.get("background").and_then(|v| v.as_str())
+        val.get("background")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "background")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.98))))
     } else {
-        nested_light.and_then(|l| str_from(l, "background"))
+        nested_light
+            .and_then(|l| str_from(l, "background"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.98))))
     };
 
     let light_surf_lowest = if source_is_light {
-        val.get("surface_container_lowest").and_then(|v| v.as_str())
+        val.get("surface_container_lowest")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "surface_container_lowest")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| "#ffffff".to_string())
     } else {
-        nested_light.and_then(|l| str_from(l, "surface_container_lowest"))
+        nested_light
+            .and_then(|l| str_from(l, "surface_container_lowest"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| "#ffffff".to_string())
     };
 
     let light_surf_low = if source_is_light {
-        val.get("surface_container_low").and_then(|v| v.as_str())
+        val.get("surface_container_low")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "surface_container_low")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.96))))
     } else {
-        nested_light.and_then(|l| str_from(l, "surface_container_low"))
+        nested_light
+            .and_then(|l| str_from(l, "surface_container_low"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.96))))
     };
 
     let light_surf = if source_is_light {
-        val.get("surface_container").and_then(|v| v.as_str())
+        val.get("surface_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "surface_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.93))))
     } else {
-        nested_light.and_then(|l| str_from(l, "surface_container"))
+        nested_light
+            .and_then(|l| str_from(l, "surface_container"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.93))))
     };
 
     let light_surf_high = if source_is_light {
-        val.get("surface_container_high").and_then(|v| v.as_str())
+        val.get("surface_container_high")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "surface_container_high")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.89))))
     } else {
-        nested_light.and_then(|l| str_from(l, "surface_container_high"))
+        nested_light
+            .and_then(|l| str_from(l, "surface_container_high"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.89))))
     };
 
     let light_surf_highest = if source_is_light {
-        val.get("surface_container_highest").and_then(|v| v.as_str())
+        val.get("surface_container_highest")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "surface_container_highest")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.85))))
     } else {
-        nested_light.and_then(|l| str_from(l, "surface_container_highest"))
+        nested_light
+            .and_then(|l| str_from(l, "surface_container_highest"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, tint_s * 0.6, 0.85))))
     };
@@ -491,96 +595,153 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let light_primary = if source_is_light {
         raw_primary.to_string()
     } else {
-        val.get("inverse_primary").and_then(|v| v.as_str())
+        val.get("inverse_primary")
+            .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| nested_light.and_then(|l| str_from(l, "primary")).map(|s| s.to_string()))
+            .or_else(|| {
+                nested_light
+                    .and_then(|l| str_from(l, "primary"))
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, p_s.max(0.65), 0.38))))
     };
 
     let light_on_primary = if source_is_light {
-        val.get("on_primary").and_then(|v| v.as_str())
+        val.get("on_primary")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "on_primary")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| "#ffffff".to_string())
     } else {
-        nested_light.and_then(|l| str_from(l, "on_primary"))
+        nested_light
+            .and_then(|l| str_from(l, "on_primary"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| "#ffffff".to_string())
     };
 
     let light_container = if source_is_light {
-        val.get("primary_container").and_then(|v| v.as_str())
+        val.get("primary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "primary_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, (p_s * 0.55).max(0.15), 0.88))))
     } else {
-        nested_light.and_then(|l| str_from(l, "primary_container"))
+        nested_light
+            .and_then(|l| str_from(l, "primary_container"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, (p_s * 0.55).max(0.15), 0.88))))
     };
 
     let light_on_container = if source_is_light {
-        val.get("on_primary_container").and_then(|v| v.as_str())
+        val.get("on_primary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "on_primary_container")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, (p_s * 0.75).max(0.3), 0.14))))
     } else {
-        nested_light.and_then(|l| str_from(l, "on_primary_container"))
+        nested_light
+            .and_then(|l| str_from(l, "on_primary_container"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((p_h, (p_s * 0.75).max(0.3), 0.14))))
     };
 
     let light_sec_container = if source_is_light {
-        val.get("secondary_container").and_then(|v| v.as_str())
+        val.get("secondary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "secondary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.45).max(0.12), 0.87))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.45).max(0.12),
+                    0.87,
+                )))
+            })
     } else {
-        nested_light.and_then(|l| str_from(l, "secondary_container"))
+        nested_light
+            .and_then(|l| str_from(l, "secondary_container"))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.45).max(0.12), 0.87))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.45).max(0.12),
+                    0.87,
+                )))
+            })
     };
 
     let light_on_sec_container = if source_is_light {
-        val.get("on_secondary_container").and_then(|v| v.as_str())
+        val.get("on_secondary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "on_secondary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.7).max(0.25), 0.15))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.7).max(0.25),
+                    0.15,
+                )))
+            })
     } else {
-        nested_light.and_then(|l| str_from(l, "on_secondary_container"))
+        nested_light
+            .and_then(|l| str_from(l, "on_secondary_container"))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 25.0) % 360.0, (p_s * 0.7).max(0.25), 0.15))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 25.0) % 360.0,
+                    (p_s * 0.7).max(0.25),
+                    0.15,
+                )))
+            })
     };
 
     let light_tertiary_container = if source_is_light {
-        val.get("tertiary_container").and_then(|v| v.as_str())
+        val.get("tertiary_container")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "tertiary_container")))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 50.0) % 360.0, (p_s * 0.35).max(0.1), 0.88))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 50.0) % 360.0,
+                    (p_s * 0.35).max(0.1),
+                    0.88,
+                )))
+            })
     } else {
-        nested_light.and_then(|l| str_from(l, "tertiary_container"))
+        nested_light
+            .and_then(|l| str_from(l, "tertiary_container"))
             .map(|s| s.to_string())
-            .unwrap_or_else(|| to_hex(hsl_to_rgb(((p_h + 50.0) % 360.0, (p_s * 0.35).max(0.1), 0.88))))
+            .unwrap_or_else(|| {
+                to_hex(hsl_to_rgb((
+                    (p_h + 50.0) % 360.0,
+                    (p_s * 0.35).max(0.1),
+                    0.88,
+                )))
+            })
     };
 
     let raw_light_text = if source_is_light {
-        val.get("on_surface").and_then(|v| v.as_str())
+        val.get("on_surface")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "on_surface")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| "#1d1b19".to_string())
     } else {
-        nested_light.and_then(|l| str_from(l, "on_surface"))
+        nested_light
+            .and_then(|l| str_from(l, "on_surface"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.12, 0.12))))
     };
 
     let raw_light_muted = if source_is_light {
-        val.get("on_surface_variant").and_then(|v| v.as_str())
+        val.get("on_surface_variant")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "on_surface_variant")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.15, 0.36))))
     } else {
-        nested_light.and_then(|l| str_from(l, "on_surface_variant"))
+        nested_light
+            .and_then(|l| str_from(l, "on_surface_variant"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.15, 0.36))))
     };
@@ -589,64 +750,143 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     let light_muted = ensure_contrast(&raw_light_muted, &light_surf, 4.5, false);
 
     let light_outline = if source_is_light {
-        val.get("outline").and_then(|v| v.as_str())
+        val.get("outline")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "outline")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.12, 0.48))))
     } else {
-        nested_light.and_then(|l| str_from(l, "outline"))
+        nested_light
+            .and_then(|l| str_from(l, "outline"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.12, 0.48))))
     };
 
     let light_outline_variant = if source_is_light {
-        val.get("outline_variant").and_then(|v| v.as_str())
+        val.get("outline_variant")
+            .and_then(|v| v.as_str())
             .or_else(|| nested_light.and_then(|l| str_from(l, "outline_variant")))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.15, 0.78))))
     } else {
-        nested_light.and_then(|l| str_from(l, "outline_variant"))
+        nested_light
+            .and_then(|l| str_from(l, "outline_variant"))
             .map(|s| s.to_string())
             .unwrap_or_else(|| to_hex(hsl_to_rgb((tint_h, 0.15, 0.78))))
     };
 
     let mut dark_map = serde_json::Map::new();
     dark_map.insert("background".to_string(), serde_json::json!(dark_bg));
-    dark_map.insert("surface_container_lowest".to_string(), serde_json::json!(dark_surf_lowest));
-    dark_map.insert("surface_container_low".to_string(), serde_json::json!(dark_surf_low));
-    dark_map.insert("surface_container".to_string(), serde_json::json!(dark_surf));
-    dark_map.insert("surface_container_high".to_string(), serde_json::json!(dark_surf_high));
-    dark_map.insert("surface_container_highest".to_string(), serde_json::json!(dark_surf_highest));
+    dark_map.insert(
+        "surface_container_lowest".to_string(),
+        serde_json::json!(dark_surf_lowest),
+    );
+    dark_map.insert(
+        "surface_container_low".to_string(),
+        serde_json::json!(dark_surf_low),
+    );
+    dark_map.insert(
+        "surface_container".to_string(),
+        serde_json::json!(dark_surf),
+    );
+    dark_map.insert(
+        "surface_container_high".to_string(),
+        serde_json::json!(dark_surf_high),
+    );
+    dark_map.insert(
+        "surface_container_highest".to_string(),
+        serde_json::json!(dark_surf_highest),
+    );
     dark_map.insert("primary".to_string(), serde_json::json!(dark_primary));
     dark_map.insert("on_primary".to_string(), serde_json::json!(dark_on_primary));
-    dark_map.insert("primary_container".to_string(), serde_json::json!(dark_container));
-    dark_map.insert("on_primary_container".to_string(), serde_json::json!(dark_on_container));
-    dark_map.insert("secondary_container".to_string(), serde_json::json!(dark_sec_container));
-    dark_map.insert("on_secondary_container".to_string(), serde_json::json!(dark_on_sec_container));
-    dark_map.insert("tertiary_container".to_string(), serde_json::json!(dark_tertiary_container));
+    dark_map.insert(
+        "primary_container".to_string(),
+        serde_json::json!(dark_container),
+    );
+    dark_map.insert(
+        "on_primary_container".to_string(),
+        serde_json::json!(dark_on_container),
+    );
+    dark_map.insert(
+        "secondary_container".to_string(),
+        serde_json::json!(dark_sec_container),
+    );
+    dark_map.insert(
+        "on_secondary_container".to_string(),
+        serde_json::json!(dark_on_sec_container),
+    );
+    dark_map.insert(
+        "tertiary_container".to_string(),
+        serde_json::json!(dark_tertiary_container),
+    );
     dark_map.insert("on_surface".to_string(), serde_json::json!(dark_text));
-    dark_map.insert("on_surface_variant".to_string(), serde_json::json!(dark_muted));
+    dark_map.insert(
+        "on_surface_variant".to_string(),
+        serde_json::json!(dark_muted),
+    );
     dark_map.insert("outline".to_string(), serde_json::json!(dark_outline));
-    dark_map.insert("outline_variant".to_string(), serde_json::json!(dark_outline_variant));
+    dark_map.insert(
+        "outline_variant".to_string(),
+        serde_json::json!(dark_outline_variant),
+    );
 
     let mut light_map = serde_json::Map::new();
     light_map.insert("background".to_string(), serde_json::json!(light_bg));
-    light_map.insert("surface_container_lowest".to_string(), serde_json::json!(light_surf_lowest));
-    light_map.insert("surface_container_low".to_string(), serde_json::json!(light_surf_low));
-    light_map.insert("surface_container".to_string(), serde_json::json!(light_surf));
-    light_map.insert("surface_container_high".to_string(), serde_json::json!(light_surf_high));
-    light_map.insert("surface_container_highest".to_string(), serde_json::json!(light_surf_highest));
+    light_map.insert(
+        "surface_container_lowest".to_string(),
+        serde_json::json!(light_surf_lowest),
+    );
+    light_map.insert(
+        "surface_container_low".to_string(),
+        serde_json::json!(light_surf_low),
+    );
+    light_map.insert(
+        "surface_container".to_string(),
+        serde_json::json!(light_surf),
+    );
+    light_map.insert(
+        "surface_container_high".to_string(),
+        serde_json::json!(light_surf_high),
+    );
+    light_map.insert(
+        "surface_container_highest".to_string(),
+        serde_json::json!(light_surf_highest),
+    );
     light_map.insert("primary".to_string(), serde_json::json!(light_primary));
-    light_map.insert("on_primary".to_string(), serde_json::json!(light_on_primary));
-    light_map.insert("primary_container".to_string(), serde_json::json!(light_container));
-    light_map.insert("on_primary_container".to_string(), serde_json::json!(light_on_container));
-    light_map.insert("secondary_container".to_string(), serde_json::json!(light_sec_container));
-    light_map.insert("on_secondary_container".to_string(), serde_json::json!(light_on_sec_container));
-    light_map.insert("tertiary_container".to_string(), serde_json::json!(light_tertiary_container));
+    light_map.insert(
+        "on_primary".to_string(),
+        serde_json::json!(light_on_primary),
+    );
+    light_map.insert(
+        "primary_container".to_string(),
+        serde_json::json!(light_container),
+    );
+    light_map.insert(
+        "on_primary_container".to_string(),
+        serde_json::json!(light_on_container),
+    );
+    light_map.insert(
+        "secondary_container".to_string(),
+        serde_json::json!(light_sec_container),
+    );
+    light_map.insert(
+        "on_secondary_container".to_string(),
+        serde_json::json!(light_on_sec_container),
+    );
+    light_map.insert(
+        "tertiary_container".to_string(),
+        serde_json::json!(light_tertiary_container),
+    );
     light_map.insert("on_surface".to_string(), serde_json::json!(light_text));
-    light_map.insert("on_surface_variant".to_string(), serde_json::json!(light_muted));
+    light_map.insert(
+        "on_surface_variant".to_string(),
+        serde_json::json!(light_muted),
+    );
     light_map.insert("outline".to_string(), serde_json::json!(light_outline));
-    light_map.insert("outline_variant".to_string(), serde_json::json!(light_outline_variant));
+    light_map.insert(
+        "outline_variant".to_string(),
+        serde_json::json!(light_outline_variant),
+    );
 
     let mut out = dark_map.clone();
     out.insert("dark".to_string(), serde_json::Value::Object(dark_map));
@@ -659,7 +899,10 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
 pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
     let home = std::env::var("HOME").unwrap_or_default();
     let candidates = [
-        format!("{}/.local/state/quickshell/user/generated/colors.json", home),
+        format!(
+            "{}/.local/state/quickshell/user/generated/colors.json",
+            home
+        ),
         format!("{}/.cache/wal/colors.json", home),
         format!("{}/.cache/matugen/colors.json", home),
         format!("{}/.config/matugen/colors.json", home),
@@ -669,7 +912,9 @@ pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
 
     for path_str in candidates {
         let path = Path::new(&path_str);
-        let Ok(raw_content) = fs::read_to_string(path) else { continue };
+        let Ok(raw_content) = fs::read_to_string(path) else {
+            continue;
+        };
         let is_object = serde_json::from_str::<serde_json::Value>(&raw_content)
             .ok()
             .map(|v| v.is_object() && v.as_object().map(|o| !o.is_empty()).unwrap_or(false))
@@ -695,7 +940,6 @@ pub fn read_wallpaper_colors() -> String {
         .unwrap_or_else(|| "{}".to_string())
 }
 
-
 pub fn detect_device_type() -> &'static str {
     if let Ok(chassis) = fs::read_to_string("/sys/class/dmi/id/chassis_type") {
         match chassis.trim() {
@@ -703,7 +947,9 @@ pub fn detect_device_type() -> &'static str {
             _ => {}
         }
     }
-    if Path::new("/sys/class/power_supply/BAT0").exists() || Path::new("/sys/class/power_supply/BAT1").exists() {
+    if Path::new("/sys/class/power_supply/BAT0").exists()
+        || Path::new("/sys/class/power_supply/BAT1").exists()
+    {
         return "laptop";
     }
     "desktop"

@@ -20,7 +20,9 @@ fn settings_file() -> PathBuf {
 fn load_settings() -> HashMap<String, String> {
     let mut map = HashMap::new();
     if let Ok(content) = std::fs::read_to_string(settings_file()) {
-        if let Ok(serde_json::Value::Object(obj)) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Ok(serde_json::Value::Object(obj)) =
+            serde_json::from_str::<serde_json::Value>(&content)
+        {
             for (k, v) in obj {
                 let s = match v {
                     serde_json::Value::String(s) => s,
@@ -39,7 +41,9 @@ pub fn get(key: &str) -> Option<String> {
 }
 
 pub fn get_or(key: &str, default: &str) -> String {
-    get(key).filter(|v| !v.is_empty()).unwrap_or_else(|| default.to_string())
+    get(key)
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| default.to_string())
 }
 
 pub fn get_bool(key: &str, default: bool) -> bool {
@@ -63,8 +67,10 @@ pub fn set(key: &str, value: &str) {
     };
     let mut sorted: Vec<(&String, &String)> = snapshot.iter().collect();
     sorted.sort();
-    let obj: serde_json::Map<String, serde_json::Value> =
-        sorted.into_iter().map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone()))).collect();
+    let obj: serde_json::Map<String, serde_json::Value> = sorted
+        .into_iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+        .collect();
     let json = serde_json::to_string_pretty(&obj).unwrap_or_else(|_| "{}".into());
     if let Err(e) = util::write_atomic(&settings_file(), json.as_bytes()) {
         eprintln!("loaf: could not save settings: {}", e);
@@ -103,7 +109,12 @@ pub fn record_visit(path: &str) {
         }
         map.clone()
     };
-    let _ = util::write_atomic(&visits_file(), serde_json::to_string(&snapshot).unwrap_or_default().as_bytes());
+    let _ = util::write_atomic(
+        &visits_file(),
+        serde_json::to_string(&snapshot)
+            .unwrap_or_default()
+            .as_bytes(),
+    );
 }
 
 /// Most visited folders that still exist, most visited first.
