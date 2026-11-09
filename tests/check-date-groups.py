@@ -329,6 +329,38 @@ function runAllTests() {
         console.log("ROOT_INDEPENDENT_REAL_INPUT_PASS " + (modeIndex === 0 ? "grid" : "list"));
     }
 
+    // Only one grid may render, independently of the selected sort key.
+    p.engine.set_view("grid");
+    var groupModes = ["none", "name", "modified", "size", "type"];
+    var sortModes = ["name", "modified", "size", "type"];
+    for (var groupIndex = 0; groupIndex < groupModes.length; ++groupIndex) {
+        for (var sortIndex = 0; sortIndex < sortModes.length; ++sortIndex) {
+            var grouping = groupModes[groupIndex];
+            var sorting = sortModes[sortIndex];
+            p.engine.set_group(grouping, true);
+            p.engine.set_sort(sorting, true);
+            waitMs(60);
+            var grouped = grouping !== "none";
+            var combination = "group=" + grouping + ", sort=" + sorting;
+            check(p.gridView.visible === !grouped, "Flat grid visibility: " + combination);
+            check(p.groupedListView.visible === grouped, "Grouped grid visibility: " + combination);
+            check(!p.listView.visible, "List remains hidden in grid mode: " + combination);
+            var activeGrid = grouped ? p.groupedListView : p.gridView;
+            check(activeGrid.count > 0, "Active grid has rows: " + combination);
+            p.ensureVisible(0);
+            waitMs(40);
+            var firstPath = p.engine.path_at(0);
+            var firstCard = grouped ? findCard(activeGrid.contentItem, firstPath) : activeGrid.itemAtIndex(0);
+            check(firstCard !== null && firstCard.itemPath === firstPath, "First grid card is rendered: " + combination);
+            p.clearSelection();
+            var firstPoint = firstCard.mapToItem(p, firstCard.width / 2, firstCard.height / 2);
+            uiTest.mouseClick(p, firstPoint.x, firstPoint.y, Qt.LeftButton, Qt.NoModifier, 30);
+            waitMs(30);
+            check(p.selectedCount === 1 && p.selection[firstPath], "Active grid receives clicks: " + combination);
+        }
+    }
+    console.log("GRID_VISIBILITY_ALL_GROUP_SORT_MODES_PASS");
+
     console.log("ALL_DATE_GROUPS_UI_TESTS_PASS");
     Qt.quit();
 }

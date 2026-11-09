@@ -1040,8 +1040,8 @@ Item {
                 anchors.fill: parent
                 z: 1
                 visible: opacity > 0.01
-                opacity: (!pane.isList() && paneEngine.sort_by !== "modified") ? 1.0 : 0.0
-                scale: (!pane.isList() && paneEngine.sort_by !== "modified") ? 1.0 : 0.97
+                opacity: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.0
+                scale: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.97
                 enabled: visible
                 clip: true
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
