@@ -1,7 +1,4 @@
-//! Support for acting as an xdg-desktop-portal backend. Everything that can
-//! live without Qt is kept here so it can be unit tested: file chooser
-//! filter parsing and matching now, option validation and URI helpers with
-//! the D-Bus layer.
+//! xdg-desktop-portal file chooser backend support.
 
 pub mod filters;
 pub mod request;

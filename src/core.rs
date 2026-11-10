@@ -48,7 +48,12 @@ pub mod qobject {
         #[qsignal]
         fn notify(self: Pin<&mut LoafCore>, kind: QString, text: QString);
         #[qsignal]
-        fn operation_finished(self: Pin<&mut LoafCore>, kind: QString, ok: bool, result_json: QString);
+        fn operation_finished(
+            self: Pin<&mut LoafCore>,
+            kind: QString,
+            ok: bool,
+            result_json: QString,
+        );
         #[qsignal]
         fn mtp_preview_ready(self: Pin<&mut LoafCore>, path: QString);
         /// An archive or encrypted drive needs a password: {kind, ...}.
@@ -135,7 +140,12 @@ pub mod qobject {
         #[qinvokable]
         fn eject_drive(self: Pin<&mut LoafCore>, disk: &QString);
         #[qinvokable]
-        fn unlock_drive(self: Pin<&mut LoafCore>, device: &QString, passphrase: &QString, remember: bool);
+        fn unlock_drive(
+            self: Pin<&mut LoafCore>,
+            device: &QString,
+            passphrase: &QString,
+            remember: bool,
+        );
         #[qinvokable]
         fn lock_drive(self: Pin<&mut LoafCore>, device: &QString);
         #[qinvokable]
@@ -158,7 +168,12 @@ pub mod qobject {
         #[qinvokable]
         fn remove_network_profile(self: Pin<&mut LoafCore>, id: &QString);
         #[qinvokable]
-        fn connect_network(self: Pin<&mut LoafCore>, id: &QString, password: &QString, remember: bool);
+        fn connect_network(
+            self: Pin<&mut LoafCore>,
+            id: &QString,
+            password: &QString,
+            remember: bool,
+        );
         #[qinvokable]
         fn disconnect_network(self: Pin<&mut LoafCore>, id: &QString);
         #[qinvokable]
@@ -191,7 +206,11 @@ pub mod qobject {
         fn clear_ignored_smb_servers(self: Pin<&mut LoafCore>);
         /// Saves a discovered server/share (if needed) and mounts it.
         #[qinvokable]
-        fn add_smb_discovered(self: Pin<&mut LoafCore>, server: &QString, share: &QString) -> QString;
+        fn add_smb_discovered(
+            self: Pin<&mut LoafCore>,
+            server: &QString,
+            share: &QString,
+        ) -> QString;
         #[qinvokable]
         fn open_item(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
@@ -211,7 +230,12 @@ pub mod qobject {
         #[qinvokable]
         fn run_custom_command(self: Pin<&mut LoafCore>, command: &QString, path: &QString) -> bool;
         #[qinvokable]
-        fn run_script(self: Pin<&mut LoafCore>, script: &QString, dir: &QString, paths_json: &QString);
+        fn run_script(
+            self: Pin<&mut LoafCore>,
+            script: &QString,
+            dir: &QString,
+            paths_json: &QString,
+        );
         #[qinvokable]
         fn open_terminal(self: Pin<&mut LoafCore>, dir: &QString);
         #[qinvokable]
@@ -231,7 +255,12 @@ pub mod qobject {
         #[qinvokable]
         fn start_dir_size(self: Pin<&mut LoafCore>, key: &QString, paths_json: &QString);
         #[qinvokable]
-        fn set_permissions(self: Pin<&mut LoafCore>, path: &QString, mode: i32, recursive: bool) -> QString;
+        fn set_permissions(
+            self: Pin<&mut LoafCore>,
+            path: &QString,
+            mode: i32,
+            recursive: bool,
+        ) -> QString;
         #[qinvokable]
         fn is_archive_file(self: &LoafCore, path: &QString) -> bool;
         #[qinvokable]
@@ -242,7 +271,13 @@ pub mod qobject {
         fn check_conflicts(self: &LoafCore, paths_json: &QString, dest: &QString) -> QString;
         /// mode: copy | move | link; resolution: rename | skip | overwrite.
         #[qinvokable]
-        fn transfer(self: Pin<&mut LoafCore>, paths_json: &QString, dest: &QString, mode: &QString, resolution: &QString);
+        fn transfer(
+            self: Pin<&mut LoafCore>,
+            paths_json: &QString,
+            dest: &QString,
+            mode: &QString,
+            resolution: &QString,
+        );
         #[qinvokable]
         fn trash_items(self: Pin<&mut LoafCore>, paths_json: &QString);
         #[qinvokable]
@@ -252,15 +287,29 @@ pub mod qobject {
         #[qinvokable]
         fn empty_trash(self: Pin<&mut LoafCore>);
         #[qinvokable]
-        fn compress(self: Pin<&mut LoafCore>, paths_json: &QString, format: &QString, password: &QString);
+        fn compress(
+            self: Pin<&mut LoafCore>,
+            paths_json: &QString,
+            format: &QString,
+            password: &QString,
+        );
         #[qinvokable]
-        fn extract(self: Pin<&mut LoafCore>, archive: &QString, into_subfolder: bool, password: &QString);
+        fn extract(
+            self: Pin<&mut LoafCore>,
+            archive: &QString,
+            into_subfolder: bool,
+            password: &QString,
+        );
         #[qinvokable]
         fn create_folder(self: Pin<&mut LoafCore>, dir: &QString, name: &QString) -> QString;
         #[qinvokable]
         fn create_file(self: Pin<&mut LoafCore>, dir: &QString, name: &QString) -> QString;
         #[qinvokable]
-        fn create_from_template(self: Pin<&mut LoafCore>, template_path: &QString, dir: &QString) -> QString;
+        fn create_from_template(
+            self: Pin<&mut LoafCore>,
+            template_path: &QString,
+            dir: &QString,
+        ) -> QString;
         /// Returns "" on success or an error message.
         #[qinvokable]
         fn rename_item(self: Pin<&mut LoafCore>, path: &QString, new_name: &QString) -> QString;
@@ -294,7 +343,9 @@ pub mod qobject {
 use crate::archive::{self, ArchiveError};
 use crate::fsops::{self, Monitor};
 use crate::share;
-use crate::{apps, drives, icons, info, native, network, smb, state, theme, trash, util, watcher, xdg};
+use crate::{
+    apps, drives, icons, info, native, network, smb, state, theme, trash, util, watcher, xdg,
+};
 use core::pin::Pin;
 use cxx_qt::{CxxQtThread, CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -321,7 +372,10 @@ impl Op {
         let now = self.started.elapsed().as_millis() as u64;
         let last = self.last_publish.load(Ordering::Relaxed);
         if now >= last + 200
-            && self.last_publish.compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed).is_ok()
+            && self
+                .last_publish
+                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
         {
             let _ = self.thread.queue(|core| core.publish_ops());
         }
@@ -375,10 +429,21 @@ struct Outcome {
 
 impl Outcome {
     fn ok(message: impl Into<String>) -> Self {
-        Outcome { ok: true, message: message.into(), undo: None, result: serde_json::Value::Null, is_undo: false, is_redo: false, requeue: None }
+        Outcome {
+            ok: true,
+            message: message.into(),
+            undo: None,
+            result: serde_json::Value::Null,
+            is_undo: false,
+            is_redo: false,
+            requeue: None,
+        }
     }
     fn err(message: impl Into<String>) -> Self {
-        Outcome { ok: false, ..Outcome::ok(message) }
+        Outcome {
+            ok: false,
+            ..Outcome::ok(message)
+        }
     }
 }
 
@@ -472,7 +537,9 @@ fn parse_paths(json: &QString) -> Vec<PathBuf> {
 }
 
 fn file_name(p: &Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| p.to_string_lossy().to_string())
+    p.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| p.to_string_lossy().to_string())
 }
 
 fn plural(n: usize, one: &str, many: &str) -> String {
@@ -527,7 +594,9 @@ fn is_low_end_hardware() -> bool {
                 .and_then(|v| v.parse().ok())
         })
         .unwrap_or(u64::MAX);
-    let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     mem_kib < 4 * 1024 * 1024 || cpus <= 2
 }
 
@@ -543,11 +612,16 @@ struct PlacesConfig {
 }
 
 fn places_config() -> PlacesConfig {
-    state::get("placesConfig").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    state::get("placesConfig")
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
 fn save_places_config(c: &PlacesConfig) {
-    state::set("placesConfig", &serde_json::to_string(c).unwrap_or_default());
+    state::set(
+        "placesConfig",
+        &serde_json::to_string(c).unwrap_or_default(),
+    );
 }
 
 /// Sidebar entry for a non-file (network) GTK bookmark, e.g. a remote
@@ -571,7 +645,11 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
 fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     let cfg = places_config();
     let mut items: Vec<serde_json::Value> = Vec::new();
-    let pc_icon = if device_type == "laptop" { "laptop" } else { "desktop" };
+    let pc_icon = if device_type == "laptop" {
+        "laptop"
+    } else {
+        "desktop"
+    };
     let custom_name = state::get("pcName").unwrap_or_default();
     let custom_name = custom_name.trim();
     let pc_name = if !custom_name.is_empty() {
@@ -588,7 +666,11 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     // the same folder (e.g. ~/Projects) is not listed twice.
     let mut shown_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
     for p in xdg::default_places() {
-        let (name, path) = cfg.overrides.get(&p.id).cloned().unwrap_or((p.name.clone(), p.path.clone()));
+        let (name, path) = cfg
+            .overrides
+            .get(&p.id)
+            .cloned()
+            .unwrap_or((p.name.clone(), p.path.clone()));
         if !Path::new(&path).is_dir() {
             continue; // issue #22: only show folders that exist
         }
@@ -643,7 +725,10 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     // Automatically discovered servers that are not configured yet. They are
     // shortcuts to the SMB editor (with the server prefilled), not profiles.
     if smb::discovery_enabled() {
-        let saved: HashSet<String> = profiles.iter().map(|p| smb::normalized_server(&p.server)).collect();
+        let saved: HashSet<String> = profiles
+            .iter()
+            .map(|p| smb::normalized_server(&p.server))
+            .collect();
         for d in smb::cached_discovered() {
             if d.server.trim().is_empty() || smb::is_ignored(&d.server) {
                 continue;
@@ -669,8 +754,11 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
 
     // Apply the user's order: listed ids first in that order, then the rest.
     let pos = |id: &str| cfg.order.iter().position(|o| o == id).unwrap_or(usize::MAX);
-    let mut indexed: Vec<(usize, usize, serde_json::Value)> =
-        items.into_iter().enumerate().map(|(i, v)| (pos(v["id"].as_str().unwrap_or("")), i, v)).collect();
+    let mut indexed: Vec<(usize, usize, serde_json::Value)> = items
+        .into_iter()
+        .enumerate()
+        .map(|(i, v)| (pos(v["id"].as_str().unwrap_or("")), i, v))
+        .collect();
     indexed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
     indexed
         .into_iter()
@@ -695,7 +783,9 @@ fn secret_store(key: &str, label: &str, secret: &str) {
 }
 
 fn secret_get(key: &str) -> String {
-    let Some(tool) = secret_tool() else { return String::new() };
+    let Some(tool) = secret_tool() else {
+        return String::new();
+    };
     let mut cmd = std::process::Command::new(tool);
     cmd.args(["lookup", "application", "loaf", "key", key]);
     let (ok, out, _) = util::run_capture(cmd, None);
@@ -714,9 +804,17 @@ impl qobject::LoafCore {
             .map(|op| {
                 let total = op.total.load(Ordering::Relaxed);
                 let done = op.done.load(Ordering::Relaxed).min(total.max(1));
-                let progress = if total > 0 { done as f64 / total as f64 } else { -1.0 };
+                let progress = if total > 0 {
+                    done as f64 / total as f64
+                } else {
+                    -1.0
+                };
                 let detail = if total > 0 && op.kind != "delete" && op.kind != "trash" {
-                    format!("{} of {}", util::format_size(done), util::format_size(total))
+                    format!(
+                        "{} of {}",
+                        util::format_size(done),
+                        util::format_size(total)
+                    )
                 } else if total > 0 {
                     format!("{} of {}", done, total)
                 } else {
@@ -734,7 +832,8 @@ impl qobject::LoafCore {
             })
             .collect();
         let busy = !self.ops.is_empty();
-        self.as_mut().set_operations_json(q(&serde_json::to_string(&list).unwrap_or_default()));
+        self.as_mut()
+            .set_operations_json(q(&serde_json::to_string(&list).unwrap_or_default()));
         if *self.busy() != busy {
             self.as_mut().set_busy(busy);
         }
@@ -765,11 +864,19 @@ impl qobject::LoafCore {
         std::thread::spawn(move || {
             let outcome = work(&op);
             let cancelled = op.cancel.load(Ordering::Relaxed);
-            let _ = op.thread.queue(move |core| core.finish_op(id, kind, outcome, cancelled));
+            let _ = op
+                .thread
+                .queue(move |core| core.finish_op(id, kind, outcome, cancelled));
         });
     }
 
-    fn finish_op(mut self: Pin<&mut Self>, id: u64, kind: String, outcome: Outcome, cancelled: bool) {
+    fn finish_op(
+        mut self: Pin<&mut Self>,
+        id: u64,
+        kind: String,
+        outcome: Outcome,
+        cancelled: bool,
+    ) {
         self.as_mut().rust_mut().ops.retain(|o| o.id != id);
         self.as_mut().publish_ops();
         if let Some(entry) = outcome.undo.clone() {
@@ -810,7 +917,10 @@ impl qobject::LoafCore {
             self.as_mut().notify(q(kind_s), q(&outcome.message));
         }
         self.as_mut().sync_undo_props();
-        if matches!(kind.as_str(), "trash" | "restore" | "empty" | "delete" | "undo" | "redo") {
+        if matches!(
+            kind.as_str(),
+            "trash" | "restore" | "empty" | "delete" | "undo" | "redo"
+        ) {
             self.as_mut().update_trash_empty();
         }
         let result = serde_json::to_string(&outcome.result).unwrap_or_else(|_| "null".into());
@@ -824,8 +934,16 @@ impl qobject::LoafCore {
     }
 
     fn sync_undo_props(mut self: Pin<&mut Self>) {
-        let u = self.undo_stack.last().map(|e| e.label.clone()).unwrap_or_default();
-        let r = self.redo_stack.last().map(|e| e.label.clone()).unwrap_or_default();
+        let u = self
+            .undo_stack
+            .last()
+            .map(|e| e.label.clone())
+            .unwrap_or_default();
+        let r = self
+            .redo_stack
+            .last()
+            .map(|e| e.label.clone())
+            .unwrap_or_default();
         let (cu, cr) = (!self.undo_stack.is_empty(), !self.redo_stack.is_empty());
         self.as_mut().set_can_undo(cu);
         self.as_mut().set_can_redo(cr);
@@ -914,25 +1032,41 @@ impl qobject::LoafCore {
     }
 
     pub fn icon_themes_json(&self) -> QString {
-        let themes: Vec<serde_json::Value> =
-            icons::installed_themes().into_iter().map(|(id, name)| serde_json::json!({"id": id, "name": name})).collect();
+        let themes: Vec<serde_json::Value> = icons::installed_themes()
+            .into_iter()
+            .map(|(id, name)| serde_json::json!({"id": id, "name": name}))
+            .collect();
         q(&serde_json::to_string(&themes).unwrap_or_default())
     }
     pub fn load_places(mut self: Pin<&mut Self>) {
-        let places: Vec<serde_json::Value> = build_places(&self.hostname().to_string(), &self.device_type().to_string())
-            .into_iter()
-            .filter(|p| !p["hidden"].as_bool().unwrap_or(false))
-            .collect();
-        self.as_mut().set_places_json(q(&serde_json::to_string(&places).unwrap_or_default()));
+        let places: Vec<serde_json::Value> = build_places(
+            &self.hostname().to_string(),
+            &self.device_type().to_string(),
+        )
+        .into_iter()
+        .filter(|p| !p["hidden"].as_bool().unwrap_or(false))
+        .collect();
+        self.as_mut()
+            .set_places_json(q(&serde_json::to_string(&places).unwrap_or_default()));
     }
 
     pub fn all_places_json(&self) -> QString {
-        q(&serde_json::to_string(&build_places(&self.hostname().to_string(), &self.device_type().to_string())).unwrap_or_default())
+        q(&serde_json::to_string(&build_places(
+            &self.hostname().to_string(),
+            &self.device_type().to_string(),
+        ))
+        .unwrap_or_default())
     }
 
     pub fn add_bookmark(mut self: Pin<&mut Self>, path: &QString) {
         match xdg::add_bookmark(Path::new(&path.to_string())) {
-            Ok(()) => self.as_mut().notify(q("info"), q(&format!("Added “{}” to the sidebar", file_name(Path::new(&path.to_string()))))),
+            Ok(()) => self.as_mut().notify(
+                q("info"),
+                q(&format!(
+                    "Added “{}” to the sidebar",
+                    file_name(Path::new(&path.to_string()))
+                )),
+            ),
             Err(e) => self.as_mut().notify(q("error"), q(&e.to_string())),
         }
         self.load_places();
@@ -950,7 +1084,9 @@ impl qobject::LoafCore {
 
     pub fn is_bookmarked(&self, path: &QString) -> bool {
         let p = PathBuf::from(path.to_string());
-        xdg::bookmarks().iter().any(|b| b.path().as_deref() == Some(p.as_path()))
+        xdg::bookmarks()
+            .iter()
+            .any(|b| b.path().as_deref() == Some(p.as_path()))
     }
 
     pub fn create_symlink(&self, target: &QString, link_path: &QString) -> bool {
@@ -980,10 +1116,13 @@ impl qobject::LoafCore {
 
     pub fn move_place(self: Pin<&mut Self>, id: &QString, to: i32) {
         let mut c = places_config();
-        let mut order: Vec<String> = build_places(&self.hostname().to_string(), &self.device_type().to_string())
-            .iter()
-            .filter_map(|p| p["id"].as_str().map(String::from))
-            .collect();
+        let mut order: Vec<String> = build_places(
+            &self.hostname().to_string(),
+            &self.device_type().to_string(),
+        )
+        .iter()
+        .filter_map(|p| p["id"].as_str().map(String::from))
+        .collect();
         let id = id.to_string();
         if let Some(from) = order.iter().position(|o| *o == id) {
             let item = order.remove(from);
@@ -998,7 +1137,8 @@ impl qobject::LoafCore {
         let id = id.to_string();
         let path_s = path.to_string();
         if !Path::new(&path_s).is_dir() {
-            self.as_mut().notify(q("error"), q("That folder doesn't exist"));
+            self.as_mut()
+                .notify(q("error"), q("That folder doesn't exist"));
             return;
         }
         if let Some(bm) = id.strip_prefix("bookmark:") {
@@ -1038,7 +1178,8 @@ impl qobject::LoafCore {
                 serde_json::json!({"name": name, "path": p, "icon": "folder"})
             })
             .collect();
-        self.as_mut().set_frequent_dirs_json(q(&serde_json::to_string(&list).unwrap_or_default()));
+        self.as_mut()
+            .set_frequent_dirs_json(q(&serde_json::to_string(&list).unwrap_or_default()));
     }
 
     pub fn templates_json(&self) -> QString {
@@ -1054,7 +1195,9 @@ impl qobject::LoafCore {
         if k == "HOME" {
             return q(&util::home().to_string_lossy());
         }
-        q(&xdg::user_dir(&k).map(|p| p.to_string_lossy().to_string()).unwrap_or_default())
+        q(&xdg::user_dir(&k)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default())
     }
 
     pub fn complete_path(&self, text: &QString, show_hidden: bool) -> QString {
@@ -1085,7 +1228,11 @@ impl qobject::LoafCore {
     {
         self.spawn_op("drive", title, move |_op| match work() {
             Ok(val) => {
-                let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("").to_string();
+                let msg = val
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let mut res = val;
                 if let Some(obj) = res.as_object_mut() {
                     obj.insert("reload_drives".to_string(), serde_json::Value::Bool(true));
@@ -1118,134 +1265,183 @@ impl qobject::LoafCore {
     pub fn mount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Mounting {}", dev), dev, move || {
-            match drives::mount(&dev_clone) {
+        self.drive_job(
+            format!("Mounting {}", dev),
+            dev,
+            move || match drives::mount(&dev_clone) {
                 Ok(path) => Ok(serde_json::json!({
                     "action": "mount",
                     "device": dev_clone,
                     "mount_point": path
                 })),
-                Err(e) => Err((e, serde_json::json!({
-                    "action": "mount",
-                    "device": dev_clone
-                }))),
-            }
-        });
+                Err(e) => Err((
+                    e,
+                    serde_json::json!({
+                        "action": "mount",
+                        "device": dev_clone
+                    }),
+                )),
+            },
+        );
     }
 
     pub fn unmount_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Unmounting {}", dev), dev, move || {
-            match drives::unmount(&dev_clone) {
+        self.drive_job(
+            format!("Unmounting {}", dev),
+            dev,
+            move || match drives::unmount(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "unmount",
                     "device": dev_clone
                 })),
-                Err(e) => Err((e, serde_json::json!({
-                    "action": "unmount",
-                    "device": dev_clone
-                }))),
-            }
-        });
+                Err(e) => Err((
+                    e,
+                    serde_json::json!({
+                        "action": "unmount",
+                        "device": dev_clone
+                    }),
+                )),
+            },
+        );
     }
 
     pub fn eject_drive(self: Pin<&mut Self>, disk: &QString) {
         let disk = disk.to_string();
         let disk_clone = disk.clone();
         let snapshot = self.drives.clone();
-        self.drive_job(format!("Ejecting {}", disk), disk, move || {
-            match drives::eject(&disk_clone, &snapshot) {
+        self.drive_job(
+            format!("Ejecting {}", disk),
+            disk,
+            move || match drives::eject(&disk_clone, &snapshot) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "eject",
                     "disk": disk_clone,
                     "message": "It is now safe to remove the drive"
                 })),
-                Err(e) => Err((e, serde_json::json!({
-                    "action": "eject",
-                    "disk": disk_clone
-                }))),
-            }
-        });
+                Err(e) => Err((
+                    e,
+                    serde_json::json!({
+                        "action": "eject",
+                        "disk": disk_clone
+                    }),
+                )),
+            },
+        );
     }
 
-    pub fn unlock_drive(mut self: Pin<&mut Self>, device: &QString, passphrase: &QString, remember: bool) {
+    pub fn unlock_drive(
+        mut self: Pin<&mut Self>,
+        device: &QString,
+        passphrase: &QString,
+        remember: bool,
+    ) {
         let dev = device.to_string();
         let mut pass = passphrase.to_string();
         if pass.is_empty() {
             pass = secret_get(&format!("luks:{}", dev));
             if pass.is_empty() {
-                self.as_mut().password_required(q(&serde_json::json!({"kind": "luks", "device": dev}).to_string()));
+                self.as_mut().password_required(q(
+                    &serde_json::json!({"kind": "luks", "device": dev}).to_string(),
+                ));
                 return;
             }
         }
         let thread = self.qt_thread();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Unlocking {}", dev.clone()), dev, move || match drives::unlock(&dev_clone, &pass) {
-            Ok(clear) => {
-                if remember {
-                    secret_store(&format!("luks:{}", dev_clone), &format!("Loaf: encrypted drive {}", dev_clone), &pass);
+        self.drive_job(
+            format!("Unlocking {}", dev.clone()),
+            dev,
+            move || match drives::unlock(&dev_clone, &pass) {
+                Ok(clear) => {
+                    if remember {
+                        secret_store(
+                            &format!("luks:{}", dev_clone),
+                            &format!("Loaf: encrypted drive {}", dev_clone),
+                            &pass,
+                        );
+                    }
+                    match drives::mount(&clear) {
+                        Ok(mount_point) => Ok(serde_json::json!({
+                            "action": "unlock",
+                            "device": dev_clone,
+                            "clear_device": clear,
+                            "mount_point": mount_point
+                        })),
+                        Err(mount_err) => Err((
+                            mount_err,
+                            serde_json::json!({
+                                "action": "unlock",
+                                "device": dev_clone,
+                                "clear_device": clear
+                            }),
+                        )),
+                    }
                 }
-                match drives::mount(&clear) {
-                    Ok(mount_point) => Ok(serde_json::json!({
-                        "action": "unlock",
-                        "device": dev_clone,
-                        "clear_device": clear,
-                        "mount_point": mount_point
-                    })),
-                    Err(mount_err) => Err((mount_err, serde_json::json!({
-                        "action": "unlock",
-                        "device": dev_clone,
-                        "clear_device": clear
-                    }))),
+                Err(e) => {
+                    let dev2 = dev_clone.clone();
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().password_required(q(
+                            &serde_json::json!({"kind": "luks", "device": dev2, "error": true})
+                                .to_string(),
+                        ));
+                    });
+                    Err((
+                        e,
+                        serde_json::json!({
+                            "action": "unlock",
+                            "device": dev_clone
+                        }),
+                    ))
                 }
-            }
-            Err(e) => {
-                let dev2 = dev_clone.clone();
-                let _ = thread.queue(move |mut core| {
-                    core.as_mut().password_required(q(&serde_json::json!({"kind": "luks", "device": dev2, "error": true}).to_string()));
-                });
-                Err((e, serde_json::json!({
-                    "action": "unlock",
-                    "device": dev_clone
-                })))
-            }
-        });
+            },
+        );
     }
 
     pub fn lock_drive(self: Pin<&mut Self>, device: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
-        self.drive_job(format!("Locking {}", dev), dev, move || {
-            match drives::lock(&dev_clone) {
+        self.drive_job(
+            format!("Locking {}", dev),
+            dev,
+            move || match drives::lock(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "lock",
                     "device": dev_clone
                 })),
-                Err(e) => Err((e, serde_json::json!({
-                    "action": "lock",
-                    "device": dev_clone
-                }))),
-            }
-        });
+                Err(e) => Err((
+                    e,
+                    serde_json::json!({
+                        "action": "lock",
+                        "device": dev_clone
+                    }),
+                )),
+            },
+        );
     }
 
     pub fn rename_drive(self: Pin<&mut Self>, device: &QString, name: &QString) {
         let dev = device.to_string();
         let dev_clone = dev.clone();
         let name = name.to_string();
-        self.drive_job(format!("Renaming {}", dev), dev, move || {
-            match drives::set_label(&dev_clone, &name) {
+        self.drive_job(
+            format!("Renaming {}", dev),
+            dev,
+            move || match drives::set_label(&dev_clone, &name) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "rename",
                     "device": dev_clone
                 })),
-                Err(e) => Err((e, serde_json::json!({
-                    "action": "rename",
-                    "device": dev_clone
-                }))),
-            }
-        });
+                Err(e) => Err((
+                    e,
+                    serde_json::json!({
+                        "action": "rename",
+                        "device": dev_clone
+                    }),
+                )),
+            },
+        );
     }
 
     fn refresh_network(mut self: Pin<&mut Self>) {
@@ -1263,6 +1459,8 @@ impl qobject::LoafCore {
         }
     }
 
+    // Preserving existing QML ABI signature (10 args required by QML dialog)
+    #[allow(clippy::too_many_arguments)]
     pub fn save_network_profile(
         mut self: Pin<&mut Self>,
         id: &QString,
@@ -1305,11 +1503,19 @@ impl qobject::LoafCore {
         }
 
         let current = id.to_string();
-        let profile_id = if current.trim().is_empty() { network::new_id() } else { current };
+        let profile_id = if current.trim().is_empty() {
+            network::new_id()
+        } else {
+            current
+        };
         let name = name.to_string();
         let username = username.to_string();
         let domain = domain.to_string();
-        let port_u16 = if port > 0 && port <= 65535 { Some(port as u16) } else { None };
+        let port_u16 = if port > 0 && port <= 65535 {
+            Some(port as u16)
+        } else {
+            None
+        };
 
         let mut list = network::profiles();
         let previous = list.iter().find(|p| p.id == profile_id).cloned();
@@ -1326,14 +1532,17 @@ impl qobject::LoafCore {
             remember: previous.as_ref().map(|p| p.remember).unwrap_or(false),
         };
 
-        let identity_changed = previous.as_ref().map(|old| {
-            old.protocol != profile.protocol
-                || old.server != profile.server
-                || old.username != profile.username
-                || old.domain != profile.domain
-                || old.port != profile.port
-                || old.ssl != profile.ssl
-        }).unwrap_or(false);
+        let identity_changed = previous
+            .as_ref()
+            .map(|old| {
+                old.protocol != profile.protocol
+                    || old.server != profile.server
+                    || old.username != profile.username
+                    || old.domain != profile.domain
+                    || old.port != profile.port
+                    || old.ssl != profile.ssl
+            })
+            .unwrap_or(false);
 
         if identity_changed {
             profile.remember = false;
@@ -1344,10 +1553,13 @@ impl qobject::LoafCore {
             }
         }
 
-        let reconnect = previous.as_ref().map(|old| {
-            (identity_changed || old.share != profile.share)
-                && network::connected_path(old).is_some()
-        }).unwrap_or(false);
+        let reconnect = previous
+            .as_ref()
+            .map(|old| {
+                (identity_changed || old.share != profile.share)
+                    && network::connected_path(old).is_some()
+            })
+            .unwrap_or(false);
 
         if let Some(existing) = list.iter_mut().find(|p| p.id == profile_id) {
             *existing = profile;
@@ -1360,15 +1572,17 @@ impl qobject::LoafCore {
         if reconnect {
             if let Some(old) = previous {
                 let thread = self.qt_thread();
-                self.spawn_op("network", format!("Disconnecting from {}", old.label()), move |_op| {
-                    match network::unmount(&old) {
+                self.spawn_op(
+                    "network",
+                    format!("Disconnecting from {}", old.label()),
+                    move |_op| match network::unmount(&old) {
                         Ok(()) => {
                             let _ = thread.queue(|mut core| core.as_mut().refresh_network());
                             Outcome::ok(String::new())
                         }
                         Err(e) => Outcome::err(e),
-                    }
-                });
+                    },
+                );
             }
         }
         q(&profile_id)
@@ -1387,25 +1601,33 @@ impl qobject::LoafCore {
             self.as_mut().refresh_network();
             if network::connected_path(&profile).is_some() {
                 let thread = self.qt_thread();
-                self.spawn_op("network", format!("Disconnecting from {}", profile.label()), move |_op| {
-                    match network::unmount(&profile) {
+                self.spawn_op(
+                    "network",
+                    format!("Disconnecting from {}", profile.label()),
+                    move |_op| match network::unmount(&profile) {
                         Ok(()) => {
                             let _ = thread.queue(|mut core| core.as_mut().refresh_network());
                             Outcome::ok(String::new())
                         }
                         Err(e) => Outcome::err(e),
-                    }
-                });
+                    },
+                );
             }
         } else {
             self.as_mut().refresh_network();
         }
     }
 
-    pub fn connect_network(mut self: Pin<&mut Self>, id: &QString, password: &QString, remember: bool) {
+    pub fn connect_network(
+        mut self: Pin<&mut Self>,
+        id: &QString,
+        password: &QString,
+        remember: bool,
+    ) {
         let profile_id = id.to_string();
         let Some(profile) = network::profiles().into_iter().find(|p| p.id == profile_id) else {
-            self.as_mut().notify(q("error"), q("That network drive no longer exists"));
+            self.as_mut()
+                .notify(q("error"), q("That network drive no longer exists"));
             return;
         };
         let typed = password.to_string();
@@ -1428,7 +1650,10 @@ impl qobject::LoafCore {
             return;
         }
         if entered && !network::store_password(&profile, &pass) {
-            self.as_mut().notify(q("error"), q("Could not save the password in the system keyring"));
+            self.as_mut().notify(
+                q("error"),
+                q("Could not save the password in the system keyring"),
+            );
             return;
         }
         if entered {
@@ -1477,17 +1702,21 @@ impl qobject::LoafCore {
 
     pub fn disconnect_network(self: Pin<&mut Self>, id: &QString) {
         let profile_id = id.to_string();
-        let Some(profile) = network::profiles().into_iter().find(|p| p.id == profile_id) else { return };
+        let Some(profile) = network::profiles().into_iter().find(|p| p.id == profile_id) else {
+            return;
+        };
         let thread = self.qt_thread();
-        self.spawn_op("network", format!("Disconnecting from {}", profile.label()), move |_op| {
-            match network::unmount(&profile) {
+        self.spawn_op(
+            "network",
+            format!("Disconnecting from {}", profile.label()),
+            move |_op| match network::unmount(&profile) {
                 Ok(()) => {
                     let _ = thread.queue(|mut core| core.as_mut().refresh_network());
                     Outcome::ok(String::new())
                 }
                 Err(e) => Outcome::err(e),
-            }
-        });
+            },
+        );
     }
 
     pub fn load_smb_discovery(mut self: Pin<&mut Self>) {
@@ -1553,7 +1782,11 @@ impl qobject::LoafCore {
         self.as_mut().load_places();
     }
 
-    pub fn add_smb_discovered(mut self: Pin<&mut Self>, server: &QString, share: &QString) -> QString {
+    pub fn add_smb_discovered(
+        mut self: Pin<&mut Self>,
+        server: &QString,
+        share: &QString,
+    ) -> QString {
         let server_text = server.to_string();
         let share_text = share.to_string();
         let share_text = share_text.trim().trim_matches('/');
@@ -1570,7 +1803,9 @@ impl qobject::LoafCore {
             return id;
         }
         let empty = QString::default();
-        let id = self.as_mut().save_smb_profile(&empty, &empty, server, share, &empty, &empty);
+        let id = self
+            .as_mut()
+            .save_smb_profile(&empty, &empty, server, share, &empty, &empty);
         if !id.is_empty() {
             self.as_mut().connect_smb(&id, &QString::default(), false);
         }
@@ -1591,7 +1826,17 @@ impl qobject::LoafCore {
         username: &QString,
         domain: &QString,
     ) -> QString {
-        self.save_network_profile(id, &q("smb"), name, server, share, username, domain, 0, false)
+        self.save_network_profile(
+            id,
+            &q("smb"),
+            name,
+            server,
+            share,
+            username,
+            domain,
+            0,
+            false,
+        )
     }
 
     pub fn remove_smb_profile(self: Pin<&mut Self>, id: &QString) {
@@ -1614,7 +1859,9 @@ impl qobject::LoafCore {
                     Ok(local) => {
                         let path = local.to_string_lossy().to_string();
                         let _ = thread.queue(move |core| core.open_item(&q(&path)));
-                        Outcome::ok("Opened a downloaded copy. Copy changes back to update the phone.")
+                        Outcome::ok(
+                            "Opened a downloaded copy. Copy changes back to update the phone.",
+                        )
                     }
                     Err(error) => Outcome::err(error),
                 }
@@ -1629,7 +1876,7 @@ impl qobject::LoafCore {
         // Never "run" a file by double click; desktop entries and scripts
         // open in their default viewer (text editor), like Nautilus does.
         let launched = match apps::default_for(&mime) {
-            Some(app) => apps::launch(&app, &[path.clone()]).is_ok(),
+            Some(app) => apps::launch(&app, std::slice::from_ref(&path)).is_ok(),
             None => false,
         };
         if !launched {
@@ -1641,7 +1888,10 @@ impl qobject::LoafCore {
                 })
                 .unwrap_or(false);
             if !ok {
-                self.as_mut().notify(q("error"), q(&format!("No application can open “{}”", file_name(&path))));
+                self.as_mut().notify(
+                    q("error"),
+                    q(&format!("No application can open “{}”", file_name(&path))),
+                );
                 return;
             }
         }
@@ -1652,7 +1902,9 @@ impl qobject::LoafCore {
     fn open_archive_member(self: Pin<&mut Self>, url: String) {
         let rest = &url[crate::pane::ARCHIVE_SCHEME.len()..];
         let (file, member) = crate::pane::split_archive_url(rest);
-        let runtime = std::env::var("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(|_| std::env::temp_dir());
+        let runtime = std::env::var("XDG_RUNTIME_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::temp_dir());
         // One folder per archive: hash the whole path, not a prefix of it.
         let key = {
             use std::hash::{Hash, Hasher};
@@ -1662,17 +1914,27 @@ impl qobject::LoafCore {
         };
         let target = runtime.join("loaf-archives").join(key);
         let thread = self.qt_thread();
-        self.spawn_op("open", format!("Opening {}", Path::new(&member).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()), move |_op| {
-            let pw = secret_get(&format!("archive:{}", file.to_string_lossy()));
-            match archive::extract_member(&file, &member, &target, &pw) {
-                Ok(out) => {
-                    let out_s = out.to_string_lossy().to_string();
-                    let _ = thread.queue(move |core| core.open_item(&q(&out_s)));
-                    Outcome::ok("")
+        self.spawn_op(
+            "open",
+            format!(
+                "Opening {}",
+                Path::new(&member)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            ),
+            move |_op| {
+                let pw = secret_get(&format!("archive:{}", file.to_string_lossy()));
+                match archive::extract_member(&file, &member, &target, &pw) {
+                    Ok(out) => {
+                        let out_s = out.to_string_lossy().to_string();
+                        let _ = thread.queue(move |core| core.open_item(&q(&out_s)));
+                        Outcome::ok("")
+                    }
+                    Err(e) => Outcome::err(e.to_string()),
                 }
-                Err(e) => Outcome::err(e.to_string()),
-            }
-        });
+            },
+        );
     }
 
     fn app_entry(app: &apps::DesktopApp, theme_name: &str) -> serde_json::Value {
@@ -1685,25 +1947,40 @@ impl qobject::LoafCore {
     }
 
     fn app_entries(list: Vec<apps::DesktopApp>, theme_name: &str) -> QString {
-        let v: Vec<serde_json::Value> = list.iter().map(|a| Self::app_entry(a, theme_name)).collect();
+        let v: Vec<serde_json::Value> = list
+            .iter()
+            .map(|a| Self::app_entry(a, theme_name))
+            .collect();
         q(&serde_json::to_string(&v).unwrap_or_else(|_| "[]".into()))
     }
 
     pub fn open_with_apps(&self, path: &QString) -> QString {
         let p = PathBuf::from(path.to_string());
-        let mime = if p.is_dir() { "inode/directory".to_string() } else { native::mime_type(&p, true) };
+        let mime = if p.is_dir() {
+            "inode/directory".to_string()
+        } else {
+            native::mime_type(&p, true)
+        };
         Self::app_entries(apps::for_mime(&mime), &self.icon_theme().to_string())
     }
 
     pub fn open_with_data(&self, path: &QString) -> QString {
         let p = PathBuf::from(path.to_string());
-        let mime = if p.is_dir() { "inode/directory".to_string() } else { native::mime_type(&p, true) };
+        let mime = if p.is_dir() {
+            "inode/directory".to_string()
+        } else {
+            native::mime_type(&p, true)
+        };
         let theme_name = self.icon_theme().to_string();
         let installed = apps::all();
-        let default_id = apps::default_for_in(&installed, &mime).map(|a| a.id).unwrap_or_default();
+        let default_id = apps::default_for_in(&installed, &mime)
+            .map(|a| a.id)
+            .unwrap_or_default();
 
-        let mut recommended: Vec<&apps::DesktopApp> =
-            installed.iter().filter(|a| a.mimes.iter().any(|m| apps::mime_covers(m, &mime))).collect();
+        let mut recommended: Vec<&apps::DesktopApp> = installed
+            .iter()
+            .filter(|a| a.mimes.iter().any(|m| apps::mime_covers(m, &mime)))
+            .collect();
         if let Some(pos) = recommended.iter().position(|a| a.id == default_id) {
             let first = recommended.remove(pos);
             recommended.insert(0, first);
@@ -1715,8 +1992,10 @@ impl qobject::LoafCore {
             .filter(|s| !s.is_empty() && !s.starts_with("cmd:"))
             .map(String::from)
             .collect();
-        let recent: Vec<&apps::DesktopApp> =
-            recent_ids.iter().filter_map(|id| installed.iter().find(|a| &a.id == id)).collect();
+        let recent: Vec<&apps::DesktopApp> = recent_ids
+            .iter()
+            .filter_map(|id| installed.iter().find(|a| &a.id == id))
+            .collect();
 
         // "Other Applications" is fetched with all_open_with_apps() only when that
         // submenu opens: resolving ~200 app icons on every right-click is slow.
@@ -1731,7 +2010,10 @@ impl qobject::LoafCore {
     }
 
     pub fn all_open_with_apps(&self) -> QString {
-        Self::app_entries(apps::all().into_iter().filter(|a| !a.no_display).collect(), &self.icon_theme().to_string())
+        Self::app_entries(
+            apps::all().into_iter().filter(|a| !a.no_display).collect(),
+            &self.icon_theme().to_string(),
+        )
     }
 
     pub fn recent_open_with_apps(&self) -> QString {
@@ -1747,7 +2029,11 @@ impl qobject::LoafCore {
 
     pub fn default_app_for(&self, path: &QString) -> QString {
         let p = PathBuf::from(path.to_string());
-        let mime = if p.is_dir() { "inode/directory".to_string() } else { native::mime_type(&p, true) };
+        let mime = if p.is_dir() {
+            "inode/directory".to_string()
+        } else {
+            native::mime_type(&p, true)
+        };
         q(&apps::default_for(&mime).map(|a| a.id).unwrap_or_default())
     }
 
@@ -1768,23 +2054,36 @@ impl qobject::LoafCore {
         let paths = parse_paths(paths_json);
         let id = app_id.to_string();
         let Some(app) = apps::find(&id) else {
-            self.as_mut().notify(q("error"), q("That application is no longer installed"));
+            self.as_mut()
+                .notify(q("error"), q("That application is no longer installed"));
             return;
         };
         Self::push_recent_app(&id);
         if let Err(e) = apps::launch(&app, &paths) {
-            self.as_mut().notify(q("error"), q(&format!("Could not start {}: {}", app.name, e)));
+            self.as_mut().notify(
+                q("error"),
+                q(&format!("Could not start {}: {}", app.name, e)),
+            );
         }
     }
 
     pub fn set_default_app(mut self: Pin<&mut Self>, path: &QString, app_id: &QString) {
         let p = PathBuf::from(path.to_string());
-        let mime = if p.is_dir() { "inode/directory".to_string() } else { native::mime_type(&p, true) };
+        let mime = if p.is_dir() {
+            "inode/directory".to_string()
+        } else {
+            native::mime_type(&p, true)
+        };
         match apps::set_default(&mime, &app_id.to_string()) {
             Ok(()) => {
                 let comment = native::mime_comment(&mime);
-                let name = apps::find(&app_id.to_string()).map(|a| a.name).unwrap_or_default();
-                self.as_mut().notify(q("info"), q(&format!("{} now opens {} files", name, comment)));
+                let name = apps::find(&app_id.to_string())
+                    .map(|a| a.name)
+                    .unwrap_or_default();
+                self.as_mut().notify(
+                    q("info"),
+                    q(&format!("{} now opens {} files", name, comment)),
+                );
             }
             Err(e) => self.as_mut().notify(q("error"), q(&e.to_string())),
         }
@@ -1799,22 +2098,36 @@ impl qobject::LoafCore {
         Self::push_recent_app(&format!("cmd:{}", trimmed));
         let p = PathBuf::from(path.to_string());
         let mut cmd = std::process::Command::new("sh");
-        cmd.arg("-c").arg(apps::command_script(trimmed)).arg("sh").arg(&p);
+        cmd.arg("-c")
+            .arg(apps::command_script(trimmed))
+            .arg("sh")
+            .arg(&p);
         if let Some(parent) = p.parent().filter(|d| d.is_dir()) {
             cmd.current_dir(parent);
         }
         match util::spawn_detached(cmd) {
             Ok(()) => true,
             Err(e) => {
-                self.as_mut().notify(q("error"), q(&format!("Could not run the command: {}", e)));
+                self.as_mut()
+                    .notify(q("error"), q(&format!("Could not run the command: {}", e)));
                 false
             }
         }
     }
 
-    pub fn run_script(mut self: Pin<&mut Self>, script: &QString, dir: &QString, paths_json: &QString) {
-        if let Err(e) = xdg::run_script(Path::new(&script.to_string()), Path::new(&dir.to_string()), &parse_paths(paths_json)) {
-            self.as_mut().notify(q("error"), q(&format!("Could not run the script: {}", e)));
+    pub fn run_script(
+        mut self: Pin<&mut Self>,
+        script: &QString,
+        dir: &QString,
+        paths_json: &QString,
+    ) {
+        if let Err(e) = xdg::run_script(
+            Path::new(&script.to_string()),
+            Path::new(&dir.to_string()),
+            &parse_paths(paths_json),
+        ) {
+            self.as_mut()
+                .notify(q("error"), q(&format!("Could not run the script: {}", e)));
         }
     }
 
@@ -1826,21 +2139,39 @@ impl qobject::LoafCore {
 
     pub fn open_as_admin(mut self: Pin<&mut Self>, path: &QString) {
         let p = PathBuf::from(path.to_string());
-        let dir = if p.is_dir() { p } else { p.parent().map(|x| x.to_path_buf()).unwrap_or_else(|| PathBuf::from("/")) };
+        let dir = if p.is_dir() {
+            p
+        } else {
+            p.parent()
+                .map(|x| x.to_path_buf())
+                .unwrap_or_else(|| PathBuf::from("/"))
+        };
         let Some(pkexec) = util::which("pkexec") else {
-            self.as_mut().notify(q("error"), q("pkexec (polkit) is not installed"));
+            self.as_mut()
+                .notify(q("error"), q("pkexec (polkit) is not installed"));
             return;
         };
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("loaf"));
         let mut cmd = std::process::Command::new(pkexec);
         cmd.arg("env");
         // A root GUI needs to reach the user's display server.
-        for var in ["DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XAUTHORITY", "QT_QPA_PLATFORM", "XDG_CURRENT_DESKTOP", "LANG"] {
+        for var in [
+            "DISPLAY",
+            "WAYLAND_DISPLAY",
+            "XDG_RUNTIME_DIR",
+            "XAUTHORITY",
+            "QT_QPA_PLATFORM",
+            "XDG_CURRENT_DESKTOP",
+            "LANG",
+        ] {
             if let Ok(v) = std::env::var(var) {
                 cmd.arg(format!("{}={}", var, v));
             }
         }
-        cmd.arg("LOAF_ADMIN=1").arg(exe).arg("--new-window").arg(&dir);
+        cmd.arg("LOAF_ADMIN=1")
+            .arg(exe)
+            .arg("--new-window")
+            .arg(&dir);
         if let Err(e) = util::spawn_detached(cmd) {
             self.as_mut().notify(q("error"), q(&e.to_string()));
         }
@@ -1869,26 +2200,32 @@ impl qobject::LoafCore {
             })
             .unwrap_or(false);
         if !launched {
-            self.as_mut().notify(q("error"), q(&format!("No application can open “{}”", u)));
+            self.as_mut()
+                .notify(q("error"), q(&format!("No application can open “{}”", u)));
         }
     }
     pub fn preview_mtp(self: Pin<&mut Self>, path: &QString) {
         let path = path.to_string();
         let thread = self.qt_thread();
-        self.spawn_op("preview", "Downloading phone preview".to_string(), move |op| {
-            match crate::mtp_ops::local_copy(&path, op) {
+        self.spawn_op(
+            "preview",
+            "Downloading phone preview".to_string(),
+            move |op| match crate::mtp_ops::local_copy(&path, op) {
                 Ok(local) => {
                     let path = local.to_string_lossy().to_string();
                     let _ = thread.queue(move |mut core| core.as_mut().mtp_preview_ready(q(&path)));
                     Outcome::ok("")
                 }
                 Err(error) => Outcome::err(error),
-            }
-        });
+            },
+        );
     }
 
     pub fn quick_look(&self, path: &QString) -> QString {
-        q(&serde_json::to_string(&info::quick_look(Path::new(&path.to_string()))).unwrap_or_else(|_| "{}".into()))
+        q(
+            &serde_json::to_string(&info::quick_look(Path::new(&path.to_string())))
+                .unwrap_or_else(|_| "{}".into()),
+        )
     }
 
     pub fn get_item_info(&self, path: &QString) -> QString {
@@ -1928,7 +2265,12 @@ impl qobject::LoafCore {
         });
     }
 
-    pub fn set_permissions(self: Pin<&mut Self>, path: &QString, mode: i32, recursive: bool) -> QString {
+    pub fn set_permissions(
+        self: Pin<&mut Self>,
+        path: &QString,
+        mode: i32,
+        recursive: bool,
+    ) -> QString {
         match info::set_permissions(Path::new(&path.to_string()), mode as u32, recursive) {
             Ok(()) => QString::default(),
             Err(e) => q(&e.to_string()),
@@ -1948,8 +2290,11 @@ impl qobject::LoafCore {
     }
     pub fn check_conflicts(&self, paths_json: &QString, dest: &QString) -> QString {
         // MTP conflicts are resolved on the transfer worker, never by blocking the GUI.
-        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
-        if dest.to_string().starts_with("mtp:") || locations.iter().any(|path| path.starts_with("mtp:")) {
+        let locations =
+            serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        if dest.to_string().starts_with("mtp:")
+            || locations.iter().any(|path| path.starts_with("mtp:"))
+        {
             return q("[]");
         }
         let dest = PathBuf::from(dest.to_string());
@@ -1958,11 +2303,17 @@ impl qobject::LoafCore {
             if src.parent() == Some(dest.as_path()) {
                 continue; // same folder: becomes a duplicate, not a conflict
             }
-            let Some(name) = src.file_name() else { continue };
+            let Some(name) = src.file_name() else {
+                continue;
+            };
             let target = dest.join(name);
-            let Ok(dmeta) = std::fs::symlink_metadata(&target) else { continue };
+            let Ok(dmeta) = std::fs::symlink_metadata(&target) else {
+                continue;
+            };
             let smeta = std::fs::symlink_metadata(&src).ok();
-            let mtime = |m: &std::fs::Metadata| crate::pane::relative_time(std::os::unix::fs::MetadataExt::mtime(m));
+            let mtime = |m: &std::fs::Metadata| {
+                crate::pane::relative_time(std::os::unix::fs::MetadataExt::mtime(m))
+            };
             out.push(serde_json::json!({
                 "name": name.to_string_lossy(),
                 "src_path": src.to_string_lossy(),
@@ -1978,8 +2329,15 @@ impl qobject::LoafCore {
         q(&serde_json::to_string(&out).unwrap_or_else(|_| "[]".into()))
     }
 
-    pub fn transfer(self: Pin<&mut Self>, paths_json: &QString, dest: &QString, mode: &QString, resolution: &QString) {
-        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+    pub fn transfer(
+        self: Pin<&mut Self>,
+        paths_json: &QString,
+        dest: &QString,
+        mode: &QString,
+        resolution: &QString,
+    ) {
+        let locations =
+            serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
         let target = dest.to_string();
         if target.starts_with("mtp:") || locations.iter().any(|path| path.starts_with("mtp:")) {
             let mode = mode.to_string();
@@ -2006,23 +2364,40 @@ impl qobject::LoafCore {
             "link" => "Linking",
             _ => "Copying",
         };
-        let what = if sources.len() == 1 { format!("“{}”", file_name(&sources[0])) } else { plural(sources.len(), "item", "items") };
+        let what = if sources.len() == 1 {
+            format!("“{}”", file_name(&sources[0]))
+        } else {
+            plural(sources.len(), "item", "items")
+        };
         let title = format!("{} {} to {}", verb, what, file_name(&dest));
         let kind = mode.clone();
-        self.spawn_op(&kind, title, move |op| run_transfer(op, sources, dest, &mode, &res));
+        self.spawn_op(&kind, title, move |op| {
+            run_transfer(op, sources, dest, &mode, &res)
+        });
     }
 
     pub fn trash_items(mut self: Pin<&mut Self>, paths_json: &QString) {
-        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        let locations =
+            serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
         if locations.iter().any(|path| path.starts_with("mtp:")) {
-            self.as_mut().notify(q("error"), q("Phone files have no trash. Use Delete Permanently."));
+            self.as_mut().notify(
+                q("error"),
+                q("Phone files have no trash. Use Delete Permanently."),
+            );
             return;
         }
         let paths = parse_paths(paths_json);
         if paths.is_empty() {
             return;
         }
-        let title = format!("Moving {} to the trash", if paths.len() == 1 { format!("“{}”", file_name(&paths[0])) } else { plural(paths.len(), "item", "items") });
+        let title = format!(
+            "Moving {} to the trash",
+            if paths.len() == 1 {
+                format!("“{}”", file_name(&paths[0]))
+            } else {
+                plural(paths.len(), "item", "items")
+            }
+        );
         self.spawn_op("trash", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut done = Vec::new();
@@ -2050,7 +2425,10 @@ impl qobject::LoafCore {
                 format!("{} moved to the trash", plural(n, "item", "items"))
             });
             if n > 0 {
-                o.undo = Some(UndoEntry { label: "Move to Trash".into(), action: UndoAction::Trash(done) });
+                o.undo = Some(UndoEntry {
+                    label: "Move to Trash".into(),
+                    action: UndoAction::Trash(done),
+                });
             }
             if !failed.is_empty() {
                 // The UI offers to delete these permanently instead.
@@ -2062,23 +2440,35 @@ impl qobject::LoafCore {
     }
 
     pub fn delete_items(self: Pin<&mut Self>, paths_json: &QString) {
-        let locations = serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
+        let locations =
+            serde_json::from_str::<Vec<String>>(&paths_json.to_string()).unwrap_or_default();
         if locations.iter().any(|path| path.starts_with("mtp:")) {
-            self.spawn_op("mtp-delete", "Deleting phone files".to_string(), move |op| {
-                let mut outcome = match crate::mtp_ops::remove(&locations, op) {
-                    Ok(()) => Outcome::ok("Phone files deleted"),
-                    Err(error) => Outcome::err(error),
-                };
-                outcome.result = serde_json::json!({"mtp": true});
-                outcome
-            });
+            self.spawn_op(
+                "mtp-delete",
+                "Deleting phone files".to_string(),
+                move |op| {
+                    let mut outcome = match crate::mtp_ops::remove(&locations, op) {
+                        Ok(()) => Outcome::ok("Phone files deleted"),
+                        Err(error) => Outcome::err(error),
+                    };
+                    outcome.result = serde_json::json!({"mtp": true});
+                    outcome
+                },
+            );
             return;
         }
         let paths = parse_paths(paths_json);
         if paths.is_empty() {
             return;
         }
-        let title = format!("Deleting {}", if paths.len() == 1 { format!("“{}”", file_name(&paths[0])) } else { plural(paths.len(), "item", "items") });
+        let title = format!(
+            "Deleting {}",
+            if paths.len() == 1 {
+                format!("“{}”", file_name(&paths[0]))
+            } else {
+                plural(paths.len(), "item", "items")
+            }
+        );
         self.spawn_op("delete", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut errors = 0;
@@ -2099,7 +2489,11 @@ impl qobject::LoafCore {
                 op.advance(1, p);
             }
             if errors > 0 {
-                Outcome::err(format!("Could not delete {}: {}", plural(errors, "item", "items"), last))
+                Outcome::err(format!(
+                    "Could not delete {}: {}",
+                    plural(errors, "item", "items"),
+                    last
+                ))
             } else {
                 Outcome::ok(format!("Deleted {}", plural(paths.len(), "item", "items")))
             }
@@ -2111,52 +2505,74 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        self.spawn_op("restore", format!("Restoring {}", plural(paths.len(), "item", "items")), move |op| {
-            let records = trash::list();
-            let mut moved = Vec::new();
-            let mut renamed = 0;
-            let mut errors = Vec::new();
-            for p in &paths {
-                if op.cancelled() {
-                    break;
-                }
-                let Some(item) = records.iter().find(|r| r.trashed == *p) else {
-                    errors.push(format!("{}: no trash record", file_name(p)));
-                    continue;
-                };
-                match trash::restore(item) {
-                    Ok(to) => {
-                        if to != item.original {
-                            renamed += 1;
-                        }
-                        moved.push((item.trashed.clone(), to));
+        self.spawn_op(
+            "restore",
+            format!("Restoring {}", plural(paths.len(), "item", "items")),
+            move |op| {
+                let records = trash::list();
+                let mut moved = Vec::new();
+                let mut renamed = 0;
+                let mut errors = Vec::new();
+                for p in &paths {
+                    if op.cancelled() {
+                        break;
                     }
-                    Err(e) => errors.push(format!("{}: {}", file_name(p), e)),
+                    let Some(item) = records.iter().find(|r| r.trashed == *p) else {
+                        errors.push(format!("{}: no trash record", file_name(p)));
+                        continue;
+                    };
+                    match trash::restore(item) {
+                        Ok(to) => {
+                            if to != item.original {
+                                renamed += 1;
+                            }
+                            moved.push((item.trashed.clone(), to));
+                        }
+                        Err(e) => errors.push(format!("{}: {}", file_name(p), e)),
+                    }
                 }
-            }
-            let mut msg = format!("Restored {}", plural(moved.len(), "item", "items"));
-            if renamed > 0 {
-                msg.push_str(&format!(" ({} renamed because the name was taken)", renamed));
-            }
-            if !errors.is_empty() {
-                return Outcome::err(format!("{}. Failed: {}", msg, errors.join("; ")));
-            }
-            Outcome::ok(msg)
-        });
+                let mut msg = format!("Restored {}", plural(moved.len(), "item", "items"));
+                if renamed > 0 {
+                    msg.push_str(&format!(
+                        " ({} renamed because the name was taken)",
+                        renamed
+                    ));
+                }
+                if !errors.is_empty() {
+                    return Outcome::err(format!("{}. Failed: {}", msg, errors.join("; ")));
+                }
+                Outcome::ok(msg)
+            },
+        );
     }
 
     pub fn empty_trash(mut self: Pin<&mut Self>) {
         // Trashed items can't be restored afterwards: drop stale undo steps.
-        self.as_mut().rust_mut().undo_stack.retain(|e| !matches!(e.action, UndoAction::Trash(_)));
-        self.as_mut().rust_mut().redo_stack.retain(|e| !matches!(e.action, UndoAction::Trash(_)));
+        self.as_mut()
+            .rust_mut()
+            .undo_stack
+            .retain(|e| !matches!(e.action, UndoAction::Trash(_)));
+        self.as_mut()
+            .rust_mut()
+            .redo_stack
+            .retain(|e| !matches!(e.action, UndoAction::Trash(_)));
         self.as_mut().sync_undo_props();
-        self.spawn_op("empty", "Emptying the trash".into(), |_op| match trash::empty_all() {
-            Ok(()) => Outcome::ok("Trash emptied"),
-            Err(e) => Outcome::err(format!("Some items could not be deleted: {}", e)),
-        });
+        self.spawn_op(
+            "empty",
+            "Emptying the trash".into(),
+            |_op| match trash::empty_all() {
+                Ok(()) => Outcome::ok("Trash emptied"),
+                Err(e) => Outcome::err(format!("Some items could not be deleted: {}", e)),
+            },
+        );
     }
 
-    pub fn compress(self: Pin<&mut Self>, paths_json: &QString, format: &QString, password: &QString) {
+    pub fn compress(
+        self: Pin<&mut Self>,
+        paths_json: &QString,
+        format: &QString,
+        password: &QString,
+    ) {
         let items = parse_paths(paths_json);
         if items.is_empty() {
             return;
@@ -2170,7 +2586,10 @@ impl qobject::LoafCore {
                 // "report.pdf" -> "report.zip"; archives keep their stem.
                 let b = archive::base_name(&items[0]);
                 if b == file_name(&items[0]) {
-                    items[0].file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(b)
+                    items[0]
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or(b)
                 } else {
                     b
                 }
@@ -2191,7 +2610,10 @@ impl qobject::LoafCore {
         let title = format!("Compressing into “{}”", file_name(&target));
         self.spawn_op("compress", title, move |op| {
             // Items from other folders can't share relative names: skip them.
-            let items: Vec<PathBuf> = items.into_iter().filter(|p| p.parent() == Some(parent.as_path())).collect();
+            let items: Vec<PathBuf> = items
+                .into_iter()
+                .filter(|p| p.parent() == Some(parent.as_path()))
+                .collect();
             // Build inside a private staging folder so a cancelled or failed
             // run never leaves a broken archive, and two runs never write
             // into the same file. Then move it to a free name.
@@ -2200,14 +2622,22 @@ impl qobject::LoafCore {
             if let Err(e) = std::fs::create_dir(&staging) {
                 return Outcome::err(format!("Could not create the archive: {}", e));
             }
-            let built = archive::compress(&staging.join(&name), &items, &fmt, &pass, &|| op.cancelled())
-                .and_then(|()| fsops::place_unique(&staging.join(&name), &parent, &name).map_err(|e| ArchiveError::Failed(e.to_string())));
+            let built = archive::compress(&staging.join(&name), &items, &fmt, &pass, &|| {
+                op.cancelled()
+            })
+            .and_then(|()| {
+                fsops::place_unique(&staging.join(&name), &parent, &name)
+                    .map_err(|e| ArchiveError::Failed(e.to_string()))
+            });
             let _ = fsops::remove_tree(&staging);
             match built {
                 Ok(target) => {
                     fsops::sync_filesystem(&target);
                     let mut o = Outcome::ok(format!("Created “{}”", file_name(&target)));
-                    o.undo = Some(UndoEntry { label: "Compress".into(), action: UndoAction::Create(vec![target.clone()]) });
+                    o.undo = Some(UndoEntry {
+                        label: "Compress".into(),
+                        action: UndoAction::Create(vec![target.clone()]),
+                    });
                     o.result = serde_json::json!({"created": [target.to_string_lossy()]});
                     o
                 }
@@ -2217,7 +2647,12 @@ impl qobject::LoafCore {
         });
     }
 
-    pub fn extract(self: Pin<&mut Self>, archive_path: &QString, into_subfolder: bool, password: &QString) {
+    pub fn extract(
+        self: Pin<&mut Self>,
+        archive_path: &QString,
+        into_subfolder: bool,
+        password: &QString,
+    ) {
         let arch = PathBuf::from(archive_path.to_string());
         if !arch.is_file() {
             return;
@@ -2253,7 +2688,12 @@ impl qobject::LoafCore {
         });
     }
 
-    fn create_item(mut self: Pin<&mut Self>, dir: &QString, name: &QString, is_dir: bool) -> QString {
+    fn create_item(
+        mut self: Pin<&mut Self>,
+        dir: &QString,
+        name: &QString,
+        is_dir: bool,
+    ) -> QString {
         let name = match validate_name(&name.to_string()) {
             Ok(n) => n,
             Err(e) => {
@@ -2290,24 +2730,36 @@ impl qobject::LoafCore {
         }
         let target = PathBuf::from(dir.to_string()).join(&name);
         if std::fs::symlink_metadata(&target).is_ok() {
-            self.as_mut().notify(q("error"), q(&format!("“{}” already exists", name)));
+            self.as_mut()
+                .notify(q("error"), q(&format!("“{}” already exists", name)));
             return QString::default();
         }
         let res = if is_dir {
             std::fs::create_dir(&target)
         } else {
-            std::fs::OpenOptions::new().write(true).create_new(true).open(&target).map(|_| ())
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&target)
+                .map(|_| ())
         };
         match res {
             Ok(()) => {
                 self.as_mut().record_undo(UndoEntry {
-                    label: if is_dir { "New Folder".into() } else { "New File".into() },
+                    label: if is_dir {
+                        "New Folder".into()
+                    } else {
+                        "New File".into()
+                    },
                     action: UndoAction::Create(vec![target.clone()]),
                 });
                 q(&target.to_string_lossy())
             }
             Err(e) => {
-                self.as_mut().notify(q("error"), q(&format!("Could not create “{}”: {}", name, e)));
+                self.as_mut().notify(
+                    q("error"),
+                    q(&format!("Could not create “{}”: {}", name, e)),
+                );
                 QString::default()
             }
         }
@@ -2321,14 +2773,24 @@ impl qobject::LoafCore {
         self.create_item(dir, name, false)
     }
 
-    pub fn create_from_template(mut self: Pin<&mut Self>, template_path: &QString, dir: &QString) -> QString {
+    pub fn create_from_template(
+        mut self: Pin<&mut Self>,
+        template_path: &QString,
+        dir: &QString,
+    ) -> QString {
         let tpl = PathBuf::from(template_path.to_string());
         let target = fsops::unique_name(Path::new(&dir.to_string()), &file_name(&tpl));
         match fsops::copy_tree(&tpl, &target, &fsops::Silent) {
             Ok(()) => {
                 // A new document should look new, not inherit the template's age.
-                let _ = std::fs::File::options().write(true).open(&target).and_then(|f| f.set_modified(std::time::SystemTime::now()));
-                self.as_mut().record_undo(UndoEntry { label: "New Document".into(), action: UndoAction::Create(vec![target.clone()]) });
+                let _ = std::fs::File::options()
+                    .write(true)
+                    .open(&target)
+                    .and_then(|f| f.set_modified(std::time::SystemTime::now()));
+                self.as_mut().record_undo(UndoEntry {
+                    label: "New Document".into(),
+                    action: UndoAction::Create(vec![target.clone()]),
+                });
                 q(&target.to_string_lossy())
             }
             Err(e) => {
@@ -2340,7 +2802,10 @@ impl qobject::LoafCore {
 
     pub fn rename_item(mut self: Pin<&mut Self>, path: &QString, new_name: &QString) -> QString {
         if path.to_string().starts_with("mtp:") {
-            let name = match validate_name(&new_name.to_string()) { Ok(name) => name, Err(error) => return q(&error) };
+            let name = match validate_name(&new_name.to_string()) {
+                Ok(name) => name,
+                Err(error) => return q(&error),
+            };
             let source = path.to_string();
             self.spawn_op("mtp-rename", "Renaming phone item".to_string(), move |_op| {
                 let result = crate::mtp_ops::rename(&source, &name);
@@ -2355,7 +2820,9 @@ impl qobject::LoafCore {
             Ok(n) => n,
             Err(e) => return q(&e),
         };
-        let Some(parent) = from.parent() else { return q("Can't rename this item") };
+        let Some(parent) = from.parent() else {
+            return q("Can't rename this item");
+        };
         let to = parent.join(&name);
         if to == from {
             return QString::default();
@@ -2363,7 +2830,10 @@ impl qobject::LoafCore {
         if let Ok(existing) = std::fs::symlink_metadata(&to) {
             // Case-only renames on case-insensitive drives hit the same file.
             let same = std::fs::symlink_metadata(&from)
-                .map(|m| std::os::unix::fs::MetadataExt::ino(&m) == std::os::unix::fs::MetadataExt::ino(&existing))
+                .map(|m| {
+                    std::os::unix::fs::MetadataExt::ino(&m)
+                        == std::os::unix::fs::MetadataExt::ino(&existing)
+                })
                 .unwrap_or(false);
             if !same {
                 return q(&format!("“{}” already exists", name));
@@ -2375,7 +2845,10 @@ impl qobject::LoafCore {
                     let _ = xdg::set_starred(&from, false);
                     let _ = xdg::set_starred(&to, true);
                 }
-                self.as_mut().record_undo(UndoEntry { label: "Rename".into(), action: UndoAction::Rename(vec![(from, to)]) });
+                self.as_mut().record_undo(UndoEntry {
+                    label: "Rename".into(),
+                    action: UndoAction::Rename(vec![(from, to)]),
+                });
                 QString::default()
             }
             Err(e) => q(&e.to_string()),
@@ -2408,8 +2881,14 @@ impl qobject::LoafCore {
             Ok(()) => {
                 if !pairs.is_empty() {
                     let n = pairs.len();
-                    self.as_mut().record_undo(UndoEntry { label: "Rename".into(), action: UndoAction::Rename(pairs) });
-                    self.as_mut().notify(q("undo"), q(&format!("Renamed {}", plural(n, "item", "items"))));
+                    self.as_mut().record_undo(UndoEntry {
+                        label: "Rename".into(),
+                        action: UndoAction::Rename(pairs),
+                    });
+                    self.as_mut().notify(
+                        q("undo"),
+                        q(&format!("Renamed {}", plural(n, "item", "items"))),
+                    );
                 }
                 QString::default()
             }
@@ -2431,7 +2910,11 @@ impl qobject::LoafCore {
         if self.history_running {
             return;
         }
-        let entry = if is_undo { self.as_mut().rust_mut().undo_stack.pop() } else { self.as_mut().rust_mut().redo_stack.pop() };
+        let entry = if is_undo {
+            self.as_mut().rust_mut().undo_stack.pop()
+        } else {
+            self.as_mut().rust_mut().redo_stack.pop()
+        };
         let Some(entry) = entry else { return };
         self.as_mut().rust_mut().history_running = true;
         self.as_mut().sync_undo_props();
@@ -2442,13 +2925,23 @@ impl qobject::LoafCore {
             ("redo", "Redoing", "Redid", "Could not redo")
         };
         self.spawn_op(kind, format!("{} {}", doing, label), move |op| {
-            let p = if is_undo { invert(&entry.action, op) } else { replay(&entry.action, op) };
+            let p = if is_undo {
+                invert(&entry.action, op)
+            } else {
+                replay(&entry.action, op)
+            };
             let mut o = match &p.error {
                 None => Outcome::ok(format!("{} {}", did, label)),
                 Some(e) => Outcome::err(format!("{} {}: {}", fail, label, e)),
             };
-            o.undo = p.reverse.map(|a| UndoEntry { label: label.clone(), action: a });
-            o.requeue = p.rest.map(|a| UndoEntry { label: label.clone(), action: a });
+            o.undo = p.reverse.map(|a| UndoEntry {
+                label: label.clone(),
+                action: a,
+            });
+            o.requeue = p.rest.map(|a| UndoEntry {
+                label: label.clone(),
+                action: a,
+            });
             o.is_undo = is_undo;
             o.is_redo = !is_undo;
             o
@@ -2466,9 +2959,15 @@ impl qobject::LoafCore {
                 core.as_mut().set_cloudflared_ready(ok);
                 core.as_mut().cloudflared_status_changed(ok);
                 if ok {
-                    core.as_mut().notify(q("info"), q("Cloudflare Tunnel agent installed successfully"));
+                    core.as_mut().notify(
+                        q("info"),
+                        q("Cloudflare Tunnel agent installed successfully"),
+                    );
                 } else if !msg.is_empty() {
-                    core.as_mut().notify(q("error"), q(&format!("Failed to install cloudflared: {}", msg)));
+                    core.as_mut().notify(
+                        q("error"),
+                        q(&format!("Failed to install cloudflared: {}", msg)),
+                    );
                 }
             });
         }));
@@ -2479,22 +2978,38 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let compress_folders = match self.get_setting(&q("shareCompressFolders")).to_string().as_str() {
-            "false" => false,
-            _ => true,
-        };
-        let compress_files = match self.get_setting(&q("shareCompressFiles")).to_string().as_str() {
-            "true" => true,
-            _ => false,
-        };
-        let format = match self.get_setting(&q("shareCompressFormat")).to_string().as_str() {
+        let compress_folders = !matches!(
+            self.get_setting(&q("shareCompressFolders"))
+                .to_string()
+                .as_str(),
+            "false"
+        );
+        let compress_files = matches!(
+            self.get_setting(&q("shareCompressFiles"))
+                .to_string()
+                .as_str(),
+            "true"
+        );
+        let format = match self
+            .get_setting(&q("shareCompressFormat"))
+            .to_string()
+            .as_str()
+        {
             "7z" => "7z".to_string(),
             "tar.gz" => "tar.gz".to_string(),
             _ => "zip".to_string(),
         };
         let password = self.get_setting(&q("sharePassword")).to_string();
-        let expiration_hours = self.get_setting(&q("shareExpirationHours")).to_string().parse::<u32>().unwrap_or(24);
-        let throttle_kbps = self.get_setting(&q("shareThrottleKbps")).to_string().parse::<u32>().unwrap_or(0);
+        let expiration_hours = self
+            .get_setting(&q("shareExpirationHours"))
+            .to_string()
+            .parse::<u32>()
+            .unwrap_or(24);
+        let throttle_kbps = self
+            .get_setting(&q("shareThrottleKbps"))
+            .to_string()
+            .parse::<u32>()
+            .unwrap_or(0);
 
         let params = share::CreateShareParams {
             paths,
@@ -2508,14 +3023,12 @@ impl qobject::LoafCore {
 
         let thread = self.qt_thread();
         share::start_share_pipeline(params, move |result| {
-            let _ = thread.queue(move |mut core| {
-                match result {
-                    Ok((id, url)) => {
-                        core.as_mut().share_link_ready(q(&id), q(&url));
-                    }
-                    Err(e) => {
-                        core.as_mut().share_link_error(q(&e));
-                    }
+            let _ = thread.queue(move |mut core| match result {
+                Ok((id, url)) => {
+                    core.as_mut().share_link_ready(q(&id), q(&url));
+                }
+                Err(e) => {
+                    core.as_mut().share_link_error(q(&e));
                 }
             });
         });
@@ -2547,13 +3060,18 @@ pub fn complete_path(text: &str, show_hidden: bool) -> String {
         Some(i) => (&expanded[..=i], &expanded[i + 1..]),
         None => return text.to_string(),
     };
-    let Ok(rd) = std::fs::read_dir(dir) else { return text.to_string() };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return text.to_string();
+    };
     let lower = prefix.to_lowercase();
     let mut names: Vec<String> = rd
         .flatten()
         .filter(|e| e.path().is_dir())
         .map(|e| e.file_name().to_string_lossy().to_string())
-        .filter(|n| (show_hidden || !n.starts_with('.') || prefix.starts_with('.')) && n.to_lowercase().starts_with(&lower))
+        .filter(|n| {
+            (show_hidden || !n.starts_with('.') || prefix.starts_with('.'))
+                && n.to_lowercase().starts_with(&lower)
+        })
         .collect();
     names.sort();
     match names.len() {
@@ -2573,7 +3091,9 @@ pub fn complete_path(text: &str, show_hidden: bool) -> String {
                     }
                 }
             }
-            let common: String = first[..len.max(prefix.chars().count()).min(first.len())].iter().collect();
+            let common: String = first[..len.max(prefix.chars().count()).min(first.len())]
+                .iter()
+                .collect();
             format!("{}{}", dir, common)
         }
     }
@@ -2671,7 +3191,11 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
 }
 
 fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: &str) -> Outcome {
-    let (bytes, _) = if mode == "link" { (0, 0) } else { fsops::measure(&sources, op) };
+    let (bytes, _) = if mode == "link" {
+        (0, 0)
+    } else {
+        fsops::measure(&sources, op)
+    };
     op.total.store(bytes.max(1), Ordering::Relaxed);
     let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
@@ -2727,7 +3251,10 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         op.publish_soon();
         fsops::sync_filesystem(&dest);
     }
-    let created: Vec<String> = pairs.iter().map(|(_, t)| t.to_string_lossy().to_string()).collect();
+    let created: Vec<String> = pairs
+        .iter()
+        .map(|(_, t)| t.to_string_lossy().to_string())
+        .collect();
     let n = pairs.len();
     let verb = match mode {
         "move" => "Moved",
@@ -2735,13 +3262,27 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         _ => "Copied",
     };
     let mut o = if errors.is_empty() {
-        let mut msg = if n == 0 { String::new() } else { format!("{} {}", verb, plural(n, "item", "items")) };
+        let mut msg = if n == 0 {
+            String::new()
+        } else {
+            format!("{} {}", verb, plural(n, "item", "items"))
+        };
         if skipped > 0 {
-            msg.push_str(&format!("{}{} skipped", if msg.is_empty() { "" } else { ", " }, skipped));
+            msg.push_str(&format!(
+                "{}{} skipped",
+                if msg.is_empty() { "" } else { ", " },
+                skipped
+            ));
         }
         Outcome::ok(msg)
     } else {
-        Outcome::err(format!("{} {}; {} failed: {}", verb, plural(n, "item", "items"), errors.len(), errors.join("; ")))
+        Outcome::err(format!(
+            "{} {}; {} failed: {}",
+            verb,
+            plural(n, "item", "items"),
+            errors.len(),
+            errors.join("; ")
+        ))
     };
     if n > 0 {
         let action = match mode {
@@ -2754,7 +3295,10 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             "link" => "Link",
             _ => "Copy",
         };
-        o.undo = Some(UndoEntry { label: label.into(), action });
+        o.undo = Some(UndoEntry {
+            label: label.into(),
+            action,
+        });
     }
     o.result = serde_json::json!({"created": created, "mode": mode});
     o
@@ -2771,22 +3315,35 @@ struct Partial {
 
 impl Partial {
     fn done(reverse: UndoAction) -> Self {
-        Partial { reverse: Some(reverse), rest: None, error: None }
+        Partial {
+            reverse: Some(reverse),
+            rest: None,
+            error: None,
+        }
     }
     fn stopped(reverse: Option<UndoAction>, rest: Option<UndoAction>, error: String) -> Self {
-        Partial { reverse, rest, error: Some(error) }
+        Partial {
+            reverse,
+            rest,
+            error: Some(error),
+        }
     }
 }
 
 fn some_if<T>(v: Vec<T>, wrap: impl FnOnce(Vec<T>) -> UndoAction) -> Option<UndoAction> {
-    if v.is_empty() { None } else { Some(wrap(v)) }
+    if v.is_empty() {
+        None
+    } else {
+        Some(wrap(v))
+    }
 }
 
 /// Reverses an action.
 fn invert(action: &UndoAction, op: &Op) -> Partial {
     match action {
         UndoAction::Rename(pairs) => {
-            let back: Vec<(PathBuf, PathBuf)> = pairs.iter().map(|(f, t)| (t.clone(), f.clone())).collect();
+            let back: Vec<(PathBuf, PathBuf)> =
+                pairs.iter().map(|(f, t)| (t.clone(), f.clone())).collect();
             match batch_rename_pairs(&back) {
                 Ok(()) => Partial::done(action.clone()),
                 Err(e) => Partial::stopped(None, Some(action.clone()), e),
@@ -2825,9 +3382,14 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
             for idx in (0..pairs.len()).rev() {
                 let (from, to) = &pairs[idx];
                 let err = if std::fs::symlink_metadata(from).is_ok() {
-                    Some(format!("“{}” exists again at its old place", file_name(from)))
+                    Some(format!(
+                        "“{}” exists again at its old place",
+                        file_name(from)
+                    ))
                 } else {
-                    fsops::move_path(to, from, op).err().map(|e| format!("{}: {}", file_name(to), e))
+                    fsops::move_path(to, from, op)
+                        .err()
+                        .map(|e| format!("{}: {}", file_name(to), e))
                 };
                 if let Some(e) = err {
                     return Partial::stopped(
@@ -2846,7 +3408,10 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                     // Remember where it really landed ("a (2).txt" when the
                     // old name was taken) so Redo trashes this file, not
                     // whatever now lives at the old name.
-                    Ok(to) => restored.push(trash::TrashedItem { original: to, ..it.clone() }),
+                    Ok(to) => restored.push(trash::TrashedItem {
+                        original: to,
+                        ..it.clone()
+                    }),
                     Err(e) => {
                         return Partial::stopped(
                             some_if(restored, UndoAction::Trash),
@@ -2873,7 +3438,11 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
             let records = trash::list();
             let mut back = Vec::new();
             for p in paths {
-                if let Some(rec) = records.iter().filter(|r| &r.original == p).max_by(|a, b| a.deleted.cmp(&b.deleted)) {
+                if let Some(rec) = records
+                    .iter()
+                    .filter(|r| &r.original == p)
+                    .max_by(|a, b| a.deleted.cmp(&b.deleted))
+                {
                     if let Ok(to) = trash::restore(rec) {
                         back.push(to);
                     }
@@ -3005,26 +3574,40 @@ mod tests {
 
     #[test]
     fn file_operations_accept_only_local_paths() {
-        let paths = parse_paths(&q(r#"["/tmp/local.txt", "mtp://2f74657374/Internal%20storage/file.txt", "relative.txt"]"#));
+        let paths = parse_paths(&q(
+            r#"["/tmp/local.txt", "mtp://2f74657374/Internal%20storage/file.txt", "relative.txt"]"#,
+        ));
         assert_eq!(paths, vec![PathBuf::from("/tmp/local.txt")]);
     }
 
     #[test]
     fn network_bookmark_places() {
         // Non-file bookmarks (e.g. remote URIs) become "network" entries.
-        let remote = xdg::Bookmark { uri: "sftp://user@example-nas/media".to_string(), label: "Media".to_string() };
+        let remote = xdg::Bookmark {
+            uri: "sftp://user@example-nas/media".to_string(),
+            label: "Media".to_string(),
+        };
         let v = network_place(&remote).expect("network bookmark should produce a place");
         assert_eq!(v["kind"], "network");
         assert_eq!(v["id"], "network:sftp://user@example-nas/media");
         assert_eq!(v["name"], "Media");
         assert_eq!(v["path"], "sftp://user@example-nas/media");
         // Without a label the URI itself is shown.
-        let bare = xdg::Bookmark { uri: "ftp://nas/share".to_string(), label: String::new() };
+        let bare = xdg::Bookmark {
+            uri: "ftp://nas/share".to_string(),
+            label: String::new(),
+        };
         assert_eq!(network_place(&bare).unwrap()["name"], "ftp://nas/share");
         // file:// bookmarks and non-URIs are not network entries.
-        let local = xdg::Bookmark { uri: "file:///home/x".to_string(), label: String::new() };
+        let local = xdg::Bookmark {
+            uri: "file:///home/x".to_string(),
+            label: String::new(),
+        };
         assert!(network_place(&local).is_none());
-        let junk = xdg::Bookmark { uri: "not a uri".to_string(), label: String::new() };
+        let junk = xdg::Bookmark {
+            uri: "not a uri".to_string(),
+            label: String::new(),
+        };
         assert!(network_place(&junk).is_none());
     }
 
@@ -3043,17 +3626,30 @@ mod tests {
         let arch = out.join("demo.tar.gz");
 
         // Extract Here next to an existing "demo": the old one is untouched.
-        let here = extract_safely(&arch, &out, false, "", 1, &|| false).unwrap().0;
-        assert_eq!(std::fs::read(out.join("demo/sub/a.txt")).unwrap(), b"precious");
+        let here = extract_safely(&arch, &out, false, "", 1, &|| false)
+            .unwrap()
+            .0;
+        assert_eq!(
+            std::fs::read(out.join("demo/sub/a.txt")).unwrap(),
+            b"precious"
+        );
         assert_eq!(here, vec![out.join("demo (2)")]);
-        assert_eq!(std::fs::read(out.join("demo (2)/sub/a.txt")).unwrap(), b"new");
+        assert_eq!(
+            std::fs::read(out.join("demo (2)/sub/a.txt")).unwrap(),
+            b"new"
+        );
 
         // Extract to Folder with a single top-level folder: no demo/demo.
-        let sub = extract_safely(&arch, &out, true, "", 2, &|| false).unwrap().0;
+        let sub = extract_safely(&arch, &out, true, "", 2, &|| false)
+            .unwrap()
+            .0;
         assert_eq!(sub, vec![out.join("demo (3)")]);
         assert!(out.join("demo (3)/sub/a.txt").exists());
         // No staging folders are left behind.
-        assert!(!std::fs::read_dir(&out).unwrap().flatten().any(|e| e.file_name().to_string_lossy().starts_with(".loaf-extract")));
+        assert!(!std::fs::read_dir(&out)
+            .unwrap()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with(".loaf-extract")));
         std::fs::remove_dir_all(&d).unwrap();
     }
 
@@ -3066,10 +3662,22 @@ mod tests {
         std::fs::create_dir_all(d.join("Music")).unwrap();
         std::fs::write(d.join("Mfile"), b"").unwrap();
         let base = d.to_string_lossy().to_string();
-        assert_eq!(complete_path(&format!("{}/mu", base), false), format!("{}/Music/", base));
-        assert_eq!(complete_path(&format!("{}/Do", base), false), format!("{}/Do", base));
-        assert_eq!(complete_path(&format!("{}/Doc", base), false), format!("{}/Documents/", base));
-        assert_eq!(complete_path(&format!("{}/zz", base), false), format!("{}/zz", base));
+        assert_eq!(
+            complete_path(&format!("{}/mu", base), false),
+            format!("{}/Music/", base)
+        );
+        assert_eq!(
+            complete_path(&format!("{}/Do", base), false),
+            format!("{}/Do", base)
+        );
+        assert_eq!(
+            complete_path(&format!("{}/Doc", base), false),
+            format!("{}/Documents/", base)
+        );
+        assert_eq!(
+            complete_path(&format!("{}/zz", base), false),
+            format!("{}/zz", base)
+        );
         std::fs::remove_dir_all(&d).unwrap();
     }
 

@@ -4,9 +4,9 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="$DIR/packaging/dist"
 
-VERSION="$(grep -m1 '^version = ' "$DIR/Cargo.toml" | cut -d '"' -f2)"
-if [ -z "$VERSION" ]; then
-    VERSION="0.2.0"
+if [ -z "${VERSION:-}" ]; then
+    VERSION="$(grep -m1 '^version = ' "$DIR/Cargo.toml" | cut -d '"' -f2)"
+    VERSION="${VERSION:-0.3.0}"
 fi
 
 if [ -f "$DIR/target/release/loaf" ]; then
