@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import app.loaf
 
 // LoafPopup -- Material 3 Expressive surface popup.
