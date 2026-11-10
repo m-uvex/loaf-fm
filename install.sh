@@ -119,7 +119,7 @@ detect_pkg_family() {
 }
 
 determine_prefix() {
-    if [ "${1:-}" = "--system" ] || [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    if [ "${SYSTEM_INSTALL:-0}" -eq 1 ] || [ "${1:-}" = "--system" ] || [ "${EUID:-$(id -u)}" -eq 0 ]; then
         PREFIX="${PREFIX:-/usr/local}"
     else
         PREFIX="${PREFIX:-$HOME/.local}"
@@ -164,7 +164,11 @@ get_release_info() {
     if [ -z "$RELEASE_JSON" ]; then
         echo -e "${AMBER}[!] GitHub API request failed (rate limited?). Fetching releases page...${RESET}"
         # Fallback to direct releases page if API is rate-limited
-        RELEASE_JSON="$(curl -fsSL --max-time 15 "$GITHUB/$REPO/releases/latest" 2>/dev/null || true)"
+        if [ -n "${VERSION_TAG:-}" ] && [ "$VERSION_TAG" != "latest" ]; then
+            RELEASE_JSON="$(curl -fsSL --max-time 15 "$GITHUB/$REPO/releases/tag/$VERSION_TAG" 2>/dev/null || true)"
+        else
+            RELEASE_JSON="$(curl -fsSL --max-time 15 "$GITHUB/$REPO/releases/latest" 2>/dev/null || true)"
+        fi
     fi
 }
 
@@ -481,6 +485,8 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  (none)        Install Loaf automatically using native packages or tarball"
+    echo "  --nightly     Install latest verified nightly build instead of stable release"
+    echo "  --canary      Alias for --nightly"
     echo "  --appimage    Install standalone AppImage directly into \$PREFIX/bin"
     echo "  --tarball     Install universal standalone tarball directly into \$PREFIX"
     echo "  --update      Update Loaf to the latest stable version"
@@ -496,34 +502,40 @@ show_help() {
 }
 
 main() {
-    case "${1:-}" in
-        --try|try)
-            shift; do_try "$@"
-            ;;
-        --update|update)
-            shift; do_update "$@"
-            ;;
-        --uninstall|uninstall)
-            shift; do_uninstall "$@"
-            ;;
-        --appimage|appimage)
-            FORCE_APPIMAGE=1; shift; do_install "$@"
-            ;;
-        --tarball|tarball)
-            FORCE_TARBALL=1; shift; do_install "$@"
-            ;;
-        --help|-h|help)
-            show_help
-            ;;
-        --install|install|"")
-            [ "${1:-}" = "--install" ] || [ "${1:-}" = "install" ] && shift
-            do_install "$@"
-            ;;
-        *)
-            echo -e "${RED}Unknown option: $1${RESET}"
-            show_help
-            exit 1
-            ;;
+    local action="install"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --try|try)
+                action="try"; shift ;;
+            --update|update)
+                action="update"; shift ;;
+            --uninstall|uninstall)
+                action="uninstall"; shift ;;
+            --appimage|appimage)
+                FORCE_APPIMAGE=1; shift ;;
+            --tarball|tarball)
+                FORCE_TARBALL=1; shift ;;
+            --nightly|nightly|--canary|canary)
+                VERSION_TAG="nightly"; shift ;;
+            --help|-h|help)
+                show_help; exit 0 ;;
+            --install|install)
+                action="install"; shift ;;
+            --system)
+                shift ;;
+            *)
+                echo -e "${RED}Unknown option: $1${RESET}"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
+    case "$action" in
+        try)       do_try "$@" ;;
+        update)    do_update "$@" ;;
+        uninstall) do_uninstall "$@" ;;
+        install)   do_install "$@" ;;
     esac
 }
 

@@ -5,8 +5,10 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="$DIR/packaging/dist"
 APPDIR="$DIR/packaging/AppDir"
 
-VERSION="$(grep -m1 '^version = ' "$DIR/Cargo.toml" | cut -d '"' -f2)"
-VERSION="${VERSION:-0.2.0}"
+if [ -z "${VERSION:-}" ]; then
+    VERSION="$(grep -m1 '^version = ' "$DIR/Cargo.toml" | cut -d '"' -f2)"
+    VERSION="${VERSION:-0.3.0}"
+fi
 
 BIN="$DIR/target/release/loaf"
 if [ ! -f "$BIN" ]; then
