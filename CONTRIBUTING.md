@@ -79,6 +79,36 @@ cargo run
 cargo test
 ```
 
+### Fast Development Iteration (`scripts/dev-loaf`)
+
+To iterate without invoking Cargo on every run or risking broken builds:
+
+```bash
+# 1. Compile and atomically publish a launchable dev binary:
+./scripts/dev-loaf build
+
+# 2. Run the published build instantly (no Cargo call, caller CWD preserved):
+./scripts/dev-loaf run
+
+# 3. Snapshot previous good binary before building a new experiment:
+./scripts/dev-loaf build --keep my-experiment
+
+# 4. Run a saved snapshot:
+./scripts/dev-loaf run --keep my-experiment
+
+# 5. (Optional) Install an isolated user desktop entry (Loaf (Development)):
+./scripts/dev-loaf install-desktop
+```
+
+#### Prerequisites, Workflow & Known Constraints
+
+- **Python standard library only**: Requires Python 3.8+ (`python3`). Zero third-party Python dependencies.
+- **Explicit build required**: A normal `cargo build` in your terminal builds into Cargo's target directory but does not publish to the dev launcher. You must run `./scripts/dev-loaf build` to compile and publish the active development binary.
+- **Cargo cache preserved**: Does not purge Cargo build caches or object directories. Respects custom `CARGO_TARGET_DIR` and `.cargo/config.toml` target directories via Cargo compiler artifact discovery.
+- **Dynamic Qt & Runtime dependencies**: Loaf dynamically links against Qt6 and host C/C++ libraries. The published development binary relies on host runtime libraries and does not bundle a self-contained environment. When using Nix, run the helper within `nix develop` or ensure equivalent runtime dependencies are available.
+- **Platform support**: Linux only (X11 / Wayland).
+- **Checkout relocation**: The desktop entry (`loaf-dev.desktop`) records the absolute checkout path. If you move or rename the repository directory, re-run `./scripts/dev-loaf install-desktop`.
+
 ---
 
 ## 🧱 Codebase Architecture
