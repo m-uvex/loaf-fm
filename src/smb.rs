@@ -80,7 +80,10 @@ pub fn set_ignored(server: &str, ignored: bool) {
     }
     list.sort();
     list.dedup();
-    state::set(DISCOVERY_IGNORED, &serde_json::to_string(&list).unwrap_or_else(|_| "[]".into()));
+    state::set(
+        DISCOVERY_IGNORED,
+        &serde_json::to_string(&list).unwrap_or_else(|_| "[]".into()),
+    );
 }
 
 pub fn clear_ignored() {
@@ -112,26 +115,45 @@ pub fn cached_discovered() -> Vec<Discovered> {
 
 fn store_discovered(list: &[Discovered]) {
     *util::lock(&DISCOVERED) = list.to_vec();
-    state::set(DISCOVERY_CACHE, &serde_json::to_string(list).unwrap_or_else(|_| "[]".into()));
+    state::set(
+        DISCOVERY_CACHE,
+        &serde_json::to_string(list).unwrap_or_else(|_| "[]".into()),
+    );
 }
 
 /// JSON for QML: adds whether a profile already exists and whether the user
 /// hid this server. Ignored entries are kept so Settings can offer "Unhide".
 pub fn discovered_json() -> String {
-    let saved: std::collections::HashSet<String> =
-        profiles().iter().map(|p| normalized_server(&p.server)).collect();
+    let saved: std::collections::HashSet<String> = profiles()
+        .iter()
+        .map(|p| normalized_server(&p.server))
+        .collect();
     let ignored = ignored_servers();
     let mut list = cached_discovered();
     list.sort_by(|a, b| {
-        let an = if a.name.trim().is_empty() { &a.server } else { &a.name };
-        let bn = if b.name.trim().is_empty() { &b.server } else { &b.name };
-        an.to_ascii_lowercase().cmp(&bn.to_ascii_lowercase()).then_with(|| a.server.cmp(&b.server))
+        let an = if a.name.trim().is_empty() {
+            &a.server
+        } else {
+            &a.name
+        };
+        let bn = if b.name.trim().is_empty() {
+            &b.server
+        } else {
+            &b.name
+        };
+        an.to_ascii_lowercase()
+            .cmp(&bn.to_ascii_lowercase())
+            .then_with(|| a.server.cmp(&b.server))
     });
     let items: Vec<serde_json::Value> = list
         .iter()
         .map(|d| {
             let key = normalized_server(&d.server);
-            let name = if d.name.trim().is_empty() { d.server.clone() } else { d.name.clone() };
+            let name = if d.name.trim().is_empty() {
+                d.server.clone()
+            } else {
+                d.name.clone()
+            };
             serde_json::json!({
                 "server": d.server,
                 "name": name,
@@ -183,8 +205,9 @@ fn add_found(
     // well so the sidebar does not show duplicates.
     let existing = found.iter().find_map(|(k, d)| {
         let same_server = k == &key;
-        let same_address =
-            !address.is_empty() && !d.address.is_empty() && d.address.eq_ignore_ascii_case(&address);
+        let same_address = !address.is_empty()
+            && !d.address.is_empty()
+            && d.address.eq_ignore_ascii_case(&address);
         if same_server || same_address {
             Some(k.clone())
         } else {
@@ -207,7 +230,11 @@ fn add_found(
     }
     // Prefer a DNS/mDNS hostname over a bare NetBIOS name, since it resolves
     // the same way but also works with `smb://host.local/` style URIs.
-    if server.contains('.') && !entry.server.contains('.') && !entry.server.contains(':') && !server.contains(':') {
+    if server.contains('.')
+        && !entry.server.contains('.')
+        && !entry.server.contains(':')
+        && !server.contains(':')
+    {
         entry.server = server;
     }
     if source == "mdns" || entry.source.is_empty() {
@@ -245,12 +272,23 @@ fn parse_nmblookup(out: &str, found: &mut BTreeMap<String, Discovered>) {
     for line in out.lines() {
         let line = line.trim();
         let mut fields = line.split_whitespace();
-        let Some(address) = fields.next() else { continue };
-        if !address.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        let Some(address) = fields.next() else {
+            continue;
+        };
+        if !address
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+        {
             continue;
         }
-        let Some(record) = fields.next() else { continue };
-        let Some((name, suffix)) = record.rsplit_once('<') else { continue };
+        let Some(record) = fields.next() else {
+            continue;
+        };
+        let Some((name, suffix)) = record.rsplit_once('<') else {
+            continue;
+        };
         let suffix = suffix.trim_end_matches('>');
         if suffix != "00" && suffix != "20" {
             continue;
@@ -259,7 +297,13 @@ fn parse_nmblookup(out: &str, found: &mut BTreeMap<String, Discovered>) {
         if name.is_empty() || name.eq_ignore_ascii_case("__MSBROWSE__") {
             continue;
         }
-        add_found(found, name.to_string(), name.to_string(), address.to_string(), "netbios");
+        add_found(
+            found,
+            name.to_string(),
+            name.to_string(),
+            address.to_string(),
+            "netbios",
+        );
     }
 }
 
@@ -312,9 +356,13 @@ fn parse_ws_discovery_response(xml: &str, found: &mut BTreeMap<String, Discovere
     let computer = tag_text(xml, "wsdp:Computer")
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
-    let Some(addrs) = tag_text(xml, "d:XAddrs") else { return };
+    let Some(addrs) = tag_text(xml, "d:XAddrs") else {
+        return;
+    };
     for url in addrs.split_whitespace() {
-        let Some(address) = host_from_url(url) else { continue };
+        let Some(address) = host_from_url(url) else {
+            continue;
+        };
         // The computer name (NetBIOS/DNS) is more useful for SMB than the
         // WS-Discovery HTTP address; keep the address for merging/deduping.
         let name = computer.unwrap_or(&address).to_string();
@@ -332,7 +380,14 @@ fn ws_probe_message() -> String {
     let pid = std::process::id() as u128;
     let raw = nanos ^ (pid << 64);
     let hex = format!("{raw:032x}");
-    let uuid = format!("{}-{}-{}-{}-{}", &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32]);
+    let uuid = format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    );
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope"
@@ -356,9 +411,13 @@ fn ws_probe_message() -> String {
 /// effort, because many networks filter multicast.
 fn ws_discovery(found: &mut BTreeMap<String, Discovered>) {
     use std::net::{SocketAddr, UdpSocket};
-    let Ok(socket) = UdpSocket::bind(("0.0.0.0", 0)) else { return };
+    let Ok(socket) = UdpSocket::bind(("0.0.0.0", 0)) else {
+        return;
+    };
     let _ = socket.set_multicast_ttl_v4(2);
-    let Ok(target) = "239.255.255.250:3702".parse::<SocketAddr>() else { return };
+    let Ok(target) = "239.255.255.250:3702".parse::<SocketAddr>() else {
+        return;
+    };
     let probe = ws_probe_message();
     let deadline = Instant::now() + Duration::from_millis(1800);
     for _ in 0..2 {
@@ -386,12 +445,20 @@ fn ws_discovery(found: &mut BTreeMap<String, Discovered>) {
 fn parse_gio_network(out: &str, found: &mut BTreeMap<String, Discovered>) {
     for line in out.lines() {
         let uri = line.trim();
-        let Some(rest) = uri.strip_prefix("smb://") else { continue };
+        let Some(rest) = uri.strip_prefix("smb://") else {
+            continue;
+        };
         let server = rest.split('/').next().unwrap_or("").trim();
         if server.is_empty() {
             continue;
         }
-        add_found(found, server.to_string(), server.to_string(), String::new(), "gvfs");
+        add_found(
+            found,
+            server.to_string(),
+            server.to_string(),
+            String::new(),
+            "gvfs",
+        );
     }
 }
 
@@ -412,7 +479,7 @@ fn parse_smbclient_shares(out: &str) -> Vec<String> {
             shares.push(name.to_string());
         }
     }
-    shares.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+    shares.sort_by_key(|a| a.to_ascii_lowercase());
     shares
 }
 
@@ -473,7 +540,11 @@ fn discover_inner() -> Vec<Discovered> {
         }
     }
     list.retain(|d| !d.server.trim().is_empty());
-    list.sort_by(|a, b| a.server.to_ascii_lowercase().cmp(&b.server.to_ascii_lowercase()));
+    list.sort_by(|a, b| {
+        a.server
+            .to_ascii_lowercase()
+            .cmp(&b.server.to_ascii_lowercase())
+    });
     list
 }
 
@@ -520,12 +591,26 @@ mod tests {
 
     #[test]
     fn builds_uris() {
-        assert_eq!(uri(&profile()), "smb://WORKGROUP;alice@nas.local/media/movies");
-        let guest = Profile { username: String::new(), domain: String::new(), share: String::new(), ..profile() };
+        assert_eq!(
+            uri(&profile()),
+            "smb://WORKGROUP;alice@nas.local/media/movies"
+        );
+        let guest = Profile {
+            username: String::new(),
+            domain: String::new(),
+            share: String::new(),
+            ..profile()
+        };
         assert_eq!(uri(&guest), "smb://nas.local/");
-        let plain = Profile { domain: String::new(), ..profile() };
+        let plain = Profile {
+            domain: String::new(),
+            ..profile()
+        };
         assert_eq!(uri(&plain), "smb://alice@nas.local/media/movies");
-        let spaced = Profile { share: "my media".into(), ..profile() };
+        let spaced = Profile {
+            share: "my media".into(),
+            ..profile()
+        };
         assert_eq!(uri(&spaced), "smb://WORKGROUP;alice@nas.local/my%20media");
     }
 
@@ -550,14 +635,18 @@ mod tests {
 
     #[test]
     fn reads_mount_entries() {
-        let entry = parse_smb_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
+        let entry =
+            parse_smb_mount_entry("smb-share:server=nas.local,share=media,user=alice").unwrap();
         assert_eq!(entry.server, "nas.local");
         assert_eq!(entry.share, "media");
         assert_eq!(entry.user, "alice");
         assert_eq!(entry.domain, "");
         assert_eq!(entry.port, None);
         assert!(parse_smb_mount_entry("smb-share:share=media").is_none());
-        let entry = parse_smb_mount_entry("smb-share:domain=WORKGROUP,port=4455,server=127.0.0.1,share=media,user=archy").unwrap();
+        let entry = parse_smb_mount_entry(
+            "smb-share:domain=WORKGROUP,port=4455,server=127.0.0.1,share=media,user=archy",
+        )
+        .unwrap();
         assert_eq!(entry.port, Some(4455));
     }
 
@@ -581,9 +670,18 @@ mod tests {
     #[test]
     fn reads_avahi_records() {
         let mut found = BTreeMap::new();
-        parse_avahi_line("=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;192.168.1.5;445;", &mut found);
-        parse_avahi_line("=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;fe80::1;445;", &mut found);
-        parse_avahi_line("=;eth0;IPv4;Printer;_ipp._tcp;local;printer.local;192.168.1.9;631;", &mut found);
+        parse_avahi_line(
+            "=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;192.168.1.5;445;",
+            &mut found,
+        );
+        parse_avahi_line(
+            "=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;fe80::1;445;",
+            &mut found,
+        );
+        parse_avahi_line(
+            "=;eth0;IPv4;Printer;_ipp._tcp;local;printer.local;192.168.1.9;631;",
+            &mut found,
+        );
         let list: Vec<&Discovered> = found.values().collect();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].server, "nas.local");
@@ -599,7 +697,9 @@ mod tests {
             &mut found,
         );
         assert_eq!(found.len(), 2);
-        assert!(found.values().any(|d| d.server == "NAS" && d.address == "192.168.1.5"));
+        assert!(found
+            .values()
+            .any(|d| d.server == "NAS" && d.address == "192.168.1.5"));
         assert!(found.values().any(|d| d.server == "DESKTOP"));
     }
 
@@ -607,7 +707,10 @@ mod tests {
     fn merges_mdns_names_with_netbios_addresses() {
         let mut found = BTreeMap::new();
         parse_nmblookup("192.168.1.5 NAS<00>\n", &mut found);
-        parse_avahi_line("=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;192.168.1.5;445;", &mut found);
+        parse_avahi_line(
+            "=;eth0;IPv4;NAS;_smb._tcp;local;nas.local;192.168.1.5;445;",
+            &mut found,
+        );
         let list: Vec<&Discovered> = found.values().collect();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].server, "nas.local");
@@ -660,8 +763,14 @@ Disk|MEDIA|Duplicate
 
     #[test]
     fn extracts_hosts_from_urls() {
-        assert_eq!(host_from_url("http://192.168.1.5:5357/abc/"), Some("192.168.1.5".into()));
-        assert_eq!(host_from_url("http://[fe80::1]:5357/x"), Some("fe80::1".into()));
+        assert_eq!(
+            host_from_url("http://192.168.1.5:5357/abc/"),
+            Some("192.168.1.5".into())
+        );
+        assert_eq!(
+            host_from_url("http://[fe80::1]:5357/x"),
+            Some("fe80::1".into())
+        );
         assert_eq!(host_from_url("http://nas.local/"), Some("nas.local".into()));
         assert_eq!(host_from_url(""), None);
     }
