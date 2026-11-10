@@ -1,6 +1,4 @@
-//! System appearance: dark mode detection and wallpaper palettes
-//! (matugen / pywal / quickshell), plus host information. Moved unchanged
-//! from the original bridge.rs.
+//! System appearance, dark mode detection, and wallpaper palettes.
 
 use std::fs;
 use std::path::{Path, PathBuf};

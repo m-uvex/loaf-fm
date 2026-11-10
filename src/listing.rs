@@ -387,7 +387,7 @@ pub fn disambiguate(entries: &mut [Entry]) {
 /// only names that just became ambiguous are rebuilt; the rest keep their
 /// `Arc` (previously every batch re-copying every entry).
 pub fn disambiguate_shared(entries: &mut [Arc<Entry>]) {
-    // Owned keys: the map must not borrow into `entries` — later batches
+    // Owned keys: the map must not borrow into entries, as later batches
     // replace shared entries in place.
     let mut counts = std::collections::HashMap::<String, usize>::new();
     for e in entries.iter() {

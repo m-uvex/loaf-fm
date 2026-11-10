@@ -1,9 +1,4 @@
-//! Validation and normalization of portal file chooser requests. The D-Bus
-//! layer (C++) demarshals the option map into the JSON shape documented in
-//! `filters.rs`; this module checks it against the spec's safety rules and
-//! fills defaults, so the picker UI and the reply builder only ever see
-//! sensible values. An error means the request is answered with response
-//! code 2.
+//! Validation and normalization of portal file chooser requests.
 
 use serde_json::{json, Map, Value};
 

@@ -89,7 +89,6 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 16
 
-    // ---- Group 1: Saved Drives ------------------------------------------
     SettingCard {
         visible: root.matchSaved
         title: qsTr("Saved Drives")
@@ -235,7 +234,6 @@ ColumnLayout {
         }
     }
 
-    // ---- Group 2: Auto Discovery ----------------------------------------
     SettingCard {
         visible: root.matchDiscovery
         title: qsTr("Auto Discovery")

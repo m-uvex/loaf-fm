@@ -332,7 +332,6 @@ mod tests {
             vec![("Phone".to_string(), root_url.clone())]
         );
 
-        // Storage with spaces, unicode, special chars
         let st_name = "Internal Storage #1 (SD card & 100%)";
         let loc_storage = loc.child(st_name).expect("child storage");
         assert_eq!(loc_storage.title(), st_name);
@@ -344,7 +343,6 @@ mod tests {
         assert_eq!(parsed_st, loc_storage);
         assert_eq!(parsed_st.title(), st_name);
 
-        // Child directories with unicode
         let dir1 = "DCIM 📁";
         let loc_dir1 = loc_storage.child(dir1).expect("child dir1");
         assert_eq!(loc_dir1.title(), dir1);
@@ -363,7 +361,6 @@ mod tests {
         let parsed_dir2 = Location::parse(&dir2_url).expect("parse dir2");
         assert_eq!(parsed_dir2, loc_dir2);
 
-        // Check breadcrumbs
         let crumbs = loc_dir2.breadcrumbs();
         assert_eq!(crumbs.len(), 4);
         assert_eq!(crumbs[0], ("Phone".to_string(), root_url));
@@ -374,12 +371,10 @@ mod tests {
 
     #[test]
     fn test_location_rejects_invalid_urls() {
-        // Not mtp://
         assert_eq!(Location::parse("file:///home"), None);
         assert_eq!(Location::parse("mtp:udi=/test/phone/"), None);
         assert_eq!(Location::parse("mtp://"), None);
 
-        // Query / fragment reject
         let hex_u = hex_encode(b"/test");
         assert_eq!(Location::parse(&format!("mtp://{}?query=1", hex_u)), None);
         assert_eq!(Location::parse(&format!("mtp://{}#frag", hex_u)), None);

@@ -291,7 +291,7 @@ pub fn transfer(
     let mut completed = Vec::new();
 
     if is_dest_mtp && !any_src_mtp {
-        // Local -> MTP
+        // Upload from local filesystem to MTP device.
         let dest_loc =
             Location::parse(dest).ok_or_else(|| "Invalid destination MTP URL".to_string())?;
         if dest_loc.is_root() {
@@ -343,7 +343,7 @@ pub fn transfer(
             completed.push(item_url);
         }
     } else if !is_dest_mtp && any_src_mtp {
-        // MTP -> Local
+        // Download from MTP device to local filesystem.
         let dest_path = PathBuf::from(dest);
         if !dest_path.is_dir() {
             return Err("Local destination must be an existing directory".to_string());
@@ -380,7 +380,7 @@ pub fn transfer(
             completed.push(target_item.to_str().unwrap().to_string());
         }
     } else {
-        // MTP -> MTP
+        // Transfer between MTP locations.
         let dest_loc =
             Location::parse(dest).ok_or_else(|| "Invalid destination MTP URL".to_string())?;
         if dest_loc.is_root() {
@@ -395,7 +395,6 @@ pub fn transfer(
             if src_loc.is_root() || src_loc.dirs().is_empty() && src_loc.storage().is_some() {
                 return Err("Cannot transfer device or storage root".to_string());
             }
-            // Check self or recursive ancestor copy
             if dest_loc == src_loc || dest_loc.url().starts_with(&(src_loc.url() + "/")) {
                 return Err("Cannot copy a directory into itself or its descendant".to_string());
             }
@@ -408,13 +407,12 @@ pub fn transfer(
             let meta = metadata(src_url)?
                 .ok_or_else(|| format!("Source not found on MTP device: {}", src_url))?;
 
-            // Optimization: if move within same parent, perform rename
             if mode == "move" && src_loc.parent() == Some(dest_loc.clone()) {
                 completed.push(src_loc.url());
                 continue;
             }
 
-            // Transfer via private staging directory
+            // Stage through a temporary local directory.
             let staging_dir = tempfile_staging_dir()?;
             let staged_target = staging_dir.join(&meta.name);
 

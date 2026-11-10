@@ -26,7 +26,6 @@ Item {
     property real shown: root.clampedValue
     Behavior on shown { enabled: theme.animate; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
 
-    // ---- plain bar ---------------------------------------------------------
     Rectangle {
         visible: !root.wavy
         anchors.fill: parent
@@ -46,7 +45,6 @@ Item {
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
     }
 
-    // ---- wavy bar ----------------------------------------------------------
     readonly property real cap: root.thickness / 2
     readonly property real gap: root.thickness + 2
     readonly property real activeEnd: root.cap + (root.width - root.thickness) * root.shown

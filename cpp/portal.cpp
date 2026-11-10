@@ -226,8 +226,6 @@ QVariantMap resultsFromJson(const QString &json)
 
 } // namespace
 
-// ---- D-Bus marshaling ------------------------------------------------------
-
 QDBusArgument &operator<<(QDBusArgument &argument, const PortalPattern &pattern)
 {
     argument.beginStructure();
@@ -291,8 +289,6 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, PortalChoice &cho
     argument.endStructure();
     return argument;
 }
-
-// ---- PortalService ---------------------------------------------------------
 
 bool LoafNative::initPortal(bool portalOnly)
 {
@@ -424,7 +420,6 @@ void PortalService::quitIfIdle()
     }
     QCoreApplication::quit();
 }
-// ---- Adaptors --------------------------------------------------------------
 
 PortalFileChooserAdaptor::PortalFileChooserAdaptor(QObject *host, PortalService *service)
     : QDBusAbstractAdaptor(host)

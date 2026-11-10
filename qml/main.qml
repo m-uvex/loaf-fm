@@ -259,8 +259,7 @@ ApplicationWindow {
         function onPickerDismissed(handle) { window.closePicker(handle); }
     }
 
-    // ---- portal file chooser windows ---------------------------------------
-    // One PickerWindow per active request, keyed by the D-Bus handle.
+    // Active portal picker windows keyed by D-Bus handle.
     property var pickerWindows: ({})
 
     Component {

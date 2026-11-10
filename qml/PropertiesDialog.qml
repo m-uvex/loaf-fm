@@ -61,7 +61,6 @@ LoafDialog {
         onSelected: function(v) { dlg.tab = v; }
     }
 
-    // ---- General ----------------------------------------------------------
     GridLayout {
         visible: dlg.tab === 0
         Layout.fillWidth: true
@@ -110,7 +109,6 @@ LoafDialog {
         Val { text: dlg.info.free_space || "-"; visible: !dlg.multiple }
     }
 
-    // ---- Permissions --------------------------------------------------------
     ColumnLayout {
         visible: dlg.tab === 1 && !dlg.multiple
         Layout.fillWidth: true
@@ -215,7 +213,6 @@ LoafDialog {
         }
     }
 
-    // ---- Open With -----------------------------------------------------------
     ColumnLayout {
         visible: dlg.tab === 2 && !dlg.multiple
         Layout.fillWidth: true
