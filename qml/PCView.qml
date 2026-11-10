@@ -11,8 +11,6 @@ import app.loaf
 Item {
     id: pcView
 
-    // ---- customization model -----------------------------------------------
-
     readonly property var knownSections: ["places", "frequent", "internal", "external", "remotes", "network"]
 
     property var sectionOrder: ["places", "frequent", "internal", "external", "remotes", "network"]
@@ -129,8 +127,6 @@ Item {
         pcView.sectionConfig = copy;
         pcView.saveCustomization();
     }
-
-    // ---- drive data --------------------------------------------------------
 
     readonly property var allDrives: {
         try {
@@ -274,8 +270,6 @@ Item {
             return d.mounted === true;
         return d.is_mounted === true;
     }
-
-    // ---- drive actions -----------------------------------------------------
 
     function openDrive(d) {
         window.openDrive(d, false);

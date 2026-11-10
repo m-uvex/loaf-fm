@@ -47,35 +47,24 @@ class LoafNative : public QObject
 public:
     explicit LoafNative(QObject *parent = nullptr);
 
-    // ---- clipboard (interoperable with Nautilus, Dolphin, ...) ----------
-    // Puts files on the system clipboard (x-special/gnome-copied-files,
-    // text/uri-list, application/x-kde-cutselection, text/plain).
+    // Clipboard integration (compatible with standard desktop file managers).
     Q_INVOKABLE void setClipboardFiles(const QStringList &paths, bool cut);
-    // { "cut": bool, "paths": [absolute paths] } read from the clipboard.
     Q_INVOKABLE QVariantMap clipboardFiles() const;
     Q_INVOKABLE bool clipboardHasFiles() const;
     Q_INVOKABLE void setClipboardText(const QString &text);
-    // Forget a cut once it was pasted (the files moved away).
     Q_INVOKABLE void clearClipboardIfOurs();
 
-    // ---- MIME ------------------------------------------------------------
+    // MIME type resolution.
     Q_INVOKABLE QString mimeType(const QString &path, bool sniffContents = true) const;
     Q_INVOKABLE QString mimeComment(const QString &path) const;
 
-    // Files passed on the command line / requested over D-Bus but not yet
-    // opened by the UI (drained by QML on start-up).
+    // Files passed on the command line or via D-Bus, drained on startup.
     Q_INVOKABLE QStringList takePendingOpen();
 
-    // ---- portal file chooser ----------------------------------------------
-    // Creates the portal service and exports the FileChooser backend.
-    // Returns false when another backend owns the portal name. In portal
-    // mode (D-Bus activation) the service exits when idle.
+    // Portal file chooser backend.
     bool initPortal(bool portalOnly);
-    // QML answers a picker request: code 0 = picked, 1 = cancelled. The
-    // results JSON carries uris (paths), choices and current_filter.
     Q_INVOKABLE void respondPicker(const QString &handle, uint code, const QString &resultsJson);
     Q_INVOKABLE void cancelPicker(const QString &handle);
-    // Overwrite checks for the save dialog.
     Q_INVOKABLE bool fileExists(const QString &path) const;
     Q_INVOKABLE bool isDirectory(const QString &path) const;
     // Makes a picker window transient for the caller's window on X11
@@ -147,7 +136,7 @@ private:
     LoafNative *m_native;
 };
 
-// ---- functions called from Rust ------------------------------------------
+// Functions called from Rust.
 
 // Asks an already running Loaf to handle `paths`. Returns true when it did
 // (the new process should then exit).

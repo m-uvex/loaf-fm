@@ -46,14 +46,17 @@ pub fn preview_language(ext: &str) -> &'static str {
         "css" | "scss" | "sass" | "less" => "css",
         "json" | "json5" | "jsonc" => "json",
         "yaml" | "yml" | "toml" | "ini" | "conf" | "cfg" | "properties" => "yaml",
-        "rb" | "php" | "swift" | "hs" | "ml" | "ex" | "exs" | "erl" | "clj" | "zig" | "dart" | "r" | "jl" => "c_like",
+        "rb" | "php" | "swift" | "hs" | "ml" | "ex" | "exs" | "erl" | "clj" | "zig" | "dart"
+        | "r" | "jl" => "c_like",
         _ => "text",
     }
 }
 
 /// Reads the head of a file; (text, truncated, looks_binary).
 pub fn read_head(path: &Path) -> (String, bool, bool) {
-    let Ok(f) = fs::File::open(path) else { return (String::new(), false, false) };
+    let Ok(f) = fs::File::open(path) else {
+        return (String::new(), false, false);
+    };
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
     let mut buf = Vec::with_capacity(PREVIEW_BYTES.min(len) as usize);
     if f.take(PREVIEW_BYTES).read_to_end(&mut buf).is_err() {
@@ -70,11 +73,18 @@ pub fn read_head(path: &Path) -> (String, bool, bool) {
             end = e.valid_up_to(); // only an incomplete character at the end
         }
     }
-    (String::from_utf8_lossy(&buf[..end]).to_string(), len > PREVIEW_BYTES, false)
+    (
+        String::from_utf8_lossy(&buf[..end]).to_string(),
+        len > PREVIEW_BYTES,
+        false,
+    )
 }
 
 pub fn quick_look(path: &Path) -> QuickLook {
-    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let meta = fs::metadata(path).ok();
     let mut q = QuickLook {
         name: name.clone(),
@@ -113,7 +123,13 @@ pub fn quick_look(path: &Path) -> QuickLook {
                 let mut lines: Vec<String> = entries
                     .iter()
                     .take(400)
-                    .map(|e| if e.is_dir { format!("{}/", e.path) } else { format!("{}  ({})", e.path, util::format_size(e.size)) })
+                    .map(|e| {
+                        if e.is_dir {
+                            format!("{}/", e.path)
+                        } else {
+                            format!("{}  ({})", e.path, util::format_size(e.size))
+                        }
+                    })
                     .collect();
                 lines.sort();
                 q.text = lines.join("\n");
@@ -151,7 +167,9 @@ fn user_name(uid: u32) -> String {
     let mut out: *mut libc::passwd = std::ptr::null_mut();
     let rc = unsafe { libc::getpwuid_r(uid, &mut pw, buf.as_mut_ptr(), buf.len(), &mut out) };
     if rc == 0 && !out.is_null() {
-        return unsafe { std::ffi::CStr::from_ptr(pw.pw_name) }.to_string_lossy().to_string();
+        return unsafe { std::ffi::CStr::from_ptr(pw.pw_name) }
+            .to_string_lossy()
+            .to_string();
     }
     uid.to_string()
 }
@@ -162,14 +180,22 @@ fn group_name(gid: u32) -> String {
     let mut out: *mut libc::group = std::ptr::null_mut();
     let rc = unsafe { libc::getgrgid_r(gid, &mut gr, buf.as_mut_ptr(), buf.len(), &mut out) };
     if rc == 0 && !out.is_null() {
-        return unsafe { std::ffi::CStr::from_ptr(gr.gr_name) }.to_string_lossy().to_string();
+        return unsafe { std::ffi::CStr::from_ptr(gr.gr_name) }
+            .to_string_lossy()
+            .to_string();
     }
     gid.to_string()
 }
 
 pub fn mode_string(mode: u32, is_dir: bool, is_link: bool) -> String {
     let mut s = String::with_capacity(10);
-    s.push(if is_link { 'l' } else if is_dir { 'd' } else { '-' });
+    s.push(if is_link {
+        'l'
+    } else if is_dir {
+        'd'
+    } else {
+        '-'
+    });
     for shift in [6, 3, 0] {
         let bits = (mode >> shift) & 7;
         s.push(if bits & 4 != 0 { 'r' } else { '-' });
@@ -185,9 +211,17 @@ pub fn item_info(path: &Path) -> serde_json::Value {
         return serde_json::json!({ "name": path.file_name().map(|n| n.to_string_lossy().to_string()), "path": path, "exists": false });
     };
     let is_link = lmeta.file_type().is_symlink();
-    let meta = if is_link { fs::metadata(path).unwrap_or(lmeta.clone()) } else { lmeta.clone() };
+    let meta = if is_link {
+        fs::metadata(path).unwrap_or(lmeta.clone())
+    } else {
+        lmeta.clone()
+    };
     let is_dir = meta.is_dir();
-    let mime = if is_dir { "inode/directory".to_string() } else { native::mime_type(path, true) };
+    let mime = if is_dir {
+        "inode/directory".to_string()
+    } else {
+        native::mime_type(path, true)
+    };
     let created = meta
         .created()
         .ok()

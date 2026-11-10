@@ -73,11 +73,16 @@ pub fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopApp> {
         }
         if in_group {
             if let Some((k, v)) = line.split_once('=') {
-                kv.entry(k.trim().to_string()).or_insert_with(|| v.trim().to_string());
+                kv.entry(k.trim().to_string())
+                    .or_insert_with(|| v.trim().to_string());
             }
         }
     }
-    let is_true = |k: &str| kv.get(k).map(|v| v.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let is_true = |k: &str| {
+        kv.get(k)
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+    };
     if !kv.get("Type").map(|t| t == "Application").unwrap_or(false) || is_true("Hidden") {
         return None;
     }
@@ -87,7 +92,11 @@ pub fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopApp> {
     }
     // TryExec names a binary that must exist for the entry to be usable.
     if let Some(try_exec) = kv.get("TryExec").filter(|t| !t.is_empty()) {
-        let ok = if try_exec.starts_with('/') { Path::new(try_exec).exists() } else { util::which(try_exec).is_some() };
+        let ok = if try_exec.starts_with('/') {
+            Path::new(try_exec).exists()
+        } else {
+            util::which(try_exec).is_some()
+        };
         if !ok {
             return None;
         }
@@ -112,7 +121,12 @@ pub fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopApp> {
         icon: kv.get("Icon").cloned().unwrap_or_default(),
         mimes: kv
             .get("MimeType")
-            .map(|m| m.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+            .map(|m| {
+                m.split(';')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
             .unwrap_or_default(),
         terminal: is_true("Terminal"),
         no_display: is_true("NoDisplay"),
@@ -130,7 +144,9 @@ fn scan_dir(dir: &Path, prefix: &str, seen: &mut HashSet<String>, out: &mut Vec<
             scan_dir(&p, &format!("{}{}-", prefix, fname), seen, out);
             continue;
         }
-        let Some(stem) = fname.strip_suffix(".desktop") else { continue };
+        let Some(stem) = fname.strip_suffix(".desktop") else {
+            continue;
+        };
         let id = format!("{}{}", prefix, stem);
         // The first folder in priority order owns an id, even if that entry
         // is hidden (that is how users hide system entries).
@@ -191,7 +207,9 @@ pub fn mime_covers(declared: &str, mime: &str) -> bool {
         ("text/markdown", "text/x-markdown"),
         ("application/x-pdf", "application/pdf"),
     ];
-    ALIASES.iter().any(|(a, b)| (declared == *a && mime == *b) || (declared == *b && mime == *a))
+    ALIASES
+        .iter()
+        .any(|(a, b)| (declared == *a && mime == *b) || (declared == *b && mime == *a))
 }
 
 /// `mimeapps.list` files in priority order (spec: desktop-specific first).
@@ -211,7 +229,11 @@ fn mimeapps_files() -> Vec<PathBuf> {
             .map(PathBuf::from),
     );
     dirs.push(util::data_home().join("applications"));
-    dirs.extend(util::data_dirs().into_iter().map(|d| d.join("applications")));
+    dirs.extend(
+        util::data_dirs()
+            .into_iter()
+            .map(|d| d.join("applications")),
+    );
     let mut out = Vec::new();
     for d in dirs {
         for de in &desktops {
@@ -236,7 +258,11 @@ fn group_values(content: &str, group: &str, mime: &str) -> Vec<String> {
         }
         if let Some((k, v)) = line.split_once('=') {
             if k.trim().eq_ignore_ascii_case(mime) {
-                out.extend(v.split(';').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+                out.extend(
+                    v.split(';')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty()),
+                );
             }
         }
     }
@@ -259,7 +285,10 @@ pub fn default_for_in(apps: &[DesktopApp], mime: &str) -> Option<DesktopApp> {
         apps.iter().find(|a| a.id == id).cloned()
     };
     let mut removed: HashSet<String> = HashSet::new();
-    let files: Vec<String> = mimeapps_files().iter().filter_map(|p| fs::read_to_string(p).ok()).collect();
+    let files: Vec<String> = mimeapps_files()
+        .iter()
+        .filter_map(|p| fs::read_to_string(p).ok())
+        .collect();
     for content in &files {
         for r in group_values(content, "[Removed Associations]", mime) {
             removed.insert(r.trim_end_matches(".desktop").to_string());
@@ -288,8 +317,11 @@ pub fn default_for_in(apps: &[DesktopApp], mime: &str) -> Option<DesktopApp> {
 /// Apps that declare support for `mime`, default first.
 pub fn for_mime(mime: &str) -> Vec<DesktopApp> {
     let apps = all();
-    let mut list: Vec<DesktopApp> =
-        apps.iter().filter(|a| a.mimes.iter().any(|m| mime_covers(m, mime))).cloned().collect();
+    let mut list: Vec<DesktopApp> = apps
+        .iter()
+        .filter(|a| a.mimes.iter().any(|m| mime_covers(m, mime)))
+        .cloned()
+        .collect();
     if let Some(def) = default_for_in(&apps, mime) {
         if let Some(pos) = list.iter().position(|a| a.id == def.id) {
             let d = list.remove(pos);
@@ -302,7 +334,11 @@ pub fn for_mime(mime: &str) -> Vec<DesktopApp> {
 /// Writes `id` as the default for `mime` in `~/.config/mimeapps.list`,
 /// keeping everything else in the file intact.
 pub fn set_default(mime: &str, id: &str) -> std::io::Result<()> {
-    let desktop = if id.ends_with(".desktop") { id.to_string() } else { format!("{}.desktop", id) };
+    let desktop = if id.ends_with(".desktop") {
+        id.to_string()
+    } else {
+        format!("{}.desktop", id)
+    };
     let path = util::config_home().join("mimeapps.list");
     let existing = fs::read_to_string(&path).unwrap_or_default();
     let updated = set_default_in(&existing, mime, &desktop);
@@ -508,14 +544,20 @@ pub fn open_terminal_in(dir: &Path) -> std::io::Result<()> {
             return util::spawn_detached(cmd);
         }
     }
-    Err(std::io::Error::new(std::io::ErrorKind::NotFound, "no terminal emulator found"))
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "no terminal emulator found",
+    ))
 }
 
 /// Launches `app` with `files`.
 pub fn launch(app: &DesktopApp, files: &[PathBuf]) -> std::io::Result<()> {
     let mut argv = expand_exec(app, files);
     if argv.is_empty() {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty Exec line"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "empty Exec line",
+        ));
     }
     if app.terminal {
         if let Some((term, prefix)) = terminal_command() {
@@ -540,7 +582,9 @@ const PLACEHOLDERS: [&str; 4] = ["%f", "%F", "%u", "%U"];
 
 /// True when a typed command uses shell syntax and must run verbatim.
 pub fn uses_shell_syntax(command: &str) -> bool {
-    command.contains(['|', '&', ';', '>', '<', '`', '$', '(', ')', '{', '}', '*', '?', '\n'])
+    command.contains([
+        '|', '&', ';', '>', '<', '`', '$', '(', ')', '{', '}', '*', '?', '\n',
+    ])
 }
 
 /// Turns a user-typed command into a `sh -c` script that reads the file
@@ -593,9 +637,17 @@ mod tests {
         assert_eq!(app.mimes, vec!["image/png", "image/*"]);
         let gone = write_desktop(&d, "gone.desktop", "[Desktop Entry]\nType=Application\nName=Gone\nExec=gone\nTryExec=/definitely/not/here\n");
         assert!(parse_desktop_file(&gone, "gone").is_none());
-        let hidden = write_desktop(&d, "h.desktop", "[Desktop Entry]\nType=Application\nName=H\nExec=h\nHidden=true\n");
+        let hidden = write_desktop(
+            &d,
+            "h.desktop",
+            "[Desktop Entry]\nType=Application\nName=H\nExec=h\nHidden=true\n",
+        );
         assert!(parse_desktop_file(&hidden, "h").is_none());
-        let link = write_desktop(&d, "l.desktop", "[Desktop Entry]\nType=Link\nName=L\nURL=x\n");
+        let link = write_desktop(
+            &d,
+            "l.desktop",
+            "[Desktop Entry]\nType=Link\nName=L\nURL=x\n",
+        );
         assert!(parse_desktop_file(&link, "l").is_none());
         fs::remove_dir_all(&d).unwrap();
     }
@@ -615,14 +667,26 @@ mod tests {
         let files = vec![PathBuf::from("/a b/c.txt"), PathBuf::from("/d.txt")];
         let argv = expand_exec(&app, &files);
         assert_eq!(argv[0], "x");
-        assert_eq!(argv[1], "--title=%c", "quoted codes inside args stay literal");
-        assert_eq!(&argv[2..4], &["/a b/c.txt".to_string(), "/d.txt".to_string()]);
+        assert_eq!(
+            argv[1], "--title=%c",
+            "quoted codes inside args stay literal"
+        );
+        assert_eq!(
+            &argv[2..4],
+            &["/a b/c.txt".to_string(), "/d.txt".to_string()]
+        );
         assert!(argv.contains(&"--icon".to_string()) && argv.contains(&"x-icon".to_string()));
         assert_eq!(argv.last().unwrap(), "--opt=/a b/c.txt");
 
-        let uri_app = DesktopApp { exec: "open %u".into(), ..app.clone() };
+        let uri_app = DesktopApp {
+            exec: "open %u".into(),
+            ..app.clone()
+        };
         assert_eq!(expand_exec(&uri_app, &files)[1], "file:///a%20b/c.txt");
-        let flatpak = DesktopApp { exec: "/usr/bin/flatpak run --file-forwarding org.x @@u %U @@".into(), ..app };
+        let flatpak = DesktopApp {
+            exec: "/usr/bin/flatpak run --file-forwarding org.x @@u %U @@".into(),
+            ..app
+        };
         let argv = expand_exec(&flatpak, &files[..1]);
         assert_eq!(argv.last().unwrap(), "file:///a%20b/c.txt");
     }
@@ -655,15 +719,24 @@ mod tests {
     fn custom_commands() {
         assert_eq!(command_script("mpv"), "mpv \"$1\"");
         assert_eq!(command_script("mpv %f --fs"), "mpv \"$1\" --fs");
-        assert_eq!(command_script("ffmpeg -i \"%f\" o.mp4"), "ffmpeg -i \"$1\" o.mp4");
+        assert_eq!(
+            command_script("ffmpeg -i \"%f\" o.mp4"),
+            "ffmpeg -i \"$1\" o.mp4"
+        );
         assert_eq!(command_script("cat '%f'"), "cat \"$1\"");
         assert_eq!(command_script("echo hi | wc"), "echo hi | wc");
         // The path only ever arrives as an argument.
         let d = std::env::temp_dir().join(format!("loaf-cmd-{}", std::process::id()));
         fs::create_dir_all(&d).unwrap();
         let evil = d.join("x\"$(touch pwned)\"'`touch pwned2`'");
-        let out = Command::new("sh").arg("-c").arg(command_script("printf %s \"%f\"")).arg("sh").arg(&evil)
-            .current_dir(&d).output().unwrap();
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg(command_script("printf %s \"%f\""))
+            .arg("sh")
+            .arg(&evil)
+            .current_dir(&d)
+            .output()
+            .unwrap();
         assert_eq!(String::from_utf8_lossy(&out.stdout), evil.to_string_lossy());
         assert!(!d.join("pwned").exists() && !d.join("pwned2").exists());
         let _ = fs::remove_dir_all(&d);
@@ -671,6 +744,9 @@ mod tests {
 
     #[test]
     fn tokenizer() {
-        assert_eq!(tokenize(r#"a "b c" d\ e '' f"#), vec!["a", "b c", "d e", "", "f"]);
+        assert_eq!(
+            tokenize(r#"a "b c" d\ e '' f"#),
+            vec!["a", "b c", "d e", "", "f"]
+        );
     }
 }

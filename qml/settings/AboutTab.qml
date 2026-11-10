@@ -191,7 +191,6 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 16
 
-    // ---- Hero identity card -------------------------------------------
     Rectangle {
         visible: root.matchAbout
         Layout.fillWidth: true
@@ -306,7 +305,6 @@ ColumnLayout {
         }
     }
 
-    // ---- Contributors --------------------------------------------------
     SettingCard {
         visible: root.matchContributors
         title: qsTr("Contributors")

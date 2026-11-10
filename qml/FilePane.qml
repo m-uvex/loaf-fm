@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
+import "components"
 
 // One file view (grid + list) bound to its own LoafEngine model. Used for
 // every tab and for both sides of the split view.
@@ -12,6 +13,11 @@ Item {
     id: pane
 
     property alias engine: paneEngine
+    property alias gridView: gridView
+    property alias groupedListView: groupedListView
+    property alias listView: listView
+    property alias groupedBgMouse: groupedBgMouse
+    property alias listBgMouse: listBgMouse
     property bool isActive: true
     property bool showHeader: true
     // Portal picker behavior: folders navigate, files are handed to the
@@ -50,6 +56,103 @@ Item {
         // hidden items must not stay selected (Delete would hit them).
         onFilter_textChanged: Qt.callLater(pane.trimSelection)
         onShow_hiddenChanged: Qt.callLater(pane.trimSelection)
+        onSort_byChanged: pane.updateVisualRows()
+        onItem_countChanged: pane.updateVisualRows()
+        onModelReset: pane.updateVisualRows()
+        onLayoutChanged: pane.updateVisualRows()
+        onView_modeChanged: pane.updateVisualRows()
+        onGroup_byChanged: pane.updateVisualRows()
+        onGroup_ascendingChanged: pane.updateVisualRows()
+        onSort_ascendingChanged: pane.updateVisualRows()
+        onRowsInserted: pane.updateVisualRows()
+        onRowsRemoved: pane.updateVisualRows()
+        onDataChanged: pane.updateVisualRows()
+    }
+
+    property int groupedVisualRevision: 0
+
+    property var groupedRows: []
+    property var groupedGroupTops: []
+    property var groupedFileToVisual: []
+
+    function isGroupedGrid() {
+        return !isList() && paneEngine.group_by !== "none";
+    }
+
+    onWidthChanged: updateVisualRows()
+    onCellWChanged: updateVisualRows()
+    onCellHChanged: updateVisualRows()
+
+    Timer {
+        id: midnightTimer
+        interval: 15000
+        repeat: true
+        running: true
+        property string lastDateKey: Qt.formatDate(new Date(), "yyyy-MM-dd")
+        onTriggered: {
+            var key = Qt.formatDate(new Date(), "yyyy-MM-dd");
+            if (key !== lastDateKey) {
+                if (paneEngine.group_by === "modified" || paneEngine.sort_by === "modified") {
+                    paneEngine.set_sort(paneEngine.sort_by, paneEngine.sort_ascending);
+                }
+            }
+            lastDateKey = key;
+        }
+    }
+
+    function updateVisualRows() {
+        if (!isGroupedGrid()) {
+            groupedRows = [];
+            groupedGroupTops = [];
+            groupedFileToVisual = [];
+            return;
+        }
+        var groupsJson = paneEngine.groups_json();
+        var groups = [];
+        try { groups = JSON.parse(groupsJson); } catch (e) { groups = []; }
+        var c = cols();
+        var rows = [];
+        var groupTops = [];
+        var currentY = 0;
+        var fileToVisual = [];
+        for (var g = 0; g < groups.length; ++g) {
+            var grp = groups[g];
+            groupTops.push(currentY);
+            rows.push({
+                isHeader: true,
+                title: grp.title,
+                groupIndex: g,
+                y: currentY,
+                height: 28
+            });
+            currentY += 28;
+            var count = grp.count;
+            var start = grp.start;
+            for (var offset = 0; offset < count; offset += c) {
+                var rowCardCount = Math.min(c, count - offset);
+                var visualRowIndex = rows.length;
+                rows.push({
+                    isHeader: false,
+                    groupIndex: g,
+                    startIndex: start + offset,
+                    count: rowCardCount,
+                    y: currentY,
+                    height: cellH
+                });
+                for (var ci = 0; ci < rowCardCount; ++ci) {
+                    fileToVisual[start + offset + ci] = {
+                        visualRow: visualRowIndex,
+                        groupIndex: g,
+                        col: ci
+                    };
+                }
+                currentY += cellH;
+            }
+        }
+        groupedGroupTops = groupTops;
+        groupedFileToVisual = fileToVisual;
+        groupedRows = rows;
+        groupedVisualRevision++;
     }
 
     // Apply right away when the items are already listed (the watcher may
@@ -173,6 +276,31 @@ Item {
                 s[paths[i]] = true;
             return s;
         }
+        if (isGroupedGrid()) {
+            var m1 = groupedFileToVisual[fromRow];
+            var m2 = groupedFileToVisual[toRow];
+            if (m1 && m2 && m1.groupIndex === m2.groupIndex) {
+                var grp = JSON.parse(paneEngine.groups_json())[m1.groupIndex];
+                var c = cols();
+                var r1 = Math.floor((fromRow - grp.start) / c), r2 = Math.floor((toRow - grp.start) / c);
+                var c1 = (fromRow - grp.start) % c, c2 = (toRow - grp.start) % c;
+                var out = {};
+                for (var r = Math.min(r1, r2); r <= Math.max(r1, r2); ++r) {
+                    for (var cc = Math.min(c1, c2); cc <= Math.max(c1, c2); ++cc) {
+                        var idx = grp.start + r * c + cc;
+                        if (idx < grp.start + grp.count && idx < paneEngine.item_count)
+                            out[paneEngine.path_at(idx)] = true;
+                    }
+                }
+                return out;
+            } else {
+                var paths = JSON.parse(paneEngine.paths_in_range(fromRow, toRow));
+                var out = {};
+                for (var p = 0; p < paths.length; ++p)
+                    out[paths[p]] = true;
+                return out;
+            }
+        }
         var c = cols();
         var r1 = Math.floor(fromRow / c), r2 = Math.floor(toRow / c);
         var c1 = fromRow % c, c2 = toRow % c;
@@ -224,12 +352,48 @@ Item {
         var c = cols();
         var cur = cursorPath ? paneEngine.row_of(cursorPath) : -1;
         var target;
-        if (cur < 0)
+        if (cur < 0) {
             target = 0;
-        else if (isList())
+        } else if (isList()) {
             target = cur + (dy !== 0 ? dy : dx);
-        else
+        } else if (isGroupedGrid()) {
+            var m = groupedFileToVisual[cur];
+            if (!m) {
+                target = cur + (dy !== 0 ? dy * c : dx);
+            } else if (dy === 0) {
+                target = cur + dx;
+            } else {
+                var groups = JSON.parse(paneEngine.groups_json());
+                var grp = groups[m.groupIndex];
+                var localIdx = cur - grp.start;
+                var rowInGroup = Math.floor(localIdx / c);
+                var numRowsInGroup = Math.ceil(grp.count / c);
+                if (dy > 0) {
+                    if (rowInGroup + 1 < numRowsInGroup) {
+                        target = grp.start + (rowInGroup + 1) * c + m.col;
+                        if (target >= grp.start + grp.count)
+                            target = grp.start + grp.count - 1;
+                    } else if (m.groupIndex + 1 < groups.length) {
+                        var nextGrp = groups[m.groupIndex + 1];
+                        target = nextGrp.start + Math.min(m.col, nextGrp.count - 1);
+                    } else {
+                        target = cur;
+                    }
+                } else {
+                    if (rowInGroup > 0) {
+                        target = grp.start + (rowInGroup - 1) * c + m.col;
+                    } else if (m.groupIndex > 0) {
+                        var prevGrp = groups[m.groupIndex - 1];
+                        var lastRowInPrev = Math.floor((prevGrp.count - 1) / c);
+                        target = prevGrp.start + Math.min(prevGrp.count - 1, lastRowInPrev * c + m.col);
+                    } else {
+                        target = cur;
+                    }
+                }
+            }
+        } else {
             target = cur + dx + dy * c;
+        }
         target = Math.max(0, Math.min(n - 1, target));
         selectRow(target, false, shift);
         ensureVisible(target);
@@ -238,10 +402,16 @@ Item {
     function ensureVisible(row) {
         if (row < 0)
             return;
-        if (isList())
+        if (isList()) {
             listView.positionViewAtIndex(row, ListView.Contain);
-        else
+        } else if (isGroupedGrid()) {
+            var m = groupedFileToVisual[row];
+            if (m) {
+                groupedListView.positionViewAtIndex(m.visualRow, ListView.Contain);
+            }
+        } else {
             gridView.positionViewAtIndex(row, GridView.Contain);
+        }
     }
 
     function selectFirstMatch(prefix) {
@@ -475,6 +645,12 @@ Item {
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                 }
                 Connections {
+                    target: groupedListView
+                    function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
+                }
+                Connections {
                     target: listView
                     function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
@@ -597,7 +773,19 @@ Item {
                     var on = function (n) { return n >= 0 && !!traced[n] && !!sel[n]; };
                     if (pane.isList()) {
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
-                        var ly = Math.round(listHeader.height + 6 + idx * (rowH + 3) - listView.contentY);
+                        var pitch = rowH + listView.spacing;
+                        var itemTop = idx * pitch;
+                        if (paneEngine.sort_by === "modified") {
+                            var groups = [];
+                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                            for (var g = 0; g < groups.length; ++g) {
+                                if (idx >= groups[g].start && idx < groups[g].start + groups[g].count) {
+                                    itemTop = idx * pitch + (g + 1) * 28;
+                                    break;
+                                }
+                            }
+                        }
+                        var ly = Math.round(listHeader.height + 6 + itemTop - listView.contentY);
                         var up = idx > 0 && on(idx - 1);
                         var down = on(idx + 1);
                         return {
@@ -607,6 +795,27 @@ Item {
                             y0: up ? ly : ly + 2,
                             y1: down ? ly + rowH + 3 : ly + rowH - 2,
                             up: up, down: down, left: false, right: false
+                        };
+                    }
+                    if (pane.isGroupedGrid()) {
+                        var m = pane.groupedFileToVisual[idx];
+                        if (!m) return { x0: 0, x1: 0, y0: 0, y1: 0, up: false, down: false, left: false, right: false };
+                        var vRow = pane.groupedRows[m.visualRow];
+                        var c = m.col;
+                        var cw = pane.cellW;
+                        var ch = pane.cellH;
+                        var isLeft = c > 0 && on(idx - 1);
+                        var isRight = c < vRow.count - 1 && on(idx + 1);
+                        var prevRow = m.visualRow > 0 ? pane.groupedRows[m.visualRow - 1] : null;
+                        var isUp = (prevRow && !prevRow.isHeader && prevRow.count > c) && on(prevRow.startIndex + c);
+                        var nextRow = m.visualRow + 1 < pane.groupedRows.length ? pane.groupedRows[m.visualRow + 1] : null;
+                        var isDown = (nextRow && !nextRow.isHeader && nextRow.count > c) && on(nextRow.startIndex + c);
+                        return {
+                            x0: Math.round(c * cw),
+                            x1: Math.round((c + 1) * cw),
+                            y0: Math.round(vRow.y - groupedListView.contentY),
+                            y1: Math.round(vRow.y + ch - groupedListView.contentY),
+                            up: isUp, down: isDown, left: isLeft, right: isRight
                         };
                     }
                     var cw = gridView.cellWidth;
@@ -636,10 +845,35 @@ Item {
                         return out;
                     if (pane.isList()) {
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom))) + 3;
-                        var first = Math.max(0, Math.floor(listView.contentY / rowH) - 1);
-                        var last = Math.min(count - 1, Math.ceil((listView.contentY + height) / rowH) + 1);
-                        for (var i = first; i <= last; ++i)
-                            out.push(i);
+                        if (paneEngine.sort_by === "modified") {
+                            var groups = [];
+                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                            for (var g = 0; g < groups.length; ++g) {
+                                var grp = groups[g];
+                                var headerOffset = (g + 1) * 28;
+                                var min_i = Math.max(grp.start, Math.floor((listView.contentY - rowH - headerOffset) / rowH));
+                                var max_i = Math.min(grp.start + grp.count - 1, Math.ceil((listView.contentY + height + rowH - headerOffset) / rowH));
+                                for (var r = min_i; r <= max_i; ++r)
+                                    out.push(r);
+                            }
+                        } else {
+                            var first = Math.max(0, Math.floor(listView.contentY / rowH) - 1);
+                            var last = Math.min(count - 1, Math.ceil((listView.contentY + height) / rowH) + 1);
+                            for (var i = first; i <= last; ++i)
+                                out.push(i);
+                        }
+                        return out;
+                    }
+                    if (pane.isGroupedGrid()) {
+                        for (var i = 0; i < pane.groupedRows.length; ++i) {
+                            var r = pane.groupedRows[i];
+                            if (r.isHeader)
+                                continue;
+                            if (r.y + pane.cellH >= groupedListView.contentY - pane.cellH && r.y <= groupedListView.contentY + height + pane.cellH) {
+                                for (var c = 0; c < r.count; ++c)
+                                    out.push(r.startIndex + c);
+                            }
+                        }
                         return out;
                     }
                     var cols = pane.cols();
@@ -806,8 +1040,8 @@ Item {
                 anchors.fill: parent
                 z: 1
                 visible: opacity > 0.01
-                opacity: !pane.isList() ? 1.0 : 0.0
-                scale: !pane.isList() ? 1.0 : 0.97
+                opacity: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.0
+                scale: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.97
                 enabled: visible
                 clip: true
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
@@ -977,12 +1211,11 @@ Item {
                     }
                 }
 
-                delegate: Item {
-                    id: card
-                    // A recycled cell must not carry a half-started drag.
-                    GridView.onPooled: cardMouse.dragging = false
-                    width: gridView.cellWidth
-                    height: gridView.cellHeight
+                delegate: FileGridCard {
+                    viewPane: pane
+                    hostWindow: window
+                    engineModel: paneEngine
+                    fileDragManager: dragManager
 
                     required property int index
                     required property string name
@@ -996,255 +1229,243 @@ Item {
                     required property string display_name
                     required property bool starred
 
-                    readonly property bool isSelected: !!pane.selection[path]
-                    readonly property bool isCut: !!window.cutSet[path]
-                    readonly property int cols: pane.cols()
-                    readonly property int col: index % Math.max(1, cols)
-                    readonly property int rowIdx: Math.floor(index / Math.max(1, cols))
+                    itemIndex: index
+                    itemName: name
+                    itemPath: path
+                    itemIsDir: is_dir
+                    itemIsSymlink: is_symlink
+                    itemIcon: icon
+                    itemSystemIcon: system_icon
+                    itemThumbable: thumbable
+                    itemThumbId: thumb_id
+                    itemDisplayName: display_name
+                    itemStarred: starred
+                }
+            }
 
+            ListView {
+                id: groupedListView
+                anchors.fill: parent
+                z: 1
+                visible: opacity > 0.01
+                opacity: pane.isGroupedGrid() ? 1.0 : 0.0
+                scale: pane.isGroupedGrid() ? 1.0 : 0.97
+                enabled: visible
+                clip: true
+                reuseItems: true
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: true
+                model: visible ? pane.groupedRows : null
+                focus: false
+                Accessible.role: Accessible.List
+                Accessible.name: paneEngine.current_dir_name
 
-                    readonly property bool isDropTarget: is_dir && folderDrop.containsDrag
-                    readonly property bool hasThumb: theme.showThumbnails && thumbable && thumbImg.status === Image.Ready
-                    readonly property bool isCursor: window.keyboardNavActive && pane.isActive && pane.cursorPath === path
-
-                    Accessible.role: Accessible.ListItem
-                    Accessible.name: name
-                    Accessible.selected: isSelected
-
-                    DropArea {
-                        id: folderDrop
-                        anchors.fill: parent
-                        enabled: card.is_dir && !paneEngine.read_only
-                        keys: ["text/uri-list"]
-                        onEntered: dragManager.hover(card.path, paneEngine)
-                        onExited: if (dragManager.hoverTarget === card.path) dragManager.hoverTarget = ""
-                        onDropped: function(drop) { pane.handleDropOn(drop, card.path, card); }
+                ScrollBar.vertical: ScrollBar {
+                    id: groupedGridScroll
+                    policy: ScrollBar.AsNeeded
+                    width: 12
+                    padding: 2
+                    contentItem: Rectangle {
+                        implicitWidth: 6
+                        radius: 3
+                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outline : theme.outlineVariant)
+                        opacity: groupedGridScroll.active ? 1.0 : 0.0
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
+                }
 
-                    Rectangle {
-                        id: hoverOverlay
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: theme.radiusM
-                        color: card.isDropTarget ? theme.primaryContainer : theme.hoverOverlay
-                        border.width: card.isDropTarget ? 2 : 0
-                        border.color: theme.primary
-                        visible: !card.isSelected && (cardMouse.containsMouse || card.isDropTarget)
+                WheelHandler {
+                    target: null
+                    acceptedModifiers: Qt.NoModifier
+                    onWheel: function(event) {
+                        var step = 80 * pane.zoom;
+                        var maxY = Math.max(0, groupedListView.contentHeight - groupedListView.height);
+                        groupedListView.contentY = Math.max(0, Math.min(maxY, groupedListView.contentY - (event.angleDelta.y > 0 ? step : -step)));
                     }
+                }
+                WheelHandler {
+                    target: null
+                    acceptedModifiers: Qt.ControlModifier
+                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                }
 
-                    // Keyboard cursor ring, drawn above the connected selection.
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: theme.radiusM
-                        color: "transparent"
-                        border.width: card.isCursor ? 2 : 0
-                        border.color: theme.primary
-                        visible: card.isCursor
-                    }
+                Rectangle {
+                    id: groupedBand
+                    parent: groupedListView.contentItem
+                    z: 100
+                    visible: false
+                    color: theme.selectionBox
+                    border.color: theme.primary
+                    border.width: 1.5
+                    radius: theme.radiusM
+                }
 
-                    // No entry animation: cells are created on every scroll step.
-                    // A short tween (not an oscillating spring) keeps hover cheap.
-                    scale: cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0)
-                    Behavior on scale { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+                MouseArea {
+                    id: groupedBgMouse
+                    parent: groupedListView.contentItem
+                    width: Math.max(groupedListView.width, groupedListView.contentWidth)
+                    height: Math.max(groupedListView.height + groupedListView.contentY, groupedListView.contentHeight)
+                    z: -1
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    preventStealing: theme.dragAction === "select"
 
-                    ColumnLayout {
-                        id: cardContentCol
-                        opacity: card.isCut ? 0.52 : 1.0
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
-                        anchors.fill: parent
-                        anchors.margins: 12 * pane.chromeScale
-                        spacing: 6
+                    property real sx: 0
+                    property real sy: 0
+                    property real pointerY: 0
+                    property bool active: false
+                    property bool justDragged: false
+                    property var base: ({})
 
-                        Item { Layout.fillHeight: true }
-
-                        Item {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.preferredWidth: pane.iconBox
-                            Layout.preferredHeight: pane.iconBox
-
-                            LoafIcon {
-                                visible: !card.hasThumb && theme.iconSource === "phosphor"
-                                anchors.centerIn: parent
-                                name: card.isCut ? (card.is_dir ? "folder-dashed" : "file-dashed") : (card.icon || "file")
-                                size: pane.iconSize
-                                color: card.isSelected ? theme.secondaryContainerFg : (card.is_dir ? theme.primary : theme.textMain)
-                            }
-
-                            Image {
-                                visible: !card.hasThumb && theme.iconSource !== "phosphor"
-                                anchors.centerIn: parent
-                                source: theme.iconSource !== "phosphor" ? window.systemIcon(card.system_icon) : ""
-                                width: pane.iconSize + 2
-                                height: pane.iconSize + 2
-                                sourceSize.width: 64 * pane.zoom
-                                sourceSize.height: 64 * pane.zoom
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                            }
-
-                            Item {
-                                id: thumbFrame
-                                anchors.centerIn: parent
-                                visible: card.hasThumb
-                                readonly property bool square: theme.thumbnailShape !== "original"
-                                // In "original" mode the frame hugs the picture so
-                                // the rounded corners and border follow its shape.
-                                readonly property real fit: (square || thumbImg.implicitWidth <= 0 || thumbImg.implicitHeight <= 0)
-                                    ? 0 : Math.min(parent.width / thumbImg.implicitWidth, parent.height / thumbImg.implicitHeight)
-                                width: fit > 0 ? Math.round(thumbImg.implicitWidth * fit) : parent.width
-                                height: fit > 0 ? Math.round(thumbImg.implicitHeight * fit) : parent.height
-
-                                // "/round": the provider rounds the corners once, so no
-                                // offscreen mask layer per thumbnail is needed.
-                                Image {
-                                    id: thumbImg
-                                    anchors.fill: parent
-                                    source: theme.showThumbnails && card.thumbable && card.thumb_id.length > 0
-                                        ? ("image://thumb/" + card.thumb_id + (thumbFrame.square ? "/cover" : "") + "/round") : ""
-                                    fillMode: thumbFrame.square ? Image.PreserveAspectCrop : Image.Stretch
-                                    sourceSize.width: pane.thumbBox
-                                    sourceSize.height: pane.thumbBox
-                                    asynchronous: true
-                                    cache: true
-                                    smooth: true
-                                    mipmap: true
+                    function updateBand(mx, my) {
+                        var x = Math.min(sx, mx), y = Math.min(sy, my);
+                        var w = Math.abs(mx - sx), h = Math.abs(my - sy);
+                        groupedBand.x = x; groupedBand.y = y; groupedBand.width = w; groupedBand.height = h;
+                        var cw = pane.cellW, ch = pane.cellH;
+                        var sel = Object.assign({}, base);
+                        for (var i = 0; i < pane.groupedRows.length; ++i) {
+                            var r = pane.groupedRows[i];
+                            if (r.isHeader)
+                                continue;
+                            if (y + h > r.y && y < r.y + ch) {
+                                for (var c = 0; c < r.count; ++c) {
+                                    var cardX = c * cw + 4;
+                                    var cardY = r.y + 4;
+                                    if (x < cardX + cw - 8 && x + w > cardX && y < cardY + ch - 8 && y + h > cardY) {
+                                        var p = paneEngine.path_at(r.startIndex + c);
+                                        if (p && p.length > 0)
+                                            sel[p] = true;
+                                    }
                                 }
+                            }
+                        }
+                        pane.selection = sel;
+                    }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: Math.min(width, height) / 6 // same as the provider's "/round"
-                                    color: "transparent"
-                                    border.color: card.isSelected ? theme.primary : theme.outlineVariant
-                                    border.width: 1
-                                    opacity: card.isSelected ? 0.75 : 0.35
-                                }
+                    onPressed: function(mouse) {
+                        pane.activated();
+                        window.defocusInputs();
+                        if (mouse.button !== Qt.LeftButton || theme.dragAction !== "select")
+                            return;
+                        sx = mouse.x; sy = mouse.y;
+                        pointerY = mouse.y - groupedListView.contentY;
+                        active = false;
+                        base = (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) ? Object.assign({}, pane.selection) : {};
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (theme.dragAction !== "select" || !(mouse.buttons & Qt.LeftButton))
+                            return;
+                        pointerY = mouse.y - groupedListView.contentY;
+                        if (!active && (Math.abs(mouse.x - sx) + Math.abs(mouse.y - sy)) > 6) {
+                            active = true;
+                            groupedBand.visible = true;
+                        }
+                        if (active)
+                            updateBand(mouse.x, mouse.y);
+                    }
+                    onReleased: {
+                        if (active) {
+                            active = false;
+                            groupedBand.visible = false;
+                            justDragged = true;
+                            groupedResetDragged.restart();
+                        }
+                    }
+                    onCanceled: { active = false; groupedBand.visible = false; }
+                    onClicked: function(mouse) {
+                        if (justDragged)
+                            return;
+                        if (mouse.button === Qt.RightButton) {
+                            var pt = mapToItem(window.contentItem, mouse.x, mouse.y);
+                            window.openEmptyMenu(pane, pt.x, pt.y);
+                        } else {
+                            pane.clearSelection();
+                        }
+                    }
+                    Timer { id: groupedResetDragged; interval: 60; onTriggered: groupedBgMouse.justDragged = false }
+                    Timer {
+                        interval: 20
+                        repeat: true
+                        running: groupedBgMouse.active
+                        onTriggered: {
+                            var my = groupedListView.contentY + groupedBgMouse.pointerY;
+                            var top = groupedListView.contentY, bottom = top + groupedListView.height;
+                            var maxY = Math.max(0, groupedListView.contentHeight - groupedListView.height);
+                            if (my < top + 32 && groupedListView.contentY > 0)
+                                groupedListView.contentY = Math.max(0, groupedListView.contentY - 12);
+                            else if (my > bottom - 32 && groupedListView.contentY < maxY)
+                                groupedListView.contentY = Math.min(maxY, groupedListView.contentY + 12);
+                            else
+                                return;
+                            groupedBgMouse.updateBand(groupedBgMouse.mouseX, groupedListView.contentY + groupedBgMouse.pointerY);
+                        }
+                    }
+                }
+
+                delegate: Item {
+                    id: visualRowItem
+                    width: groupedListView.width
+                    height: modelData.isHeader ? 28 : pane.cellH
+
+                    // Header row
+                    Item {
+                        visible: modelData.isHeader
+                        anchors.fill: parent
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 8
+                            Text {
+                                text: modelData.title || ""
+                                font.pixelSize: theme.fs(12)
+                                font.bold: true
+                                color: theme.textMuted
                             }
                             Rectangle {
-                                visible: card.is_symlink
-                                width: 14; height: 14; radius: 7
-                                color: theme.surfaceContainer
-                                border.color: theme.outlineVariant
-                                border.width: 1
-                                anchors.bottom: parent.bottom
-                                anchors.right: parent.right
-                                LoafIcon { anchors.centerIn: parent; name: "arrow-square-out"; size: 9; color: theme.primary }
-                            }
-                            LoafIcon {
-                                visible: card.starred
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.margins: -4
-                                name: "star"
-                                size: 13
-                                color: theme.primary
+                                Layout.fillWidth: true
+                                height: 1
+                                color: theme.outlineVariant
+                                opacity: 0.5
                             }
                         }
-
-                        Loader {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 30
-                            active: true
-                            sourceComponent: pane.renamingPath === card.path ? renameEditor : nameLabel
-
-                            Component {
-                                id: nameLabel
-                                Text {
-                                    text: paneEngine.is_searching_everywhere ? (card.display_name || card.name) : card.name
-                                    color: card.isSelected ? theme.secondaryContainerFg : theme.textMain
-                                    font.pixelSize: theme.fs(11)
-                                    font.bold: card.is_dir || card.isSelected
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignTop
-                                    wrapMode: Text.WrapAnywhere
-                                    maximumLineCount: 2
-                                    elide: Text.ElideMiddle
-                                }
-                            }
-                            Component {
-                                id: renameEditor
-                                InlineRename {
-                                    originalName: card.name
-                                    isDir: card.is_dir
-                                    onCommit: function(text) { pane.commitRename(card.path, text); }
-                                    onCancel: pane.cancelRename()
-                                }
-                            }
-                        }
-
-                        Item { Layout.fillHeight: true }
                     }
 
-                    MouseArea {
-                        id: cardMouse
+                    // Card row
+                    Item {
+                        id: cardRowItem
+                        visible: !modelData.isHeader
                         anchors.fill: parent
-                        anchors.margins: 4
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-                        preventStealing: true
-                        onWheel: function(wheel) { wheel.accepted = false; }
+                        property var rowItems: (pane.groupedVisualRevision >= 0 && !modelData.isHeader) ? JSON.parse(paneEngine.items_json_slice(modelData.startIndex, modelData.count)) : []
+                        Row {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            spacing: 0
+                            Repeater {
+                                model: cardRowItem.rowItems
+                                delegate: FileGridCard {
+                                    viewPane: pane
+                                    hostWindow: window
+                                    engineModel: paneEngine
+                                    fileDragManager: dragManager
 
-                        property point pressPt
-                        property bool dragging: false
-
-                        onPressed: function(mouse) {
-                            pane.activated();
-                            window.defocusInputs();
-                            pressPt = Qt.point(mouse.x, mouse.y);
-                            dragging = false;
-                            if (mouse.button === Qt.LeftButton && !card.isSelected
-                                    && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)))
-                                pane.selectRow(card.index, false, false);
-                        }
-                        onPositionChanged: function(mouse) {
-                            if (dragging || !(mouse.buttons & (Qt.LeftButton | Qt.RightButton)) || pane.renamingPath === card.path)
-                                return;
-                            // Archive members aren't real files; trashed
-                            // files must be restored, not dragged out.
-                            if (paneEngine.location_kind === "archive" || paneEngine.location_kind === "trash" || (paneEngine.location_kind === "mtp" && paneEngine.read_only))
-                                return;
-                            var dx = mouse.x - pressPt.x, dy = mouse.y - pressPt.y;
-                            if (dx * dx + dy * dy >= 36) {
-                                dragging = true;
-                                if (!card.isSelected)
-                                    pane.selectRow(card.index, false, false);
-                                dragManager.isRmb = !!(mouse.buttons & Qt.RightButton);
-                                dragManager.cursorPos = mapToItem(window.contentItem, mouse.x, mouse.y);
-                                dragManager.begin(pane.selectedPaths(), mouse);
+                                    itemIndex: modelData.index
+                                    itemName: modelData.name
+                                    itemPath: modelData.path
+                                    itemIsDir: modelData.is_dir
+                                    itemIsSymlink: modelData.is_symlink
+                                    itemIcon: modelData.icon
+                                    itemSystemIcon: modelData.system_icon
+                                    itemThumbable: modelData.thumbable
+                                    itemThumbId: modelData.thumb_id
+                                    itemDisplayName: modelData.display_name
+                                    itemStarred: modelData.starred
+                                }
                             }
                         }
-                        onReleased: if (dragging) { dragManager.end(); dragging = false; }
-                        onCanceled: if (dragging) { dragManager.end(); dragging = false; }
-                        onClicked: function(mouse) {
-                            if (mouse.button === Qt.MiddleButton) {
-                                window.newTab(card.path);
-                                return;
-                            }
-                            if (mouse.button === Qt.RightButton) {
-                                if (!card.isSelected)
-                                    pane.selectRow(card.index, false, false);
-                                var pt = mapToItem(window.contentItem, mouse.x, mouse.y);
-                                window.openItemMenu(pane, card.index, pt.x, pt.y);
-                            } else {
-                                contextMenu.close();
-                                var wasOnlySelected = card.isSelected && pane.selectedCount === 1;
-                                pane.selectRow(card.index, !!(mouse.modifiers & Qt.ControlModifier), !!(mouse.modifiers & Qt.ShiftModifier));
-                                // Single click on the already selected name renames (like Nautilus).
-                                if (wasOnlySelected && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))
-                                        && theme.clickToRename && mouse.y > card.height * 0.6)
-                                    renameDelay.restart();
-                            }
-                        }
-                        onDoubleClicked: function(mouse) {
-                            renameDelay.stop();
-                            if (mouse.button === Qt.LeftButton)
-                                pane.openRow(card.index);
-                        }
-                        Timer { id: renameDelay; interval: 500; onTriggered: pane.startRename() }
                     }
                 }
             }
+
             Rectangle {
                 id: listHeader
                 visible: pane.isList()
@@ -1265,7 +1486,7 @@ Item {
                     Repeater {
                         model: [
                             { key: "name", label: qsTr("Name"), fill: true, width: 100, show: true, defaultAsc: true },
-                            { key: "modified", label: qsTr("Date Modified"), fill: false, width: 150, show: pane.width >= 560, defaultAsc: false },
+                            { key: "modified", label: qsTr("Date Modified"), fill: false, width: 150, show: pane.width >= 560, defaultAsc: true },
                             { key: "type", label: qsTr("Type"), fill: false, width: 100, show: pane.width >= 720, defaultAsc: true },
                             { key: "size", label: qsTr("Size"), fill: false, width: 80, show: pane.width >= 640, defaultAsc: false }
                         ]
@@ -1329,6 +1550,31 @@ Item {
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: visible ? paneEngine : null
+                section.property: paneEngine.group_by !== "none" ? "group_label" : ""
+                section.criteria: ViewSection.FullString
+                section.delegate: Item {
+                    required property string section
+                    width: listView.width
+                    height: 28
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
+                        Text {
+                            text: section
+                            font.pixelSize: theme.fs(12)
+                            font.bold: true
+                            color: theme.textMuted
+                        }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 1
+                            color: theme.outlineVariant
+                            opacity: 0.5
+                        }
+                    }
+                }
                 Accessible.role: Accessible.List
                 Accessible.name: paneEngine.current_dir_name
 
@@ -1393,16 +1639,38 @@ Item {
                         var x = Math.min(sx, mx), y = Math.min(sy, my);
                         var w = Math.abs(mx - sx), h = Math.abs(my - sy);
                         listBand.x = x; listBand.y = y; listBand.width = w; listBand.height = h;
+                        var sel = Object.assign({}, base);
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
                         var pitch = rowH + listView.spacing;
-                        var sel = Object.assign({}, base);
-                        var count = paneEngine.item_count;
-                        var r1 = Math.max(0, Math.floor((y - listView.originY) / pitch));
-                        var r2 = Math.min(count - 1, Math.floor((y + h - listView.originY) / pitch));
-                        for (var r = r1; r <= r2; ++r) {
-                            var t = listView.originY + r * pitch;
-                            if (x < listView.width && x + w >= 0 && y + h > t && y < t + rowH)
-                                sel[paneEngine.path_at(r)] = true;
+                        if (paneEngine.sort_by === "modified") {
+                            var groups = [];
+                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                            for (var g = 0; g < groups.length; ++g) {
+                                var grp = groups[g];
+                                var headerOffset = (g + 1) * 28;
+                                var min_i = Math.max(grp.start, Math.floor((y - headerOffset) / pitch));
+                                var max_i = Math.min(grp.start + grp.count - 1, Math.floor((y + h - headerOffset) / pitch));
+                                for (var r = min_i; r <= max_i; ++r) {
+                                    var itemTop = r * pitch + headerOffset;
+                                    if (x < listView.width && x + w >= 0 && y + h > itemTop && y < itemTop + rowH) {
+                                        var p = paneEngine.path_at(r);
+                                        if (p && p.length > 0)
+                                            sel[p] = true;
+                                    }
+                                }
+                            }
+                        } else {
+                            var count = paneEngine.item_count;
+                            var r1 = Math.max(0, Math.floor((y - listView.originY) / pitch));
+                            var r2 = Math.min(count - 1, Math.floor((y + h - listView.originY) / pitch));
+                            for (var r = r1; r <= r2; ++r) {
+                                var t = listView.originY + r * pitch;
+                                if (x < listView.width && x + w >= 0 && y + h > t && y < t + rowH) {
+                                    var p = paneEngine.path_at(r);
+                                    if (p && p.length > 0)
+                                        sel[p] = true;
+                                }
+                            }
                         }
                         pane.selection = sel;
                     }

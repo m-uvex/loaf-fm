@@ -18,14 +18,7 @@ Item {
     readonly property real effectivePanelOpacity: lowPower ? 1.0
         : (isFinite(panelOpacity) ? Math.max(0.0, Math.min(1.0, panelOpacity)) : 1.0)
 
-    // Only large background surfaces use alpha. Foregrounds and popup surfaces
-    // retain their palette colors, so text, icons and dialogs remain opaque.
-    //
-    // The window's clear color goes straight into the premultiplied Wayland
-    // buffer, so its RGB must already be premultiplied by the alpha. A plain
-    // Qt.rgba(c, a) with a < 1 writes un-premultiplied RGB into the buffer and
-    // the compositor adds it on top of the wallpaper — that is what turned a
-    // fully transparent window into a white veil in light mode.
+    // Window background RGB is premultiplied by alpha for Wayland compositors.
     readonly property color windowBackground: {
         var a = effectiveBackgroundOpacity;
         return Qt.rgba(background.r * a, background.g * a, background.b * a, a);
@@ -71,8 +64,7 @@ Item {
     property string openFolderMode: "current" // "current", "split", "tab"
     property bool showBackgroundShapes: true
 
-    // ---- performance / accessibility ---------------------------------------
-    // "auto" turns low-power mode on when Qt renders without a GPU.
+    // Low-power mode activates automatically when running on software rendering or low-end hardware.
     property string lowPowerSetting: "auto" // "auto", "on", "off"
     property bool reduceMotionSetting: false
     readonly property bool softwareRendering: GraphicsInfo.api === GraphicsInfo.Software

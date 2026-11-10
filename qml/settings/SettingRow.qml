@@ -23,7 +23,6 @@ RowLayout {
     Layout.bottomMargin: root.isCompact ? 9 : 12
     spacing: 18
 
-    // ---- Label block -------------------------------------------------
     RowLayout {
         Layout.fillWidth: true
         Layout.minimumWidth: 0
@@ -92,10 +91,7 @@ RowLayout {
         }
     }
 
-    // ---- Control column ----------------------------------------------
-    // No maximumWidth here: capping this layout to a percentage of the row
-    // width made small controls (switches) collapse into the middle of the
-    // row instead of hugging the card's trailing edge.
+    // No maximumWidth: controls hug the card's trailing edge.
     RowLayout {
         id: controlSlot
         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter

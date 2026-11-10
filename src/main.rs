@@ -1,5 +1,9 @@
 pub mod apps;
 pub mod archive;
+// cxx-qt 0.10 generates a trampolining extern "C" wrapper for save_network_profile
+// with 10 parameters; rustc/clippy applies too_many_arguments to the module level
+// because item-level allow does not reach into macro-generated Qt bridge glue.
+#[allow(clippy::too_many_arguments)]
 pub mod core;
 pub mod drives;
 pub mod fsops;

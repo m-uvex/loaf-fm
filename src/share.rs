@@ -86,7 +86,9 @@ pub fn ensure_cloudflared_installed(on_complete: Box<dyn FnOnce(bool, String) + 
 
     thread::spawn(move || {
         let res = install_cloudflared_sync();
-        get_manager().cloudflared_installing.store(false, Ordering::SeqCst);
+        get_manager()
+            .cloudflared_installing
+            .store(false, Ordering::SeqCst);
         match res {
             Ok(path) => on_complete(true, path.to_string_lossy().to_string()),
             Err(e) => on_complete(false, e),
@@ -358,16 +360,16 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
     let srv_share_id = share_id.clone();
 
     thread::spawn(move || {
-        run_file_server(
+        run_file_server(FileServerParams {
             listener,
-            srv_file,
-            srv_name,
-            srv_token,
-            srv_throttle,
-            srv_stop,
-            srv_bytes,
-            srv_share_id,
-        );
+            file_path: srv_file,
+            filename: srv_name,
+            token: srv_token,
+            throttle_kbps: srv_throttle,
+            stop_flag: srv_stop,
+            bytes_sent: srv_bytes,
+            share_id: srv_share_id,
+        });
     });
 
     // Spawn cloudflared tunnel
@@ -398,7 +400,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
         let mut found = false;
-        for line in reader.lines().flatten() {
+        for line in reader.lines().map_while(Result::ok) {
             if !found {
                 for word in line.split_whitespace() {
                     if (word.starts_with("https://") && word.contains(".trycloudflare.com"))
@@ -483,7 +485,7 @@ fn rand_u64() -> u64 {
     now.as_nanos() as u64 ^ (pid << 32)
 }
 
-fn run_file_server(
+struct FileServerParams {
     listener: TcpListener,
     file_path: PathBuf,
     filename: String,
@@ -492,7 +494,19 @@ fn run_file_server(
     stop_flag: Arc<AtomicBool>,
     bytes_sent: Arc<AtomicU64>,
     share_id: String,
-) {
+}
+
+fn run_file_server(params: FileServerParams) {
+    let FileServerParams {
+        listener,
+        file_path,
+        filename,
+        token,
+        throttle_kbps,
+        stop_flag,
+        bytes_sent,
+        share_id,
+    } = params;
     listener
         .set_nonblocking(true)
         .expect("Cannot set non-blocking");

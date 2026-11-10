@@ -74,8 +74,6 @@ LoafPopup {
         openAt((window.width - width) / 2, (window.height - height) / 2);
     }
 
-    // ---- markup helpers ---------------------------------------------------
-
     function escapeHtml(s) {
         return String(s)
             .replace(/&/g, "&amp;")
@@ -238,8 +236,6 @@ LoafPopup {
         return "<pre style=\"margin:0px\">" + highlightCode(text, info.language) + "</pre>";
     }
 
-    // ---- content ----------------------------------------------------------
-
     ColumnLayout {
         width: quickLook.width - 2 * quickLook.contentPadding
         spacing: 10
@@ -284,7 +280,6 @@ LoafPopup {
             color: theme.separator
         }
 
-        // Image preview
         Item {
             visible: quickLook.info.kind === "image" || ((quickLook.info.kind === "thumbnail" || quickLook.info.kind === "media") && quickLookImage.status === Image.Ready)
             Layout.fillWidth: true
@@ -315,7 +310,6 @@ LoafPopup {
             }
         }
 
-        // Text / code / markdown preview
         Flickable {
             id: previewFlick
             visible: quickLook.info.kind === "text" || quickLook.info.kind === "archive"
@@ -337,8 +331,6 @@ LoafPopup {
                 textFormat: Text.RichText
                 color: theme.textMain
                 font.pixelSize: theme.fs(13)
-                // Code keeps its own line breaks and scrolls sideways;
-                // prose wraps to the pane width.
                 wrapMode: quickLook.isCode && !quickLook.isMarkdown ? Text.NoWrap : Text.Wrap
                 width: quickLook.isCode && !quickLook.isMarkdown
                     ? implicitWidth
@@ -346,7 +338,6 @@ LoafPopup {
             }
         }
 
-        // Folder / media / unsupported
         ColumnLayout {
             visible: quickLook.info.kind !== "image" && quickLook.info.kind !== "text" && quickLook.info.kind !== "archive"
                 && !((quickLook.info.kind === "thumbnail" || quickLook.info.kind === "media") && quickLookImage.status === Image.Ready)
@@ -378,7 +369,7 @@ LoafPopup {
 
         Text {
             visible: quickLook.info.truncated === true
-            text: qsTr("Preview truncated — showing the first part of the file")
+            text: qsTr("Preview truncated: showing the first part of the file")
             color: theme.textMuted
             font.pixelSize: theme.fs(11)
         }
