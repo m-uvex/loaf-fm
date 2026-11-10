@@ -51,6 +51,7 @@ jobs:
             qml6-module-qtquick-shapes \
             qml6-module-qtquick-window \
             qml6-module-qtquick-dialogs \
+            qml6-module-qtquick-effects \
             libgl1-mesa-dev \
             libgl1-mesa-dri \
             libxkbcommon-dev \
