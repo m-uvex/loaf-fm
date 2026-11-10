@@ -113,7 +113,7 @@ jobs:
           done
 
           if [ -z "$CHOSEN" ]; then
-            echo "Error: None of the last 15 commits passed the smoke test!"
+            echo "Error: None of the checked commits passed the smoke test!"
             exit 1
           fi
 
