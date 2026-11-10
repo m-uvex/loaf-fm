@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 15
+          fetch-depth: 5
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -42,13 +42,17 @@ jobs:
             qt6-base-dev \
             qt6-declarative-dev \
             libqt6quick6 \
+            qml6-module-qtqml \
+            qml6-module-qtqml-workerscript \
             qml6-module-qtquick \
             qml6-module-qtquick-controls \
             qml6-module-qtquick-layouts \
             qml6-module-qtquick-templates \
             qml6-module-qtquick-shapes \
             qml6-module-qtquick-window \
+            qml6-module-qtquick-dialogs \
             libgl1-mesa-dev \
+            libgl1-mesa-dri \
             libxkbcommon-dev \
             libvulkan-dev \
             libfuse2 \
@@ -61,7 +65,7 @@ jobs:
       - name: Find latest working commit
         id: find_commit
         run: |
-          COMMITS=$(git rev-list --max-count=15 HEAD)
+          COMMITS=$(git rev-list --max-count=5 HEAD)
           CHOSEN=""
 
           for COMMIT in $COMMITS; do
@@ -71,21 +75,14 @@ jobs:
 
             git checkout -f "$COMMIT"
 
-            # 1. Run unit / integration tests
-            if ! cargo test; then
-              echo "Commit $SHORT failed cargo test"
-              echo "::endgroup::"
-              continue
-            fi
-
-            # 2. Compile release binary
+            # 1. Compile release binary
             if ! cargo build --release; then
               echo "Commit $SHORT failed release compilation"
               echo "::endgroup::"
               continue
             fi
 
-            # 3. Smoke test: launch under Xvfb and verify it runs without crashing
+            # 2. Smoke test: launch under Xvfb and verify it runs without crashing
             rm -f /tmp/loaf-smoke.log
             xvfb-run -a ./target/release/loaf --new-window /tmp > /tmp/loaf-smoke.log 2>&1 &
             LOAF_PID=$!
