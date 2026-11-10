@@ -66,7 +66,6 @@ Item {
     Shape {
         visible: root.wavy
         anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
             strokeColor: root.trackStart < root.width - root.cap ? root.trackColor : "transparent"
