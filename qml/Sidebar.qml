@@ -468,27 +468,27 @@ Rectangle {
                 }
             }
 
-            // Quick empty trash button on hover
+            // Quick empty trash button on hover (only when sidebar is expanded so it never breaks icon centering)
             Rectangle {
                 id: quickEmptyTrashBtn
-                visible: typeof core !== "undefined" && core && !core.trash_empty
+                visible: rail.expanded && typeof core !== "undefined" && core && !core.trash_empty
                 anchors.right: parent.right
-                anchors.rightMargin: rail.expanded ? 14 : 6
+                anchors.rightMargin: 20
                 anchors.verticalCenter: parent.verticalCenter
-                width: 26
-                height: 26
-                radius: 13
-                z: 2
+                width: 28
+                height: 28
+                radius: 14
+                z: 3
                 color: quickEmptyTrashMouse.containsMouse ? theme.hoverOverlay : "transparent"
                 opacity: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.0
-                scale: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.7
-                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140 } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.35 } }
+                scale: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.85
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 120 } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.35 } }
 
                 LoafIcon {
                     anchors.centerIn: parent
-                    name: "broom"
-                    size: 14
+                    name: "trash"
+                    size: 16
                     color: quickEmptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
                 }
 
@@ -608,7 +608,7 @@ Rectangle {
             anchors.left: iconBox.right
             anchors.leftMargin: 6
             anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.rightMargin: btn.showLabel ? 52 : 16
             anchors.verticalCenter: parent.verticalCenter
             visible: opacity > 0.01
             opacity: btn.showLabel ? (btn.dimmed ? 0.5 : 1.0) : 0.0
@@ -624,6 +624,7 @@ Rectangle {
             color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             font.pixelSize: theme.fs(13)
             font.bold: btn.selected
+            font.family: theme.fontFamily
             elide: Text.ElideRight
         }
 
