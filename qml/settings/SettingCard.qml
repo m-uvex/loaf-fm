@@ -35,7 +35,6 @@ Rectangle {
         anchors.margins: root.padding
         spacing: 0
 
-        // ---- Category Header (Collapsible) --------------------------
         Item {
             id: headerItem
             visible: root.title.length > 0
@@ -129,7 +128,6 @@ Rectangle {
             }
         }
 
-        // ---- Category Inner Content ---------------------------------
         ColumnLayout {
             id: innerCol
             Layout.fillWidth: true

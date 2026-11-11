@@ -36,6 +36,8 @@ pub mod qobject {
         #[qproperty(bool, can_go_back)]
         #[qproperty(bool, can_go_forward)]
         #[qproperty(bool, show_hidden)]
+        #[qproperty(QString, group_by)]
+        #[qproperty(bool, group_ascending)]
         #[qproperty(QString, sort_by)]
         #[qproperty(bool, sort_ascending)]
         #[qproperty(QString, folder_position)]
@@ -61,13 +63,23 @@ pub mod qobject {
         fn end_reset_model(self: Pin<&mut LoafEngine>);
         #[inherit]
         #[cxx_name = "beginInsertRows"]
-        fn begin_insert_rows(self: Pin<&mut LoafEngine>, parent: &QModelIndex, first: i32, last: i32);
+        fn begin_insert_rows(
+            self: Pin<&mut LoafEngine>,
+            parent: &QModelIndex,
+            first: i32,
+            last: i32,
+        );
         #[inherit]
         #[cxx_name = "endInsertRows"]
         fn end_insert_rows(self: Pin<&mut LoafEngine>);
         #[inherit]
         #[cxx_name = "beginRemoveRows"]
-        fn begin_remove_rows(self: Pin<&mut LoafEngine>, parent: &QModelIndex, first: i32, last: i32);
+        fn begin_remove_rows(
+            self: Pin<&mut LoafEngine>,
+            parent: &QModelIndex,
+            first: i32,
+            last: i32,
+        );
         #[inherit]
         #[cxx_name = "endRemoveRows"]
         fn end_remove_rows(self: Pin<&mut LoafEngine>);
@@ -77,7 +89,12 @@ pub mod qobject {
         #[inherit]
         #[qsignal]
         #[cxx_name = "dataChanged"]
-        fn data_changed(self: Pin<&mut LoafEngine>, top_left: &QModelIndex, bottom_right: &QModelIndex, roles: &QList_i32);
+        fn data_changed(
+            self: Pin<&mut LoafEngine>,
+            top_left: &QModelIndex,
+            bottom_right: &QModelIndex,
+            roles: &QList_i32,
+        );
 
         #[qinvokable]
         #[cxx_override]
@@ -129,6 +146,10 @@ pub mod qobject {
         #[qinvokable]
         fn toggle_show_hidden(self: Pin<&mut LoafEngine>);
         #[qinvokable]
+        fn set_group(self: Pin<&mut LoafEngine>, group_by: &QString, ascending: bool);
+        #[qinvokable]
+        fn toggle_group_order(self: Pin<&mut LoafEngine>);
+        #[qinvokable]
         fn set_sort(self: Pin<&mut LoafEngine>, key: &QString, ascending: bool);
         #[qinvokable]
         fn toggle_sort_order(self: Pin<&mut LoafEngine>);
@@ -165,6 +186,14 @@ pub mod qobject {
         /// Paths of rows first..=last (for shift-selection ranges).
         #[qinvokable]
         fn paths_in_range(self: &LoafEngine, first: i32, last: i32) -> QString;
+        /// JSON array of group headers and their start indices: [{"title": "Today", "start": 0, "count": 5}, ...]
+        #[qinvokable]
+        fn groups_json(self: &LoafEngine) -> QString;
+        #[qinvokable]
+        fn date_groups_json(self: &LoafEngine) -> QString;
+        /// JSON array of item objects for rows start..start+count
+        #[qinvokable]
+        fn items_json_slice(self: &LoafEngine, start: i32, count: i32) -> QString;
     }
 
     impl cxx_qt::Threading for LoafEngine {}
@@ -175,7 +204,9 @@ use crate::listing::{self, Change, Entry, SortSpec};
 use crate::{archive, state, trash, util, watcher, xdg};
 use core::pin::Pin;
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant};
+use cxx_qt_lib::{
+    QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
+};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -187,9 +218,16 @@ enum Loc {
     Trash,
     Recent,
     Starred,
-    Search { root: PathBuf, query: String, contents: bool },
+    Search {
+        root: PathBuf,
+        query: String,
+        contents: bool,
+    },
     /// Browsing inside an archive file (read-only).
-    Archive { file: PathBuf, inner: String },
+    Archive {
+        file: PathBuf,
+        inner: String,
+    },
     Mtp(crate::mtp::Location),
 }
 
@@ -212,19 +250,23 @@ pub fn split_archive_url(rest: &str) -> (PathBuf, String) {
     (PathBuf::from(file), inner.to_string())
 }
 
-impl Loc {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Loc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Loc::Dir(p) => p.to_string_lossy().to_string(),
-            Loc::Mtp(location) => location.url(),
-            Loc::Trash => "trash:///".into(),
-            Loc::Recent => "recent:///".into(),
-            Loc::Starred => "starred:///".into(),
-            Loc::Search { root, .. } => root.to_string_lossy().to_string(),
-            Loc::Archive { file, inner } => format!("{}{}#{}", ARCHIVE_SCHEME, file.to_string_lossy(), inner),
+            Loc::Dir(p) => write!(f, "{}", p.to_string_lossy()),
+            Loc::Mtp(location) => write!(f, "{}", location.url()),
+            Loc::Trash => write!(f, "trash:///"),
+            Loc::Recent => write!(f, "recent:///"),
+            Loc::Starred => write!(f, "starred:///"),
+            Loc::Search { root, .. } => write!(f, "{}", root.to_string_lossy()),
+            Loc::Archive { file, inner } => {
+                write!(f, "{}{}#{}", ARCHIVE_SCHEME, file.to_string_lossy(), inner)
+            }
         }
     }
+}
 
+impl Loc {
     fn parse(s: &str) -> Option<Loc> {
         let s = s.trim();
         if s.starts_with("mtp:") {
@@ -238,7 +280,10 @@ impl Loc {
         }
         if let Some(rest) = s.strip_prefix(ARCHIVE_SCHEME) {
             let (file, inner) = split_archive_url(rest);
-            return Some(Loc::Archive { file, inner: inner.trim_matches('/').to_string() });
+            return Some(Loc::Archive {
+                file,
+                inner: inner.trim_matches('/').to_string(),
+            });
         }
         let path = if let Some(rest) = s.strip_prefix("file://") {
             trash::decode_path(rest)
@@ -256,7 +301,10 @@ impl Loc {
             return Some(Loc::Dir(path));
         }
         if path.is_file() && archive::is_archive(&path) {
-            return Some(Loc::Archive { file: path, inner: String::new() });
+            return Some(Loc::Archive {
+                file: path,
+                inner: String::new(),
+            });
         }
         None
     }
@@ -282,6 +330,8 @@ pub struct PaneRust {
     can_go_back: bool,
     can_go_forward: bool,
     show_hidden: bool,
+    group_by: QString,
+    group_ascending: bool,
     sort_by: QString,
     sort_ascending: bool,
     folder_position: QString,
@@ -311,6 +361,7 @@ pub struct PaneRust {
     generation: Arc<AtomicU64>,
     watcher: Option<watcher::DirWatcher>,
     archive_cache: Option<(PathBuf, i64, Vec<archive::Entry>)>,
+    pub date_ctx: listing::DateGroupContext,
 }
 
 impl Default for PaneRust {
@@ -324,6 +375,8 @@ impl Default for PaneRust {
             can_go_back: false,
             can_go_forward: false,
             show_hidden: state::get_bool("show_hidden", false),
+            group_by: QString::from(&*state::get_or("group_by", "none")),
+            group_ascending: state::get_bool("group_ascending", true),
             sort_by: QString::from(&*state::get_or("sort_by", "name")),
             sort_ascending: state::get_bool("sort_ascending", true),
             folder_position: QString::from(&*state::get_or("folder_position", "first")),
@@ -343,19 +396,23 @@ impl Default for PaneRust {
             before_search: None,
             all: Vec::new(),
             rows: Vec::new(),
-            starred: xdg::starred().into_iter().map(|p| p.to_string_lossy().to_string()).collect(),
+            starred: xdg::starred()
+                .into_iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
             back: Vec::new(),
             forward: Vec::new(),
             generation: Arc::new(AtomicU64::new(0)),
             watcher: None,
             archive_cache: None,
+            date_ctx: listing::DateGroupContext::default(),
         }
     }
 }
 
 // Model roles (Qt::UserRole + n).
 const ROLE_BASE: i32 = 0x0100;
-const ROLES: [&str; 18] = [
+const ROLES: [&str; 20] = [
     "name",
     "path",
     "is_dir",
@@ -374,6 +431,8 @@ const ROLES: [&str; 18] = [
     "display_name",
     "starred",
     "parent_path",
+    "date_group",
+    "group_label",
 ];
 
 pub fn hex_path(p: &str) -> String {
@@ -411,11 +470,25 @@ pub fn format_date(ts: i64) -> String {
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }
-    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    format!("{} {}, {}", MONTHS[tm.tm_mon.clamp(0, 11) as usize], tm.tm_mday, tm.tm_year + 1900)
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    format!(
+        "{} {}, {}",
+        MONTHS[tm.tm_mon.clamp(0, 11) as usize],
+        tm.tm_mday,
+        tm.tm_year + 1900
+    )
 }
 
-fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
+fn entry_json(
+    e: &Entry,
+    starred: bool,
+    date_ctx: &listing::DateGroupContext,
+    group_by: &str,
+) -> serde_json::Value {
+    let date_group = listing::date_group_label(e.modified, date_ctx);
+    let group_label = listing::group_label(e, group_by, date_ctx);
     serde_json::json!({
         "name": e.name,
         "path": e.path,
@@ -429,10 +502,14 @@ fn entry_json(e: &Entry, starred: bool) -> serde_json::Value {
         "icon": e.icon,
         "system_icon": e.system_icon,
         "category": e.category,
+        "thumbable": e.thumbable,
+        "thumb_id": if e.thumbable { format!("{}-{}", hex_path(&e.path), e.modified) } else { String::new() },
         "detail": e.detail,
         "parent_path": e.detail,
         "display_name": e.display_name,
         "starred": starred,
+        "date_group": date_group,
+        "group_label": group_label,
     })
 }
 
@@ -464,7 +541,13 @@ fn dir_crumbs(target: &Path) -> Vec<Crumb> {
     let mut out = Vec::new();
 
     if target.starts_with(&home) {
-        out.push(crumb("Home", &home.to_string_lossy(), "house", "user-home-symbolic", true));
+        out.push(crumb(
+            "Home",
+            &home.to_string_lossy(),
+            "house",
+            "user-home-symbolic",
+            true,
+        ));
         let mut cur = home.clone();
         if let Ok(rel) = target.strip_prefix(&home) {
             for comp in rel.components() {
@@ -486,13 +569,25 @@ fn dir_crumbs(target: &Path) -> Vec<Crumb> {
             }
         }
     } else {
-        out.push(crumb("root", "/", "hard-drive", "drive-harddisk-symbolic", true));
+        out.push(crumb(
+            "root",
+            "/",
+            "hard-drive",
+            "drive-harddisk-symbolic",
+            true,
+        ));
         let mut cur = PathBuf::from("/");
         if let Ok(rel) = target.strip_prefix("/") {
             for comp in rel.components() {
                 if let std::path::Component::Normal(c) = comp {
                     cur.push(c);
-                    out.push(crumb(&c.to_string_lossy(), &cur.to_string_lossy(), "folder", "folder", false));
+                    out.push(crumb(
+                        &c.to_string_lossy(),
+                        &cur.to_string_lossy(),
+                        "folder",
+                        "folder",
+                        false,
+                    ));
                 }
             }
         }
@@ -524,26 +619,46 @@ impl qobject::LoafEngine {
 
     pub fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
         let row = index.row();
-        let Some(e) = (row >= 0).then(|| self.rows.get(row as usize)).flatten() else { return QVariant::default() };
+        let Some(e) = (row >= 0).then(|| self.rows.get(row as usize)).flatten() else {
+            return QVariant::default();
+        };
         let s = |v: &str| QVariant::from(&QString::from(v));
-        match ROLES.get((role - ROLE_BASE) as usize).copied().unwrap_or("") {
+        match ROLES
+            .get((role - ROLE_BASE) as usize)
+            .copied()
+            .unwrap_or("")
+        {
             "name" => s(&e.name),
             "path" => s(&e.path),
             "is_dir" => QVariant::from(&e.is_dir),
             "is_symlink" => QVariant::from(&e.is_symlink),
             "is_hidden" => QVariant::from(&e.is_hidden),
             "size" => QVariant::from(&(e.size as i64)),
-            "size_str" => s(&if e.is_dir { "-".to_string() } else { util::format_size(e.size) }),
+            "size_str" => s(&if e.is_dir {
+                "-".to_string()
+            } else {
+                util::format_size(e.size)
+            }),
             "modified" => QVariant::from(&e.modified),
             "modified_str" => s(&relative_time(e.modified)),
             "icon" => s(e.icon),
             "system_icon" => s(e.system_icon),
             "category" => s(e.category),
             "thumbable" => QVariant::from(&e.thumbable),
-            "thumb_id" => s(&if e.thumbable { format!("{}-{}", hex_path(&e.path), e.modified) } else { String::new() }),
+            "thumb_id" => s(&if e.thumbable {
+                format!("{}-{}", hex_path(&e.path), e.modified)
+            } else {
+                String::new()
+            }),
             "detail" | "parent_path" => s(&e.detail),
             "display_name" => s(&e.display_name),
             "starred" => QVariant::from(&self.starred.contains(&e.path)),
+            "date_group" => s(&listing::date_group_label(e.modified, &self.date_ctx)),
+            "group_label" => s(&listing::group_label(
+                e,
+                &self.group_by().to_string(),
+                &self.date_ctx,
+            )),
             _ => QVariant::default(),
         }
     }
@@ -564,13 +679,15 @@ impl qobject::LoafEngine {
             for c in changes {
                 match c {
                     Change::Remove { at, count } => {
-                        self.as_mut().begin_remove_rows(&root, at as i32, (at + count - 1) as i32);
+                        self.as_mut()
+                            .begin_remove_rows(&root, at as i32, (at + count - 1) as i32);
                         self.as_mut().rust_mut().rows.drain(at..at + count);
                         self.as_mut().end_remove_rows();
                     }
                     Change::Insert { at, items } => {
                         let n = items.len();
-                        self.as_mut().begin_insert_rows(&root, at as i32, (at + n - 1) as i32);
+                        self.as_mut()
+                            .begin_insert_rows(&root, at as i32, (at + n - 1) as i32);
                         let rows = &mut self.as_mut().rust_mut().rows;
                         rows.splice(at..at, items);
                         self.as_mut().end_insert_rows();
@@ -578,7 +695,8 @@ impl qobject::LoafEngine {
                     Change::Update { at, item } => {
                         self.as_mut().rust_mut().rows[at] = item;
                         let idx = self.index(at as i32, 0, &root);
-                        self.as_mut().data_changed(&idx, &idx, &QList::<i32>::default());
+                        self.as_mut()
+                            .data_changed(&idx, &idx, &QList::<i32>::default());
                     }
                 }
             }
@@ -591,6 +709,8 @@ impl qobject::LoafEngine {
 
     fn sort_spec(&self) -> SortSpec {
         SortSpec {
+            group_by: self.group_by().to_string(),
+            group_ascending: *self.group_ascending(),
             key: self.sort_by().to_string(),
             ascending: *self.sort_ascending(),
             folders: self.folder_position().to_string(),
@@ -646,47 +766,124 @@ impl qobject::LoafEngine {
                 let name = if *p == util::home() {
                     "Home".to_string()
                 } else {
-                    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "/".into())
+                    p.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "/".into())
                 };
                 let mut c = dir_crumbs(p);
                 // Show where "forward" would go as faded crumbs.
-                if let Some(fwd) = self.forward.last().and_then(|f| Loc::parse(f)) {
-                    if let Loc::Dir(f) = fwd {
-                        if f != *p && f.starts_with(p) {
-                            let mut cur = p.clone();
-                            for comp in f.strip_prefix(p).unwrap_or(Path::new("")).components() {
-                                if let std::path::Component::Normal(x) = comp {
-                                    cur.push(x);
-                                    let mut cb = crumb(&x.to_string_lossy(), &cur.to_string_lossy(), "folder", "folder", false);
-                                    cb.is_forward = true;
-                                    c.push(cb);
-                                }
+                if let Some(Loc::Dir(f)) = self.forward.last().and_then(|f| Loc::parse(f)) {
+                    if f != *p && f.starts_with(p) {
+                        let mut cur = p.clone();
+                        for comp in f.strip_prefix(p).unwrap_or(Path::new("")).components() {
+                            if let std::path::Component::Normal(x) = comp {
+                                cur.push(x);
+                                let mut cb = crumb(
+                                    &x.to_string_lossy(),
+                                    &cur.to_string_lossy(),
+                                    "folder",
+                                    "folder",
+                                    false,
+                                );
+                                cb.is_forward = true;
+                                c.push(cb);
                             }
                         }
                     }
                 }
                 (name, c)
             }
-            Loc::Mtp(location) => (location.title(), location.breadcrumbs().into_iter()
-                .enumerate().map(|(index, (name, path))| crumb(&name, &path,
-                    if index == 0 { "device-mobile" } else { "folder" },
-                    if index == 0 { "phone-symbolic" } else { "folder" }, index == 0)).collect()),
-            Loc::Trash => ("Trash".into(), vec![crumb("Trash", "trash:///", "trash", "user-trash-symbolic", true)]),
-            Loc::Recent => ("Recent".into(), vec![crumb("Recent", "recent:///", "clock", "document-open-recent-symbolic", true)]),
-            Loc::Starred => ("Starred".into(), vec![crumb("Starred", "starred:///", "star", "starred-symbolic", true)]),
+            Loc::Mtp(location) => (
+                location.title(),
+                location
+                    .breadcrumbs()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (name, path))| {
+                        crumb(
+                            &name,
+                            &path,
+                            if index == 0 {
+                                "device-mobile"
+                            } else {
+                                "folder"
+                            },
+                            if index == 0 {
+                                "phone-symbolic"
+                            } else {
+                                "folder"
+                            },
+                            index == 0,
+                        )
+                    })
+                    .collect(),
+            ),
+            Loc::Trash => (
+                "Trash".into(),
+                vec![crumb(
+                    "Trash",
+                    "trash:///",
+                    "trash",
+                    "user-trash-symbolic",
+                    true,
+                )],
+            ),
+            Loc::Recent => (
+                "Recent".into(),
+                vec![crumb(
+                    "Recent",
+                    "recent:///",
+                    "clock",
+                    "document-open-recent-symbolic",
+                    true,
+                )],
+            ),
+            Loc::Starred => (
+                "Starred".into(),
+                vec![crumb(
+                    "Starred",
+                    "starred:///",
+                    "star",
+                    "starred-symbolic",
+                    true,
+                )],
+            ),
             Loc::Search { root, .. } => ("Search".into(), dir_crumbs(root)),
             Loc::Archive { file, inner } => {
                 let parent = file.parent().unwrap_or(Path::new("/"));
                 let mut c = dir_crumbs(parent);
-                let fname = file.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                c.push(crumb(&fname, &Loc::Archive { file: file.clone(), inner: String::new() }.to_string(), "file-zip", "package-x-generic", false));
+                let fname = file
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                c.push(crumb(
+                    &fname,
+                    &Loc::Archive {
+                        file: file.clone(),
+                        inner: String::new(),
+                    }
+                    .to_string(),
+                    "file-zip",
+                    "package-x-generic",
+                    false,
+                ));
                 let mut acc = String::new();
                 for part in inner.split('/').filter(|s| !s.is_empty()) {
                     if !acc.is_empty() {
                         acc.push('/');
                     }
                     acc.push_str(part);
-                    c.push(crumb(part, &Loc::Archive { file: file.clone(), inner: acc.clone() }.to_string(), "folder", "folder", false));
+                    c.push(crumb(
+                        part,
+                        &Loc::Archive {
+                            file: file.clone(),
+                            inner: acc.clone(),
+                        }
+                        .to_string(),
+                        "folder",
+                        "folder",
+                        false,
+                    ));
                 }
                 let title = if inner.is_empty() {
                     fname
@@ -700,11 +897,17 @@ impl qobject::LoafEngine {
         self.as_mut().set_current_path(QString::from(&*path));
         self.as_mut().set_current_dir_name(QString::from(&*title));
         self.as_mut().set_location_kind(QString::from(loc.kind()));
-        self.as_mut().set_breadcrumbs_json(QString::from(&*serde_json::to_string(&crumbs).unwrap_or_default()));
+        self.as_mut().set_breadcrumbs_json(QString::from(
+            &*serde_json::to_string(&crumbs).unwrap_or_default(),
+        ));
         let searching = matches!(loc, Loc::Search { .. });
         self.as_mut().set_is_searching_everywhere(searching);
-        self.as_mut().set_read_only(matches!(loc, Loc::Archive { .. } | Loc::Recent | Loc::Search { .. } | Loc::Starred)
-            || matches!(&loc, Loc::Mtp(location) if location.storage().is_none()));
+        self.as_mut().set_read_only(
+            matches!(
+                loc,
+                Loc::Archive { .. } | Loc::Recent | Loc::Search { .. } | Loc::Starred
+            ) || matches!(&loc, Loc::Mtp(location) if location.storage().is_none()),
+        );
         let (b, f) = (!self.back.is_empty(), !self.forward.is_empty());
         self.as_mut().set_can_go_back(b);
         self.as_mut().set_can_go_forward(f);
@@ -764,7 +967,11 @@ impl qobject::LoafEngine {
         let loc = self.loc.clone();
         let spec = self.sort_spec();
         // The cached listing can be large: only copy it when browsing an archive.
-        let archive_cache = if matches!(loc, Loc::Archive { .. }) { self.archive_cache.clone() } else { None };
+        let archive_cache = if matches!(loc, Loc::Archive { .. }) {
+            self.archive_cache.clone()
+        } else {
+            None
+        };
         let thread = self.qt_thread();
         if reset {
             // Show the new location right away instead of the old rows.
@@ -778,7 +985,9 @@ impl qobject::LoafEngine {
             let mut new_cache = None;
             let result: Result<Vec<Entry>, String> = match &loc {
                 Loc::Dir(p) => listing::scan(p, &cancelled).map_err(|e| match e.kind() {
-                    std::io::ErrorKind::PermissionDenied => "You don't have permission to view this folder".to_string(),
+                    std::io::ErrorKind::PermissionDenied => {
+                        "You don't have permission to view this folder".to_string()
+                    }
                     std::io::ErrorKind::NotFound => "This folder no longer exists".to_string(),
                     _ => e.to_string(),
                 }),
@@ -788,7 +997,11 @@ impl qobject::LoafEngine {
                         let name = it.original.file_name()?.to_string_lossy().to_string();
                         let mut e = listing::entry_for(&it.trashed, &name, &HashSet::new())?;
                         e.is_hidden = false;
-                        e.detail = it.original.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                        e.detail = it
+                            .original
+                            .parent()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
                         Some(e)
                     })
                     .collect()),
@@ -797,7 +1010,9 @@ impl qobject::LoafEngine {
                 Loc::Starred => Ok(listing::entries_for_paths(&xdg::starred())),
                 Loc::Search { .. } => Ok(Vec::new()),
                 Loc::Archive { file, inner } => {
-                    let mtime = std::fs::metadata(file).map(|m| std::os::unix::fs::MetadataExt::mtime(&m)).unwrap_or(0);
+                    let mtime = std::fs::metadata(file)
+                        .map(|m| std::os::unix::fs::MetadataExt::mtime(&m))
+                        .unwrap_or(0);
                     let entries = match archive_cache {
                         Some((f, m, e)) if f == *file && m == mtime => Ok(e),
                         _ => archive::list(file, "").map_err(|e| e.to_string()),
@@ -811,9 +1026,10 @@ impl qobject::LoafEngine {
             if cancelled() {
                 return;
             }
+            let date_ctx = listing::DateGroupContext::new(0);
             let result = result.map(|mut v| {
-                if !matches!(loc, Loc::Recent | Loc::Search { .. }) {
-                    listing::sort(&mut v, &spec);
+                if !matches!(loc, Loc::Recent | Loc::Search { .. }) || spec.group_by != "none" {
+                    listing::sort_with_ctx(&mut v, &spec, &date_ctx);
                 }
                 v.into_iter().map(Arc::new).collect::<Vec<_>>()
             });
@@ -836,6 +1052,7 @@ impl qobject::LoafEngine {
                         if !pane.error_text().is_empty() {
                             pane.as_mut().set_error_text(QString::default());
                         }
+                        pane.as_mut().rust_mut().date_ctx = date_ctx;
                         pane.as_mut().rust_mut().all = entries;
                         pane.as_mut().refilter(reset);
                     }
@@ -864,10 +1081,15 @@ impl qobject::LoafEngine {
         let up = match &self.loc {
             Loc::Dir(p) => p.parent().map(|x| Loc::Dir(x.to_path_buf())),
             Loc::Mtp(location) => location.parent().map(Loc::Mtp),
-            Loc::Archive { file, inner } if inner.is_empty() => file.parent().map(|x| Loc::Dir(x.to_path_buf())),
+            Loc::Archive { file, inner } if inner.is_empty() => {
+                file.parent().map(|x| Loc::Dir(x.to_path_buf()))
+            }
             Loc::Archive { file, inner } => Some(Loc::Archive {
                 file: file.clone(),
-                inner: inner.rsplit_once('/').map(|(a, _)| a.to_string()).unwrap_or_default(),
+                inner: inner
+                    .rsplit_once('/')
+                    .map(|(a, _)| a.to_string())
+                    .unwrap_or_default(),
             }),
             Loc::Search { .. } => self.before_search.clone(),
             _ => Some(Loc::Dir(util::home())),
@@ -886,7 +1108,9 @@ impl qobject::LoafEngine {
             };
             let Some(next) = next else { break };
             // Skip entries that no longer exist (deleted folders).
-            let Some(loc) = Loc::parse(&next) else { continue };
+            let Some(loc) = Loc::parse(&next) else {
+                continue;
+            };
             let current = match (&self.loc, &self.before_search) {
                 (Loc::Search { .. }, Some(prev)) => prev.to_string(),
                 _ => self.loc.to_string(),
@@ -912,7 +1136,11 @@ impl qobject::LoafEngine {
 
     pub fn refresh(self: Pin<&mut Self>) {
         match self.loc.clone() {
-            Loc::Search { root, query, contents } => {
+            Loc::Search {
+                root,
+                query,
+                contents,
+            } => {
                 self.run_search(root, query, contents);
             }
             Loc::Dir(p) if !p.is_dir() => {
@@ -961,7 +1189,11 @@ impl qobject::LoafEngine {
             let prev = self.loc.clone();
             self.as_mut().rust_mut().before_search = Some(prev);
         }
-        self.as_mut().rust_mut().loc = Loc::Search { root: root.clone(), query: q.clone(), contents };
+        self.as_mut().rust_mut().loc = Loc::Search {
+            root: root.clone(),
+            query: q.clone(),
+            contents,
+        };
         self.as_mut().set_search_query(QString::from(&*q));
         self.as_mut().update_location_props();
         self.run_search(root, q, contents);
@@ -978,7 +1210,13 @@ impl qobject::LoafEngine {
         self.as_mut().set_loading(true);
         std::thread::spawn(move || {
             let cancelled = || gen_ref.load(Ordering::SeqCst) != gen;
-            let q = crate::search::Query { text: query, root, show_hidden, contents, max_results: 2000 };
+            let q = crate::search::Query {
+                text: query,
+                root,
+                show_hidden,
+                contents,
+                max_results: 2000,
+            };
             let t = thread.clone();
             crate::search::run(&q, &cancelled, &mut |mut batch: Vec<Entry>| {
                 let _ = t.queue(move |mut pane| {
@@ -989,6 +1227,10 @@ impl qobject::LoafEngine {
                     all.extend(batch.drain(..).map(Arc::new));
                     if state::get_bool("disambiguate_duplicates", true) {
                         listing::disambiguate_shared(&mut all);
+                    }
+                    let spec = pane.sort_spec();
+                    if spec.group_by != "none" {
+                        listing::sort_with_ctx(&mut all, &spec, &pane.date_ctx);
                     }
                     pane.as_mut().rust_mut().all = all;
                     pane.as_mut().refilter(false);
@@ -1040,11 +1282,28 @@ impl qobject::LoafEngine {
     }
 
     fn resort(mut self: Pin<&mut Self>) {
+        let date_ctx = listing::DateGroupContext::new(0);
+        self.as_mut().rust_mut().date_ctx = date_ctx;
         let spec = self.sort_spec();
         let mut all = std::mem::take(&mut self.as_mut().rust_mut().all);
-        listing::sort(&mut all, &spec);
+        listing::sort_with_ctx(&mut all, &spec, &date_ctx);
         self.as_mut().rust_mut().all = all;
         self.refilter(true);
+    }
+
+    pub fn set_group(mut self: Pin<&mut Self>, group_by: &QString, ascending: bool) {
+        self.as_mut().set_group_by(group_by.clone());
+        self.as_mut().set_group_ascending(ascending);
+        state::set("group_by", &group_by.to_string());
+        state::set_bool("group_ascending", ascending);
+        self.resort();
+    }
+
+    pub fn toggle_group_order(mut self: Pin<&mut Self>) {
+        let v = !*self.group_ascending();
+        self.as_mut().set_group_ascending(v);
+        state::set_bool("group_ascending", v);
+        self.resort();
     }
 
     pub fn set_sort(mut self: Pin<&mut Self>, key: &QString, ascending: bool) {
@@ -1074,12 +1333,19 @@ impl qobject::LoafEngine {
     }
 
     pub fn toggle_view_mode(self: Pin<&mut Self>) {
-        let next = if self.view_mode().to_string() == "list" { "grid" } else { "list" };
+        let next = if self.view_mode().to_string() == "list" {
+            "grid"
+        } else {
+            "list"
+        };
         self.set_view(&QString::from(next));
     }
 
     pub fn reload_starred(mut self: Pin<&mut Self>) {
-        let set: HashSet<String> = xdg::starred().into_iter().map(|p| p.to_string_lossy().to_string()).collect();
+        let set: HashSet<String> = xdg::starred()
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
         self.as_mut().rust_mut().starred = set;
         if matches!(self.loc, Loc::Starred) {
             return self.start_scan(false);
@@ -1104,11 +1370,17 @@ impl qobject::LoafEngine {
     }
 
     pub fn restore_state(mut self: Pin<&mut Self>, state_json: &QString) {
-        let Ok(v) = serde_json::from_str::<serde_json::Value>(&state_json.to_string()) else { return };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&state_json.to_string()) else {
+            return;
+        };
         let list = |k: &str| -> Vec<String> {
             v.get(k)
                 .and_then(|x| x.as_array())
-                .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|s| s.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default()
         };
         self.as_mut().rust_mut().back = list("back");
@@ -1121,12 +1393,23 @@ impl qobject::LoafEngine {
         self.go_to(loc, false);
     }
     pub fn path_at(&self, row: i32) -> QString {
-        self.rows.get(row.max(0) as usize).map(|e| QString::from(&*e.path)).unwrap_or_default()
+        self.rows
+            .get(row.max(0) as usize)
+            .map(|e| QString::from(&*e.path))
+            .unwrap_or_default()
     }
 
     pub fn item_json(&self, row: i32) -> QString {
         match self.rows.get(row.max(0) as usize).filter(|_| row >= 0) {
-            Some(e) => QString::from(&*entry_json(e, self.starred.contains(&e.path)).to_string()),
+            Some(e) => QString::from(
+                &*entry_json(
+                    e,
+                    self.starred.contains(&e.path),
+                    &self.date_ctx,
+                    &self.group_by().to_string(),
+                )
+                .to_string(),
+            ),
             None => QString::from("{}"),
         }
     }
@@ -1144,7 +1427,11 @@ impl qobject::LoafEngine {
 
     pub fn row_of(&self, path: &QString) -> i32 {
         let p = path.to_string();
-        self.rows.iter().position(|e| e.path == p).map(|i| i as i32).unwrap_or(-1)
+        self.rows
+            .iter()
+            .position(|e| e.path == p)
+            .map(|i| i as i32)
+            .unwrap_or(-1)
     }
 
     pub fn rows_matching(&self, pattern: &QString) -> QString {
@@ -1165,14 +1452,87 @@ impl qobject::LoafEngine {
     pub fn filter_existing(&self, paths_json: &QString) -> QString {
         let wanted: Vec<String> = serde_json::from_str(&paths_json.to_string()).unwrap_or_default();
         let shown: HashSet<&str> = self.rows.iter().map(|e| e.path.as_str()).collect();
-        let kept: Vec<&String> = wanted.iter().filter(|p| shown.contains(p.as_str())).collect();
+        let kept: Vec<&String> = wanted
+            .iter()
+            .filter(|p| shown.contains(p.as_str()))
+            .collect();
         QString::from(&*serde_json::to_string(&kept).unwrap_or_else(|_| "[]".into()))
     }
 
     pub fn paths_in_range(&self, first: i32, last: i32) -> QString {
-        let (a, b) = (first.min(last).max(0) as usize, first.max(last).max(0) as usize);
-        let paths: Vec<&str> = self.rows.iter().skip(a).take(b.saturating_sub(a) + 1).map(|e| e.path.as_str()).collect();
+        let (a, b) = (
+            first.min(last).max(0) as usize,
+            first.max(last).max(0) as usize,
+        );
+        let paths: Vec<&str> = self
+            .rows
+            .iter()
+            .skip(a)
+            .take(b.saturating_sub(a) + 1)
+            .map(|e| e.path.as_str())
+            .collect();
         QString::from(&*serde_json::to_string(&paths).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn groups_json(&self) -> QString {
+        if self.group_by().to_string() == "none" {
+            return QString::from("[]");
+        }
+        #[derive(serde::Serialize)]
+        struct GroupInfo {
+            title: String,
+            start: usize,
+            count: usize,
+        }
+        let mut groups: Vec<GroupInfo> = Vec::new();
+        let group_by = self.group_by().to_string();
+        for (i, entry) in self.rows.iter().enumerate() {
+            let label = listing::group_label(entry, &group_by, &self.date_ctx);
+            if let Some(last) = groups.last_mut() {
+                if last.title == label {
+                    last.count += 1;
+                    continue;
+                }
+            }
+            groups.push(GroupInfo {
+                title: label,
+                start: i,
+                count: 1,
+            });
+        }
+        QString::from(&*serde_json::to_string(&groups).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn date_groups_json(&self) -> QString {
+        self.groups_json()
+    }
+
+    pub fn items_json_slice(&self, start: i32, count: i32) -> QString {
+        if start < 0 || count <= 0 {
+            return QString::from("[]");
+        }
+        let a = start as usize;
+        let b = (start + count) as usize;
+        let slice: Vec<serde_json::Value> = self
+            .rows
+            .iter()
+            .skip(a)
+            .take(b.saturating_sub(a))
+            .enumerate()
+            .map(|(offset, e)| {
+                let mut v = entry_json(
+                    e,
+                    self.starred.contains(&e.path),
+                    &self.date_ctx,
+                    &self.group_by().to_string(),
+                );
+                if let serde_json::Value::Object(ref mut map) = v {
+                    map.insert("index".into(), serde_json::Value::from(a + offset));
+                }
+                v
+            })
+            .collect();
+        QString::from(&*serde_json::to_string(&slice).unwrap_or_else(|_| "[]".into()))
     }
 }
 
@@ -1182,7 +1542,11 @@ pub fn glob_match(pat: &str, s: &str) -> bool {
     let t: Vec<char> = s.chars().collect();
     let (mut pi, mut ti, mut star, mut mark) = (0usize, 0usize, None::<usize>, 0usize);
     while ti < t.len() {
-        let step = if pi < p.len() { match_step(&p, pi, t[ti]) } else { None };
+        let step = if pi < p.len() {
+            match_step(&p, pi, t[ti])
+        } else {
+            None
+        };
         if let Some(next) = step {
             pi = next;
             ti += 1;
@@ -1256,10 +1620,16 @@ fn match_class(p: &[char], pi: usize, c: char) -> Option<usize> {
 
 /// Entries directly inside `inner` of an archive listing.
 fn archive_children(file: &Path, inner: &str, entries: &[archive::Entry]) -> Vec<Entry> {
-    let prefix = if inner.is_empty() { String::new() } else { format!("{}/", inner) };
+    let prefix = if inner.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", inner)
+    };
     let mut out = Vec::new();
     for e in entries {
-        let Some(rest) = e.path.strip_prefix(&prefix) else { continue };
+        let Some(rest) = e.path.strip_prefix(&prefix) else {
+            continue;
+        };
         if rest.is_empty() || rest.contains('/') {
             continue;
         }
@@ -1291,7 +1661,11 @@ fn archive_children(file: &Path, inner: &str, entries: &[archive::Entry]) -> Vec
 
 /// "YYYY-MM-DD hh:mm:ss" (local time) -> unix seconds.
 fn parse_stamp(s: &str) -> i64 {
-    let nums: Vec<i32> = s.split(|c: char| !c.is_ascii_digit()).filter(|x| !x.is_empty()).filter_map(|x| x.parse().ok()).collect();
+    let nums: Vec<i32> = s
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|x| !x.is_empty())
+        .filter_map(|x| x.parse().ok())
+        .collect();
     if nums.len() < 6 {
         return 0;
     }
@@ -1326,7 +1700,10 @@ mod tests {
     #[test]
     fn locations_round_trip() {
         assert_eq!(Loc::parse("trash:///"), Some(Loc::Trash));
-        let a = Loc::Archive { file: PathBuf::from("/tmp/x y.zip"), inner: "a/b".into() };
+        let a = Loc::Archive {
+            file: PathBuf::from("/tmp/x y.zip"),
+            inner: "a/b".into(),
+        };
         assert_eq!(Loc::parse(&a.to_string()), Some(a));
         assert_eq!(Loc::parse("relative/path"), None);
         assert_eq!(Loc::parse("/"), Some(Loc::Dir(PathBuf::from("/"))));
@@ -1394,8 +1771,18 @@ mod tests {
     #[test]
     fn archive_children_lists_one_level() {
         let entries = archive::with_implied_dirs(vec![
-            archive::Entry { path: "a/b/c.txt".into(), is_dir: false, size: 3, modified: "2024-01-01 00:00:00".into() },
-            archive::Entry { path: "top.txt".into(), is_dir: false, size: 1, modified: String::new() },
+            archive::Entry {
+                path: "a/b/c.txt".into(),
+                is_dir: false,
+                size: 3,
+                modified: "2024-01-01 00:00:00".into(),
+            },
+            archive::Entry {
+                path: "top.txt".into(),
+                is_dir: false,
+                size: 1,
+                modified: String::new(),
+            },
         ]);
         let root = archive_children(Path::new("/x.zip"), "", &entries);
         let mut names: Vec<_> = root.iter().map(|e| e.name.clone()).collect();

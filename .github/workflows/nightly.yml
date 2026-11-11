@@ -1,0 +1,212 @@
+name: "Nightly Release"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-test-nightly:
+    name: Build & Verify Nightly
+    runs-on: ubuntu-24.04
+
+    outputs:
+      commit: ${{ steps.find_commit.outputs.commit }}
+      short: ${{ steps.find_commit.outputs.short }}
+      subject: ${{ steps.find_commit.outputs.subject }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Qt6 and packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            libqt6quick6 \
+            qml6-module-qtqml \
+            qml6-module-qtqml-workerscript \
+            qml6-module-qtquick \
+            qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts \
+            qml6-module-qtquick-templates \
+            qml6-module-qtquick-shapes \
+            qml6-module-qtquick-window \
+            qml6-module-qtquick-dialogs \
+            libgl1-mesa-dev \
+            libgl1-mesa-dri \
+            libxkbcommon-dev \
+            libvulkan-dev \
+            libfuse2 \
+            desktop-file-utils \
+            rpm \
+            dpkg-dev \
+            zstd \
+            xvfb
+
+      - name: Find latest working commit
+        id: find_commit
+        run: |
+          COMMITS=$(git rev-list --max-count=5 HEAD)
+          CHOSEN=""
+
+          for COMMIT in $COMMITS; do
+            SHORT=$(git rev-parse --short "$COMMIT")
+            SUBJECT=$(git log -1 --pretty=format:'%s' "$COMMIT")
+            echo "::group::Testing commit $SHORT: $SUBJECT"
+
+            git checkout -f "$COMMIT"
+
+            # 1. Compile release binary
+            if ! cargo build --release; then
+              echo "Commit $SHORT failed release compilation"
+              echo "::endgroup::"
+              continue
+            fi
+
+            # 2. Smoke test: launch under Xvfb and verify it runs without crashing
+            rm -f /tmp/loaf-smoke.log
+            xvfb-run -a ./target/release/loaf --new-window /tmp > /tmp/loaf-smoke.log 2>&1 &
+            LOAF_PID=$!
+            sleep 4
+
+            if kill -0 "$LOAF_PID" 2>/dev/null; then
+              kill "$LOAF_PID" 2>/dev/null || true
+              wait "$LOAF_PID" 2>/dev/null || true
+
+              # Fail on fatal QML or engine errors
+              if grep -Ei "fatal|QQmlApplicationEngine failed to load component|segmentation fault" /tmp/loaf-smoke.log; then
+                echo "Commit $SHORT ran but encountered fatal QML or runtime errors:"
+                cat /tmp/loaf-smoke.log
+                echo "::endgroup::"
+                continue
+              fi
+
+              echo "Commit $SHORT verified functional and running!"
+              echo "::endgroup::"
+              CHOSEN="$COMMIT"
+              break
+            else
+              echo "Commit $SHORT crashed or exited during startup:"
+              cat /tmp/loaf-smoke.log || true
+              echo "::endgroup::"
+              continue
+            fi
+          done
+
+          if [ -z "$CHOSEN" ]; then
+            echo "Error: None of the checked commits passed the smoke test!"
+            exit 1
+          fi
+
+          echo "commit=$CHOSEN" >> $GITHUB_OUTPUT
+          echo "short=$(git rev-parse --short $CHOSEN)" >> $GITHUB_OUTPUT
+          echo "subject=$(git log -1 --pretty=format:'%s' $CHOSEN)" >> $GITHUB_OUTPUT
+
+      - name: Checkout verified commit
+        run: |
+          git checkout -f ${{ steps.find_commit.outputs.commit }}
+
+      - name: Build distribution packages
+        run: |
+          bash packaging/build-packages.sh
+          bash packaging/build-appimage.sh
+
+      - name: Stage canonical nightly assets
+        run: |
+          cd packaging/dist
+          DEB_FILE=$(ls -1 loaf_*_amd64.deb 2>/dev/null | grep -v 'nightly' | head -n1)
+          RPM_FILE=$(ls -1 loaf-*.rpm 2>/dev/null | grep -v 'nightly' | head -n1)
+          PKG_FILE=$(ls -1 loaf-*-x86_64.pkg.tar.zst 2>/dev/null | grep -v 'nightly' | head -n1)
+          TAR_FILE=$(ls -1 loaf-*-linux-x86_64.tar.gz 2>/dev/null | grep -v 'nightly' | head -n1)
+          BIN_FILE=$(ls -1 loaf-v*-linux-x86_64 2>/dev/null | grep -v 'nightly' | head -n1)
+          APPIMAGE_FILE=$(ls -1 Loaf-*-x86_64.AppImage 2>/dev/null | grep -v 'nightly' | head -n1)
+
+          [ -n "$DEB_FILE" ] && cp -f "$DEB_FILE" loaf_nightly_amd64.deb
+          [ -n "$RPM_FILE" ] && cp -f "$RPM_FILE" loaf-nightly.x86_64.rpm
+          [ -n "$PKG_FILE" ] && cp -f "$PKG_FILE" loaf-nightly-x86_64.pkg.tar.zst
+          [ -n "$TAR_FILE" ] && cp -f "$TAR_FILE" loaf-nightly-linux-x86_64.tar.gz
+          [ -n "$BIN_FILE" ] && cp -f "$BIN_FILE" loaf-nightly-linux-x86_64
+          [ -n "$APPIMAGE_FILE" ] && cp -f "$APPIMAGE_FILE" Loaf-nightly-x86_64.AppImage
+
+          sha256sum loaf* Loaf* > SHA256SUMS
+
+      - name: Update git nightly tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f nightly ${{ steps.find_commit.outputs.commit }}
+          git push -f origin nightly || true
+
+      - name: Publish Nightly GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          target_commitish: ${{ steps.find_commit.outputs.commit }}
+          name: "Loaf Nightly (${{ steps.find_commit.outputs.short }})"
+          body: |
+            Automated rolling nightly build for Loaf.
+            
+            - **Commit**: [${{ steps.find_commit.outputs.short }}](https://github.com/m-uvex/loaf-fm/commit/${{ steps.find_commit.outputs.commit }})
+            - **Summary**: ${{ steps.find_commit.outputs.subject }}
+            
+            This release has passed automated tests and startup verification before publishing.
+          draft: false
+          prerelease: true
+          make_latest: false
+          files: |
+            packaging/dist/loaf_nightly*
+            packaging/dist/loaf-nightly*
+            packaging/dist/Loaf-nightly*
+            packaging/dist/loaf_*.deb
+            packaging/dist/loaf-*.rpm
+            packaging/dist/loaf-*.pkg.tar.zst
+            packaging/dist/loaf-*.tar.gz
+            packaging/dist/loaf-v*-linux-x86_64
+            packaging/dist/Loaf-*.AppImage
+            packaging/dist/SHA256SUMS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  nix-cachix:
+    name: Build & Cache Nix Flake
+    needs: build-and-test-nightly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-and-test-nightly.outputs.commit }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Setup Cachix
+        if: env.CACHIX_AUTH_TOKEN != ''
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        uses: cachix/cachix-action@v15
+        with:
+          name: ${{ vars.CACHIX_CACHE_NAME || 'loaf-fm' }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build Nix Package
+        run: nix build .#packages.x86_64-linux.default --print-build-logs

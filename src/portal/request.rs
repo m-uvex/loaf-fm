@@ -1,9 +1,4 @@
-//! Validation and normalization of portal file chooser requests. The D-Bus
-//! layer (C++) demarshals the option map into the JSON shape documented in
-//! `filters.rs`; this module checks it against the spec's safety rules and
-//! fills defaults, so the picker UI and the reply builder only ever see
-//! sensible values. An error means the request is answered with response
-//! code 2.
+//! Validation and normalization of portal file chooser requests.
 
 use serde_json::{json, Map, Value};
 
@@ -27,7 +22,8 @@ pub fn normalize_request_json(raw: &str) -> String {
 /// Validates the request JSON and returns the normalized spec, or the
 /// reason the request must fail.
 pub fn normalize(raw: &str) -> Result<Value, String> {
-    let value: Value = serde_json::from_str(raw).map_err(|error| format!("malformed request: {error}"))?;
+    let value: Value =
+        serde_json::from_str(raw).map_err(|error| format!("malformed request: {error}"))?;
     let kind = string(&value, "kind").ok_or("request kind is missing")?;
     if !matches!(kind.as_str(), "open" | "save" | "save-files") {
         return Err(format!("unknown request kind '{kind}'"));
@@ -37,20 +33,31 @@ pub fn normalize(raw: &str) -> Result<Value, String> {
         return Err("request handle is not an object path".into());
     }
 
-    let current_file = if kind == "save" { optional_path(&value, "current_file")? } else { String::new() };
+    let current_file = if kind == "save" {
+        optional_path(&value, "current_file")?
+    } else {
+        String::new()
+    };
     let current_folder = optional_path(&value, "current_folder")?;
     // current_folder wins; otherwise a save request starts where the
     // pre-filled file lives.
     let start_folder = if !current_folder.is_empty() {
         current_folder
     } else {
-        current_file.rsplit_once('/').map(|(parent, _)| parent.to_string()).unwrap_or_default()
+        current_file
+            .rsplit_once('/')
+            .map(|(parent, _)| parent.to_string())
+            .unwrap_or_default()
     };
 
     let current_name = if kind == "save" {
         let name = string(&value, "current_name").unwrap_or_default();
         if name.is_empty() && !current_file.is_empty() {
-            current_file.rsplit('/').next().unwrap_or_default().to_string()
+            current_file
+                .rsplit('/')
+                .next()
+                .unwrap_or_default()
+                .to_string()
         } else {
             name
         }
@@ -76,18 +83,45 @@ pub fn normalize(raw: &str) -> Result<Value, String> {
     let mut spec = Map::new();
     spec.insert("kind".into(), json!(kind));
     spec.insert("handle".into(), json!(handle));
-    spec.insert("app_id".into(), json!(string(&value, "app_id").unwrap_or_default()));
-    spec.insert("parent_window".into(), json!(string(&value, "parent_window").unwrap_or_default()));
-    spec.insert("title".into(), json!(string(&value, "title").unwrap_or_default()));
-    spec.insert("accept_label".into(), json!(string(&value, "accept_label").unwrap_or_default()));
-    spec.insert("modal".into(), json!(value.get("modal").and_then(Value::as_bool).unwrap_or(true)));
+    spec.insert(
+        "app_id".into(),
+        json!(string(&value, "app_id").unwrap_or_default()),
+    );
+    spec.insert(
+        "parent_window".into(),
+        json!(string(&value, "parent_window").unwrap_or_default()),
+    );
+    spec.insert(
+        "title".into(),
+        json!(string(&value, "title").unwrap_or_default()),
+    );
+    spec.insert(
+        "accept_label".into(),
+        json!(string(&value, "accept_label").unwrap_or_default()),
+    );
+    spec.insert(
+        "modal".into(),
+        json!(value.get("modal").and_then(Value::as_bool).unwrap_or(true)),
+    );
     spec.insert(
         "multiple".into(),
-        json!(kind == "open" && value.get("multiple").and_then(Value::as_bool).unwrap_or(false)),
+        json!(
+            kind == "open"
+                && value
+                    .get("multiple")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        ),
     );
     spec.insert(
         "directory".into(),
-        json!(kind == "open" && value.get("directory").and_then(Value::as_bool).unwrap_or(false)),
+        json!(
+            kind == "open"
+                && value
+                    .get("directory")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        ),
     );
     spec.insert("start_folder".into(), json!(start_folder));
     spec.insert("current_name".into(), json!(current_name));
@@ -174,11 +208,16 @@ fn choice_list(value: &Value) -> Vec<Value> {
             entries
                 .iter()
                 .filter(|entry| {
-                    let values_ok = entry.get("values").and_then(Value::as_array).is_some_and(|values| {
-                        values
-                            .iter()
-                            .all(|value| value.get("id").and_then(Value::as_str).is_some() && value.get("label").and_then(Value::as_str).is_some())
-                    });
+                    let values_ok =
+                        entry
+                            .get("values")
+                            .and_then(Value::as_array)
+                            .is_some_and(|values| {
+                                values.iter().all(|value| {
+                                    value.get("id").and_then(Value::as_str).is_some()
+                                        && value.get("label").and_then(Value::as_str).is_some()
+                                })
+                            });
                     entry.get("label").and_then(Value::as_str).is_some()
                         && entry.get("id").and_then(Value::as_str).is_some()
                         && entry.get("selected").and_then(Value::as_str).is_some()
@@ -234,7 +273,9 @@ mod tests {
 
     #[test]
     fn save_request_falls_back_to_current_file() {
-        let s = spec(json!({"kind": "save", "handle": "/org/x/request/1", "current_file": "/home/u/report.pdf"}));
+        let s = spec(
+            json!({"kind": "save", "handle": "/org/x/request/1", "current_file": "/home/u/report.pdf"}),
+        );
         assert_eq!(s["start_folder"], "/home/u");
         assert_eq!(s["current_name"], "report.pdf");
     }
@@ -251,16 +292,34 @@ mod tests {
         assert!(error(json!({"kind": "print", "handle": "/h"})).contains("unknown request kind"));
         assert!(error(json!({"handle": "/h"})).contains("kind is missing"));
         assert!(error(json!({"kind": "open"})).contains("object path"));
-        assert!(error(json!({"kind": "open", "handle": "/h", "current_folder": "relative/path"})).contains("absolute"));
-        assert!(error(json!({"kind": "save", "handle": "/h", "current_folder": "/a\u{0}b"})).contains("NUL"));
+        assert!(
+            error(json!({"kind": "open", "handle": "/h", "current_folder": "relative/path"}))
+                .contains("absolute")
+        );
+        assert!(
+            error(json!({"kind": "save", "handle": "/h", "current_folder": "/a\u{0}b"}))
+                .contains("NUL")
+        );
     }
 
     #[test]
     fn rejects_path_traversal_in_names() {
-        assert!(error(json!({"kind": "save", "handle": "/h", "current_name": "a/b.txt"})).contains("plain file name"));
-        assert!(error(json!({"kind": "save", "handle": "/h", "current_name": ".."})).contains("'.' or '..'"));
-        assert!(error(json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", "../escape"]})).contains("plain file name"));
-        assert!(error(json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", 3]})).contains("file names"));
+        assert!(
+            error(json!({"kind": "save", "handle": "/h", "current_name": "a/b.txt"}))
+                .contains("plain file name")
+        );
+        assert!(
+            error(json!({"kind": "save", "handle": "/h", "current_name": ".."}))
+                .contains("'.' or '..'")
+        );
+        assert!(error(
+            json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", "../escape"]})
+        )
+        .contains("plain file name"));
+        assert!(
+            error(json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", 3]}))
+                .contains("file names")
+        );
         assert!(error(json!({"kind": "save-files", "handle": "/h"})).contains("files"));
     }
 
@@ -285,8 +344,17 @@ mod tests {
         }));
         assert_eq!(s["filters"].as_array().unwrap().len(), 1);
         assert_eq!(s["filters"][0]["name"], "Images");
-        assert_eq!(spec(json!({"kind": "open", "handle": "/h", "current_filter": {"name": "B", "patterns": []}}))["current_filter"]["name"], "B");
-        assert_eq!(spec(json!({"kind": "open", "handle": "/h", "current_filter": "junk"}))["current_filter"], Value::Null);
+        assert_eq!(
+            spec(
+                json!({"kind": "open", "handle": "/h", "current_filter": {"name": "B", "patterns": []}})
+            )["current_filter"]["name"],
+            "B"
+        );
+        assert_eq!(
+            spec(json!({"kind": "open", "handle": "/h", "current_filter": "junk"}))
+                ["current_filter"],
+            Value::Null
+        );
     }
 
     #[test]
@@ -306,12 +374,21 @@ mod tests {
 
     #[test]
     fn envelope_reports_ok_and_errors() {
-        let ok: Value = serde_json::from_str(&normalize_request_json(&json!({"kind": "open", "handle": "/h"}).to_string())).unwrap();
+        let ok: Value = serde_json::from_str(&normalize_request_json(
+            &json!({"kind": "open", "handle": "/h"}).to_string(),
+        ))
+        .unwrap();
         assert_eq!(ok["ok"], true);
         assert_eq!(ok["spec"]["kind"], "open");
-        let bad: Value = serde_json::from_str(&normalize_request_json(&json!({"kind": "bogus", "handle": "/h"}).to_string())).unwrap();
+        let bad: Value = serde_json::from_str(&normalize_request_json(
+            &json!({"kind": "bogus", "handle": "/h"}).to_string(),
+        ))
+        .unwrap();
         assert_eq!(bad["ok"], false);
-        assert!(bad["error"].as_str().unwrap().contains("unknown request kind"));
+        assert!(bad["error"]
+            .as_str()
+            .unwrap()
+            .contains("unknown request kind"));
         let malformed: Value = serde_json::from_str(&normalize_request_json("not json")).unwrap();
         assert_eq!(malformed["ok"], false);
     }

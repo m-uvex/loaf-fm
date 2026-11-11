@@ -53,17 +53,40 @@ mod tests {
 
     #[test]
     fn encodes_reserved_and_non_ascii_bytes() {
-        assert_eq!(path_to_file_uri(Path::new("/home/u/file.txt")), "file:///home/u/file.txt");
-        assert_eq!(path_to_file_uri(Path::new("/home/u/My File.txt")), "file:///home/u/My%20File.txt");
-        assert_eq!(path_to_file_uri(Path::new("/tmp/a#b?c.txt")), "file:///tmp/a%23b%3Fc.txt");
-        assert_eq!(path_to_file_uri(Path::new("/tmp/50%.txt")), "file:///tmp/50%25.txt");
-        assert_eq!(path_to_file_uri(Path::new("/tmp/日本.txt")), "file:///tmp/%E6%97%A5%E6%9C%AC.txt");
+        assert_eq!(
+            path_to_file_uri(Path::new("/home/u/file.txt")),
+            "file:///home/u/file.txt"
+        );
+        assert_eq!(
+            path_to_file_uri(Path::new("/home/u/My File.txt")),
+            "file:///home/u/My%20File.txt"
+        );
+        assert_eq!(
+            path_to_file_uri(Path::new("/tmp/a#b?c.txt")),
+            "file:///tmp/a%23b%3Fc.txt"
+        );
+        assert_eq!(
+            path_to_file_uri(Path::new("/tmp/50%.txt")),
+            "file:///tmp/50%25.txt"
+        );
+        assert_eq!(
+            path_to_file_uri(Path::new("/tmp/日本.txt")),
+            "file:///tmp/%E6%97%A5%E6%9C%AC.txt"
+        );
     }
 
     #[test]
     fn decodes_what_it_encodes() {
-        for raw in ["/home/u/file.txt", "/home/u/My File.txt", "/tmp/a#b?c.txt", "/tmp/日本.txt"] {
-            assert_eq!(file_uri_to_path(&path_to_file_uri(Path::new(raw))).unwrap(), PathBuf::from(raw));
+        for raw in [
+            "/home/u/file.txt",
+            "/home/u/My File.txt",
+            "/tmp/a#b?c.txt",
+            "/tmp/日本.txt",
+        ] {
+            assert_eq!(
+                file_uri_to_path(&path_to_file_uri(Path::new(raw))).unwrap(),
+                PathBuf::from(raw)
+            );
         }
     }
 
@@ -73,11 +96,17 @@ mod tests {
         assert!(file_uri_to_path("/plain/path").is_none());
         assert!(file_uri_to_path("file://relative").is_none());
         assert!(file_uri_to_path("file:///tmp/x").is_some());
-        assert_eq!(file_uri_to_path("file:///tmp/x").unwrap(), PathBuf::from("/tmp/x"));
+        assert_eq!(
+            file_uri_to_path("file:///tmp/x").unwrap(),
+            PathBuf::from("/tmp/x")
+        );
     }
 
     #[test]
     fn decode_tolerates_stray_percent_signs() {
-        assert_eq!(file_uri_to_path("file:///tmp/50%.txt").unwrap(), PathBuf::from("/tmp/50%.txt"));
+        assert_eq!(
+            file_uri_to_path("file:///tmp/50%.txt").unwrap(),
+            PathBuf::from("/tmp/50%.txt")
+        );
     }
 }

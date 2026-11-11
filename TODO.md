@@ -19,6 +19,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
   - [ ] **Split View Focus-Follows-Mouse**: Optional tiling WM / Hyprland-style focus switching where hovering over a split pane automatically activates it without requiring a click.
   - [ ] **Split-View Safe Page Routing**: Automatically open singleton full-page views (like Settings and "This PC") in a dedicated new tab when split view is active to avoid breaking the split pane layout.
 - [~] **Quick Look / File Preview & Right Sidebar**: Instant preview panel / overlay (Spacebar trigger) and dedicated collapsible right sidebar with file info and preview.
+  - [ ] **Multi-Format QuickLook Expansion**: Interactive video playback (MP4/GIF), rich PDF page rendering, and audio playback in Spacebar Quick Look.
   - [ ] **Rich Code Syntax Highlighting**: Expand file preview parser with syntax-highlighted and formatted rendering for common languages and config files.
   - [ ] **Markdown Live Preview**: Render formatted Markdown `.md` text with headers, tables, links, and code blocks directly in QuickLook.
 - [~] **Tabs & Experimental Vertical Tabs**: Tabbed browsing interface with support for an experimental vertical tabs layout mode. (Tabs done; vertical tabs not yet.)
@@ -66,7 +67,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [x] **Archive Management**: Native archive creation and extraction (zip, tar.gz, 7z + advanced formats) with password encryption and progress feedback.
 - [~] **Universal Virtual Disk Archive Reader**: Support browsing and extracting raw disk images and virtual machine container formats (`.iso`, `.img`, `.vmdk`, `.vdi`) including GPT/MBR partitions. (`.iso` browsing/extraction via 7-Zip done.)
 - [ ] **Downloads Smart Organizer**: Context menu "Organize" action for the Downloads folder using an intelligent rule-based / AI assistant structure to categorize files, purge useless installers, and remove duplicates.
-- [ ] **File Picker portal**: Standalone file picker integration mode allowing Loaf to serve as the system file open/save dialog.
+- [x] **File Picker portal**: Standalone file picker integration mode (`loaf --portal`) allowing Loaf to serve as the system file open/save dialog.
 - [ ] **File Converter**: On-the-fly file conversion utility supporting bulk image conversions (e.g. PNG to JPG) directly in the right-click context menu.
 - [ ] **Video Compressor**: Video compression utility in media context menus with target size selection and presets (e.g. Discord, WhatsApp).
 - [ ] **PDF Tools Submenu**: Right-click context menu actions for PDF files to extract images, merge multiple PDFs, and more.
@@ -78,12 +79,16 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Theming & Personalization
+- [x] **Custom Icon Themes**: Selector in Settings for Phosphor, Adwaita, System desktop theme, or installed custom icon themes (Papirus, WhiteSur, Breeze).
 - [~] **Popular Theme Presets**: Catppuccin, Rosé Pine, Tokyo Night, Gruvbox, Nord (Everforest & Breeze requested).
 - [~] **Dynamic Wallpaper Theming (Matugen / Pywal)**:
   - [x] Automatic color extraction and dynamic M3 palette generation based on current desktop wallpaper.
   - [ ] **Respect Theme Mode in Wallpaper Palette**: Fix wallpaper color extraction overwriting explicit dark/light theme choices. Maintain independent light and dark variants of wallpaper tokens so choosing Dark mode stays dark, Light mode stays light, and Auto mode adheres to system color-scheme preference regardless of wallpaper luminance.
 - [~] **Custom Color Palette / User Config**: Preset accent palettes exist, but user-defined custom color tokens / config file planned.
   - [ ] **Palette Creator, Manager & Sharing**: In-app UI to build custom M3-compliant color palettes, save them locally, and export/import/share palette presets (JSON or sharing link).
+  - [ ] **Custom Theme Files & Sharing**: Load and save custom `.theme` / `.json` palettes from `~/.config/loaf/themes/` to easily rice and share.
+- [ ] **Custom Font Selection**: Setting in Interface -> Appearance to choose custom or system fonts (e.g. OpenDyslexic, Inter, system UI font) rather than hardcoded fonts.
+- [ ] **Compositor Window Blur**: Wayland compositor background blur protocol support (`ext-background-effect-v1` / `org_kde_kwin_blur`) for translucent window backing.
 - [ ] **Customizable Toolbar & Layout**: Configurable toolbar actions and adjustable layout density.
 - [x] **Header Hierarchy & Layout Polish**: Branding badge vs breadcrumb path toggle and polish.
 - [~] **Mini / Compact Mode**: Ultra-compact layout mode showing only essential information for minimalist workflows. (`--mini` starts with a collapsed sidebar and smaller icons.)
@@ -103,7 +108,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [x] **Automatic SMB Discovery**: Detect SMB/CIFS servers and shares on the local network without manual host entry, using mDNS/Avahi, WS-Discovery, and NetBIOS name resolution, and surface discovered hosts in the sidebar and "This PC" network section.
   - [x] **Discovery Toggle & Refresh**: Setting to enable/disable LAN scanning, plus manual refresh and an ignore list for unwanted hosts.
   - [x] **One-Click Add from Discovery**: Turn a discovered server/share into a saved SMB profile with prompted credentials, then mount it directly.
-- [ ] **Remote Protocols & Cloud Services**: SFTP, FTP, WebDAV, Google Drive, and Microsoft OneDrive mounting support.
+- [~] **Remote Protocols & Cloud Services**: WebDAV cloud storage mounted natively; SFTP, FTP, NFS, Google Drive, and Microsoft OneDrive planned.
 - [x] **Keyring Integration**: Secure password storage in system keyring for SMB and encrypted volumes.
 
 ---
@@ -119,6 +124,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Integrations & Context Actions
+- [ ] **Custom Terminal Emulator Selection**: User setting in Behavior to configure preferred terminal executable (`kitty`, `ghostty`, `foot`, `alacritty`, `wezterm`, etc.) for "Open in Terminal".
 - [ ] **Integrated Terminal**: Embedded terminal panel that opens directly inside Loaf, styled to match the active theme.
 - [ ] **Direct File Viewer & Editor**: In-app viewing and lightweight editing support for documents and markup (e.g. `.md`).
 - [ ] **Syncthing Integration**: Native integration with Syncthing to show folder sync status, manage shared folders, and control sync settings directly inside Loaf.
@@ -132,7 +138,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [x] **Open as Administrator**: Root / pkexec operations support.
 - [ ] **Side Terminal Panel**: Embedded terminal panel next to previews.
 - [x] **Browse Inside Archives**: Direct archive tree navigation without extraction.
-- [ ] **MTP / Android Device Support**: Native phone-over-USB storage access.
+- [x] **MTP / Android Device Support**: Native phone-over-USB storage access via KIO/KMTPd.
 - [x] **Video Thumbnails**: Extract and display video frame thumbnails in grid and list views.
 - [ ] **Advanced Selection Behaviors**:
   - [x] Grid-accurate shift selection (selecting a file then `Shift + Down` selects only the item directly underneath, bypassing left-to-right row wrapping).

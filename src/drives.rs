@@ -41,7 +41,10 @@ pub fn statvfs(mount: &str) -> Option<(u64, u64)> {
     if unsafe { libc::statvfs(c.as_ptr(), &mut st) } != 0 {
         return None;
     }
+    // Explicit numeric widening to u64 ensures portability across 32-bit and 64-bit systems.
+    #[allow(clippy::unnecessary_cast)]
     let total = st.f_blocks as u64 * st.f_frsize as u64;
+    #[allow(clippy::unnecessary_cast)]
     let free = st.f_bavail as u64 * st.f_frsize as u64;
     Some((total, free))
 }
@@ -74,7 +77,11 @@ fn b(v: &serde_json::Value, k: &str) -> bool {
 fn mountpoint_of(v: &serde_json::Value) -> String {
     // util-linux >= 2.37 reports "mountpoints": [...]; older "mountpoint".
     if let Some(arr) = v.get("mountpoints").and_then(|m| m.as_array()) {
-        let mut valid: Vec<&str> = arr.iter().filter_map(|m| m.as_str()).filter(|m| !m.is_empty()).collect();
+        let mut valid: Vec<&str> = arr
+            .iter()
+            .filter_map(|m| m.as_str())
+            .filter(|m| !m.is_empty())
+            .collect();
         // Sort candidate mountpoints stably: category priority, then shortest path, then lexical tiebreak.
         fn score(m: &str) -> u8 {
             if m == "/" {
@@ -87,14 +94,19 @@ fn mountpoint_of(v: &serde_json::Value) -> String {
                 3
             } else if m.starts_with("/mnt/") {
                 4
-            } else if !m.starts_with("/var/") && !m.starts_with("/srv") && !m.starts_with("/root") && !m.starts_with("/nix") {
+            } else if !m.starts_with("/var/")
+                && !m.starts_with("/srv")
+                && !m.starts_with("/root")
+                && !m.starts_with("/nix")
+            {
                 5
             } else {
                 6
             }
         }
         valid.sort_by(|a, b| {
-            score(a).cmp(&score(b))
+            score(a)
+                .cmp(&score(b))
                 .then_with(|| a.len().cmp(&b.len()))
                 .then_with(|| a.cmp(b))
         });
@@ -107,10 +119,18 @@ fn mountpoint_of(v: &serde_json::Value) -> String {
 
 /// Parses `lsblk -J -b -o NAME,PATH,LABEL,MOUNTPOINT(S),FSTYPE,SIZE,RM,HOTPLUG,TRAN,MODEL,TYPE`.
 /// `usage` returns (total, free) for a mount point.
-pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, removable: &dyn Fn(&str) -> bool) -> Vec<Drive> {
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(json) else { return vec![] };
+pub fn parse_lsblk(
+    json: &str,
+    usage: &dyn Fn(&str) -> Option<(u64, u64)>,
+    removable: &dyn Fn(&str) -> bool,
+) -> Vec<Drive> {
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(json) else {
+        return vec![];
+    };
     let mut out = Vec::new();
-    let Some(devs) = val.get("blockdevices").and_then(|d| d.as_array()) else { return out };
+    let Some(devs) = val.get("blockdevices").and_then(|d| d.as_array()) else {
+        return out;
+    };
     struct Ctx<'a> {
         disk: String,
         model: String,
@@ -130,7 +150,11 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
                 return;
             }
             // Unlocked LUKS: show the cleartext filesystem inside instead.
-            let me = if s(v, "path").is_empty() { format!("/dev/{}", name) } else { s(v, "path").to_string() };
+            let me = if s(v, "path").is_empty() {
+                format!("/dev/{}", name)
+            } else {
+                s(v, "path").to_string()
+            };
             for c in ch {
                 walk(c, ctx, &me, out);
             }
@@ -143,10 +167,18 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         if mount == "[SWAP]" || mount.starts_with("/boot") || mount == "/nix/store" {
             return;
         }
-        let path = if s(v, "path").is_empty() { format!("/dev/{}", name) } else { s(v, "path").to_string() };
+        let path = if s(v, "path").is_empty() {
+            format!("/dev/{}", name)
+        } else {
+            s(v, "path").to_string()
+        };
         let size = v.get("size").and_then(|x| x.as_u64()).unwrap_or(0);
         let mounted = !mount.is_empty();
-        let (total, free) = if mounted { (ctx.usage)(&mount).unwrap_or((size, 0)) } else { (size, size) };
+        let (total, free) = if mounted {
+            (ctx.usage)(&mount).unwrap_or((size, 0))
+        } else {
+            (size, size)
+        };
         let used = total.saturating_sub(free);
         let label = s(v, "label");
         let display = if !label.is_empty() {
@@ -154,13 +186,20 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         } else if mount == "/" {
             "Root (/)".to_string()
         } else if mounted {
-            Path::new(&mount).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| name.to_string())
+            Path::new(&mount)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| name.to_string())
         } else if !ctx.model.is_empty() {
             format!("{} ({})", ctx.model.trim(), util::format_size(size))
         } else {
             format!("{} Volume", util::format_size(size))
         };
-        let pct = if total > 0 && mounted { ((used as f64 / total as f64) * 1000.0).round() / 10.0 } else { 0.0 };
+        let pct = if total > 0 && mounted {
+            ((used as f64 / total as f64) * 1000.0).round() / 10.0
+        } else {
+            0.0
+        };
         out.push(Drive {
             name: display,
             device: path,
@@ -193,10 +232,17 @@ pub fn parse_lsblk(json: &str, usage: &dyn Fn(&str) -> Option<(u64, u64)>, remov
         let tran = s(d, "tran").to_lowercase();
         let external = b(d, "rm")
             || b(d, "hotplug")
-            || matches!(tran.as_str(), "usb" | "mmc" | "sdio" | "firewire" | "1394" | "memstick")
+            || matches!(
+                tran.as_str(),
+                "usb" | "mmc" | "sdio" | "firewire" | "1394" | "memstick"
+            )
             || removable(name);
         let ctx = Ctx {
-            disk: if s(d, "path").is_empty() { format!("/dev/{}", name) } else { s(d, "path").to_string() },
+            disk: if s(d, "path").is_empty() {
+                format!("/dev/{}", name)
+            } else {
+                s(d, "path").to_string()
+            },
             model: s(d, "model").trim().to_string(),
             external,
             usage,
@@ -241,25 +287,45 @@ pub fn list() -> Vec<Drive> {
 }
 
 pub fn parse_mtp_devices(json: &str) -> Vec<Drive> {
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(json) else { return vec![] };
-    let Some(arr) = val.as_array() else { return vec![] };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(json) else {
+        return vec![];
+    };
+    let Some(arr) = val.as_array() else {
+        return vec![];
+    };
     let mut out = Vec::new();
     for item in arr {
         let name = s(item, "name").trim().to_string();
         let url = s(item, "url").to_string();
         let udi = s(item, "udi").to_string();
         let model = s(item, "model").trim().to_string();
-        let total = item.get("total_bytes").and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))).unwrap_or(0);
-        let free = item.get("free_bytes").and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))).unwrap_or(0);
+        let total = item
+            .get("total_bytes")
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+            .unwrap_or(0);
+        let free = item
+            .get("free_bytes")
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+            .unwrap_or(0);
         let used = total.saturating_sub(free);
-        let pct = if total > 0 { ((used as f64 / total as f64) * 1000.0).round() / 10.0 } else { 0.0 };
+        let pct = if total > 0 {
+            ((used as f64 / total as f64) * 1000.0).round() / 10.0
+        } else {
+            0.0
+        };
 
         // A phone is a virtual location, never a guessed local mount path.
-        let Some(location) = crate::mtp::Location::parse(&url).filter(|loc| loc.is_root() && loc.udi() == udi) else {
+        let Some(location) =
+            crate::mtp::Location::parse(&url).filter(|loc| loc.is_root() && loc.udi() == udi)
+        else {
             continue;
         };
         out.push(Drive {
-            name: if !name.is_empty() { name } else { "MTP Device".to_string() },
+            name: if !name.is_empty() {
+                name
+            } else {
+                "MTP Device".to_string()
+            },
             device: location.url(),
             disk: String::new(),
             mount_point: String::new(),
@@ -285,16 +351,28 @@ pub fn parse_mtp_devices(json: &str) -> Vec<Drive> {
 }
 
 pub fn list_block() -> Vec<Drive> {
-    let Some(lsblk) = which("lsblk") else { return vec![] };
+    let Some(lsblk) = which("lsblk") else {
+        return vec![];
+    };
     let out = Command::new(lsblk)
-        .args(["-J", "-b", "-o", "NAME,PATH,LABEL,MOUNTPOINTS,FSTYPE,SIZE,RM,HOTPLUG,TRAN,MODEL,TYPE"])
+        .args([
+            "-J",
+            "-b",
+            "-o",
+            "NAME,PATH,LABEL,MOUNTPOINTS,FSTYPE,SIZE,RM,HOTPLUG,TRAN,MODEL,TYPE",
+        ])
         .output();
     let json = match out {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
         _ => {
             // Older util-linux without MOUNTPOINTS.
             Command::new("lsblk")
-                .args(["-J", "-b", "-o", "NAME,PATH,LABEL,MOUNTPOINT,FSTYPE,SIZE,RM,HOTPLUG,TRAN,MODEL,TYPE"])
+                .args([
+                    "-J",
+                    "-b",
+                    "-o",
+                    "NAME,PATH,LABEL,MOUNTPOINT,FSTYPE,SIZE,RM,HOTPLUG,TRAN,MODEL,TYPE",
+                ])
                 .output()
                 .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
                 .unwrap_or_default()
@@ -304,7 +382,11 @@ pub fn list_block() -> Vec<Drive> {
 }
 
 fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
-    let device = args.windows(2).find(|pair| pair[0] == "-b").map(|pair| pair[1]).unwrap_or("");
+    let device = args
+        .windows(2)
+        .find(|pair| pair[0] == "-b")
+        .map(|pair| pair[1])
+        .unwrap_or("");
     if !device.starts_with("/dev/") {
         return Err("This action is only supported for block devices".to_string());
     }
@@ -315,7 +397,12 @@ fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
     if ok {
         Ok(out)
     } else {
-        Err(err.lines().last().unwrap_or("UDisks reported an error").trim().to_string())
+        Err(err
+            .lines()
+            .last()
+            .unwrap_or("UDisks reported an error")
+            .trim()
+            .to_string())
     }
 }
 
@@ -323,7 +410,8 @@ pub fn mount(device: &str) -> Result<String, String> {
     udisks(&["mount", "-b", device], None)?;
     // Resolve from the filesystem model: udisksctl's human-readable output
     // can be localized and is not a reliable navigation target.
-    list_block().into_iter()
+    list_block()
+        .into_iter()
         .find(|d| d.device == device && d.is_mounted)
         .map(|d| d.mount_point)
         .ok_or_else(|| "mounted device has no discoverable mount point".to_string())
@@ -349,9 +437,18 @@ pub fn eject(disk: &str, drives: &[Drive]) -> Result<(), String> {
 /// Unlocks a LUKS device with `passphrase` (sent on stdin) and returns the
 /// cleartext device path.
 pub fn unlock(device: &str, passphrase: &str) -> Result<String, String> {
-    let out = udisks(&["unlock", "-b", device, "--key-file", "/dev/stdin"], Some(passphrase.as_bytes()))?;
+    let out = udisks(
+        &["unlock", "-b", device, "--key-file", "/dev/stdin"],
+        Some(passphrase.as_bytes()),
+    )?;
     // "Unlocked /dev/sdb1 as /dev/dm-3."
-    Ok(out.trim().rsplit(" as ").next().unwrap_or("").trim_end_matches('.').to_string())
+    Ok(out
+        .trim()
+        .rsplit(" as ")
+        .next()
+        .unwrap_or("")
+        .trim_end_matches('.')
+        .to_string())
 }
 
 pub fn lock(device: &str) -> Result<(), String> {
@@ -360,7 +457,10 @@ pub fn lock(device: &str) -> Result<(), String> {
 
 /// UDisks object path for a block device ("/dev/dm-0" -> ".../dm_2d0").
 pub fn udisks_object(device: &str) -> String {
-    let base = Path::new(device).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let base = Path::new(device)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let mut esc = String::new();
     for c in base.bytes() {
         if c.is_ascii_alphanumeric() {
@@ -390,13 +490,21 @@ pub fn set_label(device: &str, label: &str) -> Result<(), String> {
         "--method",
         "org.freedesktop.UDisks2.Filesystem.SetLabel",
     ])
-    .arg(format!("'{}'", label.replace('\\', "\\\\").replace('\'', "\\'")))
+    .arg(format!(
+        "'{}'",
+        label.replace('\\', "\\\\").replace('\'', "\\'")
+    ))
     .arg("{}");
     let (ok, _, err) = util::run_capture(cmd, None);
     if ok {
         Ok(())
     } else {
-        Err(err.trim().lines().last().unwrap_or("could not rename the drive").to_string())
+        Err(err
+            .trim()
+            .lines()
+            .last()
+            .unwrap_or("could not rename the drive")
+            .to_string())
     }
 }
 
@@ -421,12 +529,23 @@ mod tests {
 
     #[test]
     fn parses_drives() {
-        let d = parse_lsblk(SAMPLE, &|m| if m == "/" { Some((1000, 250)) } else { None }, &|_| false);
+        let d = parse_lsblk(
+            SAMPLE,
+            &|m| if m == "/" { Some((1000, 250)) } else { None },
+            &|_| false,
+        );
         let names: Vec<_> = d.iter().map(|x| x.device.as_str()).collect();
-        assert_eq!(names, vec!["/dev/nvme0n1p2", "/dev/sdb1", "/dev/sdc1"], "efi, swap and loop are hidden");
+        assert_eq!(
+            names,
+            vec!["/dev/nvme0n1p2", "/dev/sdb1", "/dev/sdc1"],
+            "efi, swap and loop are hidden"
+        );
         let root = &d[0];
         assert_eq!(root.name, "fedora");
-        assert_eq!(root.mount_point, "/", "root wins over the other btrfs subvolumes");
+        assert_eq!(
+            root.mount_point, "/",
+            "root wins over the other btrfs subvolumes"
+        );
         assert_eq!(root.percent, 75.0);
         assert!(!root.is_external);
         let usb = &d[1];
@@ -468,21 +587,36 @@ mod tests {
             vec!["/var/log", "/home", "/"],
             vec!["/", "/home", "/var/log"],
         ] {
-            assert_eq!(mountpoint_of(&serde_json::json!({"mountpoints": mounts})), "/");
+            assert_eq!(
+                mountpoint_of(&serde_json::json!({"mountpoints": mounts})),
+                "/"
+            );
         }
         for mounts in [
             vec!["/var/log", "/mnt/z", "/mnt/a"],
             vec!["/mnt/a", "/mnt/z", "/var/log"],
         ] {
-            assert_eq!(mountpoint_of(&serde_json::json!({"mountpoints": mounts})), "/mnt/a");
+            assert_eq!(
+                mountpoint_of(&serde_json::json!({"mountpoints": mounts})),
+                "/mnt/a"
+            );
         }
-        assert_eq!(mountpoint_of(&serde_json::json!({"mountpoint": "/home"})), "/home");
+        assert_eq!(
+            mountpoint_of(&serde_json::json!({"mountpoint": "/home"})),
+            "/home"
+        );
     }
 
     #[test]
     fn object_paths() {
-        assert_eq!(udisks_object("/dev/sdb1"), "/org/freedesktop/UDisks2/block_devices/sdb1");
-        assert_eq!(udisks_object("/dev/dm-0"), "/org/freedesktop/UDisks2/block_devices/dm_2d0");
+        assert_eq!(
+            udisks_object("/dev/sdb1"),
+            "/org/freedesktop/UDisks2/block_devices/sdb1"
+        );
+        assert_eq!(
+            udisks_object("/dev/dm-0"),
+            "/org/freedesktop/UDisks2/block_devices/dm_2d0"
+        );
     }
 
     #[test]

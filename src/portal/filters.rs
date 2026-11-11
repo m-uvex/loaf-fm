@@ -1,12 +1,4 @@
-//! File chooser filters: parsing and matching. A filter has a display name
-//! and a list of patterns; a pattern is either a `glob` (shell-style, matched
-//! case-insensitively against the file name) or a `mime` type (matched with
-//! shared-mime-info inheritance and aliases, which needs QMimeDatabase and
-//! is therefore injected as a callback). A filter with no patterns matches
-//! everything — the "All files" entry.
-//!
-//! JSON form shared between the D-Bus layer and the engine:
-//! `{ "name": "Images", "patterns": [["glob", "*.png"], ["mime", "image/png"]] }`
+//! File chooser filters: parsing and matching glob and MIME type patterns.
 
 use crate::pane::glob_match;
 use serde_json::Value;

@@ -20,18 +20,44 @@ pub struct Query {
 }
 
 /// Folders that are almost never what a person is searching for.
-const NOISE: [&str; 9] = [".git", "node_modules", "target", ".cache", ".direnv", "__pycache__", ".npm", ".cargo", ".rustup"];
+const NOISE: [&str; 9] = [
+    ".git",
+    "node_modules",
+    "target",
+    ".cache",
+    ".direnv",
+    "__pycache__",
+    ".npm",
+    ".cargo",
+    ".rustup",
+];
 
 /// Device ids of mounts we must not descend into (network shares, FUSE
 /// remotes, pseudo filesystems): a hung NFS server would freeze the search.
 fn excluded_devices() -> HashSet<u64> {
     let mut out = HashSet::new();
-    let Ok(m) = fs::read_to_string("/proc/self/mounts") else { return out };
+    let Ok(m) = fs::read_to_string("/proc/self/mounts") else {
+        return out;
+    };
     for line in m.lines() {
         let mut p = line.split_whitespace();
-        let (Some(_), Some(mnt), Some(fs)) = (p.next(), p.next(), p.next()) else { continue };
-        let remote = matches!(fs, "nfs" | "nfs4" | "cifs" | "smb3" | "smbfs" | "sshfs" | "9p" | "afs" | "ceph" | "glusterfs")
-            || fs.starts_with("fuse.") && !matches!(fs, "fuse.ntfs-3g" | "fuse.ntfs" | "fuse.exfat");
+        let (Some(_), Some(mnt), Some(fs)) = (p.next(), p.next(), p.next()) else {
+            continue;
+        };
+        let remote = matches!(
+            fs,
+            "nfs"
+                | "nfs4"
+                | "cifs"
+                | "smb3"
+                | "smbfs"
+                | "sshfs"
+                | "9p"
+                | "afs"
+                | "ceph"
+                | "glusterfs"
+        ) || fs.starts_with("fuse.")
+            && !matches!(fs, "fuse.ntfs-3g" | "fuse.ntfs" | "fuse.exfat");
         if remote || crate::trash::is_virtual_fs(fs) && fs != "tmpfs" {
             // Only stat the mount point itself; never anything below it.
             let mnt = crate::trash::unescape_mount(mnt);
@@ -47,7 +73,9 @@ fn file_contains(path: &Path, needle_lower: &str, size: u64) -> bool {
     if size == 0 || size > 4 * 1024 * 1024 || needle_lower.is_empty() {
         return false;
     }
-    let Ok(mut f) = fs::File::open(path) else { return false };
+    let Ok(mut f) = fs::File::open(path) else {
+        return false;
+    };
     let mut buf = Vec::with_capacity(size as usize);
     if f.read_to_end(&mut buf).is_err() {
         return false;
@@ -55,7 +83,9 @@ fn file_contains(path: &Path, needle_lower: &str, size: u64) -> bool {
     if buf.iter().take(8192).any(|b| *b == 0) {
         return false; // binary
     }
-    String::from_utf8_lossy(&buf).to_lowercase().contains(needle_lower)
+    String::from_utf8_lossy(&buf)
+        .to_lowercase()
+        .contains(needle_lower)
 }
 
 /// Runs the search, calling `emit` with batches of matches (roughly every
@@ -103,7 +133,9 @@ pub fn run(q: &Query, cancelled: &dyn Fn() -> bool, emit: &mut dyn FnMut(Vec<Ent
             let content_hit = !name_hit
                 && q.contents
                 && ft.is_file()
-                && e.metadata().map(|m| file_contains(&path, &needle, m.len())).unwrap_or(false);
+                && e.metadata()
+                    .map(|m| file_contains(&path, &needle, m.len()))
+                    .unwrap_or(false);
             if name_hit || content_hit {
                 if let Some(mut entry) = listing::entry_for(&path, &name, &empty) {
                     entry.detail = dir.to_string_lossy().to_string();
@@ -139,19 +171,40 @@ mod tests {
         fs::write(d.join(".secret/report.md"), b"x").unwrap();
         fs::write(d.join("node_modules/report/x"), b"x").unwrap();
         let mut found = Vec::new();
-        let q = Query { text: "report".into(), root: d.clone(), show_hidden: false, contents: false, max_results: 100 };
-        run(&q, &|| false, &mut |b| found.extend(b.into_iter().map(|e| e.name)));
+        let q = Query {
+            text: "report".into(),
+            root: d.clone(),
+            show_hidden: false,
+            contents: false,
+            max_results: 100,
+        };
+        run(&q, &|| false, &mut |b| {
+            found.extend(b.into_iter().map(|e| e.name))
+        });
         found.sort();
-        assert_eq!(found, vec!["Report-2024.pdf"], "hidden folders and node_modules are skipped");
+        assert_eq!(
+            found,
+            vec!["Report-2024.pdf"],
+            "hidden folders and node_modules are skipped"
+        );
 
         let mut found = Vec::new();
-        let q = Query { contents: true, show_hidden: true, ..q };
-        run(&q, &|| false, &mut |b| found.extend(b.into_iter().map(|e| e.name)));
+        let q = Query {
+            contents: true,
+            show_hidden: true,
+            ..q
+        };
+        run(&q, &|| false, &mut |b| {
+            found.extend(b.into_iter().map(|e| e.name))
+        });
         assert!(found.contains(&"notes.txt".to_string()));
         assert!(found.contains(&"report.md".to_string()));
 
         let mut n = 0;
-        let q = Query { max_results: 1, ..q };
+        let q = Query {
+            max_results: 1,
+            ..q
+        };
         run(&q, &|| false, &mut |b| n += b.len());
         assert_eq!(n, 1);
         let mut n = 0;

@@ -16,7 +16,10 @@ pub fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 /// Finds an executable on `$PATH` (plus the usual NixOS profile locations
 /// for when Loaf is started outside a login shell). Cached.
 pub fn which(name: &str) -> Option<PathBuf> {
-    if let Some(hit) = lock(&WHICH_CACHE).get_or_insert_with(HashMap::new).get(name) {
+    if let Some(hit) = lock(&WHICH_CACHE)
+        .get_or_insert_with(HashMap::new)
+        .get(name)
+    {
         return hit.clone();
     }
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
@@ -35,14 +38,21 @@ pub fn which(name: &str) -> Option<PathBuf> {
     ] {
         dirs.push(PathBuf::from(extra));
     }
-    let found = dirs.into_iter().map(|d| d.join(name)).find(|c| is_executable(c));
-    lock(&WHICH_CACHE).get_or_insert_with(HashMap::new).insert(name.to_string(), found.clone());
+    let found = dirs
+        .into_iter()
+        .map(|d| d.join(name))
+        .find(|c| is_executable(c));
+    lock(&WHICH_CACHE)
+        .get_or_insert_with(HashMap::new)
+        .insert(name.to_string(), found.clone());
     found
 }
 
 fn is_executable(p: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::metadata(p).map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+    std::fs::metadata(p)
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
 }
 
 /// First available program out of a list of aliases.
@@ -65,7 +75,11 @@ pub fn spawn_detached(mut cmd: Command) -> std::io::Result<()> {
 pub fn run_capture(mut cmd: Command, stdin_data: Option<&[u8]>) -> (bool, String, String) {
     use std::io::Write;
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    cmd.stdin(if stdin_data.is_some() { Stdio::piped() } else { Stdio::null() });
+    cmd.stdin(if stdin_data.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => return (false, String::new(), e.to_string()),
@@ -111,9 +125,20 @@ pub fn cache_home() -> PathBuf {
 /// `$XDG_DATA_DIRS`, defaulting as the spec says.
 pub fn data_dirs() -> Vec<PathBuf> {
     let raw = std::env::var("XDG_DATA_DIRS").unwrap_or_default();
-    let raw = if raw.trim().is_empty() { "/usr/local/share:/usr/share".to_string() } else { raw };
-    let mut v: Vec<PathBuf> = raw.split(':').filter(|s| !s.is_empty()).map(PathBuf::from).collect();
-    for extra in ["/run/current-system/sw/share", "/var/lib/flatpak/exports/share"] {
+    let raw = if raw.trim().is_empty() {
+        "/usr/local/share:/usr/share".to_string()
+    } else {
+        raw
+    };
+    let mut v: Vec<PathBuf> = raw
+        .split(':')
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .collect();
+    for extra in [
+        "/run/current-system/sw/share",
+        "/var/lib/flatpak/exports/share",
+    ] {
         let p = PathBuf::from(extra);
         if !v.contains(&p) {
             v.push(p);
@@ -131,15 +156,20 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
     static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let tmp = path.with_file_name(format!(
         ".{}.loaf-tmp-{}-{}",
-        path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+        path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
         std::process::id(),
         SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::write(&tmp, data)?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        e
-    })
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp);
+            Err(e)
+        }
+    }
 }
 
 /// Human readable byte count ("1.4 MB").
@@ -160,6 +190,16 @@ pub fn format_size(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn atomic_write_roundtrip() {
+        let tmp_dir = std::env::temp_dir().join(format!("loaf_util_atomic_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp_dir);
+        let target = tmp_dir.join("test.txt");
+        assert!(write_atomic(&target, b"content").is_ok());
+        assert_eq!(std::fs::read(&target).unwrap(), b"content");
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
 
     #[test]
     fn finds_sh() {

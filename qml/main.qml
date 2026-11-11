@@ -259,8 +259,7 @@ ApplicationWindow {
         function onPickerDismissed(handle) { window.closePicker(handle); }
     }
 
-    // ---- portal file chooser windows ---------------------------------------
-    // One PickerWindow per active request, keyed by the D-Bus handle.
+    // Active portal picker windows keyed by D-Bus handle.
     property var pickerWindows: ({})
 
     Component {
@@ -1975,6 +1974,7 @@ ApplicationWindow {
                                 anchors.fill: parent
                                 anchors.margins: 14
                                 isActive: window.activePane === pane0
+                                Keys.forwardTo: [globalKeyHandler]
                                 onActivated: window.setActivePane(pane0)
                                 opacity: window.splitView && !isActive ? 0.90 : 1.0
                             }
@@ -2008,6 +2008,7 @@ ApplicationWindow {
                                 sourceComponent: FilePane {
                                     id: pane1
                                     isActive: window.activePane === pane1
+                                    Keys.forwardTo: [globalKeyHandler]
                                     onActivated: window.setActivePane(pane1)
                                     opacity: !isActive ? 0.90 : 1.0
                                 }
@@ -2909,46 +2910,78 @@ ApplicationWindow {
         menuMaxWidth: 340
         model: []
 
-        Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("VIEW MODE"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-        LoafSegmented {
+        Flickable {
+            id: viewMenuFlickable
             Layout.fillWidth: true
-            Layout.leftMargin: 4; Layout.rightMargin: 4
-            options: [{ value: "grid", label: qsTr("Grid"), icon: "squares-four" }, { value: "list", label: qsTr("List"), icon: "list" }]
-            value: engine.view_mode
-            onSelected: function(v) { engine.set_view(v); }
+            Layout.preferredHeight: Math.min(viewMenuContent.implicitHeight, Math.max(120, window.height - 40))
+            contentWidth: width
+            contentHeight: viewMenuContent.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar { policy: viewMenuFlickable.contentHeight > viewMenuFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+
+            ColumnLayout {
+                id: viewMenuContent
+                width: viewMenuFlickable.width
+                spacing: 4
+
+                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("VIEW MODE"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
+                LoafSegmented {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 4; Layout.rightMargin: 4
+                    options: [{ value: "grid", label: qsTr("Grid"), icon: "squares-four" }, { value: "list", label: qsTr("List"), icon: "list" }]
+                    value: engine.view_mode
+                    onSelected: function(v) { engine.set_view(v); }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8; Layout.rightMargin: 8
+                    Text { text: qsTr("Icon size"); color: theme.textMain; font.pixelSize: theme.fs(12); Layout.fillWidth: true }
+                    LoafButton { icon: "magnifying-glass-minus"; variant: "tonal"; enabled: theme.zoomIndex > 0; onClicked: theme.stepZoom(-1) }
+                    Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                    LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
+                }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
+                LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
+                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
+                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.group_by === "modified"; onTriggered: engine.set_group("modified", engine.group_ascending) }
+                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.group_by === "size"; onTriggered: engine.set_group("size", engine.group_ascending) }
+                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.group_by === "type"; onTriggered: engine.set_group("type", engine.group_ascending) }
+                LoafSegmented {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 4; Layout.rightMargin: 4
+                    visible: engine.group_by !== "none"
+                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
+                    value: engine.group_ascending ? "asc" : "desc"
+                    onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
+                }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
+                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
+                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
+                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.sort_by === "size"; onTriggered: engine.set_sort("size", engine.sort_ascending) }
+                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.sort_by === "type"; onTriggered: engine.set_sort("type", engine.sort_ascending) }
+                LoafSegmented {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 4; Layout.rightMargin: 4
+                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
+                    value: engine.sort_ascending ? "asc" : "desc"
+                    onSelected: function(v) { engine.set_sort(engine.sort_by, v === "asc"); }
+                }
+                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("FOLDERS"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
+                LoafSegmented {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 4; Layout.rightMargin: 4
+                    options: [{ value: "first", label: qsTr("First") }, { value: "last", label: qsTr("Last") }, { value: "mixed", label: qsTr("Mixed") }]
+                    value: engine.folder_position
+                    onSelected: function(v) { engine.change_folder_position(v); }
+                }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
+                LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
+            }
         }
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.leftMargin: 8; Layout.rightMargin: 8
-            Text { text: qsTr("Icon size"); color: theme.textMain; font.pixelSize: theme.fs(12); Layout.fillWidth: true }
-            LoafButton { icon: "magnifying-glass-minus"; variant: "tonal"; enabled: theme.zoomIndex > 0; onClicked: theme.stepZoom(-1) }
-            Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-            LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
-        }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
-        Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-        LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
-        LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
-        LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.sort_by === "size"; onTriggered: engine.set_sort("size", engine.sort_ascending) }
-        LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.sort_by === "type"; onTriggered: engine.set_sort("type", engine.sort_ascending) }
-        LoafSegmented {
-            Layout.fillWidth: true
-            Layout.leftMargin: 4; Layout.rightMargin: 4
-            options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-            value: engine.sort_ascending ? "asc" : "desc"
-            onSelected: function(v) { engine.set_sort(engine.sort_by, v === "asc"); }
-        }
-        Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("FOLDERS"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-        LoafSegmented {
-            Layout.fillWidth: true
-            Layout.leftMargin: 4; Layout.rightMargin: 4
-            options: [{ value: "first", label: qsTr("First") }, { value: "last", label: qsTr("Last") }, { value: "mixed", label: qsTr("Mixed") }]
-            value: engine.folder_position
-            onSelected: function(v) { engine.change_folder_position(v); }
-        }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
-        LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
-        LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
     }
     QuickLook { id: quickLook }
     PropertiesDialog { id: propsDialog }

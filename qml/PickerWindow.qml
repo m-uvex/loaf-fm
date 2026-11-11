@@ -4,15 +4,10 @@ import QtQuick.Layouts
 import app.loaf
 import "components"
 
-// One portal file chooser request: a dedicated window that reuses the
-// normal browsing views (sidebar + file pane) plus a filter dropdown, the
-// choice widgets and an accept/cancel row. main.qml creates one per
-// pickerRequested and answers through nativeBridge.respondPicker exactly
-// once per request.
+// Portal file chooser dialog.
 Window {
     id: picker
 
-    // The normalized request spec from the portal backend.
     required property var request
 
     readonly property bool isSave: request.kind === "save"
@@ -31,21 +26,13 @@ Window {
             options.push({ "value": String(i), "label": filters[i].name });
         return options;
     }
-    // Index into `filters`, -1 = all files. Starts plain and is set
-    // imperatively in onCompleted so the current_filter match cannot fight
-    // with user selections.
+    // Index into filters, -1 = all files.
     property int activeFilter: -1
 
-    // Look the filter up straight from `activeFilter` instead of through a
-    // dependent binding: bindings still hold the previous value while a
-    // change handler runs, so a binding read here applied the previous
-    // filter (every selection lagged one step behind).
     function filterAt(index) {
         return index >= 0 && index < filters.length ? filters[index] : null;
     }
 
-    // Chosen value per choice id; booleans are stored as JS booleans and
-    // serialized as "true"/"false" in the reply.
     property var choiceValues: ({})
     property bool answered: false
     property bool pathEditing: false
@@ -356,7 +343,6 @@ Window {
             }
         }
 
-        // ---- header: title and filter ------------------------------------
         Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 56
@@ -397,7 +383,6 @@ Window {
             }
         }
 
-        // ---- header: path bar and search -----------------------------------
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 12
@@ -405,7 +390,7 @@ Window {
             Layout.bottomMargin: 10
             spacing: 10
 
-            // Path bar: breadcrumbs, or a text field (Ctrl+L) with Tab completion.
+            // Path bar with breadcrumbs and direct edit mode.
             Rectangle {
                 id: pathBar
                 Layout.fillWidth: true
@@ -674,7 +659,6 @@ Window {
             }
         }
 
-        // ---- body: sidebar and the normal file view -----------------------
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -724,7 +708,6 @@ Window {
             }
         }
 
-        // ---- footer: choices, file name, buttons ---------------------------
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1

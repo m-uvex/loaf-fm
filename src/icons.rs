@@ -39,8 +39,9 @@ struct Theme {
     inherits: Vec<String>,
 }
 
+type IconCacheKey = (String, String, u32);
 static THEMES: Mutex<Option<HashMap<String, Option<Theme>>>> = Mutex::new(None);
-static CACHE: Mutex<Option<HashMap<(String, String, u32), String>>> = Mutex::new(None);
+static CACHE: Mutex<Option<HashMap<IconCacheKey, String>>> = Mutex::new(None);
 
 fn parse_index(content: &str) -> (Vec<SubDir>, Vec<String>) {
     let mut sections: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -55,20 +56,30 @@ fn parse_index(content: &str) -> (Vec<SubDir>, Vec<String>) {
             continue;
         }
         if let Some((k, v)) = line.split_once('=') {
-            sections.entry(current.clone()).or_default().insert(k.trim().to_string(), v.trim().to_string());
+            sections
+                .entry(current.clone())
+                .or_default()
+                .insert(k.trim().to_string(), v.trim().to_string());
         }
     }
     let main = sections.get("Icon Theme").cloned().unwrap_or_default();
     let list = |key: &str| -> Vec<String> {
         main.get(key)
-            .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
             .unwrap_or_default()
     };
     let mut names = list("Directories");
     names.extend(list("ScaledDirectories"));
     let mut dirs = Vec::new();
     for name in names {
-        let Some(sec) = sections.get(&name) else { continue };
+        let Some(sec) = sections.get(&name) else {
+            continue;
+        };
         let num = |k: &str, d: u32| sec.get(k).and_then(|v| v.parse().ok()).unwrap_or(d);
         let size = num("Size", 48);
         dirs.push(SubDir {
@@ -77,7 +88,10 @@ fn parse_index(content: &str) -> (Vec<SubDir>, Vec<String>) {
             min: num("MinSize", size),
             max: num("MaxSize", size),
             threshold: num("Threshold", 2),
-            kind: sec.get("Type").cloned().unwrap_or_else(|| "Threshold".into()),
+            kind: sec
+                .get("Type")
+                .cloned()
+                .unwrap_or_else(|| "Threshold".into()),
             scale: num("Scale", 1),
         });
     }
@@ -106,7 +120,9 @@ fn load_theme(name: &str) -> Option<Theme> {
         }
     }
     let result = if parsed { Some(theme) } else { None };
-    lock(&THEMES).get_or_insert_with(HashMap::new).insert(name.to_string(), result.clone());
+    lock(&THEMES)
+        .get_or_insert_with(HashMap::new)
+        .insert(name.to_string(), result.clone());
     result
 }
 
@@ -167,7 +183,13 @@ fn lookup_in(theme: &Theme, name: &str, size: u32) -> Option<PathBuf> {
     best.map(|(_, p)| p)
 }
 
-fn lookup_chain(theme_name: &str, name: &str, size: u32, depth: usize, visited: &mut Vec<String>) -> Option<PathBuf> {
+fn lookup_chain(
+    theme_name: &str,
+    name: &str,
+    size: u32,
+    depth: usize,
+    visited: &mut Vec<String>,
+) -> Option<PathBuf> {
     if depth > 8 || visited.iter().any(|v| v == theme_name) {
         return None;
     }
@@ -236,8 +258,12 @@ pub fn resolve(theme: &str, name: &str, size: u32) -> String {
             }
         }
     }
-    let url = found.map(|p| format!("file://{}", crate::trash::encode_path(&p))).unwrap_or_default();
-    lock(&CACHE).get_or_insert_with(HashMap::new).insert(key, url.clone());
+    let url = found
+        .map(|p| format!("file://{}", crate::trash::encode_path(&p)))
+        .unwrap_or_default();
+    lock(&CACHE)
+        .get_or_insert_with(HashMap::new)
+        .insert(key, url.clone());
     url
 }
 
@@ -246,7 +272,10 @@ fn gsettings_icon_theme() -> Option<String> {
         .args(["get", "org.gnome.desktop.interface", "icon-theme"])
         .output()
         .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout).trim().trim_matches('\'').to_string();
+    let s = String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .trim_matches('\'')
+        .to_string();
     if out.status.success() && !s.is_empty() {
         Some(s)
     } else {
@@ -280,7 +309,9 @@ pub fn installed_themes() -> Vec<(String, String)> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
     for base in base_dirs() {
-        let Ok(entries) = fs::read_dir(&base) else { continue };
+        let Ok(entries) = fs::read_dir(&base) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let id = entry.file_name().to_string_lossy().to_string();
             let index = entry.path().join("index.theme");
@@ -323,11 +354,23 @@ fn detect_system_theme() -> String {
         }
     }
     let cfg = util::config_home();
-    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_uppercase();
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+        .unwrap_or_default()
+        .to_uppercase();
     let kde = || ini_value(&cfg.join("kdeglobals"), "[Icons]", "Theme");
     let gtk = || {
-        ini_value(&cfg.join("gtk-4.0/settings.ini"), "[Settings]", "gtk-icon-theme-name")
-            .or_else(|| ini_value(&cfg.join("gtk-3.0/settings.ini"), "[Settings]", "gtk-icon-theme-name"))
+        ini_value(
+            &cfg.join("gtk-4.0/settings.ini"),
+            "[Settings]",
+            "gtk-icon-theme-name",
+        )
+        .or_else(|| {
+            ini_value(
+                &cfg.join("gtk-3.0/settings.ini"),
+                "[Settings]",
+                "gtk-icon-theme-name",
+            )
+        })
     };
     let picked = if desktop.contains("KDE") {
         kde().or_else(gsettings_icon_theme).or_else(gtk)
@@ -336,7 +379,13 @@ fn detect_system_theme() -> String {
     };
     picked
         .filter(|t| load_theme(t).is_some())
-        .unwrap_or_else(|| if load_theme("Adwaita").is_some() { "Adwaita".into() } else { "hicolor".into() })
+        .unwrap_or_else(|| {
+            if load_theme("Adwaita").is_some() {
+                "Adwaita".into()
+            } else {
+                "hicolor".into()
+            }
+        })
 }
 
 #[cfg(test)]
@@ -347,9 +396,19 @@ mod tests {
     fn fallback_order() {
         assert_eq!(
             fallback_names("text-x-python"),
-            vec!["text-x-python", "text-x-python-symbolic", "text-x", "text-x-symbolic", "text", "text-symbolic"]
+            vec![
+                "text-x-python",
+                "text-x-python-symbolic",
+                "text-x",
+                "text-x-symbolic",
+                "text",
+                "text-symbolic"
+            ]
         );
-        assert_eq!(fallback_names("go-next-symbolic")[..2], ["go-next-symbolic".to_string(), "go-next".to_string()]);
+        assert_eq!(
+            fallback_names("go-next-symbolic")[..2],
+            ["go-next-symbolic".to_string(), "go-next".to_string()]
+        );
     }
 
     #[test]

@@ -17,6 +17,7 @@ fn main() {
             .qml_file("qml/ConflictDialog.qml")
             .qml_file("qml/OperationsPanel.qml")
             .qml_file("qml/Toast.qml")
+            .qml_file("qml/components/FileGridCard.qml")
             .qml_file("qml/components/InlineRename.qml")
             .qml_file("qml/components/LoafCheckBox.qml")
             .qml_file("qml/components/LoafRadio.qml")

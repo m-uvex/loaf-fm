@@ -89,11 +89,14 @@ pub fn is_archive(path: &Path) -> bool {
 
 /// Archive name without its (possibly double) extension.
 pub fn base_name(path: &Path) -> String {
-    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "archive".into());
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "archive".into());
     let lower = name.to_lowercase();
     for suffix in [
-        ".tar.gz", ".tar.xz", ".tar.zst", ".tar.bz2", ".tgz", ".txz", ".tbz2", ".tbz", ".tzst", ".zip", ".zipx",
-        ".7z", ".rar", ".tar", ".cpio", ".iso", ".cab", ".arj", ".lha", ".lzh",
+        ".tar.gz", ".tar.xz", ".tar.zst", ".tar.bz2", ".tgz", ".txz", ".tbz2", ".tbz", ".tzst",
+        ".zip", ".zipx", ".7z", ".rar", ".tar", ".cpio", ".iso", ".cab", ".arj", ".lha", ".lzh",
     ] {
         if lower.ends_with(suffix) && name.len() > suffix.len() {
             return name[..name.len() - suffix.len()].to_string();
@@ -108,11 +111,21 @@ fn seven_zip() -> Option<PathBuf> {
 
 /// Runs `cmd`, feeding `stdin` and polling `cancelled` so a long run can be
 /// stopped. Returns (success, combined output).
-fn run(mut cmd: Command, stdin: Option<String>, cancelled: &dyn Fn() -> bool) -> Result<(bool, String), ArchiveError> {
-    cmd.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| ArchiveError::Failed(e.to_string()))?;
+fn run(
+    mut cmd: Command,
+    stdin: Option<String>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(bool, String), ArchiveError> {
+    cmd.stdin(if stdin.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    })
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| ArchiveError::Failed(e.to_string()))?;
     if let Some(data) = stdin {
         if let Some(mut s) = child.stdin.take() {
             let _ = s.write_all(data.as_bytes());
@@ -151,13 +164,19 @@ fn run(mut cmd: Command, stdin: Option<String>, cancelled: &dyn Fn() -> bool) ->
             Err(e) => return Err(ArchiveError::Failed(e.to_string())),
         }
     };
-    let text = format!("{}\n{}", t_out.join().unwrap_or_default(), t_err.join().unwrap_or_default());
+    let text = format!(
+        "{}\n{}",
+        t_out.join().unwrap_or_default(),
+        t_err.join().unwrap_or_default()
+    );
     Ok((status.success(), text))
 }
 
 fn looks_like_password_error(output: &str) -> bool {
     let o = output.to_lowercase();
-    o.contains("wrong password") || o.contains("cannot open encrypted archive") || o.contains("can not open encrypted archive")
+    o.contains("wrong password")
+        || o.contains("cannot open encrypted archive")
+        || o.contains("can not open encrypted archive")
         || o.contains("enter password") && o.contains("error")
 }
 
@@ -166,8 +185,9 @@ fn last_error_line(output: &str) -> String {
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
-        .filter(|l| l.to_lowercase().contains("error") || l.starts_with("tar:") || l.contains("cannot"))
-        .last()
+        .rfind(|l| {
+            l.to_lowercase().contains("error") || l.starts_with("tar:") || l.contains("cannot")
+        })
         .unwrap_or("The archive tool reported an error")
         .to_string()
 }
@@ -177,9 +197,10 @@ fn member_args(items: &[PathBuf], parent: &Path) -> Vec<String> {
     items
         .iter()
         .map(|p| {
-            let rel = p.strip_prefix(parent).map(|r| r.to_path_buf()).unwrap_or_else(|_| {
-                PathBuf::from(p.file_name().unwrap_or_default())
-            });
+            let rel = p
+                .strip_prefix(parent)
+                .map(|r| r.to_path_buf())
+                .unwrap_or_else(|_| PathBuf::from(p.file_name().unwrap_or_default()));
             format!("./{}", rel.to_string_lossy())
         })
         .collect()
@@ -187,13 +208,19 @@ fn member_args(items: &[PathBuf], parent: &Path) -> Vec<String> {
 
 fn collect_cpio(root: &Path, rel: &str, out: &mut Vec<String>) {
     out.push(rel.to_string());
-    let Ok(meta) = fs::symlink_metadata(root) else { return };
+    let Ok(meta) = fs::symlink_metadata(root) else {
+        return;
+    };
     if !meta.is_dir() {
         return;
     }
     if let Ok(rd) = fs::read_dir(root) {
         for e in rd.flatten() {
-            let child = format!("{}/{}", rel.trim_end_matches('/'), e.file_name().to_string_lossy());
+            let child = format!(
+                "{}/{}",
+                rel.trim_end_matches('/'),
+                e.file_name().to_string_lossy()
+            );
             collect_cpio(&e.path(), &child, out);
         }
     }
@@ -214,11 +241,21 @@ pub fn compress(
         .ok_or_else(|| ArchiveError::Failed("nothing to compress".into()))?
         .to_path_buf();
     let members = member_args(items, &parent);
-    let pw = if password.is_empty() { None } else { Some(format!("{}\n{}\n", password, password)) };
-    let format = if format == "zip_encrypted" && pw.is_none() { "zip" } else { format };
+    let pw = if password.is_empty() {
+        None
+    } else {
+        Some(format!("{}\n{}\n", password, password))
+    };
+    let format = if format == "zip_encrypted" && pw.is_none() {
+        "zip"
+    } else {
+        format
+    };
 
     let result = match format {
-        "7z" | "zip_encrypted" | "zip" if format == "7z" || pw.is_some() || which("zip").is_none() => {
+        "7z" | "zip_encrypted" | "zip"
+            if format == "7z" || pw.is_some() || which("zip").is_none() =>
+        {
             let bin = seven_zip().ok_or(ArchiveError::MissingTool("7z (p7zip / 7zip)"))?;
             let mut cmd = Command::new(bin);
             cmd.current_dir(&parent).args(["a", "-y", "-bd"]);
@@ -241,7 +278,11 @@ pub fn compress(
         "zip" => {
             let mut cmd = Command::new(which("zip").unwrap());
             // zip wants `--` after the archive name (the archive path is absolute).
-            cmd.current_dir(&parent).args(["-r", "-q", "-y"]).arg(archive).arg("--").args(&members);
+            cmd.current_dir(&parent)
+                .args(["-r", "-q", "-y"])
+                .arg(archive)
+                .arg("--")
+                .args(&members);
             run(cmd, None, cancelled)?
         }
         "zip_encrypted" => return Err(ArchiveError::MissingTool("7z (p7zip / 7zip)")),
@@ -253,19 +294,34 @@ pub fn compress(
                 _ => "-cf",
             };
             let mut cmd = Command::new(which("tar").ok_or(ArchiveError::MissingTool("tar"))?);
-            cmd.arg(flag).arg(archive).arg("-C").arg(&parent).arg("--").args(&members);
+            cmd.arg(flag)
+                .arg(archive)
+                .arg("-C")
+                .arg(&parent)
+                .arg("--")
+                .args(&members);
             run(cmd, None, cancelled)?
         }
         "tar.zst" => {
             let tar = which("tar").ok_or(ArchiveError::MissingTool("tar"))?;
             let mut cmd = Command::new(&tar);
-            cmd.args(["--zstd", "-cf"]).arg(archive).arg("-C").arg(&parent).arg("--").args(&members);
+            cmd.args(["--zstd", "-cf"])
+                .arg(archive)
+                .arg("-C")
+                .arg(&parent)
+                .arg("--")
+                .args(&members);
             let first = run(cmd, None, cancelled)?;
             if first.0 {
                 first
             } else {
                 let mut cmd = Command::new(&tar);
-                cmd.args(["-I", "zstd", "-cf"]).arg(archive).arg("-C").arg(&parent).arg("--").args(&members);
+                cmd.args(["-I", "zstd", "-cf"])
+                    .arg(archive)
+                    .arg("-C")
+                    .arg(&parent)
+                    .arg("--")
+                    .args(&members);
                 run(cmd, None, cancelled)?
             }
         }
@@ -290,10 +346,20 @@ pub fn compress(
                     let _ = stdin.write_all(b"\0");
                 }
             }
-            let out = child.wait_with_output().map_err(|e| ArchiveError::Failed(e.to_string()))?;
-            (out.status.success(), String::from_utf8_lossy(&out.stderr).to_string())
+            let out = child
+                .wait_with_output()
+                .map_err(|e| ArchiveError::Failed(e.to_string()))?;
+            (
+                out.status.success(),
+                String::from_utf8_lossy(&out.stderr).to_string(),
+            )
         }
-        other => return Err(ArchiveError::Failed(format!("unsupported format '{}'", other))),
+        other => {
+            return Err(ArchiveError::Failed(format!(
+                "unsupported format '{}'",
+                other
+            )))
+        }
     };
 
     if result.0 {
@@ -307,7 +373,12 @@ pub fn compress(
 /// Extracts `archive` into `target` (created if needed). Returns
 /// `NeedPassword` when the archive is encrypted and `password` is empty or
 /// wrong, so the caller can ask and try again.
-pub fn extract(archive: &Path, target: &Path, password: &str, cancelled: &dyn Fn() -> bool) -> Result<(), ArchiveError> {
+pub fn extract(
+    archive: &Path,
+    target: &Path,
+    password: &str,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), ArchiveError> {
     let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
     fs::create_dir_all(target).map_err(|e| ArchiveError::Failed(e.to_string()))?;
     let (ok, output) = match kind {
@@ -321,16 +392,24 @@ pub fn extract(archive: &Path, target: &Path, password: &str, cancelled: &dyn Fn
                 Kind::TarZst => cmd.args(["--zstd", "-xf"]),
                 _ => cmd.arg("-xf"),
             };
-            cmd.arg(archive).arg("-C").arg(target).arg("--no-same-owner");
+            cmd.arg(archive)
+                .arg("-C")
+                .arg(target)
+                .arg("--no-same-owner");
             run(cmd, None, cancelled)?
         }
         _ => {
             if let Some(bin) = seven_zip() {
                 let mut cmd = Command::new(bin);
-                cmd.args(["x", "-y", "-bd"]).arg(format!("-o{}", target.display()));
+                cmd.args(["x", "-y", "-bd"])
+                    .arg(format!("-o{}", target.display()));
                 // Without -p, 7-Zip asks for a password on stdin only when the
                 // archive needs one (`-p` alone would mean "empty password").
-                let stdin = if password.is_empty() { None } else { Some(format!("{}\n", password)) };
+                let stdin = if password.is_empty() {
+                    None
+                } else {
+                    Some(format!("{}\n", password))
+                };
                 cmd.arg("--").arg(archive);
                 run(cmd, stdin, cancelled)?
             } else {
@@ -351,21 +430,28 @@ pub fn extract(archive: &Path, target: &Path, password: &str, cancelled: &dyn Fn
                         }
                     }
                     Kind::Rar => {
-                        let unrar = which("unrar").ok_or(ArchiveError::MissingTool("7z or unrar"))?;
+                        let unrar =
+                            which("unrar").ok_or(ArchiveError::MissingTool("7z or unrar"))?;
                         let mut cmd = Command::new(unrar);
-                        cmd.args(["x", "-o+", "-p-"]).arg(archive).arg(format!("{}/", target.display()));
+                        cmd.args(["x", "-o+", "-p-"])
+                            .arg(archive)
+                            .arg(format!("{}/", target.display()));
                         run(cmd, None, cancelled)?
                     }
                     Kind::Cpio => {
                         let cpio = which("cpio").ok_or(ArchiveError::MissingTool("cpio"))?;
-                        let input = fs::File::open(archive).map_err(|e| ArchiveError::Failed(e.to_string()))?;
+                        let input = fs::File::open(archive)
+                            .map_err(|e| ArchiveError::Failed(e.to_string()))?;
                         let out = Command::new(cpio)
                             .current_dir(target)
                             .args(["-idm", "--no-absolute-filenames", "--quiet"])
                             .stdin(Stdio::from(input))
                             .output()
                             .map_err(|e| ArchiveError::Failed(e.to_string()))?;
-                        (out.status.success(), String::from_utf8_lossy(&out.stderr).to_string())
+                        (
+                            out.status.success(),
+                            String::from_utf8_lossy(&out.stderr).to_string(),
+                        )
                     }
                     _ => return Err(ArchiveError::MissingTool("7z (p7zip / 7zip)")),
                 }
@@ -375,7 +461,9 @@ pub fn extract(archive: &Path, target: &Path, password: &str, cancelled: &dyn Fn
     if ok {
         return Ok(());
     }
-    if looks_like_password_error(&output) || (!ok && password.is_empty() && output.to_lowercase().contains("password")) {
+    if looks_like_password_error(&output)
+        || (!ok && password.is_empty() && output.to_lowercase().contains("password"))
+    {
         return Err(ArchiveError::NeedPassword);
     }
     Err(ArchiveError::Failed(last_error_line(&output)))
@@ -413,7 +501,9 @@ pub fn parse_7z_listing(text: &str) -> Vec<Entry> {
         let mut size = 0;
         let mut modified = String::new();
         for line in block.lines() {
-            let Some((k, v)) = line.split_once(" = ") else { continue };
+            let Some((k, v)) = line.split_once(" = ") else {
+                continue;
+            };
             match k {
                 "Path" => path = Some(clean_member(v)),
                 "Folder" => is_dir = v.trim() == "+",
@@ -424,7 +514,12 @@ pub fn parse_7z_listing(text: &str) -> Vec<Entry> {
             }
         }
         if let Some(p) = path.filter(|p| !p.is_empty()) {
-            out.push(Entry { path: p, is_dir, size, modified });
+            out.push(Entry {
+                path: p,
+                is_dir,
+                size,
+                modified,
+            });
         }
     }
     out
@@ -437,7 +532,9 @@ pub fn parse_tar_listing(text: &str) -> Vec<Entry> {
         let mut rest = line.trim_start();
         let mut fields = Vec::new();
         for _ in 0..5 {
-            let Some((f, r)) = rest.split_once(char::is_whitespace) else { break };
+            let Some((f, r)) = rest.split_once(char::is_whitespace) else {
+                break;
+            };
             fields.push(f);
             rest = r.trim_start();
         }
@@ -458,7 +555,10 @@ pub fn parse_tar_listing(text: &str) -> Vec<Entry> {
             path,
             is_dir,
             size: fields[2].parse().unwrap_or(0),
-            modified: format!("{} {}", fields[3], fields[4]).chars().take(19).collect(),
+            modified: format!("{} {}", fields[3], fields[4])
+                .chars()
+                .take(19)
+                .collect(),
         });
     }
     out
@@ -467,8 +567,11 @@ pub fn parse_tar_listing(text: &str) -> Vec<Entry> {
 /// Adds folder entries that are only implied by member paths (zip files
 /// often omit them).
 pub fn with_implied_dirs(mut entries: Vec<Entry>) -> Vec<Entry> {
-    let mut known: std::collections::HashSet<String> =
-        entries.iter().filter(|e| e.is_dir).map(|e| e.path.clone()).collect();
+    let mut known: std::collections::HashSet<String> = entries
+        .iter()
+        .filter(|e| e.is_dir)
+        .map(|e| e.path.clone())
+        .collect();
     let mut extra = Vec::new();
     for e in &entries {
         let mut p = Path::new(&e.path).parent();
@@ -478,7 +581,12 @@ pub fn with_implied_dirs(mut entries: Vec<Entry>) -> Vec<Entry> {
                 break;
             }
             if known.insert(s.clone()) {
-                extra.push(Entry { path: s, is_dir: true, size: 0, modified: String::new() });
+                extra.push(Entry {
+                    path: s,
+                    is_dir: true,
+                    size: 0,
+                    modified: String::new(),
+                });
             }
             p = dir.parent();
         }
@@ -509,7 +617,11 @@ pub fn list(archive: &Path, password: &str) -> Result<Vec<Entry>, ArchiveError> 
             let bin = seven_zip().ok_or(ArchiveError::MissingTool("7z (p7zip / 7zip)"))?;
             let mut cmd = Command::new(bin);
             cmd.args(["l", "-slt"]);
-            let stdin = if password.is_empty() { None } else { Some(format!("{}\n", password)) };
+            let stdin = if password.is_empty() {
+                None
+            } else {
+                Some(format!("{}\n", password))
+            };
             cmd.arg("--").arg(archive);
             let (ok, text) = run(cmd, stdin, &never)?;
             if !ok {
@@ -526,7 +638,12 @@ pub fn list(archive: &Path, password: &str) -> Result<Vec<Entry>, ArchiveError> 
 
 /// Extracts a single member (file or folder) into `target_dir`, returning
 /// the extracted path. Used to open files from inside an archive.
-pub fn extract_member(archive: &Path, member: &str, target_dir: &Path, password: &str) -> Result<PathBuf, ArchiveError> {
+pub fn extract_member(
+    archive: &Path,
+    member: &str,
+    target_dir: &Path,
+    password: &str,
+) -> Result<PathBuf, ArchiveError> {
     let never = || false;
     let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
     fs::create_dir_all(target_dir).map_err(|e| ArchiveError::Failed(e.to_string()))?;
@@ -541,7 +658,13 @@ pub fn extract_member(archive: &Path, member: &str, target_dir: &Path, password:
                 if kind == Kind::TarZst {
                     cmd.arg("--zstd");
                 }
-                cmd.arg("-xf").arg(archive).arg("-C").arg(target_dir).arg("--no-same-owner").arg("--").arg(&name);
+                cmd.arg("-xf")
+                    .arg(archive)
+                    .arg("-C")
+                    .arg(target_dir)
+                    .arg("--no-same-owner")
+                    .arg("--")
+                    .arg(&name);
                 last = run(cmd, None, &never)?;
                 if last.0 {
                     break;
@@ -552,8 +675,13 @@ pub fn extract_member(archive: &Path, member: &str, target_dir: &Path, password:
         _ => {
             let bin = seven_zip().ok_or(ArchiveError::MissingTool("7z (p7zip / 7zip)"))?;
             let mut cmd = Command::new(bin);
-            cmd.args(["x", "-y", "-bd", "-spd"]).arg(format!("-o{}", target_dir.display()));
-            let stdin = if password.is_empty() { None } else { Some(format!("{}\n", password)) };
+            cmd.args(["x", "-y", "-bd", "-spd"])
+                .arg(format!("-o{}", target_dir.display()));
+            let stdin = if password.is_empty() {
+                None
+            } else {
+                Some(format!("{}\n", password))
+            };
             cmd.arg("--").arg(archive).arg(member);
             run(cmd, stdin, &never)?
         }
@@ -568,7 +696,9 @@ pub fn extract_member(archive: &Path, member: &str, target_dir: &Path, password:
     if fs::symlink_metadata(&out).is_ok() {
         Ok(out)
     } else {
-        Err(ArchiveError::Failed("the file was not found in the archive".into()))
+        Err(ArchiveError::Failed(
+            "the file was not found in the archive".into(),
+        ))
     }
 }
 
@@ -602,9 +732,22 @@ mod tests {
             let arch = d.join(format!("out.{}", fmt));
             compress(&arch, &[d.join(evil), d.join("-rf")], fmt, "", &|| false).unwrap();
             assert!(arch.exists(), "{} archive created", fmt);
-            assert!(!d.join("PWNED").exists(), "{} must not execute file names", fmt);
-            let names: Vec<String> = list(&arch, "").unwrap().into_iter().map(|e| e.path).collect();
-            assert!(names.contains(&evil.to_string()), "{} keeps the name: {:?}", fmt, names);
+            assert!(
+                !d.join("PWNED").exists(),
+                "{} must not execute file names",
+                fmt
+            );
+            let names: Vec<String> = list(&arch, "")
+                .unwrap()
+                .into_iter()
+                .map(|e| e.path)
+                .collect();
+            assert!(
+                names.contains(&evil.to_string()),
+                "{} keeps the name: {:?}",
+                fmt,
+                names
+            );
             let out = d.join(format!("x-{}", fmt));
             extract(&arch, &out, "", &|| false).unwrap();
             assert_eq!(fs::read(out.join(evil)).unwrap(), b"x");
@@ -624,10 +767,19 @@ mod tests {
             let arch = d.join(if fmt == "7z" { "s.7z" } else { "s.zip" });
             compress(&arch, &[d.join("docs")], fmt, "hunter2", &|| false).unwrap();
             let out = d.join(format!("out-{}", fmt));
-            assert_eq!(extract(&arch, &out, "", &|| false), Err(ArchiveError::NeedPassword));
-            assert_eq!(extract(&arch, &d.join("bad"), "wrong", &|| false), Err(ArchiveError::NeedPassword));
+            assert_eq!(
+                extract(&arch, &out, "", &|| false),
+                Err(ArchiveError::NeedPassword)
+            );
+            assert_eq!(
+                extract(&arch, &d.join("bad"), "wrong", &|| false),
+                Err(ArchiveError::NeedPassword)
+            );
             extract(&arch, &out, "hunter2", &|| false).unwrap();
-            assert_eq!(fs::read(out.join("docs/secret.txt")).unwrap(), b"top secret");
+            assert_eq!(
+                fs::read(out.join("docs/secret.txt")).unwrap(),
+                b"top secret"
+            );
         }
         fs::remove_dir_all(&d).unwrap();
     }
@@ -642,12 +794,24 @@ mod tests {
             let arch = d.join(format!("p.{}", fmt));
             compress(&arch, &[d.join("proj")], fmt, "", &|| false).unwrap();
             let entries = list(&arch, "").unwrap();
-            assert!(entries.iter().any(|e| e.path == "proj/src" && e.is_dir), "{:?}", entries);
-            assert!(entries.iter().any(|e| e.path == "proj/src/main.rs" && !e.is_dir && e.size == 11));
+            assert!(
+                entries.iter().any(|e| e.path == "proj/src" && e.is_dir),
+                "{:?}",
+                entries
+            );
+            assert!(entries
+                .iter()
+                .any(|e| e.path == "proj/src/main.rs" && !e.is_dir && e.size == 11));
             if fmt == "zip" && seven_zip().is_none() {
                 continue;
             }
-            let got = extract_member(&arch, "proj/src/main.rs", &d.join(format!("one-{}", fmt)), "").unwrap();
+            let got = extract_member(
+                &arch,
+                "proj/src/main.rs",
+                &d.join(format!("one-{}", fmt)),
+                "",
+            )
+            .unwrap();
             assert_eq!(fs::read(got).unwrap(), b"fn main(){}");
         }
         fs::remove_dir_all(&d).unwrap();
@@ -658,7 +822,15 @@ mod tests {
         let t = "drwxr-xr-x u/g 0 2024-01-02 03:04:05 ./a dir/\n-rw-r--r-- u/g 12 2024-01-02 03:04:05 ./a dir/f g.txt\nlrwxrwxrwx u/g 0 2024-01-02 03:04:05 ./ln -> f g.txt\n";
         let e = parse_tar_listing(t);
         assert_eq!(e.len(), 3);
-        assert_eq!(e[0], Entry { path: "a dir".into(), is_dir: true, size: 0, modified: "2024-01-02 03:04:05".into() });
+        assert_eq!(
+            e[0],
+            Entry {
+                path: "a dir".into(),
+                is_dir: true,
+                size: 0,
+                modified: "2024-01-02 03:04:05".into()
+            }
+        );
         assert_eq!(e[1].path, "a dir/f g.txt");
         assert_eq!(e[1].size, 12);
         assert_eq!(e[2].path, "ln");

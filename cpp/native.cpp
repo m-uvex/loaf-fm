@@ -298,6 +298,14 @@ bool forward_to_running_instance(const rust::Vec<rust::String> &paths, rust::Str
 
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode)
 {
+    engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
+    for (const char *p : {"/usr/lib/x86_64-linux-gnu/qt6/qml", "/usr/lib/qt6/qml", "/usr/lib64/qt6/qml"}) {
+        if (QDir(QString::fromLatin1(p)).exists()) {
+            engine.addImportPath(QString::fromLatin1(p));
+            break;
+        }
+    }
+
     auto *native = new LoafNative(&engine);
     QStringList raw;
     for (const rust::String &p : paths)

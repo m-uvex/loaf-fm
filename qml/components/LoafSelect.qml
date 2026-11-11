@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
+import ".."
 
 // LoafSelect -- Material 3 Expressive dropdown field built on LoafMenu.
 // options: [{ value, label, iconUrl? }]
