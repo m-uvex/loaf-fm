@@ -247,6 +247,10 @@ LoafPopup {
         obj.parentMenu = menu;
         if (parentItem)
             obj.parent = parentItem;
+        obj.closed.connect(function() {
+            if (!menu.contentHovered)
+                menu.highlightIndex = -1;
+        });
         menu.currentSubmenu = obj;
         return obj;
     }
@@ -286,6 +290,8 @@ LoafPopup {
         hideTimer.stop();
         if (menu.currentSubmenu && menu.currentSubmenu.opened)
             menu.currentSubmenu.close();
+        if (!menu.contentHovered)
+            menu.highlightIndex = -1;
     }
 
     function isNestedMenu() {
@@ -417,12 +423,18 @@ LoafPopup {
                 onTriggered: menu.activate(rowWrap.rowIndex)
                 onSubmenuHovered: menu.openSubmenuAt(rowWrap.rowIndex)
                 onHoveredChanged: {
-                    if (!row.hovered)
-                        return;
-                    if (row.hasSubmenu)
-                        menu.openSubmenuAt(rowWrap.rowIndex);
-                    else
-                        menu.hideSubmenuSoon();
+                    if (row.hovered) {
+                        menu.highlightIndex = rowWrap.rowIndex;
+                        if (row.hasSubmenu)
+                            menu.openSubmenuAt(rowWrap.rowIndex);
+                        else
+                            menu.hideSubmenuSoon();
+                    } else {
+                        if (!row.hasSubmenu || !menu.currentSubmenu || !menu.currentSubmenu.opened) {
+                            if (menu.highlightIndex === rowWrap.rowIndex)
+                                menu.highlightIndex = -1;
+                        }
+                    }
                 }
             }
         }
