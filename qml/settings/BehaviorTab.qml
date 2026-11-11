@@ -27,11 +27,60 @@ ColumnLayout {
     readonly property bool matchRename: matches("click rename inline single click")
     readonly property bool matchSearch: matches("search file contents text inside")
     readonly property bool matchSession: matches("session restore tabs remember last folder window startup launch")
+    readonly property bool matchDefaultApps: matches("default apps applications folders directories text txt plain text png images image file type mime formats")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchOpenDirs ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
-            + (matchDisambig ? 1 : 0) + (matchRename ? 1 : 0) + (matchSearch ? 1 : 0) + (matchSession ? 1 : 0))
+            + (matchDisambig ? 1 : 0) + (matchRename ? 1 : 0) + (matchSearch ? 1 : 0)
+            + (matchSession ? 1 : 0) + (matchDefaultApps ? 1 : 0))
         : 0
+
+    property var mimeTypeOptions: []
+    property var mimeAppOptions: []
+    property string selectedMimeType: ""
+    property string selectedMimeApp: ""
+
+    function loadAppOptions(mime) {
+        var apps = [];
+        try {
+            apps = JSON.parse(core.apps_for_mime(mime) || "[]");
+        } catch (e) {
+            console.warn("Could not load default applications for " + mime + ": " + e);
+        }
+        return apps.map(function(app) {
+            return { value: app.id, label: app.name, iconUrl: app.icon };
+        });
+    }
+
+    function selectMimeType(mime) {
+        selectedMimeType = mime;
+        mimeAppOptions = loadAppOptions(mime);
+        selectedMimeApp = core.default_app_for_mime(mime);
+    }
+
+    function loadDefaultAppSettings() {
+        if (typeof core === "undefined" || !core)
+            return;
+        try {
+            var types = JSON.parse(core.used_mime_types() || "[]");
+            mimeTypeOptions = types.map(function(type) {
+                return { value: type.mime, label: type.label };
+            });
+        } catch (e) {
+            console.warn("Could not load supported file types: " + e);
+            mimeTypeOptions = [];
+        }
+        if (mimeTypeOptions.length > 0)
+            selectMimeType(mimeTypeOptions[0].value);
+    }
+
+    function saveDefaultApp(appId) {
+        if (selectedMimeType.length > 0 && core.set_default_mime_app(selectedMimeType, appId))
+            selectedMimeApp = core.default_app_for_mime(selectedMimeType);
+    }
+
+    onVisibleChanged: if (visible) loadDefaultAppSettings()
+    Component.onCompleted: loadDefaultAppSettings()
 
     Layout.fillWidth: true
     spacing: 16
@@ -161,6 +210,52 @@ ColumnLayout {
                 checked: typeof core !== "undefined" && core ? core.get_setting("restoreSession") !== "false" : true
                 onToggled: if (typeof core !== "undefined" && core) core.set_setting("restoreSession", checked ? "true" : "false")
             }
+        }
+    }
+
+    SettingCard {
+        visible: root.matchDefaultApps
+        title: qsTr("Default Applications")
+        subtitle: qsTr("Choose a file type and the installed app that should open it")
+        icon: "app-window"
+
+        SettingRow {
+            visible: root.mimeTypeOptions.length > 0
+            icon: "file"
+            title: qsTr("File type")
+            subtitle: qsTr("Types you have opened in Loaf")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
+                options: root.mimeTypeOptions
+                value: root.selectedMimeType
+                placeholder: qsTr("No supported file types")
+                enabled: root.mimeTypeOptions.length > 0
+                onSelected: function(mime) { root.selectMimeType(mime); }
+            }
+        }
+
+        SettingRow {
+            visible: root.mimeTypeOptions.length > 0
+            icon: "app-window"
+            title: qsTr("Application")
+            subtitle: qsTr("Default app for the selected file type")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
+                options: root.mimeAppOptions
+                value: root.selectedMimeApp
+                placeholder: qsTr("Choose an app")
+                enabled: root.mimeAppOptions.length > 0
+                onSelected: function(id) { root.saveDefaultApp(id); }
+            }
+        }
+
+        SettingRow {
+            visible: root.mimeTypeOptions.length === 0
+            icon: "info"
+            title: qsTr("No file types yet")
+            subtitle: qsTr("Open a file in Loaf to add its type here")
         }
     }
 

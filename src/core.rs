@@ -222,6 +222,15 @@ pub mod qobject {
         #[qinvokable]
         fn default_app_for(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
+        fn default_app_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        #[qinvokable]
+        fn used_mime_types(self: &LoafCore) -> QString;
+        #[qinvokable]
+        fn apps_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        #[qinvokable]
+        fn set_default_mime_app(self: Pin<&mut LoafCore>, mime: &QString, app_id: &QString)
+            -> bool;
+        #[qinvokable]
         fn open_with_app(self: Pin<&mut LoafCore>, paths_json: &QString, app_id: &QString);
         #[qinvokable]
         fn set_default_app(self: Pin<&mut LoafCore>, path: &QString, app_id: &QString);
@@ -1906,6 +1915,7 @@ impl qobject::LoafCore {
                 return;
             }
         }
+        Self::record_used_mime_type(&mime);
         std::thread::spawn(move || xdg::add_recent(&path, &mime));
     }
 
@@ -2048,6 +2058,79 @@ impl qobject::LoafCore {
         q(&apps::default_for(&mime).map(|a| a.id).unwrap_or_default())
     }
 
+    pub fn default_app_for_mime(&self, mime: &QString) -> QString {
+        q(&apps::default_for(&mime.to_string())
+            .map(|app| app.id)
+            .unwrap_or_default())
+    }
+
+    pub fn used_mime_types(&self) -> QString {
+        let mimes: Vec<String> = state::get("openedMimeTypes")
+            .unwrap_or_default()
+            .split('\u{1}')
+            .filter(|mime| {
+                mime.contains('/') && !mime.contains('*') && !mime.starts_with("x-scheme-handler/")
+            })
+            .map(String::from)
+            .collect();
+        let entries: Vec<serde_json::Value> = mimes
+            .into_iter()
+            .map(|mime| {
+                let comment = native::mime_comment(&mime);
+                let label = if comment.is_empty() || comment == mime {
+                    mime.clone()
+                } else {
+                    format!("{} ({})", comment, mime)
+                };
+                serde_json::json!({"mime": mime, "label": label})
+            })
+            .collect();
+        q(&serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn apps_for_mime(&self, mime: &QString) -> QString {
+        Self::app_entries(
+            apps::for_mime(&mime.to_string()),
+            &self.icon_theme().to_string(),
+        )
+    }
+
+    pub fn set_default_mime_app(
+        mut self: Pin<&mut Self>,
+        mime: &QString,
+        app_id: &QString,
+    ) -> bool {
+        let mime = mime.to_string();
+        let app_id = app_id.to_string();
+        let app = apps::find(&app_id).filter(|app| {
+            app.mimes
+                .iter()
+                .any(|declared| apps::mime_covers(declared, &mime))
+        });
+        let Some(app) = app else {
+            self.as_mut().notify(
+                q("error"),
+                q("That application does not support this file type"),
+            );
+            return false;
+        };
+        match apps::set_default(&mime, &app_id) {
+            Ok(()) => {
+                Self::record_used_mime_type(&mime);
+                let comment = native::mime_comment(&mime);
+                self.as_mut().notify(
+                    q("info"),
+                    q(&format!("{} now opens {} files", app.name, comment)),
+                );
+                true
+            }
+            Err(e) => {
+                self.as_mut().notify(q("error"), q(&e.to_string()));
+                false
+            }
+        }
+    }
+
     fn push_recent_app(id: &str) {
         let mut list: Vec<String> = state::get("recentOpenApps")
             .unwrap_or_default()
@@ -2061,6 +2144,23 @@ impl qobject::LoafCore {
         state::set("recentOpenApps", &list.join("\u{1}"));
     }
 
+    fn record_used_mime_type(mime: &str) {
+        if !mime.contains('/') || mime.contains('*') || mime.starts_with("x-scheme-handler/") {
+            return;
+        }
+        let mut list: Vec<String> = state::get("openedMimeTypes")
+            .unwrap_or_default()
+            .split('\u{1}')
+            .filter(|value| !value.is_empty())
+            .map(String::from)
+            .collect();
+        if !list.iter().any(|value| value == mime) {
+            list.push(mime.to_string());
+            list.sort();
+            state::set("openedMimeTypes", &list.join("\u{1}"));
+        }
+    }
+
     pub fn open_with_app(mut self: Pin<&mut Self>, paths_json: &QString, app_id: &QString) {
         let paths = parse_paths(paths_json);
         let id = app_id.to_string();
@@ -2070,11 +2170,21 @@ impl qobject::LoafCore {
             return;
         };
         Self::push_recent_app(&id);
-        if let Err(e) = apps::launch(&app, &paths) {
-            self.as_mut().notify(
+        match apps::launch(&app, &paths) {
+            Ok(()) => {
+                for path in paths {
+                    let mime = if path.is_dir() {
+                        "inode/directory".to_string()
+                    } else {
+                        native::mime_type(&path, true)
+                    };
+                    Self::record_used_mime_type(&mime);
+                }
+            }
+            Err(e) => self.as_mut().notify(
                 q("error"),
                 q(&format!("Could not start {}: {}", app.name, e)),
-            );
+            ),
         }
     }
 
@@ -2087,6 +2197,7 @@ impl qobject::LoafCore {
         };
         match apps::set_default(&mime, &app_id.to_string()) {
             Ok(()) => {
+                Self::record_used_mime_type(&mime);
                 let comment = native::mime_comment(&mime);
                 let name = apps::find(&app_id.to_string())
                     .map(|a| a.name)
