@@ -1969,9 +1969,17 @@ impl qobject::LoafCore {
         let mime = if p.is_dir() {
             "inode/directory".to_string()
         } else {
-            native::mime_type(&p, true)
+            native::mime_type(&p, false)
         };
         let theme_name = self.icon_theme().to_string();
+        static CACHE: Mutex<Option<std::collections::HashMap<(String, String), QString>>> = Mutex::new(None);
+        let cache_key = (mime.clone(), theme_name.clone());
+        if let Ok(mut guard) = CACHE.lock() {
+            if let Some(hit) = guard.get_or_insert_with(std::collections::HashMap::new).get(&cache_key) {
+                return hit.clone();
+            }
+        }
+
         let installed = apps::all();
         let default_id = apps::default_for_in(&installed, &mime)
             .map(|a| a.id)
@@ -2006,7 +2014,11 @@ impl qobject::LoafCore {
             "recent": recent.iter().map(|a| Self::app_entry(a, &theme_name)).collect::<Vec<_>>(),
             "hasOthers": installed.iter().any(|a| !a.no_display),
         });
-        q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()))
+        let res = q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()));
+        if let Ok(mut guard) = CACHE.lock() {
+            guard.get_or_insert_with(std::collections::HashMap::new).insert(cache_key, res.clone());
+        }
+        res
     }
 
     pub fn all_open_with_apps(&self) -> QString {
