@@ -147,11 +147,10 @@ LoafPopup {
         var list = menu.animatableRows();
         for (var i = 0; i < list.length; i++) {
             var item = list[i];
-            var delay = i * 22;
             if (typeof item.playPop === "function")
-                item.playPop(delay);
+                item.playPop(0);
             else if (typeof item.popIn === "function")
-                item.popIn(delay);
+                item.popIn(0);
         }
     }
 
@@ -263,7 +262,7 @@ LoafPopup {
             return;
         sm.model = submenuModel;
         sm.parentMenu = menu;
-        sm.openRightOf(anchorItem);
+        sm.openAdjacentTo(anchorItem, menu);
     }
 
     function openSubmenuAt(index) {
