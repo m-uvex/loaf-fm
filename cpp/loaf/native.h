@@ -83,6 +83,8 @@ public:
 
 Q_SIGNALS:
     void ctrlScroll(int delta);
+    void spacePressed();
+    void spaceReleased(qint64 heldDuration);
     void clipboardChanged();
     void mtpDevicesChanged();
     // mode: "tab" (open folders), "select" (show items), "properties",

@@ -38,6 +38,8 @@
 #include <QQuickItem>
 #include <QFont>
 #include <QWheelEvent>
+#include <QKeyEvent>
+#include <QDateTime>
 #include <QStyleHints>
 #include <QTimer>
 #include <QTranslator>
@@ -326,20 +328,40 @@ public:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        if (event->type() == QEvent::Wheel) {
-            auto *we = static_cast<QWheelEvent *>(event);
-            if (we->modifiers() & Qt::ControlModifier) {
-                int delta = 0;
-                if (we->angleDelta().y() != 0)
-                    delta = we->angleDelta().y() > 0 ? 1 : -1;
-                else if (we->pixelDelta().y() != 0)
-                    delta = we->pixelDelta().y() > 0 ? 1 : -1;
-                if (delta != 0) {
-                    Q_EMIT m_native->ctrlScroll(delta);
-                    we->accept();
-                    return true;
+        if (event->type() == QEvent::KeyPress) {
+            auto *ke = static_cast<QKeyEvent *>(event);
+            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
+                m_spacePressTime = QDateTime::currentMSecsSinceEpoch();
+                m_spaceHeld = true;
+                Q_EMIT m_native->spacePressed();
+            }
+        } else if (event->type() == QEvent::KeyRelease) {
+            auto *ke = static_cast<QKeyEvent *>(event);
+            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
+                qint64 held = QDateTime::currentMSecsSinceEpoch() - m_spacePressTime;
+                bool wasHeld = m_spaceHeld;
+                m_spaceHeld = false;
+                if (wasHeld) {
+                    Q_EMIT m_native->spaceReleased(held);
                 }
             }
+        } else if (event->type() == QEvent::Wheel) {
+            auto *we = static_cast<QWheelEvent *>(event);
+            if (we->modifiers() & Qt::ControlModifier) {
+                int dy = we->angleDelta().y();
+                if (dy == 0)
+                    dy = we->pixelDelta().y() * 40;
+                m_accumulatedZoomDelta += dy;
+                if (std::abs(m_accumulatedZoomDelta) >= 120) {
+                    int steps = m_accumulatedZoomDelta / 120;
+                    m_accumulatedZoomDelta %= 120;
+                    Q_EMIT m_native->ctrlScroll(steps > 0 ? 1 : -1);
+                }
+                we->accept();
+                return true;
+            }
+
+            m_accumulatedZoomDelta = 0;
 
             auto *window = qobject_cast<QQuickWindow *>(watched);
             if (!window) {
@@ -417,6 +439,9 @@ private:
     }
 
     LoafNative *m_native;
+    int m_accumulatedZoomDelta = 0;
+    qint64 m_spacePressTime = 0;
+    bool m_spaceHeld = false;
 };
 
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode)

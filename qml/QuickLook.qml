@@ -11,29 +11,6 @@ LoafPopup {
     modal: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Space) {
-            if (event.isAutoRepeat) {
-                event.accepted = true;
-                return;
-            }
-            event.accepted = true;
-            quickLook.close();
-        }
-    }
-    Keys.onReleased: function(event) {
-        if (event.key === Qt.Key_Space) {
-            if (event.isAutoRepeat) {
-                event.accepted = true;
-                return;
-            }
-            if (typeof window !== "undefined" && window.spaceHeldForQuickLook) {
-                event.accepted = true;
-                window.handleSpaceRelease(event);
-            }
-        }
-    }
-
     transformOrigin: Item.Center
     scale: 0.15
     opacity: 0.0

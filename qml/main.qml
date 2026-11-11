@@ -262,6 +262,23 @@ ApplicationWindow {
             if (window.activeView === "files")
                 theme.stepZoom(delta);
         }
+        function onSpacePressed() {
+            if (searchInput.activeFocus || window.isEditingPath)
+                return;
+            if (!quickLook.visible && window.gridKeyboardReady) {
+                window.spaceHeldForQuickLook = true;
+                window.toggleQuickLook();
+            } else if (quickLook.visible) {
+                window.spaceHeldForQuickLook = false;
+                quickLook.close();
+            }
+        }
+        function onSpaceReleased(heldDuration) {
+            if (quickLook.visible && window.spaceHeldForQuickLook) {
+                quickLook.close();
+                window.spaceHeldForQuickLook = false;
+            }
+        }
     }
 
     // Active portal picker windows keyed by D-Bus handle.
@@ -446,40 +463,6 @@ ApplicationWindow {
     }
 
     property bool spaceHeldForQuickLook: false
-    property real spacePressTime: 0
-
-    function handleSpacePress(event) {
-        if (event.isAutoRepeat) {
-            event.accepted = true;
-            return;
-        }
-        if (!quickLook.visible && !window.gridKeyboardReady)
-            return;
-        event.accepted = true;
-        spacePressTime = Date.now();
-        if (quickLook.visible) {
-            spaceHeldForQuickLook = false;
-            quickLook.close();
-        } else {
-            spaceHeldForQuickLook = true;
-            toggleQuickLook();
-        }
-    }
-
-    function handleSpaceRelease(event) {
-        if (event.isAutoRepeat) {
-            event.accepted = true;
-            return;
-        }
-        if (spaceHeldForQuickLook && quickLook.visible) {
-            event.accepted = true;
-            var heldDuration = Date.now() - spacePressTime;
-            spaceHeldForQuickLook = false;
-            if (heldDuration > 250) {
-                quickLook.close();
-            }
-        }
-    }
 
     function toggleQuickLook() {
         if (quickLook.visible) {
@@ -924,11 +907,6 @@ ApplicationWindow {
         Keys.onPressed: function(event) {
             if (window.anyModalOpen)
                 return;
-            if (event.key === Qt.Key_Space) {
-                window.handleSpacePress(event);
-                if (event.accepted)
-                    return;
-            }
             if (event.key === Qt.Key_Escape) {
                 if (window.activePane.selectedCount > 0) {
                     window.activePane.clearSelection();
@@ -977,12 +955,6 @@ ApplicationWindow {
                 searchInput.text = event.text;
                 searchInput.cursorPosition = searchInput.text.length;
                 event.accepted = true;
-            }
-        }
-
-        Keys.onReleased: function(event) {
-            if (event.key === Qt.Key_Space) {
-                window.handleSpaceRelease(event);
             }
         }
     }
@@ -1991,6 +1963,7 @@ ApplicationWindow {
                                     color: tabDelegate.current ? theme.secondaryContainerFg : theme.textMain
                                     font.pixelSize: theme.fs(12)
                                     font.bold: tabDelegate.current && (!tabDelegate.isSplit || window.activePane === pane0)
+                                    font.family: theme.fontFamily
                                     elide: Text.ElideRight
                                 }
                             }
@@ -2013,6 +1986,7 @@ ApplicationWindow {
                                     color: tabDelegate.current ? theme.secondaryContainerFg : theme.textMain
                                     font.pixelSize: theme.fs(12)
                                     font.bold: tabDelegate.current && tabDelegate.isSplit && pane1Loader.item && window.activePane === pane1Loader.item
+                                    font.family: theme.fontFamily
                                     elide: Text.ElideRight
                                 }
                             }
@@ -2481,6 +2455,12 @@ ApplicationWindow {
         }
 
         var inArchive = kind === "archive";
+        var preloadedOpenData = null;
+        if (!item.is_dir && !inArchive) {
+            Qt.callLater(function() {
+                preloadedOpenData = openWithData(paths);
+            });
+        }
         m.push({ text: qsTr("Open"), icon: "arrow-square-out", itemKey: "open", action: function() { pane.openSelected(); } });
         if (item.is_dir && !inArchive)
             m.push({ text: qsTr("Open in New Tab"), icon: "tabs", itemKey: "new_tab", action: function() { for (var i = 0; i < paths.length; ++i) window.newTab(paths[i]); } });
@@ -2497,7 +2477,7 @@ ApplicationWindow {
                 icon: "app-window",
                 itemKey: "open_with",
                 submenu: function() {
-                    var openData = openWithData(paths);
+                    var openData = preloadedOpenData || openWithData(paths);
                     return openWithMenu(paths, openData);
                 }
             });
@@ -2506,7 +2486,7 @@ ApplicationWindow {
                 icon: "check-square",
                 itemKey: "set_default",
                 submenu: function() {
-                    var openData = openWithData(paths);
+                    var openData = preloadedOpenData || openWithData(paths);
                     return setDefaultMenu(paths, openData);
                 }
             });
