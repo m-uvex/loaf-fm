@@ -131,9 +131,9 @@ Item {
             visible: root.showValue
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredHeight: 26
-            Layout.preferredWidth: 50
+            Layout.preferredWidth: Math.max(50, valText.implicitWidth + 14)
             Layout.minimumWidth: 50
-            implicitWidth: 50
+            implicitWidth: Layout.preferredWidth
             radius: theme.radiusFull
             color: theme.surfaceContainerHighest
 

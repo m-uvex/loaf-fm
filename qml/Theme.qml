@@ -251,6 +251,27 @@ Item {
     }
     readonly property string fontFamily: defaultFontFamily
 
+    property int fontWeight: 400 // 200 to 800
+
+    function fw(isBold) {
+        return isBold ? Math.min(900, Math.max(600, fontWeight + 250)) : fontWeight;
+    }
+
+    function weightName(w) {
+        if (w <= 200) return qsTr("Thin");
+        if (w <= 300) return qsTr("Light");
+        if (w <= 400) return qsTr("Regular");
+        if (w <= 500) return qsTr("Medium");
+        if (w <= 600) return qsTr("SemiBold");
+        if (w <= 700) return qsTr("Bold");
+        return qsTr("Heavy");
+    }
+
+    function syncAppFont() {
+        if (typeof nativeBridge !== "undefined" && nativeBridge)
+            nativeBridge.setApplicationFont(defaultFontFamily, fontWeight);
+    }
+
     property bool highContrast: false
 
     function getFontFamily() {
@@ -2325,9 +2346,13 @@ Item {
         if (value.length > 0) showBackgroundShapes = (value !== "false");
         value = readSetting("fontChoice");
         if (value.length > 0) fontChoice = value;
+        value = readSetting("fontWeight");
+        if (value.length > 0 && isFinite(parseInt(value)))
+            fontWeight = Math.max(200, Math.min(800, parseInt(value)));
         value = readSetting("highContrast");
         if (value.length > 0) highContrast = (value === "true");
         loaded = true;
+        syncAppFont();
     }
 
     // Writes are skipped until the stored values have been read.
@@ -2388,7 +2413,8 @@ Item {
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onClickToOpenChanged: writeSetting("clickToOpen", clickToOpen)
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
-    onFontChoiceChanged: writeSetting("fontChoice", fontChoice)
-    onDefaultFontFamilyChanged: if (typeof nativeBridge !== "undefined" && nativeBridge) nativeBridge.setApplicationFont(defaultFontFamily)
+    onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }
+    onFontWeightChanged: { writeSetting("fontWeight", fontWeight); syncAppFont(); }
+    onDefaultFontFamilyChanged: syncAppFont()
     onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")
 }

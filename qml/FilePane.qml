@@ -1858,6 +1858,7 @@ Item {
                                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMain
                                             font.pixelSize: theme.fs(13)
                                             font.bold: row.is_dir || row.isSelected
+                                            font.weight: theme.fw(row.is_dir || row.isSelected)
                                             font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                             verticalAlignment: Text.AlignVCenter
@@ -1869,6 +1870,7 @@ Item {
                                             text: row.detail
                                             color: theme.textMuted
                                             font.pixelSize: theme.fs(10)
+                                            font.weight: theme.fontWeight
                                             font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                         }

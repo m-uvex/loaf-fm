@@ -309,14 +309,16 @@ int LoafNative::systemScrollLines() const
     return lines > 0 ? lines : 3;
 }
 
-void LoafNative::setApplicationFont(const QString &family)
+void LoafNative::setApplicationFont(const QString &family, int weight)
 {
-    if (family.trimmed().isEmpty()) {
-        QGuiApplication::setFont(QFont());
-    } else {
-        QFont f(family.trimmed());
-        QGuiApplication::setFont(f);
+    QFont f;
+    if (!family.trimmed().isEmpty()) {
+        f.setFamily(family.trimmed());
     }
+    if (weight > 0) {
+        f.setWeight(static_cast<QFont::Weight>(std::clamp(weight, 100, 900)));
+    }
+    QGuiApplication::setFont(f);
 }
 
 class WheelEventFilter : public QObject

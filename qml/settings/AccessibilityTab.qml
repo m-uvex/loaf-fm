@@ -214,6 +214,26 @@ ColumnLayout {
                 onSelected: function(v) { theme.fontChoice = v; }
             }
         }
+
+        SettingDivider { visible: root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontChoice
+            icon: "text-bolder"
+            title: qsTr("Font weight")
+            subtitle: qsTr("Adjust text stroke weight from light to bold across the interface")
+
+            LoafSlider {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                from: 200
+                to: 800
+                stepSize: 100
+                value: theme.fontWeight
+                customValueText: theme.weightName(theme.fontWeight)
+                accessibleName: qsTr("Font weight")
+                onMoved: function(v) { theme.fontWeight = Math.round(v); }
+            }
+        }
     }
 
     Connections {

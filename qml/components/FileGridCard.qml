@@ -178,6 +178,7 @@ Item {
                     color: card.isSelected ? theme.secondaryContainerFg : theme.textMain
                     font.pixelSize: theme.fs(11)
                     font.bold: card.itemIsDir || card.isSelected
+                    font.weight: theme.fw(card.itemIsDir || card.isSelected)
                     font.family: theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignTop

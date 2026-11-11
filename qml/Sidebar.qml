@@ -624,6 +624,7 @@ Rectangle {
             color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             font.pixelSize: theme.fs(13)
             font.bold: btn.selected
+            font.weight: theme.fw(btn.selected)
             font.family: theme.fontFamily
             elide: Text.ElideRight
         }
