@@ -36,6 +36,7 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QFont>
 #include <QWheelEvent>
 #include <QStyleHints>
 #include <QTimer>
@@ -304,6 +305,16 @@ int LoafNative::systemScrollLines() const
 {
     int lines = QGuiApplication::styleHints()->wheelScrollLines();
     return lines > 0 ? lines : 3;
+}
+
+void LoafNative::setApplicationFont(const QString &family)
+{
+    if (family.trimmed().isEmpty()) {
+        QGuiApplication::setFont(QFont());
+    } else {
+        QFont f(family.trimmed());
+        QGuiApplication::setFont(f);
+    }
 }
 
 class WheelEventFilter : public QObject

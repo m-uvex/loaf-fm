@@ -57,7 +57,6 @@ Window {
         ? request.title
         : (isSave ? qsTr("Save File") : qsTr("Open File"))
     color: theme.windowBackground
-    font.family: theme.defaultFontFamily
     modality: modal ? Qt.WindowModal : Qt.NonModal
     visible: true
 

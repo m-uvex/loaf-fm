@@ -2384,5 +2384,6 @@ Item {
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: writeSetting("fontChoice", fontChoice)
+    onDefaultFontFamilyChanged: if (typeof nativeBridge !== "undefined" && nativeBridge) nativeBridge.setApplicationFont(defaultFontFamily)
     onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")
 }

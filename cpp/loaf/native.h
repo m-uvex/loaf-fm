@@ -79,6 +79,7 @@ public:
     bool isAdmin() const;
     bool alphaBuffer() const;
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE void setApplicationFont(const QString &family);
 
 Q_SIGNALS:
     void ctrlScroll(int delta);
