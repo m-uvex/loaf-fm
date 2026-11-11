@@ -2411,6 +2411,8 @@ ApplicationWindow {
         if (!inArchive) {
             var termDir = item.is_dir ? item.path : (item.parent_path || pane.engine.current_path);
             m.push({ text: qsTr("Open in Terminal"), icon: "terminal", itemKey: "terminal", action: function() { core.open_terminal(termDir); } });
+            if (single && !item.is_dir && core.is_runnable(item.path))
+                m.push({ text: qsTr("Run Executable"), icon: "play", itemKey: "run", action: function() { core.run_executable(item.path); } });
 
             m.push({ text: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X", itemKey: "cut", separatorBefore: true, action: function() { window.copySelection(true); } });
             m.push({ text: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C", itemKey: "copy", action: function() { window.copySelection(false); } });

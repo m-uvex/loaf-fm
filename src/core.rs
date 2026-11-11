@@ -244,6 +244,9 @@ pub mod qobject {
         /// shared GTK bookmarks file) with the system's default handler.
         #[qinvokable]
         fn open_uri(self: Pin<&mut LoafCore>, uri: &QString);
+        /// Runs an executable file directly (context-menu "Run Executable").
+        #[qinvokable]
+        fn run_executable(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
         fn quick_look(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -261,6 +264,9 @@ pub mod qobject {
         ) -> QString;
         #[qinvokable]
         fn is_archive_file(self: &LoafCore, path: &QString) -> bool;
+        /// True when the file can be executed directly (exec bit set).
+        #[qinvokable]
+        fn is_runnable(self: &LoafCore, path: &QString) -> bool;
         #[qinvokable]
         fn mime_type(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -2215,6 +2221,25 @@ impl qobject::LoafCore {
                 .notify(q("error"), q(&format!("No application can open “{}”", u)));
         }
     }
+
+    /// Runs a file directly (context-menu "Run Executable"). Like launching
+    /// from a desktop icon: the child is detached, console output goes
+    /// nowhere, and the working directory is the file's folder.
+    pub fn run_executable(mut self: Pin<&mut Self>, path: &QString) {
+        let p = PathBuf::from(path.to_string());
+        let mut cmd = std::process::Command::new(&p);
+        if let Some(parent) = p.parent() {
+            if parent.is_dir() {
+                cmd.current_dir(parent);
+            }
+        }
+        if let Err(e) = util::spawn_detached(cmd) {
+            self.as_mut().notify(
+                q("error"),
+                q(&format!("Could not run “{}”: {}", file_name(&p), e)),
+            );
+        }
+    }
     pub fn preview_mtp(self: Pin<&mut Self>, path: &QString) {
         let path = path.to_string();
         let thread = self.qt_thread();
@@ -2290,6 +2315,13 @@ impl qobject::LoafCore {
 
     pub fn is_archive_file(&self, path: &QString) -> bool {
         archive::is_archive(Path::new(&path.to_string()))
+    }
+
+    /// True when the file itself can be executed (any execute bit set on a
+    /// regular file; symlinks follow their target). Drives the context-menu
+    /// "Run Executable" item.
+    pub fn is_runnable(&self, path: &QString) -> bool {
+        util::is_executable(Path::new(&path.to_string()))
     }
 
     pub fn mime_type(&self, path: &QString) -> QString {
