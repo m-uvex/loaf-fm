@@ -121,9 +121,9 @@ Rectangle {
 
     readonly property var entries: cachedEntries
 
-    onPlacesChanged: rebuildEntries()
-    onDrivesChanged: rebuildEntries()
-    onPickerModeChanged: rebuildEntries()
+    onPlacesChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
+    onDrivesChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
+    onPickerModeChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
     Component.onCompleted: rebuildEntries()
 
     readonly property var trashPlace: {
@@ -225,7 +225,6 @@ Rectangle {
     onActiveIdChanged: Qt.callLater(updateHighlight)
     onShowTrashChanged: Qt.callLater(updateHighlight)
     onExpandedChanged: Qt.callLater(updateHighlight)
-    onDrivesChanged: Qt.callLater(updateHighlight)
 
     ColumnLayout {
         anchors.fill: parent
