@@ -3526,6 +3526,7 @@ ApplicationWindow {
             { id: "open_containing", name: qsTr("Open Containing Folder"), icon: "folder-open", shortcut: "" },
             { id: "quick_look", name: qsTr("Quick Look"), icon: "eye", shortcut: "Space" },
             { id: "terminal", name: qsTr("Open in Terminal"), icon: "terminal", shortcut: "" },
+            { id: "run", name: qsTr("Run Executable"), icon: "play", shortcut: "" },
             { id: "cut", name: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X" },
             { id: "copy", name: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C" },
             { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C" },
