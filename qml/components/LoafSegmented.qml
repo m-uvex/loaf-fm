@@ -166,6 +166,7 @@ Item {
                                     color: segItem.isCurrent ? theme.secondaryContainerFg : (segMouse.containsMouse ? theme.textMain : theme.textMuted)
                                     font.pixelSize: theme.fs(12)
                                     font.bold: segItem.isCurrent
+                                    font.family: theme.fontFamily
 
                                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
                                 }

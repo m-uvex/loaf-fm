@@ -1858,6 +1858,7 @@ Item {
                                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMain
                                             font.pixelSize: theme.fs(13)
                                             font.bold: row.is_dir || row.isSelected
+                                            font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                             verticalAlignment: Text.AlignVCenter
                                         }
@@ -1868,6 +1869,7 @@ Item {
                                             text: row.detail
                                             color: theme.textMuted
                                             font.pixelSize: theme.fs(10)
+                                            font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                         }
                                     }
@@ -1993,6 +1995,10 @@ Item {
                                 window.openItemMenu(pane, row.index, pt.x, pt.y);
                             } else {
                                 contextMenu.close();
+                                if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
+                                    pane.openRow(row.index);
+                                    return;
+                                }
                                 pane.selectRow(row.index, !!(mouse.modifiers & Qt.ControlModifier), !!(mouse.modifiers & Qt.ShiftModifier));
                             }
                         }

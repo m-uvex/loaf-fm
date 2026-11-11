@@ -100,6 +100,7 @@ Item {
             color: root.fgColor
             font.pixelSize: theme.fs(13)
             font.bold: root.variant === "filled" || root.variant === "tonal"
+            font.family: theme.fontFamily
         }
     }
 

@@ -147,6 +147,7 @@ Item {
                 color: theme.textMain
                 font.pixelSize: theme.fs(11)
                 font.bold: true
+                font.family: theme.fontFamily
             }
         }
     }

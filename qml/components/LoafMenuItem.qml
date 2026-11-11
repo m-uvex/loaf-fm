@@ -175,6 +175,7 @@ Item {
             text: root.text
             color: root.danger ? theme.danger : theme.textMain
             font.pixelSize: theme.fs(13)
+            font.family: theme.fontFamily
             Layout.fillWidth: true
             elide: Text.ElideRight
         }
@@ -198,6 +199,7 @@ Item {
             text: root.shortcut
             color: theme.outline
             font.pixelSize: theme.fs(11)
+            font.family: theme.fontFamily
         }
     }
 

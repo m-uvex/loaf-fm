@@ -264,6 +264,7 @@ Item {
                             color: tabItem.isCurrent ? theme.primaryContainerFg : (tabItem.isHovered ? theme.textMain : theme.textMuted)
                             font.pixelSize: theme.fs(13)
                             font.bold: tabItem.isCurrent
+                            font.family: theme.fontFamily
                             elide: Text.ElideRight
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         }

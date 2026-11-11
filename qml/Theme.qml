@@ -68,6 +68,7 @@ Item {
     property string pathBarMode: "chips" // "chips", "text"
     property string openFolderMode: "current" // "current", "split", "tab"
     property string archiveOpenAction: "browse" // "browse", "extract", "open"
+    property string clickToOpen: "double" // "double", "single"
     property bool showBackgroundShapes: true
 
     property var keybindings: ({})
@@ -248,6 +249,7 @@ Item {
             return openDyslexicFont.status === FontLoader.Ready ? openDyslexicFont.name : "OpenDyslexic";
         return "";
     }
+    readonly property string fontFamily: defaultFontFamily
 
     property bool highContrast: false
 
@@ -2317,6 +2319,8 @@ Item {
         if (value.length > 0) {
             try { keybindings = JSON.parse(value); } catch (e) { keybindings = {}; }
         }
+        value = readSetting("clickToOpen");
+        if (value.length > 0) clickToOpen = value;
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
         value = readSetting("fontChoice");
@@ -2382,6 +2386,7 @@ Item {
     onOpenFolderModeChanged: writeSetting("openFolderMode", openFolderMode)
     onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
+    onClickToOpenChanged: writeSetting("clickToOpen", clickToOpen)
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: writeSetting("fontChoice", fontChoice)
     onDefaultFontFamilyChanged: if (typeof nativeBridge !== "undefined" && nativeBridge) nativeBridge.setApplicationFont(defaultFontFamily)

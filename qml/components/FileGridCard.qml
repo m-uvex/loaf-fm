@@ -178,6 +178,7 @@ Item {
                     color: card.isSelected ? theme.secondaryContainerFg : theme.textMain
                     font.pixelSize: theme.fs(11)
                     font.bold: card.itemIsDir || card.isSelected
+                    font.family: theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignTop
                     wrapMode: Text.WrapAnywhere
@@ -255,6 +256,10 @@ Item {
                 }
             } else {
                 if (typeof contextMenu !== "undefined" && contextMenu) contextMenu.close();
+                if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
+                    if (viewPane) viewPane.openRow(card.itemIndex);
+                    return;
+                }
                 var wasOnlySelected = card.isSelected && viewPane && viewPane.selectedCount === 1;
                 if (viewPane)
                     viewPane.selectRow(card.itemIndex, !!(mouse.modifiers & Qt.ControlModifier), !!(mouse.modifiers & Qt.ShiftModifier));
