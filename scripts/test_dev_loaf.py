@@ -245,7 +245,7 @@ sys.exit(1)
 
         # 2. Run without Cargo in PATH
         clean_env = os.environ.copy()
-        clean_env["PATH"] = "/usr/bin:/bin"
+        clean_env["PATH"] = os.pathsep.join([str(Path(sys.executable).parent), "/usr/bin", "/bin"])
         caller_cwd = repo_dir / "caller_dir"
         caller_cwd.mkdir()
 
