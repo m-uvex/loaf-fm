@@ -6,5 +6,6 @@
     <file alias="fonts/Phosphor-Duotone.ttf">fonts/Phosphor-Duotone.ttf</file>
     <file alias="fonts/Phosphor-Light.ttf">fonts/Phosphor-Light.ttf</file>
     <file alias="fonts/Phosphor-Thin.ttf">fonts/Phosphor-Thin.ttf</file>
+    <file alias="settings/languages.json">../qml/settings/languages.json</file>
   </qresource>
 </RCC>

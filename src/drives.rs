@@ -1,6 +1,7 @@
 //! Devices for the sidebar and This PC: block volumes via lsblk/UDisks,
 //! and optional USB MTP phones via KDE's session D-Bus service.
 
+use crate::message::{Message, MessageKey};
 use crate::util::{self, which};
 use serde::Serialize;
 use std::path::Path;
@@ -182,18 +183,28 @@ pub fn parse_lsblk(
         let used = total.saturating_sub(free);
         let label = s(v, "label");
         let display = if !label.is_empty() {
-            label.to_string()
+            Message::raw(label).to_string()
         } else if mount == "/" {
-            "Root (/)".to_string()
+            Message::key(MessageKey::DriveRoot).to_string()
         } else if mounted {
-            Path::new(&mount)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| name.to_string())
+            Message::raw(
+                Path::new(&mount)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| name.to_string()),
+            )
+            .to_string()
         } else if !ctx.model.is_empty() {
-            format!("{} ({})", ctx.model.trim(), util::format_size(size))
+            Message::raw(format!(
+                "{} ({})",
+                ctx.model.trim(),
+                util::format_size(size)
+            ))
+            .to_string()
         } else {
-            format!("{} Volume", util::format_size(size))
+            Message::key(MessageKey::DriveVolume)
+                .text(util::format_size(size))
+                .to_string()
         };
         let pct = if total > 0 && mounted {
             ((used as f64 / total as f64) * 1000.0).round() / 10.0
@@ -273,7 +284,11 @@ fn disambiguate_drive_names(drives: &mut [Drive]) {
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| d.device.clone())
             };
-            d.name = format!("{} ({})", d.name, suffix);
+            let base_name = serde_json::from_str::<serde_json::Value>(&d.name)
+                .ok()
+                .and_then(|v| v.get("raw").and_then(|r| r.as_str().map(String::from)))
+                .unwrap_or_else(|| d.name.clone());
+            d.name = Message::raw(format!("{} ({})", base_name, suffix)).to_string();
         }
     }
 }
@@ -322,9 +337,9 @@ pub fn parse_mtp_devices(json: &str) -> Vec<Drive> {
         };
         out.push(Drive {
             name: if !name.is_empty() {
-                name
+                Message::raw(name).to_string()
             } else {
-                "MTP Device".to_string()
+                Message::key(MessageKey::DriveMtpDevice).to_string()
             },
             device: location.url(),
             disk: String::new(),
@@ -388,9 +403,10 @@ fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
         .map(|pair| pair[1])
         .unwrap_or("");
     if !device.starts_with("/dev/") {
-        return Err("This action is only supported for block devices".to_string());
+        return Err(Message::key(MessageKey::DriveErrorBlockOnly).to_string());
     }
-    let bin = which("udisksctl").ok_or("udisks2 (udisksctl) is not installed")?;
+    let bin = which("udisksctl")
+        .ok_or_else(|| Message::key(MessageKey::DriveErrorUdisksMissing).to_string())?;
     let mut cmd = Command::new(bin);
     cmd.args(args);
     let (ok, out, err) = util::run_capture(cmd, stdin);
@@ -400,9 +416,10 @@ fn udisks(args: &[&str], stdin: Option<&[u8]>) -> Result<String, String> {
         Err(err
             .lines()
             .last()
-            .unwrap_or("UDisks reported an error")
-            .trim()
-            .to_string())
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(|l| Message::raw(l).to_string())
+            .unwrap_or_else(|| Message::key(MessageKey::DriveErrorUdisksFailed).to_string()))
     }
 }
 
@@ -414,7 +431,7 @@ pub fn mount(device: &str) -> Result<String, String> {
         .into_iter()
         .find(|d| d.device == device && d.is_mounted)
         .map(|d| d.mount_point)
-        .ok_or_else(|| "mounted device has no discoverable mount point".to_string())
+        .ok_or_else(|| Message::key(MessageKey::DriveErrorNoMountpoint).to_string())
 }
 
 pub fn unmount(device: &str) -> Result<(), String> {
@@ -476,9 +493,10 @@ pub fn udisks_object(device: &str) -> String {
 /// needed); works for ext*, FAT, exFAT, NTFS, btrfs, xfs...
 pub fn set_label(device: &str, label: &str) -> Result<(), String> {
     if !device.starts_with("/dev/") {
-        return Err("Renaming is only supported for block devices".to_string());
+        return Err(Message::key(MessageKey::DriveErrorRenameBlockOnly).to_string());
     }
-    let gdbus = which("gdbus").ok_or("gdbus (glib2) is not installed")?;
+    let gdbus = which("gdbus")
+        .ok_or_else(|| Message::key(MessageKey::DriveErrorGdbusMissing).to_string())?;
     let mut cmd = Command::new(gdbus);
     cmd.args([
         "call",
@@ -503,8 +521,10 @@ pub fn set_label(device: &str, label: &str) -> Result<(), String> {
             .trim()
             .lines()
             .last()
-            .unwrap_or("could not rename the drive")
-            .to_string())
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(|l| Message::raw(l).to_string())
+            .unwrap_or_else(|| Message::key(MessageKey::DriveErrorRenameFailed).to_string()))
     }
 }
 
@@ -541,7 +561,7 @@ mod tests {
             "efi, swap and loop are hidden"
         );
         let root = &d[0];
-        assert_eq!(root.name, "fedora");
+        assert_eq!(root.name, Message::raw("fedora").to_string());
         assert_eq!(
             root.mount_point, "/",
             "root wins over the other btrfs subvolumes"
@@ -568,17 +588,17 @@ mod tests {
         assert_eq!(d.len(), 4);
         assert_eq!(d[0].device, "/dev/nvme0n1p6");
         assert_eq!(d[0].mount_point, "/");
-        assert_eq!(d[0].name, "linux-root (/)");
+        assert_eq!(d[0].name, Message::raw("linux-root (/)").to_string());
 
         assert_eq!(d[1].device, "/dev/nvme0n1p8");
         assert_eq!(d[1].mount_point, "/home");
-        assert_eq!(d[1].name, "linux-root (/home)");
+        assert_eq!(d[1].name, Message::raw("linux-root (/home)").to_string());
 
         assert_eq!(d[2].device, "/dev/nvme0n1p9");
-        assert_eq!(d[2].name, "data (nvme0n1p9)");
+        assert_eq!(d[2].name, Message::raw("data (nvme0n1p9)").to_string());
 
         assert_eq!(d[3].device, "/dev/nvme0n1p10");
-        assert_eq!(d[3].name, "data (nvme0n1p10)");
+        assert_eq!(d[3].name, Message::raw("data (nvme0n1p10)").to_string());
     }
 
     #[test]
@@ -635,7 +655,7 @@ mod tests {
         let d = parse_mtp_devices(json);
         assert_eq!(d.len(), 1);
         let phone = &d[0];
-        assert_eq!(phone.name, "Redmi K20 Pro");
+        assert_eq!(phone.name, Message::raw("Redmi K20 Pro").to_string());
         assert_eq!(phone.device, "mtp://loaf/2f746573742f70686f6e65/");
         assert!(!phone.is_mounted);
         assert!(phone.mount_point.is_empty());

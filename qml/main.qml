@@ -165,7 +165,7 @@ ApplicationWindow {
         networkDialog.editingId = p.profile_id || p.id || "";
         networkDialog.editingProtocol = p.protocol || "smb";
         networkProtocolSelect.value = networkDialog.editingProtocol;
-        networkNameField.text = p.name || p.label || "";
+        networkNameField.text = theme.resolveRustMessage(p.name || p.label || "");
         networkServerField.text = p.server || "";
         networkShareField.text = p.share || "";
         networkUserField.text = p.username || "";
@@ -180,7 +180,7 @@ ApplicationWindow {
     }
 
     function removeNetworkDrive(id, label) {
-        confirmDialog.ask(qsTr("Remove “%1”?").arg(label || qsTr("this drive")),
+        confirmDialog.ask(qsTr("Remove “%1”?").arg(theme.resolveRustMessage(label) || qsTr("this drive")),
             qsTr("Any password Loaf saved will also be removed from the keyring."),
             qsTr("Remove"), function() { core.remove_network_profile(id); });
     }
@@ -336,11 +336,11 @@ ApplicationWindow {
             var selected = {};
             if (cut) paths.forEach(function(path) { selected[path] = true; });
             cutSet = selected;
-            toast("info", qsTr("%1 phone items copied to Loaf's clipboard").arg(paths.length));
+            toast("info", qsTr("%n phone item(s) copied to Loaf's clipboard", "", paths.length))
             return;
         }
         nativeBridge.setClipboardFiles(paths, cut);
-        toast("info", cut ? theme.plural(paths.length, qsTr("1 item cut"), qsTr("%1 items cut")) : theme.plural(paths.length, qsTr("1 item copied"), qsTr("%1 items copied")));
+        toast("info", cut ? qsTr("%n item(s) cut", "", paths.length) : qsTr("%n item(s) copied", "", paths.length));
     }
 
     function copyPathOfSelection() {
@@ -414,7 +414,7 @@ ApplicationWindow {
         var pane = activePane;
         confirmDialog.ask(
             paths.length === 1 ? qsTr("Permanently delete “%1”?").arg(paths[0].split("/").pop())
-                               : qsTr("Permanently delete %1 items?").arg(paths.length),
+                               : qsTr("Permanently delete %n item(s)?", "", paths.length),
             qsTr("Deleted items can't be restored."),
             qsTr("Delete"),
             function() { core.delete_items(JSON.stringify(paths)); pane.clearSelection(); });
@@ -947,7 +947,7 @@ ApplicationWindow {
             if (kind === "trash" && r && r.failed && r.failed.length > 0) {
                 var failed = r.failed;
                 confirmDialog.ask(qsTr("Can't move to the trash"),
-                    theme.plural(failed.length, qsTr("1 item can't be put in the trash on this drive. Delete it permanently instead?"), qsTr("%1 items can't be put in the trash on this drive. Delete them permanently instead?")),
+                    qsTr("%n item(s) can't be put in the trash on this drive. Delete it permanently instead?", "", failed.length),
                     qsTr("Delete Permanently"),
                     function() { core.delete_items(JSON.stringify(failed)); });
             }
@@ -1014,7 +1014,7 @@ ApplicationWindow {
             window.toast("info", qsTr("Share link copied to clipboard!"));
         }
         onShare_link_error: function(message) {
-            window.toast("error", qsTr("Could not share via link: ") + message);
+            window.toast("error", qsTr("Could not share via link: %1").arg(theme.resolveRustMessage(message)));
         }
         onStarred_changed: {
             pane0.engine.reload_starred();
@@ -2176,7 +2176,7 @@ ApplicationWindow {
             LoafIcon { anchors.verticalCenter: parent.verticalCenter; name: dragManager.paths.length > 1 ? "files" : "file"; size: 22; color: theme.primary }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: dragManager.paths.length > 1 ? qsTr("%1 files").arg(dragManager.paths.length)
+                text: dragManager.paths.length > 1 ? qsTr("%n file(s)", "", dragManager.paths.length)
                     : (dragManager.paths.length === 1 ? dragManager.paths[0].split("/").pop() : "")
                 color: theme.textMain
                 font.pixelSize: theme.fs(12)
@@ -2420,7 +2420,7 @@ ApplicationWindow {
             if (single)
                 m.push({ text: qsTr("Rename…"), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { pane.startRename(); } });
             else
-                m.push({ text: qsTr("Rename %1 Items…").arg(paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
+                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
             if (kind === "dir") {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });
@@ -3229,6 +3229,11 @@ ApplicationWindow {
             }
         }
 
+        LoafTextField { id: smbNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "Studio NAS" }
+        Text { text: qsTr("Server"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: smbServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "192.168.1.20" }
+        Text { text: qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
+        LoafTextField { id: smbShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "media" }
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
@@ -3338,7 +3343,7 @@ ApplicationWindow {
         property var place: ({})
         function openFor(p) {
             place = p;
-            nameField.text = p.name;
+            nameField.text = theme.resolveRustMessage(p.name || "");
             pathField.text = p.path;
             open();
         }
@@ -3361,7 +3366,7 @@ ApplicationWindow {
                 text: qsTr("Save")
                 variant: "filled"
                 onClicked: {
-                    core.edit_place(placeEdit.place.id, nameField.text.trim() || placeEdit.place.name, pathField.text.trim());
+                    core.edit_place(placeEdit.place.id, nameField.text.trim() || theme.resolveRustMessage(placeEdit.place.name || ""), pathField.text.trim());
                     placeEdit.close();
                 }
             }
@@ -3441,7 +3446,7 @@ ApplicationWindow {
                     }
 
                     Text {
-                        text: placeRow.modelData.name || ""
+                        text: theme.resolveRustMessage(placeRow.modelData.name || "")
                         color: placeRow.modelData.hidden ? theme.textMuted : theme.textMain
                         font.pixelSize: theme.fs(13)
                         Layout.fillWidth: true

@@ -6,6 +6,8 @@ Item {
 
     property string themeMode: "auto" // "auto", "light", "dark"
 
+    property string language: ""
+
     // How much of the desktop shows through the window itself.
     property real backgroundOpacity: 1.0
     // How solid the surfaces drawn on top of it are: file panes, the sidebar
@@ -101,15 +103,59 @@ Item {
         return Math.round(px * fontScale);
     }
 
-    // English singular/plural without a translation catalogue loaded:
-    // plural(n, qsTr("1 item"), qsTr("%1 items")).
     // "100,000" (grouped the way the user's locale writes numbers).
     function number(n) {
         return Number(n).toLocaleString(Qt.locale(), "f", 0);
     }
 
-    function plural(n, one, many) {
-        return n === 1 ? one : many.arg(number(n));
+    function relativeTime(timestampSeconds) {
+        var ts = Number(timestampSeconds) || 0;
+        if (ts <= 0) return "-";
+        var elapsed = Math.floor(Date.now() / 1000) - ts;
+        if (elapsed < 0) elapsed = 0;
+        if (elapsed < 60) return qsTr("Just now");
+        if (elapsed < 3600) return qsTr("%1m ago").arg(number(Math.floor(elapsed / 60)));
+        if (elapsed < 86400) return qsTr("%1h ago").arg(number(Math.floor(elapsed / 3600)));
+        if (elapsed < 86400 * 7) return qsTr("%1d ago").arg(number(Math.floor(elapsed / 86400)));
+        return Qt.formatDate(new Date(ts * 1000), Qt.locale(), Locale.ShortFormat);
+    }
+
+
+    function substitute(template, values) {
+        return template.replace(/%(\d+)/g, function (m, index) { var value = values[Number(index) - 1]; return value === undefined || value === null ? m : String(value); });
+    }
+
+    Messages { id: messages }
+
+    // Rust emits {key,args} JSON for strings lupdate cannot see.
+    // Non-JSON text (OS/tool errors) is shown verbatim.
+    function resolveRustMessage(text) {
+        if (!text || text.length === 0 || text.charAt(0) !== "{") return text || "";
+        var decoded;
+        try { decoded = JSON.parse(text); } catch (e) { return text; }
+        if (!decoded || decoded.v !== 1) return text;
+        if (typeof decoded.raw === "string") return decoded.raw;
+        var key = decoded && decoded.key;
+        var a = (decoded && decoded.args) || [];
+        var resolvedArgs = a.map(function (item) { return (item !== null && typeof item === "object") ? resolveRustMessage(JSON.stringify(item)) : item; });
+        var out = messages.resolve(key, resolvedArgs);
+        if (out === undefined) return text;
+        return substitute(out, resolvedArgs);
+    }
+
+    function categoryName(key) {
+        if (key === "folder") return qsTr("Folder");
+        if (key === "image") return qsTr("Image");
+        if (key === "video") return qsTr("Video");
+        if (key === "audio") return qsTr("Audio");
+        if (key === "code") return qsTr("Code");
+        if (key === "archive") return qsTr("Archive");
+        if (key === "document") return qsTr("Document");
+        if (key === "text") return qsTr("Text");
+        if (key === "font") return qsTr("Font");
+        if (key === "application") return qsTr("Application");
+        if (key === "file") return qsTr("File");
+        return key || "";
     }
 
     // Single click on a selected item's name starts renaming.
@@ -2047,6 +2093,8 @@ Item {
 
         value = readSetting("themeMode");
         if (value.length > 0) themeMode = value;
+        value = readSetting("language");
+        if (value.length > 0) language = value;
         value = readSetting("backgroundOpacity");
         if (value.trim().length > 0 && isFinite(Number(value)))
             backgroundOpacity = Math.max(0.0, Math.min(1.0, Number(value)));

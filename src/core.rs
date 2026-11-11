@@ -84,6 +84,13 @@ pub mod qobject {
         #[qinvokable]
         fn set_pc_custom_name(self: Pin<&mut LoafCore>, name: &QString);
         #[qinvokable]
+        fn set_language(self: Pin<&mut LoafCore>, locale: &QString);
+        #[qinvokable]
+        fn available_languages(self: &LoafCore) -> QString;
+        #[qinvokable]
+        fn language_overridden_by_env(self: &LoafCore) -> bool;
+        #[qinvokable]
+        fn effective_language(self: &LoafCore) -> QString;
         fn refresh_system_theme(self: Pin<&mut LoafCore>);
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
@@ -200,6 +207,10 @@ pub mod qobject {
         fn ignore_smb_server(self: Pin<&mut LoafCore>, server: &QString);
         #[qinvokable]
         fn unignore_smb_server(self: Pin<&mut LoafCore>, server: &QString);
+        #[qinvokable]
+        fn ignore_smb_discovered(self: Pin<&mut LoafCore>, server: &QString);
+        #[qinvokable]
+        fn unignore_smb_discovered(self: Pin<&mut LoafCore>, server: &QString);
         #[qinvokable]
         fn clear_ignored_smb_servers(self: Pin<&mut LoafCore>);
         /// Saves a discovered server/share (if needed) and mounts it.
@@ -340,6 +351,7 @@ pub mod qobject {
 
 use crate::archive::{self, ArchiveError};
 use crate::fsops::{self, Monitor};
+use crate::message::{Message, MessageKey};
 use crate::share;
 use crate::{
     apps, drives, icons, info, native, network, smb, state, theme, trash, util, watcher, xdg,
@@ -554,19 +566,19 @@ fn plural(n: usize, one: &str, many: &str) -> String {
 pub fn validate_name(name: &str) -> Result<String, String> {
     let n = name.trim();
     if n.is_empty() {
-        return Err("The name can't be empty".into());
+        return Err(Message::key(MessageKey::NameEmpty).to_string());
     }
     if n == "." || n == ".." {
-        return Err("\".\" and \"..\" are reserved names".into());
+        return Err(Message::key(MessageKey::NameReserved).to_string());
     }
     if n.contains('/') {
-        return Err("Names can't contain \"/\"".into());
+        return Err(Message::key(MessageKey::NameSlash).to_string());
     }
     if n.contains('\0') {
-        return Err("Invalid character in name".into());
+        return Err(Message::key(MessageKey::NameInvalid).to_string());
     }
     if n.len() > 255 {
-        return Err("The name is too long".into());
+        return Err(Message::key(MessageKey::NameTooLong).to_string());
     }
     Ok(n.to_string())
 }
@@ -634,7 +646,7 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "id": format!("network:{}", b.uri),
         "kind": "network",
-        "name": b.display_name(),
+        "name": Message::raw(&b.display_name()).to_string(),
         "path": b.uri,
         "icon": "network",
         "system_icon": "folder-remote-symbolic",
@@ -653,15 +665,15 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     let custom_name = state::get("pcName").unwrap_or_default();
     let custom_name = custom_name.trim();
     let pc_name = if !custom_name.is_empty() {
-        custom_name
+        Message::raw(custom_name).to_string()
     } else if hostname.is_empty() {
-        "This PC"
+        Message::key(MessageKey::PlacePc).to_string()
     } else {
-        hostname
+        Message::raw(hostname).to_string()
     };
     items.push(serde_json::json!({"id": "pc", "kind": "pc", "name": pc_name, "path": "", "icon": pc_icon, "system_icon": "computer-symbolic"}));
-    items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": "Recent", "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
-    items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": "Starred", "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
+    items.push(serde_json::json!({"id": "recent", "kind": "recent", "name": Message::key(MessageKey::PlaceRecent).to_string(), "path": "recent:///", "icon": "clock", "system_icon": "document-open-recent-symbolic"}));
+    items.push(serde_json::json!({"id": "starred", "kind": "starred", "name": Message::key(MessageKey::PlaceStarred).to_string(), "path": "starred:///", "icon": "star", "system_icon": "starred-symbolic"}));
     // Paths already shown by a built-in place, so a GTK bookmark pointing at
     // the same folder (e.g. ~/Projects) is not listed twice.
     let mut shown_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -675,7 +687,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             continue; // issue #22: only show folders that exist
         }
         shown_paths.insert(path.clone());
-        items.push(serde_json::json!({"id": p.id, "kind": "place", "name": name, "path": path, "icon": p.icon, "system_icon": format!("{}-symbolic", p.system_icon)}));
+        items.push(serde_json::json!({"id": p.id, "kind": "place", "name": if cfg.overrides.contains_key(&p.id) { Message::raw(&name).to_string() } else { name }, "path": path, "icon": p.icon, "system_icon": format!("{}-symbolic", p.system_icon)}));
     }
     for b in xdg::bookmarks() {
         let Some(path) = b.path() else { continue };
@@ -686,7 +698,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
         items.push(serde_json::json!({
             "id": format!("bookmark:{}", path.to_string_lossy()),
             "kind": "bookmark",
-            "name": b.display_name(),
+            "name": Message::raw(&b.display_name()).to_string(),
             "path": path.to_string_lossy(),
             "icon": "folder-simple",
             "system_icon": "folder-symbolic",
@@ -709,6 +721,9 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             "kind": "network",
             "protocol": p.protocol.as_str(),
             "name": state.label,
+            "id": format!("smb:{}", p.id),
+            "kind": "smb",
+            "name": Message::raw(&state.label).to_string(),
             "path": state.path,
             "icon": state.icon,
             "system_icon": "folder-remote-symbolic",
@@ -739,7 +754,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             items.push(serde_json::json!({
                 "id": format!("smb-discovery:{}", d.server),
                 "kind": "smb-discovery",
-                "name": if d.name.trim().is_empty() { d.server.clone() } else { d.name.clone() },
+                "name": if d.name.trim().is_empty() { Message::raw(&d.server).to_string() } else { Message::raw(&d.name).to_string() },
                 "path": "",
                 "icon": "network",
                 "system_icon": "folder-remote-symbolic",
@@ -750,7 +765,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
             }));
         }
     }
-    items.push(serde_json::json!({"id": "trash", "kind": "trash", "name": "Trash", "path": "trash:///", "icon": "trash", "system_icon": "user-trash-symbolic"}));
+    items.push(serde_json::json!({"id": "trash", "kind": "trash", "name": Message::key(MessageKey::PlaceTrash).to_string(), "path": "trash:///", "icon": "trash", "system_icon": "user-trash-symbolic"}));
 
     // Apply the user's order: listed ids first in that order, then the rest.
     let pos = |id: &str| cfg.order.iter().position(|o| o == id).unwrap_or(usize::MAX);
@@ -827,13 +842,15 @@ impl qobject::LoafCore {
                     -1.0
                 };
                 let detail = if total > 0 && op.kind != "delete" && op.kind != "trash" {
-                    format!(
-                        "{} of {}",
-                        util::format_size(done),
-                        util::format_size(total)
-                    )
+                    Message::key(MessageKey::OpDetailProgress)
+                        .text(util::format_size(done))
+                        .text(util::format_size(total))
+                        .to_string()
                 } else if total > 0 {
-                    format!("{} of {}", done, total)
+                    Message::key(MessageKey::OpDetailProgress)
+                        .count(done as usize)
+                        .count(total as usize)
+                        .to_string()
                 } else {
                     String::new()
                 };
@@ -922,7 +939,10 @@ impl qobject::LoafCore {
         // Failures are always reported, even when part of the work succeeded
         // and can be undone.
         if cancelled && outcome.undo.is_none() {
-            self.as_mut().notify(q("info"), q("Cancelled"));
+            self.as_mut().notify(
+                q("info"),
+                q(&Message::key(MessageKey::NotifyCancelled).to_string()),
+            );
         } else if !outcome.message.is_empty() {
             let kind_s = if !outcome.ok {
                 "error"
@@ -1002,6 +1022,27 @@ impl qobject::LoafCore {
         self.load_places();
     }
 
+    pub fn set_language(self: Pin<&mut Self>, locale: &QString) {
+        let locale = locale.to_string();
+        state::set("language", &locale);
+        crate::native::apply_language(&locale);
+    }
+
+    pub fn available_languages(&self) -> QString {
+        q(&crate::native::languages_json())
+    }
+
+    pub fn language_overridden_by_env(&self) -> bool {
+        crate::env_language().is_some()
+    }
+
+    pub fn effective_language(&self) -> QString {
+        q(&crate::resolve_language(
+            crate::env_language().as_deref(),
+            state::get("language").as_deref(),
+        ))
+    }
+
     pub fn refresh_system_theme(self: Pin<&mut Self>) {
         let thread = self.qt_thread();
         std::thread::spawn(move || {
@@ -1073,10 +1114,9 @@ impl qobject::LoafCore {
         match xdg::add_bookmark(Path::new(&path.to_string())) {
             Ok(()) => self.as_mut().notify(
                 q("info"),
-                q(&format!(
-                    "Added “{}” to the sidebar",
-                    file_name(Path::new(&path.to_string()))
-                )),
+                q(&Message::key(MessageKey::NotifyBookmarkAdded)
+                    .text(file_name(Path::new(&path.to_string())))
+                    .to_string()),
             ),
             Err(e) => self.as_mut().notify(q("error"), q(&e.to_string())),
         }
@@ -1148,8 +1188,10 @@ impl qobject::LoafCore {
         let id = id.to_string();
         let path_s = path.to_string();
         if !Path::new(&path_s).is_dir() {
-            self.as_mut()
-                .notify(q("error"), q("That folder doesn't exist"));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyFolderMissing).to_string()),
+            );
             return;
         }
         if let Some(bm) = id.strip_prefix("bookmark:") {
@@ -1277,7 +1319,9 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let dev_clone = dev.clone();
         self.drive_job(
-            format!("Mounting {}", dev),
+            Message::key(MessageKey::OpMounting)
+                .text(dev.clone())
+                .to_string(),
             dev,
             move || match drives::mount(&dev_clone) {
                 Ok(path) => Ok(serde_json::json!({
@@ -1300,7 +1344,9 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let dev_clone = dev.clone();
         self.drive_job(
-            format!("Unmounting {}", dev),
+            Message::key(MessageKey::OpUnmounting)
+                .text(dev.clone())
+                .to_string(),
             dev,
             move || match drives::unmount(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
@@ -1323,13 +1369,15 @@ impl qobject::LoafCore {
         let disk_clone = disk.clone();
         let snapshot = self.drives.clone();
         self.drive_job(
-            format!("Ejecting {}", disk),
+            Message::key(MessageKey::OpEjecting)
+                .text(disk.clone())
+                .to_string(),
             disk,
             move || match drives::eject(&disk_clone, &snapshot) {
                 Ok(_) => Ok(serde_json::json!({
                     "action": "eject",
                     "disk": disk_clone,
-                    "message": "It is now safe to remove the drive"
+                    "message": Message::key(MessageKey::OutcomeDriveEjected).to_string()
                 })),
                 Err(e) => Err((
                     e,
@@ -1362,7 +1410,9 @@ impl qobject::LoafCore {
         let thread = self.qt_thread();
         let dev_clone = dev.clone();
         self.drive_job(
-            format!("Unlocking {}", dev.clone()),
+            Message::key(MessageKey::OpUnlocking)
+                .text(dev.clone())
+                .to_string(),
             dev,
             move || match drives::unlock(&dev_clone, &pass) {
                 Ok(clear) => {
@@ -1414,7 +1464,9 @@ impl qobject::LoafCore {
         let dev = device.to_string();
         let dev_clone = dev.clone();
         self.drive_job(
-            format!("Locking {}", dev),
+            Message::key(MessageKey::OpLocking)
+                .text(dev.clone())
+                .to_string(),
             dev,
             move || match drives::lock(&dev_clone) {
                 Ok(_) => Ok(serde_json::json!({
@@ -1437,7 +1489,9 @@ impl qobject::LoafCore {
         let dev_clone = dev.clone();
         let name = name.to_string();
         self.drive_job(
-            format!("Renaming {}", dev),
+            Message::key(MessageKey::OpRenamingDrive)
+                .text(dev.clone())
+                .to_string(),
             dev,
             move || match drives::set_label(&dev_clone, &name) {
                 Ok(_) => Ok(serde_json::json!({
@@ -1470,8 +1524,6 @@ impl qobject::LoafCore {
         }
     }
 
-    // Preserving existing QML ABI signature (10 args required by QML dialog)
-    #[allow(clippy::too_many_arguments)]
     pub fn save_network_profile(
         mut self: Pin<&mut Self>,
         id: &QString,
@@ -1585,7 +1637,9 @@ impl qobject::LoafCore {
                 let thread = self.qt_thread();
                 self.spawn_op(
                     "network",
-                    format!("Disconnecting from {}", old.label()),
+                    Message::key(MessageKey::OpSmbDisconnecting)
+                        .text(old.label())
+                        .to_string(),
                     move |_op| match network::unmount(&old) {
                         Ok(()) => {
                             let _ = thread.queue(|mut core| core.as_mut().refresh_network());
@@ -1614,7 +1668,9 @@ impl qobject::LoafCore {
                 let thread = self.qt_thread();
                 self.spawn_op(
                     "network",
-                    format!("Disconnecting from {}", profile.label()),
+                    Message::key(MessageKey::OpSmbDisconnecting)
+                        .text(profile.label())
+                        .to_string(),
                     move |_op| match network::unmount(&profile) {
                         Ok(()) => {
                             let _ = thread.queue(|mut core| core.as_mut().refresh_network());
@@ -1637,8 +1693,10 @@ impl qobject::LoafCore {
     ) {
         let profile_id = id.to_string();
         let Some(profile) = network::profiles().into_iter().find(|p| p.id == profile_id) else {
-            self.as_mut()
-                .notify(q("error"), q("That network drive no longer exists"));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifySmbMissing).to_string()),
+            );
             return;
         };
         let typed = password.to_string();
@@ -1663,7 +1721,7 @@ impl qobject::LoafCore {
         if entered && !network::store_password(&profile, &pass) {
             self.as_mut().notify(
                 q("error"),
-                q("Could not save the password in the system keyring"),
+                q(&Message::key(MessageKey::NotifyKeyringError).to_string()),
             );
             return;
         }
@@ -1673,42 +1731,52 @@ impl qobject::LoafCore {
         let temporary = entered && !remember;
         let label = profile.label();
         let thread = self.qt_thread();
-        self.spawn_op("network", format!("Connecting to {}", label), move |_op| {
-            let result = network::mount(&profile);
-            if temporary {
-                network::clear_password(&profile);
-            }
-            match result {
-                Ok(path) => {
-                    let id = profile.id.clone();
-                    let mounted = path.clone();
-                    let _ = thread.queue(move |mut core| {
-                        core.as_mut().refresh_network();
-                        core.as_mut().network_mounted(q(&id), q(&mounted.clone()));
-                        core.as_mut().smb_mounted(q(&id), q(&mounted));
-                    });
-                    Outcome::ok(format!("Connected to {}", profile.label()))
+        self.spawn_op(
+            "network",
+            Message::key(MessageKey::OpSmbConnecting)
+                .text(label.clone())
+                .to_string(),
+            move |_op| {
+                let result = network::mount(&profile);
+                if temporary {
+                    network::clear_password(&profile);
                 }
-                Err(e) => {
-                    if e.needs_password && !profile.username.trim().is_empty() {
-                        let request = serde_json::json!({
-                            "kind": "network",
-                            "protocol": profile.protocol.as_str(),
-                            "id": profile.id,
-                            "name": profile.label(),
-                            "server": profile.server,
-                            "share": profile.share,
-                            "username": profile.username,
-                            "error": true,
-                        });
+                match result {
+                    Ok(path) => {
+                        let id = profile.id.clone();
+                        let mounted = path.clone();
                         let _ = thread.queue(move |mut core| {
-                            core.as_mut().password_required(q(&request.to_string()));
+                            core.as_mut().refresh_network();
+                            core.as_mut().network_mounted(q(&id), q(&mounted.clone()));
+                            core.as_mut().smb_mounted(q(&id), q(&mounted));
                         });
+                        Outcome::ok(
+                            Message::key(MessageKey::OutcomeSmbConnected)
+                                .text(profile.label())
+                                .to_string(),
+                        )
                     }
-                    Outcome::err(e.message)
+                    Err(e) => {
+                        if e.needs_password && !profile.username.trim().is_empty() {
+                            let request = serde_json::json!({
+                                "kind": "network",
+                                "protocol": profile.protocol.as_str(),
+                                "id": profile.id,
+                                "name": profile.label(),
+                                "server": profile.server,
+                                "share": profile.share,
+                                "username": profile.username,
+                                "error": true,
+                            });
+                            let _ = thread.queue(move |mut core| {
+                                core.as_mut().password_required(q(&request.to_string()));
+                            });
+                        }
+                        Outcome::err(e.message)
+                    }
                 }
-            }
-        });
+            },
+        );
     }
 
     pub fn disconnect_network(self: Pin<&mut Self>, id: &QString) {
@@ -1719,7 +1787,9 @@ impl qobject::LoafCore {
         let thread = self.qt_thread();
         self.spawn_op(
             "network",
-            format!("Disconnecting from {}", profile.label()),
+            Message::key(MessageKey::OpSmbDisconnecting)
+                .text(profile.label())
+                .to_string(),
             move |_op| match network::unmount(&profile) {
                 Ok(()) => {
                     let _ = thread.queue(|mut core| core.as_mut().refresh_network());
@@ -1787,6 +1857,14 @@ impl qobject::LoafCore {
         self.as_mut().load_places();
     }
 
+    pub fn ignore_smb_discovered(self: Pin<&mut Self>, server: &QString) {
+        self.ignore_smb_server(server);
+    }
+
+    pub fn unignore_smb_discovered(self: Pin<&mut Self>, server: &QString) {
+        self.unignore_smb_server(server);
+    }
+
     pub fn clear_ignored_smb_servers(mut self: Pin<&mut Self>) {
         smb::clear_ignored();
         self.as_mut().load_smb_discovery();
@@ -1805,7 +1883,7 @@ impl qobject::LoafCore {
             return QString::default();
         }
         // Reuse an existing profile instead of creating a duplicate.
-        if let Some(existing) = smb::profiles().into_iter().find(|p| {
+        if let Some(existing) = network::profiles().into_iter().find(|p| {
             smb::normalized_server(&p.server) == smb::normalized_server(&server_text)
                 && p.share.trim_matches('/').eq_ignore_ascii_case(share_text)
         }) {
@@ -1865,18 +1943,18 @@ impl qobject::LoafCore {
         let p = path.to_string();
         if p.starts_with("mtp:") {
             let thread = self.qt_thread();
-            self.spawn_op("open", "Downloading phone file".to_string(), move |op| {
-                match crate::mtp_ops::local_copy(&p, op) {
+            self.spawn_op(
+                "open",
+                Message::key(MessageKey::OpMtpDownloading).to_string(),
+                move |op| match crate::mtp_ops::local_copy(&p, op) {
                     Ok(local) => {
                         let path = local.to_string_lossy().to_string();
                         let _ = thread.queue(move |core| core.open_item(&q(&path)));
-                        Outcome::ok(
-                            "Opened a downloaded copy. Copy changes back to update the phone.",
-                        )
+                        Outcome::ok(Message::key(MessageKey::OutcomeMtpOpened).to_string())
                     }
                     Err(error) => Outcome::err(error),
-                }
-            });
+                },
+            );
             return;
         }
         if p.starts_with(crate::pane::ARCHIVE_SCHEME) {
@@ -1887,7 +1965,7 @@ impl qobject::LoafCore {
         // Never "run" a file by double click; desktop entries and scripts
         // open in their default viewer (text editor), like Nautilus does.
         let launched = match apps::default_for(&mime) {
-            Some(app) => apps::launch(&app, std::slice::from_ref(&path)).is_ok(),
+            Some(app) => apps::launch(&app, &[path.clone()]).is_ok(),
             None => false,
         };
         if !launched {
@@ -1901,7 +1979,9 @@ impl qobject::LoafCore {
             if !ok {
                 self.as_mut().notify(
                     q("error"),
-                    q(&format!("No application can open “{}”", file_name(&path))),
+                    q(&Message::key(MessageKey::NotifyNoAppForFile)
+                        .text(file_name(&path))
+                        .to_string()),
                 );
                 return;
             }
@@ -1925,15 +2005,15 @@ impl qobject::LoafCore {
         };
         let target = runtime.join("loaf-archives").join(key);
         let thread = self.qt_thread();
+        let mem_name = Path::new(&member)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         self.spawn_op(
             "open",
-            format!(
-                "Opening {}",
-                Path::new(&member)
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default()
-            ),
+            Message::key(MessageKey::OpOpeningMember)
+                .text(mem_name.clone())
+                .to_string(),
             move |_op| {
                 let pw = secret_get(&format!("archive:{}", file.to_string_lossy()));
                 match archive::extract_member(&file, &member, &target, &pw) {
@@ -2065,15 +2145,20 @@ impl qobject::LoafCore {
         let paths = parse_paths(paths_json);
         let id = app_id.to_string();
         let Some(app) = apps::find(&id) else {
-            self.as_mut()
-                .notify(q("error"), q("That application is no longer installed"));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyAppMissing).to_string()),
+            );
             return;
         };
         Self::push_recent_app(&id);
         if let Err(e) = apps::launch(&app, &paths) {
             self.as_mut().notify(
                 q("error"),
-                q(&format!("Could not start {}: {}", app.name, e)),
+                q(&Message::key(MessageKey::NotifyAppStartError)
+                    .text(app.name.clone())
+                    .text(e.to_string())
+                    .to_string()),
             );
         }
     }
@@ -2093,7 +2178,10 @@ impl qobject::LoafCore {
                     .unwrap_or_default();
                 self.as_mut().notify(
                     q("info"),
-                    q(&format!("{} now opens {} files", name, comment)),
+                    q(&Message::key(MessageKey::NotifyAppDefaultSet)
+                        .text(name.clone())
+                        .text(comment.clone())
+                        .to_string()),
                 );
             }
             Err(e) => self.as_mut().notify(q("error"), q(&e.to_string())),
@@ -2119,8 +2207,12 @@ impl qobject::LoafCore {
         match util::spawn_detached(cmd) {
             Ok(()) => true,
             Err(e) => {
-                self.as_mut()
-                    .notify(q("error"), q(&format!("Could not run the command: {}", e)));
+                self.as_mut().notify(
+                    q("error"),
+                    q(&Message::key(MessageKey::NotifyCmdError)
+                        .text(e.to_string())
+                        .to_string()),
+                );
                 false
             }
         }
@@ -2137,8 +2229,12 @@ impl qobject::LoafCore {
             Path::new(&dir.to_string()),
             &parse_paths(paths_json),
         ) {
-            self.as_mut()
-                .notify(q("error"), q(&format!("Could not run the script: {}", e)));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyScriptError)
+                    .text(e.to_string())
+                    .to_string()),
+            );
         }
     }
 
@@ -2158,8 +2254,10 @@ impl qobject::LoafCore {
                 .unwrap_or_else(|| PathBuf::from("/"))
         };
         let Some(pkexec) = util::which("pkexec") else {
-            self.as_mut()
-                .notify(q("error"), q("pkexec (polkit) is not installed"));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyPkexecMissing).to_string()),
+            );
             return;
         };
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("loaf"));
@@ -2211,8 +2309,12 @@ impl qobject::LoafCore {
             })
             .unwrap_or(false);
         if !launched {
-            self.as_mut()
-                .notify(q("error"), q(&format!("No application can open “{}”", u)));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyNoAppForFile)
+                    .text(u.clone())
+                    .to_string()),
+            );
         }
     }
     pub fn preview_mtp(self: Pin<&mut Self>, path: &QString) {
@@ -2220,7 +2322,7 @@ impl qobject::LoafCore {
         let thread = self.qt_thread();
         self.spawn_op(
             "preview",
-            "Downloading phone preview".to_string(),
+            Message::key(MessageKey::OpMtpPreviewing).to_string(),
             move |op| match crate::mtp_ops::local_copy(&path, op) {
                 Ok(local) => {
                     let path = local.to_string_lossy().to_string();
@@ -2322,15 +2424,13 @@ impl qobject::LoafCore {
                 continue;
             };
             let smeta = std::fs::symlink_metadata(&src).ok();
-            let mtime = |m: &std::fs::Metadata| {
-                crate::pane::relative_time(std::os::unix::fs::MetadataExt::mtime(m))
-            };
+            let mtime = |m: &std::fs::Metadata| std::os::unix::fs::MetadataExt::mtime(m);
             out.push(serde_json::json!({
                 "name": name.to_string_lossy(),
                 "src_path": src.to_string_lossy(),
                 "dest_path": target.to_string_lossy(),
-                "src_size": smeta.as_ref().map(|m| if m.is_dir() { "Folder".to_string() } else { util::format_size(m.len()) }).unwrap_or_default(),
-                "dest_size": if dmeta.is_dir() { "Folder".to_string() } else { util::format_size(dmeta.len()) },
+                "src_size": smeta.as_ref().map(|m| if m.is_dir() { "-".to_string() } else { util::format_size(m.len()) }).unwrap_or_default(),
+                "dest_size": if dmeta.is_dir() { "-".to_string() } else { util::format_size(dmeta.len()) },
                 "src_modified": smeta.as_ref().map(mtime).unwrap_or_default(),
                 "dest_modified": mtime(&dmeta),
                 "is_dir": dmeta.is_dir(),
@@ -2352,10 +2452,10 @@ impl qobject::LoafCore {
         let target = dest.to_string();
         if target.starts_with("mtp:") || locations.iter().any(|path| path.starts_with("mtp:")) {
             let mode = mode.to_string();
-            self.spawn_op("mtp-transfer", "Transferring phone files".to_string(), move |op| {
+            self.spawn_op("mtp-transfer", Message::key(MessageKey::OpMtpTransferring).to_string(), move |op| {
                 let result = crate::mtp_ops::transfer(&locations, &target, &mode, op);
                 let mut outcome = match &result {
-                    Ok(_) => Outcome::ok("Phone transfer complete"),
+                    Ok(_) => Outcome::ok(Message::key(MessageKey::OutcomeMtpTransferComplete).to_string()),
                     Err(error) => Outcome::err(error),
                 };
                 outcome.result = serde_json::json!({"mtp": true, "created": result.ok().unwrap_or_default(), "sources": locations, "mode": mode});
@@ -2370,17 +2470,15 @@ impl qobject::LoafCore {
         if sources.is_empty() || !dest.is_dir() {
             return;
         }
-        let verb = match mode.as_str() {
-            "move" => "Moving",
-            "link" => "Linking",
-            _ => "Copying",
+        let title_key = match mode.as_str() {
+            "move" => MessageKey::OpMoving,
+            "link" => MessageKey::OpLinking,
+            _ => MessageKey::OpCopying,
         };
-        let what = if sources.len() == 1 {
-            format!("“{}”", file_name(&sources[0]))
-        } else {
-            plural(sources.len(), "item", "items")
-        };
-        let title = format!("{} {} to {}", verb, what, file_name(&dest));
+        let title = Message::key(title_key)
+            .count(sources.len())
+            .text(file_name(&dest))
+            .to_string();
         let kind = mode.clone();
         self.spawn_op(&kind, title, move |op| {
             run_transfer(op, sources, dest, &mode, &res)
@@ -2393,7 +2491,7 @@ impl qobject::LoafCore {
         if locations.iter().any(|path| path.starts_with("mtp:")) {
             self.as_mut().notify(
                 q("error"),
-                q("Phone files have no trash. Use Delete Permanently."),
+                q(&Message::key(MessageKey::NotifyMtpNoTrash).to_string()),
             );
             return;
         }
@@ -2401,14 +2499,9 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let title = format!(
-            "Moving {} to the trash",
-            if paths.len() == 1 {
-                format!("“{}”", file_name(&paths[0]))
-            } else {
-                plural(paths.len(), "item", "items")
-            }
-        );
+        let title = Message::key(MessageKey::OpTrashing)
+            .count(paths.len())
+            .to_string();
         self.spawn_op("trash", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut done = Vec::new();
@@ -2430,14 +2523,14 @@ impl qobject::LoafCore {
             let n = done.len();
             let mut o = Outcome::ok(if n == 0 {
                 String::new()
-            } else if n == 1 {
-                format!("“{}” moved to the trash", file_name(&done[0].original))
             } else {
-                format!("{} moved to the trash", plural(n, "item", "items"))
+                Message::key(MessageKey::OutcomeTrashed)
+                    .count(n)
+                    .to_string()
             });
             if n > 0 {
                 o.undo = Some(UndoEntry {
-                    label: "Move to Trash".into(),
+                    label: Message::key(MessageKey::UndoTrash).to_string(),
                     action: UndoAction::Trash(done),
                 });
             }
@@ -2456,10 +2549,12 @@ impl qobject::LoafCore {
         if locations.iter().any(|path| path.starts_with("mtp:")) {
             self.spawn_op(
                 "mtp-delete",
-                "Deleting phone files".to_string(),
+                Message::key(MessageKey::OpDeletingPhone).to_string(),
                 move |op| {
                     let mut outcome = match crate::mtp_ops::remove(&locations, op) {
-                        Ok(()) => Outcome::ok("Phone files deleted"),
+                        Ok(()) => {
+                            Outcome::ok(Message::key(MessageKey::OutcomeMtpDeleted).to_string())
+                        }
                         Err(error) => Outcome::err(error),
                     };
                     outcome.result = serde_json::json!({"mtp": true});
@@ -2472,14 +2567,9 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let title = format!(
-            "Deleting {}",
-            if paths.len() == 1 {
-                format!("“{}”", file_name(&paths[0]))
-            } else {
-                plural(paths.len(), "item", "items")
-            }
-        );
+        let title = Message::key(MessageKey::OpDeleting)
+            .count(paths.len())
+            .to_string();
         self.spawn_op("delete", title, move |op| {
             op.total.store(paths.len() as u64, Ordering::Relaxed);
             let mut errors = 0;
@@ -2500,13 +2590,18 @@ impl qobject::LoafCore {
                 op.advance(1, p);
             }
             if errors > 0 {
-                Outcome::err(format!(
-                    "Could not delete {}: {}",
-                    plural(errors, "item", "items"),
-                    last
-                ))
+                Outcome::err(
+                    Message::key(MessageKey::OutcomeDeleteErr)
+                        .count(errors)
+                        .text(last.clone())
+                        .to_string(),
+                )
             } else {
-                Outcome::ok(format!("Deleted {}", plural(paths.len(), "item", "items")))
+                Outcome::ok(
+                    Message::key(MessageKey::OutcomeDeleted)
+                        .count(paths.len())
+                        .to_string(),
+                )
             }
         });
     }
@@ -2518,18 +2613,22 @@ impl qobject::LoafCore {
         }
         self.spawn_op(
             "restore",
-            format!("Restoring {}", plural(paths.len(), "item", "items")),
+            Message::key(MessageKey::OpRestoring)
+                .count(paths.len())
+                .to_string(),
             move |op| {
                 let records = trash::list();
                 let mut moved = Vec::new();
                 let mut renamed = 0;
-                let mut errors = Vec::new();
+                let mut errors: Vec<Message> = Vec::new();
                 for p in &paths {
                     if op.cancelled() {
                         break;
                     }
                     let Some(item) = records.iter().find(|r| r.trashed == *p) else {
-                        errors.push(format!("{}: no trash record", file_name(p)));
+                        errors.push(
+                            Message::key(MessageKey::OutcomeRestoreNoRecord).text(file_name(p)),
+                        );
                         continue;
                     };
                     match trash::restore(item) {
@@ -2539,19 +2638,34 @@ impl qobject::LoafCore {
                             }
                             moved.push((item.trashed.clone(), to));
                         }
-                        Err(e) => errors.push(format!("{}: {}", file_name(p), e)),
+                        Err(e) => errors.push(
+                            Message::key(MessageKey::OutcomeRestoreItemFailed)
+                                .text(file_name(p))
+                                .text(e.to_string()),
+                        ),
                     }
                 }
-                let mut msg = format!("Restored {}", plural(moved.len(), "item", "items"));
-                if renamed > 0 {
-                    msg.push_str(&format!(
-                        " ({} renamed because the name was taken)",
-                        renamed
-                    ));
-                }
+                let n = moved.len();
                 if !errors.is_empty() {
-                    return Outcome::err(format!("{}. Failed: {}", msg, errors.join("; ")));
+                    let list = Message::list(errors);
+                    if renamed > 0 {
+                        return Outcome::err(
+                            Message::key(MessageKey::OutcomeRestoreFailedRenamed)
+                                .count(n)
+                                .count(renamed)
+                                .nested(list)
+                                .to_string(),
+                        );
+                    }
+                    return Outcome::err(
+                        Message::key(MessageKey::OutcomeRestoreFailed)
+                            .count(n)
+                            .nested(list)
+                            .to_string(),
+                    );
                 }
+                let single_name = (n == 1).then(|| file_name(&moved[0].0));
+                let msg = restore_success_message(n, renamed, single_name.as_deref());
                 Outcome::ok(msg)
             },
         );
@@ -2570,10 +2684,14 @@ impl qobject::LoafCore {
         self.as_mut().sync_undo_props();
         self.spawn_op(
             "empty",
-            "Emptying the trash".into(),
+            Message::key(MessageKey::OpEmptyingTrash).to_string(),
             |_op| match trash::empty_all() {
-                Ok(()) => Outcome::ok("Trash emptied"),
-                Err(e) => Outcome::err(format!("Some items could not be deleted: {}", e)),
+                Ok(()) => Outcome::ok(Message::key(MessageKey::OutcomeTrashEmptied).to_string()),
+                Err(e) => Outcome::err(
+                    Message::key(MessageKey::OutcomeTrashPartialErr)
+                        .text(e.to_string())
+                        .to_string(),
+                ),
             },
         );
     }
@@ -2618,7 +2736,9 @@ impl qobject::LoafCore {
             _ => "zip",
         };
         let target = fsops::unique_name(&parent, &format!("{}.{}", base, ext));
-        let title = format!("Compressing into “{}”", file_name(&target));
+        let title = Message::key(MessageKey::OpCompressing)
+            .text(file_name(&target))
+            .to_string();
         self.spawn_op("compress", title, move |op| {
             // Items from other folders can't share relative names: skip them.
             let items: Vec<PathBuf> = items
@@ -2631,7 +2751,11 @@ impl qobject::LoafCore {
             let name = file_name(&target);
             let staging = parent.join(format!(".loaf-compress-{}-{}", std::process::id(), op.id));
             if let Err(e) = std::fs::create_dir(&staging) {
-                return Outcome::err(format!("Could not create the archive: {}", e));
+                return Outcome::err(
+                    Message::key(MessageKey::OutcomeArchiveCreateFailed)
+                        .text(e.to_string())
+                        .to_string(),
+                );
             }
             let built = archive::compress(&staging.join(&name), &items, &fmt, &pass, &|| {
                 op.cancelled()
@@ -2644,16 +2768,24 @@ impl qobject::LoafCore {
             match built {
                 Ok(target) => {
                     fsops::sync_filesystem(&target);
-                    let mut o = Outcome::ok(format!("Created “{}”", file_name(&target)));
+                    let mut o = Outcome::ok(
+                        Message::key(MessageKey::OutcomeCreatedArchive)
+                            .text(file_name(&target))
+                            .to_string(),
+                    );
                     o.undo = Some(UndoEntry {
-                        label: "Compress".into(),
+                        label: Message::key(MessageKey::UndoCompress).to_string(),
                         action: UndoAction::Create(vec![target.clone()]),
                     });
                     o.result = serde_json::json!({"created": [target.to_string_lossy()]});
                     o
                 }
                 Err(ArchiveError::Cancelled) => Outcome::ok(""),
-                Err(e) => Outcome::err(format!("Could not create the archive: {}", e)),
+                Err(e) => Outcome::err(
+                    Message::key(MessageKey::OutcomeArchiveCreateErr)
+                        .text(e.to_string())
+                        .to_string(),
+                ),
             }
         });
     }
@@ -2674,17 +2806,19 @@ impl qobject::LoafCore {
         }
         let parent = arch.parent().unwrap_or(Path::new("/")).to_path_buf();
         let thread = self.qt_thread();
-        let title = format!("Extracting “{}”", file_name(&arch));
+        let title = Message::key(MessageKey::OpExtracting)
+            .text(file_name(&arch))
+            .to_string();
         self.spawn_op("extract", title, move |op| {
             match extract_safely(&arch, &parent, into_subfolder, &pass, op.id, &|| op.cancelled()) {
                 Ok((created, failed)) => {
                     let mut o = match failed {
-                        None => Outcome::ok(format!("Extracted “{}”", file_name(&arch))),
-                        Some(e) => Outcome::err(format!("Extracted “{}” only partly: {}", file_name(&arch), e)),
+                        None => Outcome::ok(Message::key(MessageKey::OutcomeExtracted).text(file_name(&arch)).to_string()),
+                        Some(e) => Outcome::err(Message::key(MessageKey::OutcomeExtractedPartly).text(file_name(&arch)).text(e).to_string()),
                     };
                     o.result = serde_json::json!({"created": created.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>()});
                     if !created.is_empty() {
-                        o.undo = Some(UndoEntry { label: "Extract".into(), action: UndoAction::Create(created) });
+                        o.undo = Some(UndoEntry { label: Message::key(MessageKey::UndoExtract).to_string(), action: UndoAction::Create(created) });
                     }
                     o
                 }
@@ -2694,7 +2828,7 @@ impl qobject::LoafCore {
                     Outcome::ok("")
                 }
                 Err(ArchiveError::Cancelled) => Outcome::ok(""),
-                Err(other) => Outcome::err(format!("Could not extract “{}”: {}", file_name(&arch), other)),
+                Err(other) => Outcome::err(Message::key(MessageKey::OutcomeExtractErr).text(file_name(&arch)).text(other.to_string()).to_string()),
             }
         });
     }
@@ -2714,7 +2848,7 @@ impl qobject::LoafCore {
         };
         if dir.to_string().starts_with("mtp:") {
             let parent = dir.to_string();
-            self.spawn_op("mtp-create", format!("Creating {} on phone", name), move |op| {
+            self.spawn_op("mtp-create", Message::key(MessageKey::OpMtpCreating).text(name.clone()).to_string(), move |op| {
                 let result = if is_dir {
                     crate::mtp_ops::mkdir(&parent, &name).map(|path| vec![path])
                 } else {
@@ -2733,7 +2867,7 @@ impl qobject::LoafCore {
                     if owned { let _ = std::fs::remove_dir_all(&stage); }
                     result
                 };
-                let mut outcome = match &result { Ok(_) => Outcome::ok("Created on phone"), Err(error) => Outcome::err(error) };
+                let mut outcome = match &result { Ok(_) => Outcome::ok(Message::key(MessageKey::OutcomeMtpCreated).to_string()), Err(error) => Outcome::err(error) };
                 outcome.result = serde_json::json!({"mtp": true, "created": result.ok().unwrap_or_default()});
                 outcome
             });
@@ -2741,8 +2875,12 @@ impl qobject::LoafCore {
         }
         let target = PathBuf::from(dir.to_string()).join(&name);
         if std::fs::symlink_metadata(&target).is_ok() {
-            self.as_mut()
-                .notify(q("error"), q(&format!("“{}” already exists", name)));
+            self.as_mut().notify(
+                q("error"),
+                q(&Message::key(MessageKey::NotifyAlreadyExists)
+                    .text(name.clone())
+                    .to_string()),
+            );
             return QString::default();
         }
         let res = if is_dir {
@@ -2758,9 +2896,9 @@ impl qobject::LoafCore {
             Ok(()) => {
                 self.as_mut().record_undo(UndoEntry {
                     label: if is_dir {
-                        "New Folder".into()
+                        Message::key(MessageKey::UndoNewFolder).to_string()
                     } else {
-                        "New File".into()
+                        Message::key(MessageKey::UndoNewFile).to_string()
                     },
                     action: UndoAction::Create(vec![target.clone()]),
                 });
@@ -2769,7 +2907,10 @@ impl qobject::LoafCore {
             Err(e) => {
                 self.as_mut().notify(
                     q("error"),
-                    q(&format!("Could not create “{}”: {}", name, e)),
+                    q(&Message::key(MessageKey::NotifyCreateError)
+                        .text(name.clone())
+                        .text(e.to_string())
+                        .to_string()),
                 );
                 QString::default()
             }
@@ -2799,7 +2940,7 @@ impl qobject::LoafCore {
                     .open(&target)
                     .and_then(|f| f.set_modified(std::time::SystemTime::now()));
                 self.as_mut().record_undo(UndoEntry {
-                    label: "New Document".into(),
+                    label: Message::key(MessageKey::UndoNewDocument).to_string(),
                     action: UndoAction::Create(vec![target.clone()]),
                 });
                 q(&target.to_string_lossy())
@@ -2818,9 +2959,9 @@ impl qobject::LoafCore {
                 Err(error) => return q(&error),
             };
             let source = path.to_string();
-            self.spawn_op("mtp-rename", "Renaming phone item".to_string(), move |_op| {
+            self.spawn_op("mtp-rename", Message::key(MessageKey::OpMtpRenaming).to_string(), move |_op| {
                 let result = crate::mtp_ops::rename(&source, &name);
-                let mut outcome = match &result { Ok(_) => Outcome::ok("Renamed on phone"), Err(error) => Outcome::err(error) };
+                let mut outcome = match &result { Ok(_) => Outcome::ok(Message::key(MessageKey::OutcomeMtpRenamed).to_string()), Err(error) => Outcome::err(error) };
                 outcome.result = serde_json::json!({"mtp": true, "created": result.ok().into_iter().collect::<Vec<_>>()});
                 outcome
             });
@@ -2832,7 +2973,7 @@ impl qobject::LoafCore {
             Err(e) => return q(&e),
         };
         let Some(parent) = from.parent() else {
-            return q("Can't rename this item");
+            return q(&Message::key(MessageKey::OutcomeRenameNoParent).to_string());
         };
         let to = parent.join(&name);
         if to == from {
@@ -2847,7 +2988,9 @@ impl qobject::LoafCore {
                 })
                 .unwrap_or(false);
             if !same {
-                return q(&format!("“{}” already exists", name));
+                return q(&Message::key(MessageKey::OutcomeRenameExists)
+                    .text(name)
+                    .to_string());
             }
         }
         match std::fs::rename(&from, &to) {
@@ -2857,7 +3000,7 @@ impl qobject::LoafCore {
                     let _ = xdg::set_starred(&to, true);
                 }
                 self.as_mut().record_undo(UndoEntry {
-                    label: "Rename".into(),
+                    label: Message::key(MessageKey::UndoRename).to_string(),
                     action: UndoAction::Rename(vec![(from, to)]),
                 });
                 QString::default()
@@ -2874,14 +3017,19 @@ impl qobject::LoafCore {
         }
         let list: Vec<R> = match serde_json::from_str(&renames_json.to_string()) {
             Ok(l) => l,
-            Err(_) => return q("Invalid rename list"),
+            Err(_) => return q(&Message::key(MessageKey::OutcomeRenameInvalidList).to_string()),
         };
         let mut pairs = Vec::new();
         for r in &list {
             let from = PathBuf::from(&r.path);
             let name = match validate_name(&r.name) {
                 Ok(n) => n,
-                Err(e) => return q(&format!("{}: {}", r.name, e)),
+                Err(e) => {
+                    return q(&Message::key(MessageKey::OutcomeItemFailed)
+                        .text(r.name.clone())
+                        .text(e)
+                        .to_string())
+                }
             };
             let to = from.parent().unwrap_or(Path::new("/")).join(name);
             if to != from {
@@ -2893,12 +3041,12 @@ impl qobject::LoafCore {
                 if !pairs.is_empty() {
                     let n = pairs.len();
                     self.as_mut().record_undo(UndoEntry {
-                        label: "Rename".into(),
+                        label: Message::key(MessageKey::UndoRename).to_string(),
                         action: UndoAction::Rename(pairs),
                     });
                     self.as_mut().notify(
                         q("undo"),
-                        q(&format!("Renamed {}", plural(n, "item", "items"))),
+                        q(&Message::key(MessageKey::NotifyRenamed).count(n).to_string()),
                     );
                 }
                 QString::default()
@@ -2930,20 +3078,36 @@ impl qobject::LoafCore {
         self.as_mut().rust_mut().history_running = true;
         self.as_mut().sync_undo_props();
         let label = entry.label.clone();
-        let (kind, doing, did, fail) = if is_undo {
-            ("undo", "Undoing", "Undid", "Could not undo")
+        let (kind, doing_key, done_key, fail_key) = if is_undo {
+            (
+                "undo",
+                MessageKey::NotifyUndoing,
+                MessageKey::NotifyUndone,
+                MessageKey::NotifyUndoFailed,
+            )
         } else {
-            ("redo", "Redoing", "Redid", "Could not redo")
+            (
+                "redo",
+                MessageKey::NotifyRedoing,
+                MessageKey::NotifyRedone,
+                MessageKey::NotifyRedoFailed,
+            )
         };
-        self.spawn_op(kind, format!("{} {}", doing, label), move |op| {
+        let doing = Message::key(doing_key).text(label.clone()).to_string();
+        self.spawn_op(kind, doing, move |op| {
             let p = if is_undo {
                 invert(&entry.action, op)
             } else {
                 replay(&entry.action, op)
             };
             let mut o = match &p.error {
-                None => Outcome::ok(format!("{} {}", did, label)),
-                Some(e) => Outcome::err(format!("{} {}: {}", fail, label, e)),
+                None => Outcome::ok(Message::key(done_key).text(label.clone()).to_string()),
+                Some(e) => Outcome::err(
+                    Message::key(fail_key)
+                        .text(label.clone())
+                        .text(e.clone())
+                        .to_string(),
+                ),
             };
             o.undo = p.reverse.map(|a| UndoEntry {
                 label: label.clone(),
@@ -2972,12 +3136,14 @@ impl qobject::LoafCore {
                 if ok {
                     core.as_mut().notify(
                         q("info"),
-                        q("Cloudflare Tunnel agent installed successfully"),
+                        q(&Message::key(MessageKey::NotifyCloudflaredInstalled).to_string()),
                     );
                 } else if !msg.is_empty() {
                     core.as_mut().notify(
                         q("error"),
-                        q(&format!("Failed to install cloudflared: {}", msg)),
+                        q(&Message::key(MessageKey::NotifyCloudflaredInstallFailed)
+                            .text(msg.clone())
+                            .to_string()),
                     );
                 }
             });
@@ -2989,18 +3155,22 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let compress_folders = !matches!(
-            self.get_setting(&q("shareCompressFolders"))
-                .to_string()
-                .as_str(),
-            "false"
-        );
-        let compress_files = matches!(
-            self.get_setting(&q("shareCompressFiles"))
-                .to_string()
-                .as_str(),
-            "true"
-        );
+        let compress_folders = match self
+            .get_setting(&q("shareCompressFolders"))
+            .to_string()
+            .as_str()
+        {
+            "false" => false,
+            _ => true,
+        };
+        let compress_files = match self
+            .get_setting(&q("shareCompressFiles"))
+            .to_string()
+            .as_str()
+        {
+            "true" => true,
+            _ => false,
+        };
         let format = match self
             .get_setting(&q("shareCompressFormat"))
             .to_string()
@@ -3140,7 +3310,12 @@ fn extract_safely(
     let mut place = |from: &Path, name: &str| match fsops::place_unique(from, parent, name) {
         Ok(to) => created.push(to),
         Err(e) => {
-            failed.get_or_insert(format!("{}: {}", name, e));
+            failed.get_or_insert(
+                Message::key(MessageKey::OutcomeItemFailed)
+                    .text(name.to_string())
+                    .text(e.to_string())
+                    .to_string(),
+            );
         }
     };
     if into_subfolder && !(entries.len() == 1 && entries[0].is_dir()) {
@@ -3165,10 +3340,14 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     let mut targets = std::collections::HashSet::new();
     for (_, to) in pairs {
         if !targets.insert(to) {
-            return Err(format!("Two items would be named “{}”", file_name(to)));
+            return Err(Message::key(MessageKey::OutcomeRenameDuplicate)
+                .text(file_name(to))
+                .to_string());
         }
         if std::fs::symlink_metadata(to).is_ok() && !sources.contains(to) {
-            return Err(format!("“{}” already exists", file_name(to)));
+            return Err(Message::key(MessageKey::OutcomeRenameExists)
+                .text(file_name(to))
+                .to_string());
         }
     }
     let mut staged: Vec<(PathBuf, PathBuf, PathBuf)> = Vec::new();
@@ -3178,7 +3357,10 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
             for (f, t, _) in staged.iter().rev() {
                 let _ = std::fs::rename(t, f);
             }
-            return Err(format!("{}: {}", file_name(from), e));
+            return Err(Message::key(MessageKey::OutcomeItemFailed)
+                .text(file_name(from))
+                .text(e.to_string())
+                .to_string());
         }
         staged.push((from.clone(), tmp, to.clone()));
     }
@@ -3194,7 +3376,10 @@ pub fn batch_rename_pairs(pairs: &[(PathBuf, PathBuf)]) -> Result<(), String> {
                     let _ = std::fs::rename(t, f);
                 }
             }
-            return Err(format!("{}: {}", file_name(from), e));
+            return Err(Message::key(MessageKey::OutcomeItemFailed)
+                .text(file_name(from))
+                .text(e.to_string())
+                .to_string());
         }
         finished.push((from.clone(), to.clone()));
     }
@@ -3209,7 +3394,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
     };
     op.total.store(bytes.max(1), Ordering::Relaxed);
     let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
+    let mut errors: Vec<Message> = Vec::new();
     let mut skipped = 0;
     for src in &sources {
         if op.cancelled() {
@@ -3221,7 +3406,7 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             continue;
         }
         if fsops::is_inside(&dest, src) && mode != "link" {
-            errors.push(format!("Can't put “{}” inside itself", name));
+            errors.push(Message::key(MessageKey::OutcomeInsideItself).text(name.clone()));
             continue;
         }
         let plain = dest.join(&name);
@@ -3254,11 +3439,15 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => break,
-            Err(e) => errors.push(format!("{}: {}", name, e)),
+            Err(e) => errors.push(
+                Message::key(MessageKey::OutcomeItemFailed)
+                    .text(name.clone())
+                    .text(e.to_string()),
+            ),
         }
     }
     if mode != "link" && !pairs.is_empty() && needs_sync(&dest) {
-        *util::lock(&op.current) = "Writing to the drive…".into();
+        *util::lock(&op.current) = Message::key(MessageKey::OpWritingDrive).to_string();
         op.publish_soon();
         fsops::sync_filesystem(&dest);
     }
@@ -3267,33 +3456,24 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
         .map(|(_, t)| t.to_string_lossy().to_string())
         .collect();
     let n = pairs.len();
-    let verb = match mode {
-        "move" => "Moved",
-        "link" => "Linked",
-        _ => "Copied",
+    let verb_key = match mode {
+        "move" => MessageKey::OutcomeVerbMoved,
+        "link" => MessageKey::OutcomeVerbLinked,
+        _ => MessageKey::OutcomeVerbCopied,
     };
     let mut o = if errors.is_empty() {
-        let mut msg = if n == 0 {
-            String::new()
-        } else {
-            format!("{} {}", verb, plural(n, "item", "items"))
-        };
-        if skipped > 0 {
-            msg.push_str(&format!(
-                "{}{} skipped",
-                if msg.is_empty() { "" } else { ", " },
-                skipped
-            ));
-        }
-        Outcome::ok(msg)
+        Outcome::ok(transfer_success_message(mode, verb_key, n, skipped))
     } else {
-        Outcome::err(format!(
-            "{} {}; {} failed: {}",
-            verb,
-            plural(n, "item", "items"),
-            errors.len(),
-            errors.join("; ")
-        ))
+        let err_count = errors.len();
+        let list = Message::list(errors);
+        Outcome::err(
+            Message::key(MessageKey::OutcomeTransferFailed)
+                .nested(Message::key(verb_key))
+                .count(n)
+                .count(err_count)
+                .nested(list)
+                .to_string(),
+        )
     };
     if n > 0 {
         let action = match mode {
@@ -3302,14 +3482,11 @@ fn run_transfer(op: &Op, sources: Vec<PathBuf>, dest: PathBuf, mode: &str, res: 
             _ => UndoAction::Copy(pairs),
         };
         let label = match mode {
-            "move" => "Move",
-            "link" => "Link",
-            _ => "Copy",
+            "move" => Message::key(MessageKey::UndoMove).to_string(),
+            "link" => Message::key(MessageKey::UndoLink).to_string(),
+            _ => Message::key(MessageKey::UndoCopy).to_string(),
         };
-        o.undo = Some(UndoEntry {
-            label: label.into(),
-            action,
-        });
+        o.undo = Some(UndoEntry { label, action });
     }
     o.result = serde_json::json!({"created": created, "mode": mode});
     o
@@ -3368,7 +3545,10 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(paths[..i].to_vec(), UndoAction::Create),
                             some_if(paths[i..].to_vec(), UndoAction::Create),
-                            format!("{}: {}", file_name(p), e),
+                            Message::key(MessageKey::OutcomeItemFailed)
+                                .text(file_name(p))
+                                .text(e.to_string())
+                                .to_string(),
                         );
                     }
                 }
@@ -3382,7 +3562,10 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(pairs[..i].to_vec(), UndoAction::Copy),
                             some_if(pairs[i..].to_vec(), UndoAction::Copy),
-                            format!("{}: {}", file_name(t), e),
+                            Message::key(MessageKey::OutcomeItemFailed)
+                                .text(file_name(t))
+                                .text(e.to_string())
+                                .to_string(),
                         );
                     }
                 }
@@ -3393,14 +3576,18 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
             for idx in (0..pairs.len()).rev() {
                 let (from, to) = &pairs[idx];
                 let err = if std::fs::symlink_metadata(from).is_ok() {
-                    Some(format!(
-                        "“{}” exists again at its old place",
-                        file_name(from)
-                    ))
+                    Some(
+                        Message::key(MessageKey::OutcomeExistsAgain)
+                            .text(file_name(from))
+                            .to_string(),
+                    )
                 } else {
-                    fsops::move_path(to, from, op)
-                        .err()
-                        .map(|e| format!("{}: {}", file_name(to), e))
+                    fsops::move_path(to, from, op).err().map(|e| {
+                        Message::key(MessageKey::OutcomeItemFailed)
+                            .text(file_name(to))
+                            .text(e.to_string())
+                            .to_string()
+                    })
                 };
                 if let Some(e) = err {
                     return Partial::stopped(
@@ -3427,7 +3614,10 @@ fn invert(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(restored, UndoAction::Trash),
                             some_if(items[i..].to_vec(), UndoAction::Trash),
-                            format!("{}: {}", file_name(&it.original), e),
+                            Message::key(MessageKey::OutcomeItemFailed)
+                                .text(file_name(&it.original))
+                                .text(e.to_string())
+                                .to_string(),
                         )
                     }
                 }
@@ -3460,7 +3650,11 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
                 }
             }
             if back.is_empty() {
-                return Partial::stopped(None, None, "the items are no longer in the trash".into());
+                return Partial::stopped(
+                    None,
+                    None,
+                    Message::key(MessageKey::OutcomeRedoNotInTrash).to_string(),
+                );
             }
             Partial::done(UndoAction::Create(back))
         }
@@ -3476,7 +3670,10 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
                     return Partial::stopped(
                         some_if(made, UndoAction::Copy),
                         some_if(pairs[i..].to_vec(), UndoAction::Copy),
-                        format!("{}: {}", file_name(src), e),
+                        Message::key(MessageKey::OutcomeItemFailed)
+                            .text(file_name(src))
+                            .text(e.to_string())
+                            .to_string(),
                     );
                 }
                 made.push((src.clone(), target));
@@ -3489,7 +3686,10 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
                     return Partial::stopped(
                         some_if(pairs[..i].to_vec(), UndoAction::Move),
                         some_if(pairs[i..].to_vec(), UndoAction::Move),
-                        format!("{}: {}", file_name(from), e),
+                        Message::key(MessageKey::OutcomeItemFailed)
+                            .text(file_name(from))
+                            .text(e.to_string())
+                            .to_string(),
                     );
                 }
             }
@@ -3504,7 +3704,10 @@ fn replay(action: &UndoAction, op: &Op) -> Partial {
                         return Partial::stopped(
                             some_if(again, UndoAction::Trash),
                             some_if(items[i..].to_vec(), UndoAction::Trash),
-                            format!("{}: {}", file_name(&it.original), e),
+                            Message::key(MessageKey::OutcomeItemFailed)
+                                .text(file_name(&it.original))
+                                .text(e.to_string())
+                                .to_string(),
                         )
                     }
                 }
@@ -3596,6 +3799,44 @@ impl cxx_qt::Initialize for qobject::LoafCore {
     }
 }
 
+fn restore_success_message(n: usize, renamed: usize, single_name: Option<&str>) -> String {
+    let _ = single_name;
+    if renamed > 0 {
+        Message::key(MessageKey::OutcomeRestoredRenamed)
+            .count(n)
+            .count(renamed)
+            .to_string()
+    } else {
+        Message::key(MessageKey::OutcomeRestored)
+            .count(n)
+            .to_string()
+    }
+}
+
+fn transfer_success_message(mode: &str, verb_key: MessageKey, n: usize, skipped: usize) -> String {
+    if n == 0 && skipped > 0 {
+        return Message::key(MessageKey::OutcomeSkippedOnly)
+            .count(skipped)
+            .to_string();
+    }
+    if n == 0 {
+        return String::new();
+    }
+    if skipped > 0 {
+        return Message::key(MessageKey::OutcomeTransferredSkipped)
+            .nested(Message::key(verb_key))
+            .count(n)
+            .count(skipped)
+            .to_string();
+    }
+    let key = match mode {
+        "move" => MessageKey::OutcomeMoved,
+        "link" => MessageKey::OutcomeLinked,
+        _ => MessageKey::OutcomeCopied,
+    };
+    Message::key(key).count(n).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3609,6 +3850,61 @@ mod tests {
     }
 
     #[test]
+    fn restore_and_transfer_messages_report_counters() {
+        let key = |text: &str| {
+            serde_json::from_str::<serde_json::Value>(text).unwrap()["key"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        assert_eq!(
+            key(&restore_success_message(3, 1, None)),
+            "outcome.restored-renamed"
+        );
+        assert_eq!(
+            key(&restore_success_message(1, 0, Some("a.txt"))),
+            "outcome.restored"
+        );
+        assert_eq!(
+            key(&transfer_success_message(
+                "move",
+                MessageKey::OutcomeVerbMoved,
+                2,
+                1
+            )),
+            "outcome.transferred-skipped"
+        );
+        assert_eq!(
+            key(&transfer_success_message(
+                "move",
+                MessageKey::OutcomeVerbMoved,
+                0,
+                2
+            )),
+            "outcome.skipped-only"
+        );
+        assert_eq!(
+            key(&transfer_success_message(
+                "move",
+                MessageKey::OutcomeVerbMoved,
+                2,
+                0
+            )),
+            "outcome.moved"
+        );
+        let failed = Message::key(MessageKey::OutcomeRestoreFailedRenamed)
+            .count(3)
+            .count(1)
+            .nested(Message::list(vec![Message::key(
+                MessageKey::OutcomeItemFailed,
+            )
+            .text("a.txt")
+            .text("denied")]))
+            .to_string();
+        let parsed: serde_json::Value = serde_json::from_str(&failed).unwrap();
+        assert_eq!(parsed["key"], "outcome.restore-failed-renamed");
+    }
+    #[test]
     fn network_bookmark_places() {
         // Non-file bookmarks (e.g. remote URIs) become "network" entries.
         let remote = xdg::Bookmark {
@@ -3618,14 +3914,17 @@ mod tests {
         let v = network_place(&remote).expect("network bookmark should produce a place");
         assert_eq!(v["kind"], "network");
         assert_eq!(v["id"], "network:sftp://user@example-nas/media");
-        assert_eq!(v["name"], "Media");
+        assert_eq!(v["name"], Message::raw("Media").to_string());
         assert_eq!(v["path"], "sftp://user@example-nas/media");
         // Without a label the URI itself is shown.
         let bare = xdg::Bookmark {
             uri: "ftp://nas/share".to_string(),
             label: String::new(),
         };
-        assert_eq!(network_place(&bare).unwrap()["name"], "ftp://nas/share");
+        assert_eq!(
+            network_place(&bare).unwrap()["name"],
+            Message::raw("ftp://nas/share").to_string()
+        );
         // file:// bookmarks and non-URIs are not network entries.
         let local = xdg::Bookmark {
             uri: "file:///home/x".to_string(),

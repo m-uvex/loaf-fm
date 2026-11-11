@@ -464,7 +464,7 @@ Item {
                                 Text {
                                     id: summaryCountTxt
                                     anchors.centerIn: parent
-                                    text: settingsView.totalMatches + " found"
+                                    text: qsTr("%1 found").arg(settingsView.totalMatches)
                                     color: theme.primaryContainerFg
                                     font.pixelSize: theme.fs(11)
                                     font.bold: true

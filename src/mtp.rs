@@ -1,6 +1,7 @@
 //! MTP location parsing, formatting, directory listing, and metadata decoding.
 
 use crate::listing;
+use crate::message::{Message, MessageKey};
 use crate::native;
 use serde::Deserialize;
 
@@ -261,8 +262,11 @@ pub struct RawMtpEntry {
 }
 
 pub fn decode_entries(location: &Location, json: &str) -> Result<Vec<listing::Entry>, String> {
-    let resp: RawMtpResponse =
-        serde_json::from_str(json).map_err(|e| format!("Failed to parse MTP response: {}", e))?;
+    let resp: RawMtpResponse = serde_json::from_str(json).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
 
     if let Some(err) = resp.error {
         if !err.is_empty() {
@@ -272,13 +276,13 @@ pub fn decode_entries(location: &Location, json: &str) -> Result<Vec<listing::En
 
     let raw_entries = resp
         .entries
-        .ok_or_else(|| "Missing entries in MTP response".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorMissingEntries).to_string())?;
     let mut entries = Vec::with_capacity(raw_entries.len());
 
     let mut names = std::collections::HashSet::new();
     for item in raw_entries {
         if !is_valid_component(&item.name) || !names.insert(item.name.clone()) {
-            return Err("Phone returned an invalid or duplicate filename".to_string());
+            return Err(Message::key(MessageKey::MtpErrorInvalidFilename).to_string());
         }
         let child_loc = match location.child(&item.name) {
             Some(loc) => loc,

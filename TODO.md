@@ -44,7 +44,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Localization & Internationalization
-- [ ] **Multi-Language Support (i18n)**: Full localization pipeline supporting multiple UI languages, locale-aware date/number formatting, and right-to-left layout support.
+- [x] **Multi-Language Support (i18n)**: Qt Linguist pipeline (`translations/*.ts` → `lrelease` → embedded `:/i18n` catalogues) with a live language setting, `LOAF_LANG` override, and system-locale detection. Locale-aware date/number formatting and right-to-left layout support remain open.
 
 ---
 

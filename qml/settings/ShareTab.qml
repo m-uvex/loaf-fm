@@ -160,7 +160,11 @@ ColumnLayout {
                                 Text {
                                     id: stText
                                     anchors.centerIn: parent
-                                    text: modelData.status ? modelData.status.toUpperCase() : ""
+                                    text: modelData.status === "ready" ? qsTr("READY")
+                                        : (modelData.status === "starting" ? qsTr("STARTING")
+                                        : (modelData.status === "error" ? qsTr("ERROR")
+                                        : (modelData.status === "expired" ? qsTr("EXPIRED")
+                                        : (modelData.status ? modelData.status.toUpperCase() : ""))))
                                     color: modelData.status === "ready" ? theme.primaryContainerFg : theme.textMuted
                                     font.pixelSize: theme.fs(9)
                                     font.bold: true
@@ -218,7 +222,7 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 280
                 options: [
-                    { value: "off", label: qsTr("Off"), shortLabel: "Off" },
+                    { value: "off", label: qsTr("Off"), shortLabel: qsTr("Off") },
                     { value: "zip", label: ".zip", shortLabel: ".zip" },
                     { value: "7z", label: ".7z", shortLabel: ".7z" },
                     { value: "tar.gz", label: ".tar.gz", shortLabel: ".tar" }
@@ -245,7 +249,7 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 280
                 options: [
-                    { value: "off", label: qsTr("Off"), shortLabel: "Off" },
+                    { value: "off", label: qsTr("Off"), shortLabel: qsTr("Off") },
                     { value: "zip", label: ".zip", shortLabel: ".zip" },
                     { value: "7z", label: ".7z", shortLabel: ".7z" },
                     { value: "tar.gz", label: ".tar.gz", shortLabel: ".tar" }
@@ -345,10 +349,14 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 160 : 320
                 options: [
-                    { value: 1, label: qsTr("1 Hour"), shortLabel: "1h" },
-                    { value: 6, label: qsTr("6 Hours"), shortLabel: "6h" },
-                    { value: 24, label: qsTr("24 Hours"), shortLabel: "24h" },
-                    { value: 0, label: qsTr("Never"), shortLabel: "∞" }
+                    //: Short label for 1 Hour expiration. Must stay short.
+                    { value: 1, label: qsTr("1 Hour"), shortLabel: qsTr("1h") },
+                    //: Short label for 6 Hours expiration. Must stay short.
+                    { value: 6, label: qsTr("6 Hours"), shortLabel: qsTr("6h") },
+                    //: Short label for 24 Hours expiration. Must stay short.
+                    { value: 24, label: qsTr("24 Hours"), shortLabel: qsTr("24h") },
+                    //: Short label for Never expiring (infinity symbol). Must stay short.
+                    { value: 0, label: qsTr("Never"), shortLabel: qsTr("∞") }
                 ]
                 value: theme.shareExpirationHours
                 onSelected: function(v) { theme.shareExpirationHours = v; }
@@ -375,8 +383,9 @@ ColumnLayout {
                         theme.shareThrottleKbps = val;
                     }
                 }
+                //: Unit label for kilobytes per second. Must stay short.
                 Text {
-                    text: "KB/s"
+                    text: qsTr("KB/s")
                     color: theme.textMuted
                     font.pixelSize: theme.fs(12)
                 }

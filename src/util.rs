@@ -163,13 +163,9 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
         SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::write(&tmp, data)?;
-    match std::fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            let _ = std::fs::remove_file(&tmp);
-            Err(e)
-        }
-    }
+    std::fs::rename(&tmp, path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
 }
 
 /// Human readable byte count ("1.4 MB").
@@ -186,6 +182,8 @@ pub fn format_size(bytes: u64) -> String {
     }
     format!("{:.1} {}", v, UNITS[i])
 }
+
+pub use crate::message::{Message, MessageArgument, MessageBody, MessageKey};
 
 #[cfg(test)]
 mod tests {
@@ -221,5 +219,103 @@ mod tests {
         write_atomic(&p, b"two").unwrap();
         assert_eq!(std::fs::read(&p).unwrap(), b"two");
         std::fs::remove_file(&p).unwrap();
+    }
+    #[test]
+    fn messages_parse_as_single_json_object() {
+        for (msg, key) in [
+            (Message::key(MessageKey::InfoNoPreview), "info.no-preview"),
+            (
+                Message::key(MessageKey::InfoNoPreview)
+                    .text("one")
+                    .text("two"),
+                "info.no-preview",
+            ),
+            (
+                Message::list(vec![Message::key(MessageKey::InfoNoPreview)]),
+                "list.join",
+            ),
+        ] {
+            let text = msg.to_string();
+            let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+            assert!(parsed.is_object());
+            assert_eq!(parsed["key"], key);
+            assert_eq!(parsed["v"], 1);
+        }
+        let parsed: serde_json::Value = serde_json::from_str(
+            &Message::key(MessageKey::InfoNoPreview)
+                .text("one")
+                .to_string(),
+        )
+        .unwrap();
+        assert_eq!(parsed["args"], serde_json::json!(["one"]));
+    }
+
+    #[test]
+    fn raw_text_round_trips_literally() {
+        let parsed: serde_json::Value =
+            serde_json::from_str(&Message::raw("{\"key\":\"notify.cancelled\"}").to_string())
+                .unwrap();
+        assert_eq!(parsed["v"], 1);
+        assert_eq!(parsed["raw"], "{\"key\":\"notify.cancelled\"}");
+    }
+
+    #[test]
+    fn message_list_nests_messages_and_plain_text() {
+        let items = vec![
+            Message::key(MessageKey::PlaceHome),
+            Message::raw("plain text"),
+            Message::key(MessageKey::NotifyBookmarkAdded).text("arg"),
+        ];
+        let text = Message::list(items).to_string();
+        let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(parsed["key"], "list.join");
+        assert_eq!(parsed["args"][0]["key"], "place.home");
+        assert_eq!(parsed["args"][1]["raw"], "plain text");
+        assert_eq!(parsed["args"][2]["key"], "notify.bookmark-added");
+        let nested = Message::key(MessageKey::OutcomeRestoreItemFailed)
+            .text("100%2.txt")
+            .nested(Message::key(MessageKey::InfoMissing))
+            .to_string();
+        let outer: serde_json::Value = serde_json::from_str(&nested).unwrap();
+        assert_eq!(outer["args"][0], "100%2.txt");
+        assert_eq!(outer["args"][1]["key"], "info.missing");
+    }
+
+    #[test]
+    fn golden_message_serialization() {
+        assert_eq!(
+            Message::key(MessageKey::InfoNoPreview).to_string(),
+            r#"{"key":"info.no-preview","v":1}"#
+        );
+        assert_eq!(
+            Message::raw("{\"key\":\"notify.cancelled\"}").to_string(),
+            r#"{"raw":"{\"key\":\"notify.cancelled\"}","v":1}"#
+        );
+        assert_eq!(
+            Message::raw("{filename}.txt").to_string(),
+            r#"{"raw":"{filename}.txt","v":1}"#
+        );
+        assert_eq!(
+            Message::key(MessageKey::NotifyBookmarkAdded)
+                .text("100%2.txt")
+                .to_string(),
+            r#"{"args":["100%2.txt"],"key":"notify.bookmark-added","v":1}"#
+        );
+        assert_eq!(
+            Message::key(MessageKey::OutcomeRestoreItemFailed)
+                .text("arg%1")
+                .nested(Message::key(MessageKey::InfoMissing))
+                .to_string(),
+            r#"{"args":["arg%1",{"key":"info.missing","v":1}],"key":"outcome.restore-item-failed","v":1}"#
+        );
+        assert_eq!(
+            Message::list(vec![
+                Message::key(MessageKey::PlaceHome),
+                Message::raw("plain text"),
+                Message::key(MessageKey::NotifyBookmarkAdded).text("arg")
+            ])
+            .to_string(),
+            r#"{"args":[{"key":"place.home","v":1},{"raw":"plain text","v":1},{"args":["arg"],"key":"notify.bookmark-added","v":1}],"key":"list.join","v":1}"#
+        );
     }
 }

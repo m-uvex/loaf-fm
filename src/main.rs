@@ -10,6 +10,7 @@ pub mod fsops;
 pub mod icons;
 pub mod info;
 pub mod listing;
+pub mod message;
 pub mod mtp;
 pub mod mtp_ops;
 pub mod native;
@@ -50,6 +51,24 @@ Options:
 
 /// Window class (Wayland app id / WM_CLASS) used when `--class` is not given.
 const DEFAULT_CLASS: &str = "loaf";
+
+pub(crate) fn env_language() -> Option<String> {
+    std::env::var("LOAF_LANG")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub(crate) fn resolve_language(env_value: Option<&str>, stored_value: Option<&str>) -> String {
+    let clean = |v: Option<&str>| {
+        v.map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+    clean(env_value)
+        .or_else(|| clean(stored_value))
+        .unwrap_or_default()
+}
 
 struct Args {
     paths: Vec<String>,
@@ -122,6 +141,9 @@ fn main() {
         }
     };
     native::ffi::set_application_identity(env!("CARGO_PKG_VERSION"), &args.class);
+    let env_lang = env_language();
+    let language = resolve_language(env_lang.as_deref(), state::get("language").as_deref());
+    native::set_application_language(&language);
     let mut app = QGuiApplication::new();
     let admin = std::env::var("LOAF_ADMIN").is_ok();
     // A custom window class is a distinct application identity: the running
@@ -159,5 +181,27 @@ fn main() {
     }
     if let Some(app) = app.as_mut() {
         app.exec();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_language;
+
+    #[test]
+    fn environment_wins_over_stored_setting() {
+        assert_eq!(resolve_language(Some("id"), Some("de")), "id");
+    }
+
+    #[test]
+    fn stored_setting_used_without_environment() {
+        assert_eq!(resolve_language(None, Some("id_ID")), "id_ID");
+        assert_eq!(resolve_language(Some(""), Some("de")), "de");
+    }
+
+    #[test]
+    fn empty_means_system_default() {
+        assert_eq!(resolve_language(None, None), "");
+        assert_eq!(resolve_language(Some("  "), Some("   ")), "");
     }
 }

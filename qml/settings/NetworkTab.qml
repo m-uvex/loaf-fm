@@ -204,28 +204,31 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: renameBtn
                         icon: "tag"
                         variant: "ghost"
                         Accessible.name: qsTr("Rename drive")
-                        ToolTip.visible: containsMouse
+                        ToolTip.visible: renameBtn.containsMouse
                         ToolTip.text: qsTr("Rename")
                         onClicked: root.openRename(modelData)
                     }
 
                     LoafButton {
+                        id: editBtn
                         icon: "pencil-simple"
                         variant: "ghost"
                         Accessible.name: qsTr("Edit drive")
-                        ToolTip.visible: containsMouse
+                        ToolTip.visible: editBtn.containsMouse
                         ToolTip.text: qsTr("Edit")
                         onClicked: root.openNetworkEditorRequested(modelData)
                     }
 
                     LoafButton {
+                        id: removeBtn
                         icon: "trash"
                         variant: "ghost"
                         Accessible.name: qsTr("Remove drive")
-                        ToolTip.visible: containsMouse
+                        ToolTip.visible: removeBtn.containsMouse
                         ToolTip.text: qsTr("Remove")
                         onClicked: root.removeNetworkDriveRequested(modelData.id, modelData.label)
                     }
@@ -252,7 +255,7 @@ ColumnLayout {
                 variant: "tonal"
                 enabled: root.discoveryEnabled && !root.scanning
                 Accessible.name: qsTr("Scan network now")
-                ToolTip.visible: containsMouse
+                ToolTip.visible: refreshDiscoveryBtn.containsMouse
                 ToolTip.text: qsTr("Re-discover drives")
                 onClicked: if (typeof core !== "undefined" && core) core.refresh_smb_discovery()
 
@@ -374,17 +377,18 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: ignoreBtn
                         icon: entry.ignored ? "eye" : "eye-slash"
                         variant: "ghost"
                         Accessible.name: entry.ignored ? qsTr("Show drive") : qsTr("Ignore drive")
-                        ToolTip.visible: containsMouse
+                        ToolTip.visible: ignoreBtn.containsMouse
                         ToolTip.text: entry.ignored ? qsTr("Restore") : qsTr("Ignore")
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
                                 if (entry.ignored)
-                                    core.unignore_smb_discovered(entry.server);
+                                    core.unignore_smb_server(entry.server);
                                 else
-                                    core.ignore_smb_discovered(entry.server);
+                                    core.ignore_smb_server(entry.server);
                             }
                         }
                     }

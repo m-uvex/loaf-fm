@@ -8,6 +8,7 @@
 //!   readable);
 //! * every run can be cancelled (the child is killed).
 
+use crate::message::{Message, MessageKey};
 use crate::util::{which, which_any};
 use std::fs;
 use std::io::Write;
@@ -28,9 +29,17 @@ pub enum ArchiveError {
 impl std::fmt::Display for ArchiveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArchiveError::NeedPassword => write!(f, "This archive needs a password"),
-            ArchiveError::MissingTool(t) => write!(f, "'{}' is not installed", t),
-            ArchiveError::Cancelled => write!(f, "Cancelled"),
+            ArchiveError::NeedPassword => {
+                write!(f, "{}", Message::key(MessageKey::ArchiveErrorPassword))
+            }
+            ArchiveError::MissingTool(t) => write!(
+                f,
+                "{}",
+                Message::key(MessageKey::ArchiveErrorMissingTool).text(*t)
+            ),
+            ArchiveError::Cancelled => {
+                write!(f, "{}", Message::key(MessageKey::ArchiveErrorCancelled))
+            }
             ArchiveError::Failed(m) => write!(f, "{}", m),
         }
     }
@@ -185,11 +194,12 @@ fn last_error_line(output: &str) -> String {
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
-        .rfind(|l| {
+        .filter(|l| {
             l.to_lowercase().contains("error") || l.starts_with("tar:") || l.contains("cannot")
         })
-        .unwrap_or("The archive tool reported an error")
-        .to_string()
+        .last()
+        .map(str::to_string)
+        .unwrap_or_else(|| Message::key(MessageKey::ArchiveErrorToolFailed).to_string())
 }
 
 /// `./name` for each item, relative to `parent`. Items must live in `parent`.
@@ -238,7 +248,9 @@ pub fn compress(
     let parent = items
         .first()
         .and_then(|p| p.parent())
-        .ok_or_else(|| ArchiveError::Failed("nothing to compress".into()))?
+        .ok_or_else(|| {
+            ArchiveError::Failed(Message::key(MessageKey::ArchiveErrorEmpty).to_string())
+        })?
         .to_path_buf();
     let members = member_args(items, &parent);
     let pw = if password.is_empty() {
@@ -355,10 +367,11 @@ pub fn compress(
             )
         }
         other => {
-            return Err(ArchiveError::Failed(format!(
-                "unsupported format '{}'",
-                other
-            )))
+            return Err(ArchiveError::Failed(
+                Message::key(MessageKey::ArchiveErrorUnsupportedFormat)
+                    .text(other.to_string())
+                    .to_string(),
+            ))
         }
     };
 
@@ -379,7 +392,9 @@ pub fn extract(
     password: &str,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<(), ArchiveError> {
-    let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
+    let kind = kind_of(archive).ok_or_else(|| {
+        ArchiveError::Failed(Message::key(MessageKey::ArchiveErrorNotArchive).to_string())
+    })?;
     fs::create_dir_all(target).map_err(|e| ArchiveError::Failed(e.to_string()))?;
     let (ok, output) = match kind {
         Kind::Tar | Kind::TarGz | Kind::TarXz | Kind::TarBz2 | Kind::TarZst => {
@@ -598,7 +613,9 @@ pub fn with_implied_dirs(mut entries: Vec<Entry>) -> Vec<Entry> {
 /// Lists everything inside an archive.
 pub fn list(archive: &Path, password: &str) -> Result<Vec<Entry>, ArchiveError> {
     let never = || false;
-    let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
+    let kind = kind_of(archive).ok_or_else(|| {
+        ArchiveError::Failed(Message::key(MessageKey::ArchiveErrorNotArchive).to_string())
+    })?;
     let entries = match kind {
         Kind::Tar | Kind::TarGz | Kind::TarXz | Kind::TarBz2 | Kind::TarZst => {
             let tar = which("tar").ok_or(ArchiveError::MissingTool("tar"))?;
@@ -645,7 +662,9 @@ pub fn extract_member(
     password: &str,
 ) -> Result<PathBuf, ArchiveError> {
     let never = || false;
-    let kind = kind_of(archive).ok_or_else(|| ArchiveError::Failed("not an archive".into()))?;
+    let kind = kind_of(archive).ok_or_else(|| {
+        ArchiveError::Failed(Message::key(MessageKey::ArchiveErrorNotArchive).to_string())
+    })?;
     fs::create_dir_all(target_dir).map_err(|e| ArchiveError::Failed(e.to_string()))?;
     let (ok, text) = match kind {
         Kind::Tar | Kind::TarGz | Kind::TarXz | Kind::TarBz2 | Kind::TarZst => {
@@ -697,7 +716,7 @@ pub fn extract_member(
         Ok(out)
     } else {
         Err(ArchiveError::Failed(
-            "the file was not found in the archive".into(),
+            Message::key(MessageKey::ArchiveErrorNotFound).to_string(),
         ))
     }
 }
