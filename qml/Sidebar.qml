@@ -41,7 +41,10 @@ Rectangle {
         }
     }
 
-    readonly property var entries: {
+    property var cachedEntries: []
+    property string entriesFingerprint: ""
+
+    function rebuildEntries() {
         var standardPlaces = [];
         var networkPlaces = [];
 
@@ -77,9 +80,51 @@ Rectangle {
             };
         });
 
-        // Order: regular places, then storage drives, then network shares directly under them
-        return standardPlaces.concat(availableDrives).concat(networkPlaces);
+        var newEntries = standardPlaces.concat(availableDrives).concat(networkPlaces);
+        var fp = newEntries.map(function(e) {
+            return (e.id || "") + "|" + (e.name || "") + "|" + (e.path || "") + "|" + (e.drive ? (e.drive.is_mounted ? "1" : "0") : "") + "|" + (e.missing || false) + "|" + (e.connected || false);
+        }).join(";;;");
+
+        if (fp === entriesFingerprint && cachedEntries.length === newEntries.length) {
+            for (var j = 0; j < cachedEntries.length; ++j) {
+                if (cachedEntries[j].drive && newEntries[j] && newEntries[j].drive) {
+                    cachedEntries[j].drive = newEntries[j].drive;
+                }
+            }
+            return;
+        }
+
+        var savedY = placeList ? placeList.contentY : 0;
+        var focusedId = (focusedButton && focusedButton.entryData) ? focusedButton.entryData.id : "";
+        var wasFocused = (focusedButton && focusedButton.activeFocus);
+
+        entriesFingerprint = fp;
+        cachedEntries = newEntries;
+
+        if (placeList) {
+            Qt.callLater(function() {
+                if (placeList) {
+                    placeList.contentY = Math.max(0, Math.min(placeList.contentHeight - placeList.height, savedY));
+                    if (wasFocused && focusedId.length > 0) {
+                        for (var k = 0; k < placeList.count; ++k) {
+                            var item = placeList.itemAtIndex(k);
+                            if (item && item.modelData && item.modelData.id === focusedId && item.button) {
+                                item.button.forceActiveFocus();
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
+
+    readonly property var entries: cachedEntries
+
+    onPlacesChanged: rebuildEntries()
+    onDrivesChanged: rebuildEntries()
+    onPickerModeChanged: rebuildEntries()
+    Component.onCompleted: rebuildEntries()
 
     readonly property var trashPlace: {
         for (var i = 0; i < places.length; ++i) {
@@ -324,6 +369,7 @@ Rectangle {
                 }
                 RailButton {
                     id: entryButton
+                    entryData: entry.modelData
                     anchors.bottom: parent.bottom
                     width: parent.width
                     iconName: entry.modelData.icon
@@ -422,6 +468,46 @@ Rectangle {
                     }
                 }
             }
+
+            // Quick empty trash button on hover
+            Rectangle {
+                id: quickEmptyTrashBtn
+                visible: typeof core !== "undefined" && core && !core.trash_empty
+                anchors.right: parent.right
+                anchors.rightMargin: rail.expanded ? 14 : 6
+                anchors.verticalCenter: parent.verticalCenter
+                width: 26
+                height: 26
+                radius: 13
+                z: 2
+                color: quickEmptyTrashMouse.containsMouse ? theme.hoverOverlay : "transparent"
+                opacity: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.0
+                scale: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.7
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140 } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.35 } }
+
+                LoafIcon {
+                    anchors.centerIn: parent
+                    name: "broom"
+                    size: 14
+                    color: quickEmptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                }
+
+                MouseArea {
+                    id: quickEmptyTrashMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: function(mouse) {
+                        mouse.accepted = true;
+                        window.confirmEmptyTrash();
+                    }
+                }
+
+                ToolTip.visible: quickEmptyTrashMouse.containsMouse
+                ToolTip.text: qsTr("Empty Trash")
+                ToolTip.delay: 350
+            }
         }
 
         RailButton {
@@ -450,6 +536,8 @@ Rectangle {
         property string dropPath: ""
         property bool acceptsTrashDrop: false
         property string accessibleName: label
+        property var entryData: null
+        readonly property bool containsMouse: mouse.containsMouse
 
         signal clicked()
         signal middleClicked()

@@ -19,13 +19,13 @@ Item {
         var t = [
             { id: "interface", index: 0, name: qsTr("Interface"), iconName: "palette", subtitle: qsTr("Theme, appearance, top bar and icon styling") },
             { id: "behavior", index: 1, name: qsTr("Behavior"), iconName: "gear", subtitle: qsTr("Folder opening, drag behavior, and session restore") },
-            { id: "accessibility", index: 2, name: qsTr("Accessibility"), iconName: "person-arms-spread", subtitle: qsTr("Performance, motion, scaling and background effects") },
-            { id: "experimental", index: 3, name: qsTr("Experimental"), iconName: "sparkle", subtitle: qsTr("Preview features, advanced archives and link sharing") }
+            { id: "accessibility", index: 2, name: qsTr("Accessibility"), iconName: "person-arms-spread", subtitle: qsTr("Performance, motion, scaling and background effects") }
         ];
         if (theme.shareViaLinkEnabled) {
             t.push({ id: "share", index: 5, name: qsTr("Share"), iconName: "share-network", subtitle: qsTr("Cloudflare tunnel file hosting and active streams") });
         }
         t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("Saved network drives and auto discovery") });
+        t.push({ id: "experimental", index: 3, name: qsTr("Experimental"), iconName: "sparkle", subtitle: qsTr("Preview features, advanced archives and link sharing") });
         t.push({ id: "shortcuts", index: 7, name: qsTr("Shortcuts"), iconName: "keyboard", subtitle: qsTr("Customize keyboard shortcuts across Loaf") });
         return t;
     }
@@ -565,36 +565,6 @@ Item {
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
 
-                    // Tab 3: Experimental
-                    ExperimentalTab {
-                        id: tabExperimental
-                        searchQuery: settingsView.searchQuery
-                        visible: settingsView.searchQuery.length > 0
-                            ? (tabExperimental.matchCount > 0)
-                            : (settingsView.activeTab === 3)
-                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 1.0 : 0.0
-                        transform: Translate {
-                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 0 : 8
-                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        }
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
-
-                    // Tab 5: Share
-                    ShareTab {
-                        id: tabShare
-                        searchQuery: settingsView.searchQuery
-                        visible: theme.shareViaLinkEnabled && (settingsView.searchQuery.length > 0
-                            ? (tabShare.matchCount > 0)
-                            : (settingsView.activeTab === 5))
-                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 1.0 : 0.0
-                        transform: Translate {
-                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 0 : 8
-                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        }
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
-
                     // Tab 6: Network
                     NetworkTab {
                         id: tabNetwork
@@ -607,6 +577,21 @@ Item {
                         opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 1.0 : 0.0
                         transform: Translate {
                             y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 0 : 8
+                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Tab 3: Experimental
+                    ExperimentalTab {
+                        id: tabExperimental
+                        searchQuery: settingsView.searchQuery
+                        visible: settingsView.searchQuery.length > 0
+                            ? (tabExperimental.matchCount > 0)
+                            : (settingsView.activeTab === 3)
+                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 1.0 : 0.0
+                        transform: Translate {
+                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 0 : 8
                             Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         }
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }

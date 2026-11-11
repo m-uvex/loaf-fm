@@ -1086,15 +1086,6 @@ Item {
 
                 WheelHandler {
                     target: null
-                    acceptedModifiers: Qt.NoModifier
-                    onWheel: function(event) {
-                        var step = 80 * pane.zoom;
-                        var maxY = Math.max(0, gridView.contentHeight - gridView.height);
-                        gridView.contentY = Math.max(0, Math.min(maxY, gridView.contentY - (event.angleDelta.y > 0 ? step : -step)));
-                    }
-                }
-                WheelHandler {
-                    target: null
                     acceptedModifiers: Qt.ControlModifier
                     onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
@@ -1474,7 +1465,7 @@ Item {
                 anchors.right: parent.right
                 height: 32
                 radius: theme.radiusM
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
                 z: 2
 
                 RowLayout {

@@ -11,9 +11,28 @@ LoafPopup {
     modal: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    // Window shortcuts are blocked while a modal popup is open, so Space
-    // (which opened Quick Look) needs its own shortcut to close it again.
-    Shortcut { sequence: "Space"; enabled: quickLook.visible; onActivated: quickLook.close() }
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Space) {
+            if (event.isAutoRepeat) {
+                event.accepted = true;
+                return;
+            }
+            event.accepted = true;
+            quickLook.close();
+        }
+    }
+    Keys.onReleased: function(event) {
+        if (event.key === Qt.Key_Space) {
+            if (event.isAutoRepeat) {
+                event.accepted = true;
+                return;
+            }
+            if (typeof window !== "undefined" && window.spaceHeldForQuickLook) {
+                event.accepted = true;
+                window.handleSpaceRelease(event);
+            }
+        }
+    }
 
     transformOrigin: Item.Center
     scale: 0.15

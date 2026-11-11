@@ -27,10 +27,13 @@ ColumnLayout {
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
     readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
+    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility")
+    readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
-            + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0))
+            + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
+            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0))
         : 0
 
     Layout.fillWidth: true
@@ -140,36 +143,15 @@ ColumnLayout {
             title: qsTr("Icon zoom size")
             subtitle: qsTr("Default icon and thumbnail sizing for directory views (Ctrl + Scroll)")
 
-            RowLayout {
-                spacing: 12
-                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-
-                LoafSlider {
-                    Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
-                    from: 0
-                    to: theme.zoomLevels.length - 1
-                    stepSize: 1
-                    value: theme.zoomIndex
-                    showValue: false
-                    accessibleName: qsTr("Icon zoom size")
-                    onMoved: function(v) { theme.zoomIndex = Math.round(v); }
-                }
-
-                Rectangle {
-                    implicitHeight: 26
-                    radius: theme.radiusFull
-                    color: theme.surfaceContainerHighest
-                    implicitWidth: zoomValTxt.implicitWidth + 16
-
-                    Text {
-                        id: zoomValTxt
-                        anchors.centerIn: parent
-                        text: Math.round(theme.zoom * 100) + "%"
-                        color: theme.textMain
-                        font.pixelSize: theme.fs(11)
-                        font.bold: true
-                    }
-                }
+            LoafSlider {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                from: 0
+                to: theme.zoomLevels.length - 1
+                stepSize: 1
+                value: theme.zoomIndex
+                customValueText: Math.round(theme.zoom * 100) + "%"
+                accessibleName: qsTr("Icon zoom size")
+                onMoved: function(v) { theme.zoomIndex = Math.round(v); }
             }
         }
 
@@ -190,6 +172,46 @@ ColumnLayout {
                 ]
                 value: theme.thumbnailShape
                 onSelected: function(v) { theme.thumbnailShape = v; }
+            }
+        }
+    }
+
+    // Category 3: Readability & Vision
+    SettingCard {
+        visible: root.matchHighContrast || root.matchFontChoice
+        title: qsTr("Readability & Vision")
+        subtitle: qsTr("Typography and contrast adjustments for improved accessibility")
+        icon: "eye"
+
+        SettingRow {
+            visible: root.matchHighContrast
+            icon: "circle-half"
+            title: qsTr("High contrast")
+            subtitle: qsTr("Increase contrast across all text, borders, and interactive surfaces for improved readability")
+
+            LoafSwitch {
+                checked: theme.highContrast
+                onToggled: function(c) { theme.highContrast = c; }
+            }
+        }
+
+        SettingDivider { visible: root.matchHighContrast && root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontChoice
+            icon: "text-t"
+            title: qsTr("Font chooser")
+            subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 340
+                options: [
+                    { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
+                    { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },
+                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") }
+                ]
+                value: theme.fontChoice
+                onSelected: function(v) { theme.fontChoice = v; }
             }
         }
     }

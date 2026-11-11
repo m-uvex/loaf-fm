@@ -96,8 +96,7 @@ Popup {
     function openAt(px, py) {
         popup.requestedX = px;
         popup.requestedY = py;
-        popup.x = px;
-        popup.y = py;
+        popup.reposition();
         popup.open();
         popup.reposition();
     }
@@ -105,7 +104,8 @@ Popup {
     function reposition() {
         var margin = 10;
         var w = popup.width > 0 ? popup.width : (popup.implicitWidth > 0 ? popup.implicitWidth : 200);
-        var h = popup.height > 0 ? popup.height : (popup.implicitHeight > 0 ? popup.implicitHeight : 120);
+        var h = (typeof popup.computeHeight === "function") ? popup.computeHeight()
+            : (popup.height > 0 ? popup.height : (popup.implicitHeight > 0 ? popup.implicitHeight : 120));
         var winW = popup.winWidth();
         var winH = popup.winHeight();
 
@@ -125,6 +125,7 @@ Popup {
     }
 
     onOpened: popup.reposition()
+    onHeightChanged: if (popup.opened) popup.reposition()
 
     function openBelow(anchorItem) {
         if (!anchorItem || !anchorItem.mapToItem) return;

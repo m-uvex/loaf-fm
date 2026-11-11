@@ -110,6 +110,19 @@ LoafPopup {
         return Math.min(menu.menuMaxWidth, Math.ceil(cw + 2 * menu.contentPadding));
     }
 
+    function computeHeight() {
+        var opts = menu.model;
+        if (!opts || opts.length === 0)
+            return 2 * menu.contentPadding;
+        var total = 2 * menu.contentPadding;
+        for (var i = 0; i < opts.length; ++i) {
+            total += 36;
+            if (opts[i] && opts[i].separatorBefore)
+                total += 11;
+        }
+        return Math.min(total, menu.maxMenuHeight);
+    }
+
     function animatableRows() {
         var out = [];
         var kids = rowsView.contentItem ? rowsView.contentItem.children : [];
@@ -339,6 +352,7 @@ LoafPopup {
         boundsBehavior: Flickable.StopAtBounds
         model: menu.model
         ScrollBar.vertical: ScrollBar { policy: rowsView.contentHeight > rowsView.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+        onContentHeightChanged: if (menu.opened) menu.reposition()
 
         delegate: ColumnLayout {
             id: rowWrap

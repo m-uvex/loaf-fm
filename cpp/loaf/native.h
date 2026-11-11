@@ -78,8 +78,10 @@ public:
     bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
     bool alphaBuffer() const;
+    Q_INVOKABLE int systemScrollLines() const;
 
 Q_SIGNALS:
+    void ctrlScroll(int delta);
     void clipboardChanged();
     void mtpDevicesChanged();
     // mode: "tab" (open folders), "select" (show items), "properties",

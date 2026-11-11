@@ -11,15 +11,18 @@ Item {
     property real value: 0.5
     property bool formatPercent: false
     property string unit: ""
+    property string customValueText: ""
     property bool showValue: true
     property string accessibleName: ""
 
     signal moved(real value)
 
-    Layout.fillWidth: true
+    Layout.fillWidth: false
     Layout.preferredHeight: 36
+    Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+    Layout.maximumWidth: Layout.preferredWidth
     implicitHeight: 36
-    implicitWidth: 200
+    implicitWidth: Layout.preferredWidth
 
     readonly property real range: Math.max(0.0001, root.to - root.from)
     readonly property real normalized: Math.max(0.0, Math.min(1.0, (root.value - root.from) / range))
@@ -128,18 +131,19 @@ Item {
             visible: root.showValue
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredHeight: 26
+            Layout.preferredWidth: 50
+            Layout.minimumWidth: 50
+            implicitWidth: 50
             radius: theme.radiusFull
             color: theme.surfaceContainerHighest
-            implicitWidth: valText.implicitWidth + 16
 
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
 
             Text {
                 id: valText
                 anchors.centerIn: parent
-                text: root.formatPercent
-                    ? (Math.round(root.value * 100) + "%")
-                    : (root.value.toString() + root.unit)
+                text: root.customValueText.length > 0 ? root.customValueText
+                    : (root.formatPercent ? (Math.round(root.value * 100) + "%") : (root.value.toString() + root.unit))
                 color: theme.textMain
                 font.pixelSize: theme.fs(11)
                 font.bold: true

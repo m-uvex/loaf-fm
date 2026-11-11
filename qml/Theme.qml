@@ -237,6 +237,20 @@ Item {
                                               light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
     FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
 
+    property string fontChoice: "system" // "system", "google_flex", "opendyslexic"
+    FontLoader { id: googleFlexFont; source: "qrc:/loaf/fonts/GoogleSansFlex-Regular.ttf" }
+    FontLoader { id: openDyslexicFont; source: "qrc:/loaf/fonts/OpenDyslexic-Regular.ttf" }
+
+    readonly property string defaultFontFamily: {
+        if (fontChoice === "google_flex")
+            return googleFlexFont.status === FontLoader.Ready ? googleFlexFont.name : "Google Sans Flex";
+        if (fontChoice === "opendyslexic")
+            return openDyslexicFont.status === FontLoader.Ready ? openDyslexicFont.name : "OpenDyslexic";
+        return "";
+    }
+
+    property bool highContrast: false
+
     function getFontFamily() {
         return iconFont.status === FontLoader.Ready ? iconFont.name : iconFontFile;
     }
@@ -2088,32 +2102,65 @@ Item {
     readonly property var activePalette: palettes[accentName] || palettes["lavender"]
 
     // Background & Surfaces
-    readonly property color background: isDark ? activePalette.darkBg : activePalette.lightBg
-    readonly property color surfaceDim: isDark ? activePalette.darkBg : activePalette.lightSurfaceLow
-    readonly property color surface: isDark ? activePalette.darkBg : activePalette.lightBg
-    readonly property color surfaceBright: isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceLowest
-    readonly property color surfaceContainerLowest: isDark ? activePalette.darkSurfaceLowest : activePalette.lightSurfaceLowest
-    readonly property color surfaceContainerLow: isDark ? activePalette.darkSurfaceLow : activePalette.lightSurfaceLow
-    readonly property color surfaceContainer: isDark ? activePalette.darkSurface : activePalette.lightSurface
-    readonly property color surfaceContainerHigh: isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceHigh
-    readonly property color surfaceContainerHighest: isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceHighest
+    readonly property color background: highContrast
+        ? (isDark ? "#000000" : "#ffffff")
+        : (isDark ? activePalette.darkBg : activePalette.lightBg)
+    readonly property color surfaceDim: highContrast
+        ? (isDark ? "#080808" : "#f0f0f0")
+        : (isDark ? activePalette.darkBg : activePalette.lightSurfaceLow)
+    readonly property color surface: highContrast
+        ? (isDark ? "#0c0c0e" : "#f8f8fa")
+        : (isDark ? activePalette.darkBg : activePalette.lightBg)
+    readonly property color surfaceBright: highContrast
+        ? (isDark ? "#2a2a30" : "#ffffff")
+        : (isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceLowest)
+    readonly property color surfaceContainerLowest: highContrast
+        ? (isDark ? "#050505" : "#ffffff")
+        : (isDark ? activePalette.darkSurfaceLowest : activePalette.lightSurfaceLowest)
+    readonly property color surfaceContainerLow: highContrast
+        ? (isDark ? "#101014" : "#f2f2f4")
+        : (isDark ? activePalette.darkSurfaceLow : activePalette.lightSurfaceLow)
+    readonly property color surfaceContainer: highContrast
+        ? (isDark ? "#18181c" : "#e8e8ec")
+        : (isDark ? activePalette.darkSurface : activePalette.lightSurface)
+    readonly property color surfaceContainerHigh: highContrast
+        ? (isDark ? "#222228" : "#dedee4")
+        : (isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceHigh)
+    readonly property color surfaceContainerHighest: highContrast
+        ? (isDark ? "#2c2c34" : "#d4d4dc")
+        : (isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceHighest)
 
     // Primary Accents
-    readonly property color primary: isDark ? activePalette.darkPrimary : activePalette.lightPrimary
+    readonly property color rawPrimary: isDark ? activePalette.darkPrimary : activePalette.lightPrimary
+    readonly property color primary: highContrast
+        ? (isDark ? Qt.lighter(rawPrimary, 1.25) : Qt.darker(rawPrimary, 1.35))
+        : rawPrimary
     readonly property color primaryFg: isDark ? activePalette.darkFg : activePalette.lightFg
     readonly property color primaryContainer: isDark ? activePalette.darkContainer : activePalette.lightContainer
-    readonly property color primaryContainerFg: isDark ? activePalette.darkContainerFg : activePalette.lightContainerFg
+    readonly property color primaryContainerFg: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkContainerFg : activePalette.lightContainerFg)
 
     // Secondary Accents
     readonly property color secondaryContainer: isDark ? activePalette.darkSecondaryContainer : activePalette.lightSecondaryContainer
-    readonly property color secondaryContainerFg: isDark ? activePalette.darkSecondaryContainerFg : activePalette.lightSecondaryContainerFg
+    readonly property color secondaryContainerFg: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkSecondaryContainerFg : activePalette.lightSecondaryContainerFg)
     readonly property color tertiaryContainer: isDark ? activePalette.darkTertiaryContainer : activePalette.lightTertiaryContainer
 
     // Text & Outlines
-    readonly property color textMain: isDark ? activePalette.darkTextMain : activePalette.lightTextMain
-    readonly property color textMuted: isDark ? activePalette.darkTextMuted : activePalette.lightTextMuted
-    readonly property color outline: isDark ? activePalette.darkOutline : activePalette.lightOutline
-    readonly property color outlineVariant: isDark ? activePalette.darkOutlineVariant : activePalette.lightOutlineVariant
+    readonly property color textMain: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkTextMain : activePalette.lightTextMain)
+    readonly property color textMuted: highContrast
+        ? (isDark ? "#e4e4e8" : "#242428")
+        : (isDark ? activePalette.darkTextMuted : activePalette.lightTextMuted)
+    readonly property color outline: highContrast
+        ? (isDark ? "#dcdce2" : "#24242c")
+        : (isDark ? activePalette.darkOutline : activePalette.lightOutline)
+    readonly property color outlineVariant: highContrast
+        ? (isDark ? "#8e8e98" : "#60606a")
+        : (isDark ? activePalette.darkOutlineVariant : activePalette.lightOutlineVariant)
 
     // Semantic component tokens (derived so components never pick raw surface tokens)
     readonly property color menuSurface: isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceLowest
@@ -2272,6 +2319,10 @@ Item {
         }
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
+        value = readSetting("fontChoice");
+        if (value.length > 0) fontChoice = value;
+        value = readSetting("highContrast");
+        if (value.length > 0) highContrast = (value === "true");
         loaded = true;
     }
 
@@ -2332,4 +2383,6 @@ Item {
     onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
+    onFontChoiceChanged: writeSetting("fontChoice", fontChoice)
+    onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")
 }

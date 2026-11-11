@@ -57,6 +57,7 @@ Window {
         ? request.title
         : (isSave ? qsTr("Save File") : qsTr("Open File"))
     color: theme.windowBackground
+    font.family: theme.defaultFontFamily
     modality: modal ? Qt.WindowModal : Qt.NonModal
     visible: true
 
@@ -397,7 +398,7 @@ Window {
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
-                color: pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer
+                color: theme.backdropSurface(pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 clip: true
 
                 MouseArea {
@@ -581,7 +582,7 @@ Window {
                 Layout.preferredWidth: 230
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(searchField.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchField.activeFocus ? 2 : 1
                 border.color: searchField.activeFocus ? theme.primary : theme.outlineVariant
 

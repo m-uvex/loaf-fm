@@ -16,6 +16,7 @@ ApplicationWindow {
         : activeView === "pc" ? (core.pc_name || core.hostname || qsTr("This PC"))
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
+    font.family: theme.defaultFontFamily
 
     // Portal activation (--portal) starts without a main window; it shows
     // up when a normal open request arrives.
@@ -257,6 +258,10 @@ ApplicationWindow {
         function onOpenRequested(paths, mode) { window.handleOpenRequest(paths, mode); }
         function onPickerRequested(handle, spec) { window.openPicker(handle, spec); }
         function onPickerDismissed(handle) { window.closePicker(handle); }
+        function onCtrlScroll(delta) {
+            if (window.activeView === "files")
+                theme.stepZoom(delta);
+        }
     }
 
     // Active portal picker windows keyed by D-Bus handle.
@@ -438,6 +443,42 @@ ApplicationWindow {
     function previewItem(path) {
         if (path.indexOf("mtp:") === 0) core.preview_mtp(path);
         else quickLook.showFor(path);
+    }
+
+    property bool spaceHeldForQuickLook: false
+    property real spacePressTime: 0
+
+    function handleSpacePress(event) {
+        if (event.isAutoRepeat) {
+            event.accepted = true;
+            return;
+        }
+        if (!quickLook.visible && !window.gridKeyboardReady)
+            return;
+        event.accepted = true;
+        spacePressTime = Date.now();
+        if (quickLook.visible) {
+            spaceHeldForQuickLook = false;
+            quickLook.close();
+        } else {
+            spaceHeldForQuickLook = true;
+            toggleQuickLook();
+        }
+    }
+
+    function handleSpaceRelease(event) {
+        if (event.isAutoRepeat) {
+            event.accepted = true;
+            return;
+        }
+        if (spaceHeldForQuickLook && quickLook.visible) {
+            event.accepted = true;
+            var heldDuration = Date.now() - spacePressTime;
+            spaceHeldForQuickLook = false;
+            if (heldDuration > 250) {
+                quickLook.close();
+            }
+        }
     }
 
     function toggleQuickLook() {
@@ -883,6 +924,11 @@ ApplicationWindow {
         Keys.onPressed: function(event) {
             if (window.anyModalOpen)
                 return;
+            if (event.key === Qt.Key_Space) {
+                window.handleSpacePress(event);
+                if (event.accepted)
+                    return;
+            }
             if (event.key === Qt.Key_Escape) {
                 if (window.activePane.selectedCount > 0) {
                     window.activePane.clearSelection();
@@ -931,6 +977,12 @@ ApplicationWindow {
                 searchInput.text = event.text;
                 searchInput.cursorPosition = searchInput.text.length;
                 event.accepted = true;
+            }
+        }
+
+        Keys.onReleased: function(event) {
+            if (event.key === Qt.Key_Space) {
+                window.handleSpaceRelease(event);
             }
         }
     }
@@ -1140,7 +1192,7 @@ ApplicationWindow {
                 id: navChip
                 Layout.preferredHeight: 42
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
                 readonly property bool canBack: engine.can_go_back || window.isAuxView || engine.is_searching_everywhere
                 readonly property bool canForward: engine.can_go_forward && !window.isAuxView && !engine.is_searching_everywhere
                 readonly property bool showBack: theme.toolbarOperations !== "hidden"
@@ -1189,7 +1241,7 @@ ApplicationWindow {
                 Layout.preferredWidth: (theme.showNewTabButton && theme.showNewWindowButton) ? 82 : 44
                 Layout.minimumWidth: Layout.preferredWidth
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -1228,7 +1280,7 @@ ApplicationWindow {
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 42
                 radius: theme.radiusFull
-                color: window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer
+                color: theme.backdropSurface(window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 clip: true
 
                 MouseArea {
@@ -1490,7 +1542,7 @@ ApplicationWindow {
                 Layout.minimumWidth: window.width < 760 ? 80 : 120
                 Layout.maximumWidth: searchBar.Layout.preferredWidth
                 radius: theme.radiusFull
-                color: searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer
+                color: theme.backdropSurface(searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchInput.activeFocus ? 1.5 : 0
                 border.color: theme.primary
 
@@ -1624,7 +1676,7 @@ ApplicationWindow {
                 Layout.preferredWidth: viewRow.implicitWidth + 20
                 Layout.minimumWidth: viewRow.implicitWidth + 20
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
                 clip: true
 
                 RowLayout {
@@ -1688,12 +1740,50 @@ ApplicationWindow {
                 }
             }
 
-            LoafButton {
+            Rectangle {
+                id: mainEmptyTrashChip
                 visible: window.activeView === "files" && engine.location_kind === "trash" && engine.item_count > 0
-                text: window.width < 900 ? "" : qsTr("Empty Trash")
-                icon: "trash"
-                variant: "danger"
-                onClicked: window.confirmEmptyTrash()
+                Layout.preferredHeight: 42
+                Layout.preferredWidth: emptyTrashRow.implicitWidth + 24
+                Layout.minimumWidth: Layout.preferredWidth
+                radius: theme.radiusFull
+                color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineVariant
+                clip: true
+
+                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+
+                RowLayout {
+                    id: emptyTrashRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    LoafIcon {
+                        name: "trash"
+                        size: 16
+                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                    }
+
+                    Text {
+                        visible: window.width >= 900
+                        text: qsTr("Empty Trash")
+                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMain
+                        font.pixelSize: theme.fs(13)
+                        font.bold: true
+                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                    }
+                }
+
+                MouseArea {
+                    id: emptyTrashMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: window.confirmEmptyTrash()
+                }
             }
         }
         RowLayout {
@@ -1851,7 +1941,7 @@ ApplicationWindow {
                             : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
                         height: 34
                         radius: theme.radiusFull
-                        color: current ? theme.secondaryContainer : (tabMouse.containsMouse ? theme.hoverOverlay : theme.surfaceContainer)
+                        color: current ? theme.backdropSurface(theme.secondaryContainer) : (tabMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer))
                         Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
@@ -2402,13 +2492,24 @@ ApplicationWindow {
                 pane.pendingSelect = [target];
             } });
         if (!item.is_dir && !inArchive) {
-            var openData = openWithData(paths);
-            var openSub = openWithMenu(paths, openData);
-            if (openSub.length > 0)
-                m.push({ text: qsTr("Open With"), icon: "app-window", itemKey: "open_with", submenu: openSub });
-            var defSub = setDefaultMenu(paths, openData);
-            if (defSub.length > 0)
-                m.push({ text: qsTr("Set Default Application"), icon: "check-square", itemKey: "set_default", submenu: defSub });
+            m.push({
+                text: qsTr("Open With"),
+                icon: "app-window",
+                itemKey: "open_with",
+                submenu: function() {
+                    var openData = openWithData(paths);
+                    return openWithMenu(paths, openData);
+                }
+            });
+            m.push({
+                text: qsTr("Set Default Application"),
+                icon: "check-square",
+                itemKey: "set_default",
+                submenu: function() {
+                    var openData = openWithData(paths);
+                    return setDefaultMenu(paths, openData);
+                }
+            });
             if (core.is_archive_file(item.path)) {
                 m.push({ text: qsTr("Browse Archive"), icon: "folder-open", itemKey: "browse_archive", action: function() { pane.engine.set_path("archive://" + item.path + "#"); } });
                 m.push({ text: qsTr("Extract Here"), icon: "archive", itemKey: "extract", action: function() { core.extract(item.path, false, ""); } });
