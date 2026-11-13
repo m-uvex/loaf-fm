@@ -62,7 +62,118 @@ Item {
     property bool showNewWindowButton: true
     property string pathBarMode: "chips" // "chips", "text"
     property string openFolderMode: "current" // "current", "split", "tab"
+    property string archiveOpenAction: "browse" // "browse", "extract", "open"
     property bool showBackgroundShapes: true
+
+    property var keybindings: ({})
+    readonly property var defaultKeybindings: ({
+        "undo": "Ctrl+Z",
+        "redo": "Ctrl+Shift+Z",
+        "copy": "Ctrl+C",
+        "cut": "Ctrl+X",
+        "paste": "Ctrl+V",
+        "selectAll": "Ctrl+A",
+        "invertSelection": "Ctrl+Shift+I",
+        "selectPattern": "Ctrl+S",
+        "toggleHidden": "Ctrl+H",
+        "editPath": "Ctrl+L",
+        "search": "Ctrl+F",
+        "rename": "F2",
+        "quickLook": "Space",
+        "trash": "Delete",
+        "deletePermanent": "Shift+Delete",
+        "back": "Alt+Left",
+        "forward": "Alt+Right",
+        "up": "Alt+Up",
+        "home": "Alt+Home",
+        "backAlt": "Backspace",
+        "refresh": "F5",
+        "newTab": "Ctrl+T",
+        "closeTab": "Ctrl+W",
+        "nextTab": "Ctrl+Tab",
+        "prevTab": "Ctrl+Shift+Tab",
+        "newWindow": "Ctrl+N",
+        "newFolder": "Ctrl+Shift+N",
+        "toggleSplit": "F3",
+        "toggleSidebar": "F9",
+        "zoomIn": "Ctrl+=",
+        "zoomOut": "Ctrl+-",
+        "zoomReset": "Ctrl+0",
+        "viewGrid": "Ctrl+1",
+        "viewList": "Ctrl+2",
+        "bookmark": "Ctrl+D",
+        "copyPath": "Ctrl+Shift+C",
+        "properties": "Alt+Return",
+        "quit": "Ctrl+Q"
+    })
+
+    function shortcutFor(id) {
+        if (keybindings && typeof keybindings[id] === "string" && keybindings[id].length > 0)
+            return keybindings[id];
+        return defaultKeybindings[id] || "";
+    }
+
+    function setShortcut(id, seq) {
+        var next = Object.assign({}, keybindings || {});
+        if (!seq || seq === defaultKeybindings[id])
+            delete next[id];
+        else
+            next[id] = seq;
+        keybindings = next;
+    }
+
+    function resetShortcut(id) {
+        setShortcut(id, "");
+    }
+
+    function resetAllKeybindings() {
+        keybindings = ({});
+    }
+
+    function keyEventToSequence(event) {
+        var k = event.key;
+        if (k === Qt.Key_Control || k === Qt.Key_Shift || k === Qt.Key_Alt || k === Qt.Key_Meta || k === Qt.Key_AltGr)
+            return "";
+        var parts = [];
+        if (event.modifiers & Qt.ControlModifier) parts.push("Ctrl");
+        if (event.modifiers & Qt.AltModifier) parts.push("Alt");
+        if (event.modifiers & Qt.ShiftModifier) parts.push("Shift");
+        if (event.modifiers & Qt.MetaModifier) parts.push("Meta");
+        var keyName = "";
+        switch (k) {
+        case Qt.Key_Space: keyName = "Space"; break;
+        case Qt.Key_Return: keyName = "Return"; break;
+        case Qt.Key_Enter: keyName = "Enter"; break;
+        case Qt.Key_Delete: keyName = "Delete"; break;
+        case Qt.Key_Backspace: keyName = "Backspace"; break;
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab: keyName = "Tab"; break;
+        case Qt.Key_Left: keyName = "Left"; break;
+        case Qt.Key_Right: keyName = "Right"; break;
+        case Qt.Key_Up: keyName = "Up"; break;
+        case Qt.Key_Down: keyName = "Down"; break;
+        case Qt.Key_Home: keyName = "Home"; break;
+        case Qt.Key_End: keyName = "End"; break;
+        case Qt.Key_PageUp: keyName = "PgUp"; break;
+        case Qt.Key_PageDown: keyName = "PgDown"; break;
+        case Qt.Key_Plus:
+        case Qt.Key_Equal: keyName = (k === Qt.Key_Plus) ? "+" : "="; break;
+        case Qt.Key_Minus: keyName = "-"; break;
+        default:
+            if (k >= Qt.Key_F1 && k <= Qt.Key_F12)
+                keyName = "F" + (k - Qt.Key_F1 + 1);
+            else if (k >= Qt.Key_A && k <= Qt.Key_Z)
+                keyName = String.fromCharCode(k);
+            else if (k >= Qt.Key_0 && k <= Qt.Key_9)
+                keyName = String.fromCharCode(k);
+            else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) > 32)
+                keyName = event.text.toUpperCase();
+        }
+        if (!keyName)
+            return "";
+        parts.push(keyName);
+        return parts.join("+");
+    }
 
     // Low-power mode activates automatically when running on software rendering or low-end hardware.
     property string lowPowerSetting: "auto" // "auto", "on", "off"
@@ -2138,6 +2249,12 @@ Item {
         if (value.length > 0) pathBarMode = value;
         value = readSetting("openFolderMode");
         if (value.length > 0) openFolderMode = value;
+        value = readSetting("archiveOpenAction");
+        if (value === "browse" || value === "extract" || value === "open") archiveOpenAction = value;
+        value = readSetting("keybindings");
+        if (value.length > 0) {
+            try { keybindings = JSON.parse(value); } catch (e) { keybindings = {}; }
+        }
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
         loaded = true;
@@ -2192,5 +2309,7 @@ Item {
     onShowNewWindowButtonChanged: writeSetting("showNewWindowButton", showNewWindowButton ? "true" : "false")
     onPathBarModeChanged: writeSetting("pathBarMode", pathBarMode)
     onOpenFolderModeChanged: writeSetting("openFolderMode", openFolderMode)
+    onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
+    onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
 }
