@@ -1,6 +1,6 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Controls.Basic as Basic
 import app.loaf
 
 // Bottom-right progress pill for running file operations; click to expand
@@ -30,7 +30,7 @@ Item {
     Timer { id: showDelay; interval: 350; onTriggered: panel.shown = panel.ops.length > 0 }
 
     visible: shown
-    width: expanded ? 340 : pill.implicitWidth
+    width: expanded ? 340 : pill.implicitWidth + 32
     height: expanded ? list.implicitHeight + 24 : 44
     Accessible.role: Accessible.ProgressBar
     Accessible.name: ops.length > 0 ? theme.resolveRustMessage(ops[0].title) : ""
@@ -48,27 +48,31 @@ Item {
         id: pill
         visible: !panel.expanded
         anchors.centerIn: parent
-        spacing: 10
+        spacing: 12
 
         Item {
-            width: 26; height: 26
+            width: 24; height: 24
             Canvas {
                 id: ring
                 anchors.fill: parent
                 property real progress: panel.ops.length > 0 ? panel.ops[0].progress : 0
+                property color trackColor: theme.outlineAlpha(theme.outlineVariant)
+                property color progressColor: theme.primary
                 onProgressChanged: requestPaint()
+                onTrackColorChanged: requestPaint()
+                onProgressColorChanged: requestPaint()
                 onPaint: {
                     var ctx = getContext("2d");
                     ctx.reset();
                     ctx.lineWidth = 3;
-                    ctx.strokeStyle = theme.outlineAlpha(theme.outlineVariant);
+                    ctx.strokeStyle = trackColor;
                     ctx.beginPath();
-                    ctx.arc(13, 13, 10, 0, Math.PI * 2);
+                    ctx.arc(12, 12, 9, 0, Math.PI * 2);
                     ctx.stroke();
-                    ctx.strokeStyle = theme.primary;
+                    ctx.strokeStyle = progressColor;
                     ctx.beginPath();
                     var p = progress < 0 ? 0.25 : progress;
-                    ctx.arc(13, 13, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+                    ctx.arc(12, 12, 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
                     ctx.stroke();
                 }
                 RotationAnimator on rotation {
@@ -80,12 +84,23 @@ Item {
         Text {
             text: panel.ops.length === 1 ? theme.resolveRustMessage(panel.ops[0].title) : qsTr("%n operation(s)", "", panel.ops.length)
             color: theme.textMain
+            font.family: theme.fontFamily
             font.pixelSize: theme.fs(12)
-            font.bold: true
             elide: Text.ElideRight
             Layout.maximumWidth: 240
         }
-        Item { width: 4; height: 1 }
+        Text {
+            text: panel.ops.length === 1 ? panel.ops[0].speed || "" : ""
+            visible: text.length > 0
+            color: theme.textMuted
+            font.family: theme.fontFamily
+            font.pixelSize: theme.fs(11)
+        }
+        LoafIcon {
+            name: "caret-up"
+            size: 14
+            color: theme.textMuted
+        }
     }
 
     MouseArea {
@@ -132,16 +147,41 @@ Item {
                         onClicked: core.cancel_operation(modelData.id)
                     }
                 }
-                ProgressBar {
+                Basic.ProgressBar {
                     Layout.fillWidth: true
+                    palette.dark: theme.primary
+                    palette.midlight: theme.outlineVariant
                     from: 0
                     to: 1
                     value: modelData.progress < 0 ? 0 : modelData.progress
                     indeterminate: modelData.progress < 0
                 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+                    Text {
+                        text: theme.resolveRustMessage(modelData.detail)
+                        visible: text.length > 0
+                        color: theme.textMuted
+                        font.family: theme.fontFamily
+                        font.pixelSize: theme.fs(10)
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Text {
+                        text: [modelData.speed, modelData.eta].filter(function(s) { return s && s.length > 0; }).join("  ·  ")
+                        visible: text.length > 0
+                        color: theme.textMuted
+                        font.family: theme.fontFamily
+                        font.pixelSize: theme.fs(10)
+                        Layout.alignment: Qt.AlignRight
+                    }
+                }
                 Text {
-                    text: [theme.resolveRustMessage(modelData.detail), theme.resolveRustMessage(modelData.current)].filter(function(s) { return s && s.length > 0; }).join("  ·  ")
+                    text: theme.resolveRustMessage(modelData.current)
+                    visible: text.length > 0
                     color: theme.textMuted
+                    font.family: theme.fontFamily
                     font.pixelSize: theme.fs(10)
                     elide: Text.ElideMiddle
                     Layout.fillWidth: true
