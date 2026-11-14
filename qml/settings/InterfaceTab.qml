@@ -202,6 +202,28 @@ ColumnLayout {
                 }
             }
         }
+
+        SettingRow {
+            visible: theme.accentName === "wallpaper"
+                && theme.availableWallpaperPaletteSources.length > 0
+            icon: "image"
+            title: qsTr("Wallpaper palette source")
+            subtitle: qsTr("Read generated palette JSON or KDE accent colors on startup")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact)
+                    ? 180
+                    : 260
+                accessibleName: qsTr("Wallpaper palette source")
+                options: [
+                    { value: "auto", label: qsTr("Automatic") }
+                ].concat(theme.availableWallpaperPaletteSources.map(function (s) {
+                    return { value: s.id, label: s.label };
+                }))
+                value: theme.wallpaperPaletteSource
+                onSelected: function (v) { theme.wallpaperPaletteSource = v; }
+            }
+        }
     }
 
     // Category 3: Icons

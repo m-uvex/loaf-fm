@@ -275,7 +275,10 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
         .and_then(|v| v.as_str())
         .or_else(|| nested_dark.and_then(|d| str_from(d, "primary")))
         .or_else(|| nested_light.and_then(|l| str_from(l, "primary")))
+        .or_else(|| pywal_colors.and_then(|c| str_from(c, "primary")))
+        .or_else(|| val.get("color4").and_then(|v| v.as_str()))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color4")))
+        .or_else(|| val.get("color1").and_then(|v| v.as_str()))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color1")))
         .unwrap_or("#cfc6ab");
 
@@ -284,7 +287,9 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
         .and_then(|v| v.as_str())
         .or_else(|| nested_dark.and_then(|d| str_from(d, "background")))
         .or_else(|| pywal_special.and_then(|s| str_from(s, "background")))
+        .or_else(|| pywal_colors.and_then(|c| str_from(c, "background")))
         .or_else(|| pywal_colors.and_then(|c| str_from(c, "color0")))
+        .or_else(|| val.get("color0").and_then(|v| v.as_str()))
         .unwrap_or("#141311");
 
     let primary_rgb = parse_hex(raw_primary).unwrap_or((207, 198, 171));
@@ -474,6 +479,8 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
             .and_then(|v| v.as_str())
             .or_else(|| nested_dark.and_then(|d| str_from(d, "on_surface")))
             .or_else(|| pywal_special.and_then(|s| str_from(s, "foreground")))
+            .or_else(|| pywal_colors.and_then(|c| str_from(c, "foreground")))
+            .or_else(|| val.get("foreground").and_then(|v| v.as_str()))
             .unwrap_or("#e6e2dd")
     };
 
@@ -893,43 +900,319 @@ pub fn normalize_wallpaper_colors(content: &str) -> String {
     serde_json::to_string(&out).unwrap_or_else(|_| content.to_string())
 }
 
-/// Returns (source_path, content, mtime_secs) for the first readable color source.
-pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!(
-            "{}/.local/state/quickshell/user/generated/colors.json",
-            home
-        ),
-        format!("{}/.cache/wal/colors.json", home),
-        format!("{}/.cache/matugen/colors.json", home),
-        format!("{}/.config/matugen/colors.json", home),
-        format!("{}/.cache/DankMaterialShell/dms-colors.json", home),
-        format!("{}/.cache/current_wallpaper_palette.json", home),
+fn parse_rgb_triplet(s: &str) -> Option<String> {
+    let mut parts = s.split(',').map(str::trim);
+    let r = parts.next()?.parse::<u8>().ok()?;
+    let g = parts.next()?.parse::<u8>().ok()?;
+    let b = parts.next()?.parse::<u8>().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(to_hex((r, g, b)))
+}
+
+fn normalize_caelestia_scheme(content: &str) -> Option<String> {
+    let val: serde_json::Value = serde_json::from_str(content).ok()?;
+    let colours = val
+        .get("colours")
+        .or_else(|| val.get("colors"))
+        .and_then(|v| v.as_object())?;
+    if !colours.contains_key("surfaceContainer") && !colours.contains_key("surfaceContainerLowest")
+    {
+        return None;
+    }
+
+    let token = |key: &str| {
+        colours
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                if s.starts_with('#') {
+                    s.to_string()
+                } else {
+                    format!("#{s}")
+                }
+            })
+    };
+
+    const MAP: &[(&str, &str)] = &[
+        ("background", "background"),
+        ("surfaceContainerLowest", "surface_container_lowest"),
+        ("surfaceContainerLow", "surface_container_low"),
+        ("surfaceContainer", "surface_container"),
+        ("surfaceContainerHigh", "surface_container_high"),
+        ("surfaceContainerHighest", "surface_container_highest"),
+        ("primary", "primary"),
+        ("onPrimary", "on_primary"),
+        ("primaryContainer", "primary_container"),
+        ("onPrimaryContainer", "on_primary_container"),
+        ("secondaryContainer", "secondary_container"),
+        ("onSecondaryContainer", "on_secondary_container"),
+        ("tertiaryContainer", "tertiary_container"),
+        ("onSurface", "on_surface"),
+        ("onSurfaceVariant", "on_surface_variant"),
+        ("outline", "outline"),
+        ("outlineVariant", "outline_variant"),
+        ("inverseSurface", "inverse_surface"),
+        ("inversePrimary", "inverse_primary"),
+        ("inverseOnSurface", "inverse_on_surface"),
     ];
 
-    for path_str in candidates {
-        let path = Path::new(&path_str);
-        let Ok(raw_content) = fs::read_to_string(path) else {
-            continue;
-        };
-        let is_object = serde_json::from_str::<serde_json::Value>(&raw_content)
-            .ok()
-            .map(|v| v.is_object() && v.as_object().map(|o| !o.is_empty()).unwrap_or(false))
-            .unwrap_or(false);
-        if !is_object {
+    let mut flat = serde_json::Map::new();
+    for (src, dst) in MAP {
+        if let Some(v) = token(src) {
+            flat.insert((*dst).to_string(), serde_json::json!(v));
+        }
+    }
+    if flat.is_empty() {
+        return None;
+    }
+
+    if let Some(bg) = flat.get("inverse_surface").and_then(|v| v.as_str()) {
+        if parse_hex(bg)
+            .map(|rgb| relative_lum(rgb) > 0.5)
+            .unwrap_or(false)
+        {
+            let mut light = serde_json::Map::new();
+            light.insert("background".to_string(), serde_json::json!(bg));
+            if let Some(p) = flat.get("inverse_primary").cloned() {
+                light.insert("primary".to_string(), p);
+            }
+            flat.insert("colors".to_string(), serde_json::json!({ "light": light }));
+        }
+    }
+
+    Some(normalize_wallpaper_colors(
+        &serde_json::Value::Object(flat).to_string(),
+    ))
+}
+
+fn kde_accent_palette() -> Option<String> {
+    let home = std::env::var("HOME").ok()?;
+    let content = fs::read_to_string(Path::new(&home).join(".config/kdeglobals")).ok()?;
+    normalize_kde_globals(&content)
+}
+
+fn normalize_kde_globals(content: &str) -> Option<String> {
+    let mut group = String::new();
+    let mut accent = None;
+    let mut background = None;
+    let mut foreground = None;
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some(inner) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            group = inner.to_string();
             continue;
         }
-        let content = normalize_wallpaper_colors(&raw_content);
-        let mtime = fs::metadata(path)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        return Some((path_str, content, mtime));
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        if value.is_empty() {
+            continue;
+        }
+        match (group.as_str(), key.trim()) {
+            ("General", "AccentColor") => {
+                accent = parse_rgb_triplet(value).or_else(|| Some(value.to_string()));
+            }
+            ("Colors:Window", "BackgroundNormal") => background = Some(value.to_string()),
+            ("Colors:Window", "ForegroundNormal") => foreground = Some(value.to_string()),
+            _ => {}
+        }
+    }
+
+    let mut flat = serde_json::Map::new();
+    flat.insert("primary".to_string(), serde_json::json!(accent?));
+    if let Some(bg) = background {
+        flat.insert("background".to_string(), serde_json::json!(bg));
+    }
+    if let Some(fg) = foreground {
+        flat.insert("on_surface".to_string(), serde_json::json!(fg));
+    }
+    Some(normalize_wallpaper_colors(
+        &serde_json::Value::Object(flat).to_string(),
+    ))
+}
+
+fn wallpaper_mtime(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// How a single wallpaper palette source yields its colors.
+enum SourceKind {
+    /// A JSON palette file read from disk.
+    JsonFile,
+    /// KDE `kdeglobals` accent / window colors.
+    Kde,
+}
+
+/// A single detected wallpaper palette source.
+pub struct WallpaperSourceEntry {
+    pub id: String,
+    pub label: String,
+    /// Generated palette JSON or KDE globals file path.
+    pub path: String,
+    pub mtime: u64,
+    kind: SourceKind,
+}
+
+/// Every wallpaper palette source detected on this host, in preference order.
+pub fn wallpaper_color_sources(home: &Path) -> Vec<WallpaperSourceEntry> {
+    let mut out: Vec<WallpaperSourceEntry> = Vec::new();
+
+    // JSON palette files, grouped by family so the list stays short.
+    let json_families: &[(&str, &str, &[&str])] = &[
+        (
+            "quickshell",
+            "Quickshell",
+            &[".local/state/quickshell/user/generated/colors.json"],
+        ),
+        (
+            "caelestia",
+            "Caelestia",
+            &[
+                ".local/state/caelestia/scheme.json",
+                ".cache/caelestia/scheme.json",
+            ],
+        ),
+        ("wal", "pywal / Wal", &[".cache/wal/colors.json"]),
+        ("wallust", "Wallust", &[".cache/wallust/colors.json"]),
+        ("hellwal", "Hellwal", &[".cache/hellwal/colors.json"]),
+        (
+            "matugen",
+            "Matugen",
+            &[
+                ".cache/matugen/colors.json",
+                ".config/matugen/colors.json",
+                ".config/matugen/generated/colors.json",
+                ".local/state/matugen/colors.json",
+                ".local/share/matugen/colors.json",
+            ],
+        ),
+        (
+            "dms",
+            "Dank Material Shell",
+            &[".cache/DankMaterialShell/dms-colors.json"],
+        ),
+        (
+            "current-wallpaper-palette",
+            "Current Wallpaper Palette",
+            &[".cache/current_wallpaper_palette.json"],
+        ),
+    ];
+    for (id, label, rel_paths) in json_families {
+        for rel in rel_paths.iter().copied() {
+            let path = home.join(rel);
+            if !path.is_file() {
+                continue;
+            }
+            let valid = fs::read_to_string(&path)
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .map(|v| v.is_object() && v.as_object().map(|o| !o.is_empty()).unwrap_or(false))
+                .unwrap_or(false);
+            if valid {
+                out.push(WallpaperSourceEntry {
+                    id: id.to_string(),
+                    label: label.to_string(),
+                    path: path.to_string_lossy().into_owned(),
+                    mtime: wallpaper_mtime(&path),
+                    kind: SourceKind::JsonFile,
+                });
+                break; // only the first existing path per family
+            }
+        }
+    }
+
+    // KDE fallback.
+    let kde_path = home.join(".config/kdeglobals");
+    if kde_path.is_file() {
+        out.push(WallpaperSourceEntry {
+            id: "kde".to_string(),
+            label: "KDE".to_string(),
+            path: kde_path.to_string_lossy().into_owned(),
+            mtime: wallpaper_mtime(&kde_path),
+            kind: SourceKind::Kde,
+        });
+    }
+
+    out
+}
+
+/// Load and normalize the colors for a single source entry.
+fn load_source(entry: &WallpaperSourceEntry) -> Option<String> {
+    match &entry.kind {
+        SourceKind::JsonFile => {
+            let path = Path::new(&entry.path);
+            let raw_content = fs::read_to_string(path).ok()?;
+            let is_object = serde_json::from_str::<serde_json::Value>(&raw_content)
+                .ok()
+                .map(|v| v.is_object() && v.as_object().map(|o| !o.is_empty()).unwrap_or(false))
+                .unwrap_or(false);
+            if !is_object {
+                return None;
+            }
+            Some(
+                normalize_caelestia_scheme(&raw_content)
+                    .unwrap_or_else(|| normalize_wallpaper_colors(&raw_content)),
+            )
+        }
+        SourceKind::Kde => kde_accent_palette(),
+    }
+}
+
+/// Returns (source_path, content, mtime_secs) for the first readable palette source.
+pub fn read_wallpaper_colors_source() -> Option<(String, String, u64)> {
+    read_wallpaper_colors_source_for("auto")
+}
+
+/// Returns (source_path, content, mtime_secs) for `preferred`, falling back to
+/// the first available source when it is missing or `preferred` is "auto"/empty.
+pub fn read_wallpaper_colors_source_for(preferred: &str) -> Option<(String, String, u64)> {
+    let home_string = std::env::var("HOME").unwrap_or_default();
+    let home = Path::new(&home_string);
+    let sources = wallpaper_color_sources(home);
+    if sources.is_empty() {
+        return None;
+    }
+    let preferred = preferred.trim();
+    let want_auto = preferred.is_empty() || preferred == "auto";
+
+    // Order candidates so a named provider is tried first, then every source
+    // in preference order as a graceful fallback.
+    let mut candidates: Vec<&WallpaperSourceEntry> = Vec::new();
+    if !want_auto {
+        if let Some(chosen) = sources.iter().find(|s| s.id == preferred) {
+            candidates.push(chosen);
+        }
+    }
+    candidates.extend(sources.iter());
+
+    for entry in candidates {
+        if let Some(content) = load_source(entry) {
+            return Some((entry.path.clone(), content, entry.mtime));
+        }
     }
     None
+}
+
+/// JSON array of `{ id, label, path }` for every detected wallpaper palette source.
+pub fn wallpaper_color_sources_json() -> String {
+    let home_string = std::env::var("HOME").unwrap_or_default();
+    let home = Path::new(&home_string);
+    let sources = wallpaper_color_sources(home);
+    let arr: Vec<serde_json::Value> = sources
+        .into_iter()
+        .map(|s| serde_json::json!({ "id": s.id, "label": s.label, "path": s.path }))
+        .collect();
+    serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
 }
 
 pub fn read_wallpaper_colors() -> String {
@@ -985,5 +1268,67 @@ mod tests {
         assert!(val.get("light").is_some());
         assert_eq!(val["dark"]["background"], "#1b1923");
         assert!(val["light"]["surface_container_lowest"] == "#ffffff");
+    }
+
+    #[test]
+    fn normalizes_caelestia_scheme() {
+        let input = r##"{
+            "colours": {
+                "surfaceContainer": "#202020",
+                "surfaceContainerLowest": "#101010",
+                "primary": "#aabbcc"
+            }
+        }"##;
+        let normalized =
+            normalize_caelestia_scheme(input).expect("Caelestia scheme should be recognized");
+        let val: serde_json::Value = serde_json::from_str(&normalized).expect("valid json");
+        assert_eq!(val["dark"]["primary"], "#aabbcc");
+        assert!(val.get("light").is_some());
+    }
+
+    #[test]
+    fn reads_kde_globals_accent_palette() {
+        let content = "[General]\nAccentColor=65,105,225\n[Colors:Window]\nBackgroundNormal=20,20,20\nForegroundNormal=240,240,240\n";
+        let normalized = normalize_kde_globals(content).expect("KDE accent color should load");
+        let val: serde_json::Value = serde_json::from_str(&normalized).expect("valid json");
+        assert_eq!(val["dark"]["primary"], "#4169e1");
+    }
+
+    #[test]
+    fn discovers_generated_palette_json_and_kde_globals() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!(
+            "loaf-theme-sources-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir(&home).expect("create temporary home");
+
+        for rel in [
+            ".local/state/caelestia/scheme.json",
+            ".cache/wallust/colors.json",
+            ".cache/hellwal/colors.json",
+            ".cache/matugen/colors.json",
+        ] {
+            let path = home.join(rel);
+            fs::create_dir_all(path.parent().expect("palette parent"))
+                .expect("create palette directory");
+            fs::write(path, r##"{"primary":"#123456"}"##).expect("write palette");
+        }
+        let kdeglobals = home.join(".config/kdeglobals");
+        fs::create_dir_all(kdeglobals.parent().expect("KDE parent")).expect("create KDE directory");
+        fs::write(&kdeglobals, "[General]\nAccentColor=65,105,225\n").expect("write KDE globals");
+
+        let sources = wallpaper_color_sources(&home);
+        for id in ["caelestia", "wallust", "hellwal", "matugen", "kde"] {
+            assert!(
+                sources.iter().any(|source| source.id == id),
+                "missing source: {id}"
+            );
+        }
+
+        fs::remove_dir_all(home).expect("remove temporary home");
     }
 }

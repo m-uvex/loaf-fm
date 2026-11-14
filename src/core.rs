@@ -88,6 +88,8 @@ pub mod qobject {
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
         #[qinvokable]
+        fn wallpaperPaletteSourcesJson(self: &LoafCore) -> QString;
+        #[qinvokable]
         fn resolve_icon(self: &LoafCore, theme: &QString, name: &QString) -> QString;
         #[qinvokable]
         fn icon_themes_json(self: &LoafCore) -> QString;
@@ -479,7 +481,6 @@ pub struct CoreRust {
     drive_generation: Arc<AtomicU64>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
-    color_watcher: Option<watcher::DirWatcher>,
 }
 
 impl Default for CoreRust {
@@ -518,7 +519,6 @@ impl Default for CoreRust {
             drive_generation: Arc::new(AtomicU64::new(0)),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
-            color_watcher: None,
         }
     }
 }
@@ -796,23 +796,6 @@ fn secret_get(key: &str) -> String {
     }
 }
 
-/// Wallpaper color files live in these folders; watched for changes.
-fn wallpaper_dirs() -> Vec<PathBuf> {
-    let h = util::home();
-    [
-        ".local/state/quickshell/user/generated",
-        ".cache/wal",
-        ".cache/matugen",
-        ".config/matugen",
-        ".cache/DankMaterialShell",
-        ".cache",
-    ]
-    .iter()
-    .map(|d| h.join(d))
-    .filter(|d| d.is_dir())
-    .collect()
-}
-
 impl qobject::LoafCore {
     fn publish_ops(mut self: Pin<&mut Self>) {
         let list: Vec<serde_json::Value> = self
@@ -1022,7 +1005,8 @@ impl qobject::LoafCore {
 
     pub fn reload_wallpaper_colors(mut self: Pin<&mut Self>) -> bool {
         icons::reload_system_theme();
-        let Some((_, content, _)) = theme::read_wallpaper_colors_source() else {
+        let preferred = state::get("wallpaperPaletteSource").unwrap_or_default();
+        let Some((_, content, _)) = theme::read_wallpaper_colors_source_for(&preferred) else {
             return false;
         };
         if content == self.wallpaper_colors_json().to_string() {
@@ -1030,6 +1014,11 @@ impl qobject::LoafCore {
         }
         self.as_mut().set_wallpaper_colors_json(q(&content));
         true
+    }
+
+    #[allow(non_snake_case)]
+    pub fn wallpaperPaletteSourcesJson(&self) -> QString {
+        q(&theme::wallpaper_color_sources_json())
     }
 
     pub fn resolve_icon(&self, theme_name: &QString, name: &QString) -> QString {
@@ -3540,23 +3529,6 @@ impl cxx_qt::Initialize for qobject::LoafCore {
         // Populate the sidebar on a fresh launch, before the first hotplug or
         // mount-table event. Discovery runs off the GUI thread.
         self.as_mut().load_drives();
-        // Follow wallpaper palette changes without polling.
-        let t2 = self.qt_thread();
-        let cw = watcher::DirWatcher::new(move || {
-            let _ = t2.queue(|core| {
-                core.reload_wallpaper_colors();
-            });
-        });
-        if let Some(w) = cw.as_ref() {
-            if let Some(dir) = theme::read_wallpaper_colors_source()
-                .and_then(|(p, _, _)| Path::new(&p).parent().map(|x| x.to_path_buf()))
-                .or_else(|| wallpaper_dirs().into_iter().next())
-            {
-                w.watch(&dir);
-            }
-        }
-        self.as_mut().rust_mut().color_watcher = cw;
-
         // Monitor real-time system color-scheme changes (desktop portal & gsettings)
         let t_portal = self.qt_thread();
         std::thread::Builder::new()
