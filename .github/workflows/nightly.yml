@@ -172,15 +172,16 @@ jobs:
           draft: false
           prerelease: true
           make_latest: false
+          # Each asset must match exactly one glob. Overlapping patterns (e.g.
+          # `loaf_nightly*` and `loaf_*.deb`) produced duplicate upload tasks that
+          # raced on the same asset id, so the second delete returned 404.
           files: |
-            packaging/dist/loaf_nightly*
-            packaging/dist/loaf-nightly*
-            packaging/dist/Loaf-nightly*
             packaging/dist/loaf_*.deb
             packaging/dist/loaf-*.rpm
             packaging/dist/loaf-*.pkg.tar.zst
             packaging/dist/loaf-*.tar.gz
             packaging/dist/loaf-v*-linux-x86_64
+            packaging/dist/loaf-nightly-linux-x86_64
             packaging/dist/Loaf-*.AppImage
             packaging/dist/SHA256SUMS
         env:
