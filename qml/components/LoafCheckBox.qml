@@ -15,7 +15,7 @@ CheckBox {
         y: (control.height - height) / 2
         radius: 5
         color: control.checked ? theme.primary : "transparent"
-        border.color: control.checked ? theme.primary : theme.outline
+        border.color: control.checked ? theme.primary : theme.outlineAlpha(theme.outline)
         border.width: 2
         opacity: control.enabled ? 1.0 : 0.45
         LoafIcon {

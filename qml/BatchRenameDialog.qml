@@ -155,7 +155,7 @@ LoafDialog {
                 font.pixelSize: theme.fs(12)
                 elide: Text.ElideMiddle
             }
-            LoafIcon { name: "arrow-right"; size: 12; color: theme.outline }
+            LoafIcon { name: "arrow-right"; size: 12; color: theme.outlineAlpha(theme.outline) }
             Text {
                 Layout.fillWidth: true
                 text: modelData.name

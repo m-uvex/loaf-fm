@@ -16,6 +16,7 @@ ApplicationWindow {
         : activeView === "pc" ? (core.pc_name || core.hostname || qsTr("This PC"))
         : (engine.is_searching_everywhere ? qsTr("Search") : engine.current_dir_name))
     color: theme.windowBackground
+    font.family: theme.defaultFontFamily
 
     // Portal activation (--portal) starts without a main window; it shows
     // up when a normal open request arrives.
@@ -257,6 +258,31 @@ ApplicationWindow {
         function onOpenRequested(paths, mode) { window.handleOpenRequest(paths, mode); }
         function onPickerRequested(handle, spec) { window.openPicker(handle, spec); }
         function onPickerDismissed(handle) { window.closePicker(handle); }
+        function onCtrlScroll(delta) {
+            if (window.activeView === "files")
+                theme.stepZoom(delta);
+        }
+        function onSpacePressed() {
+            if (searchInput.activeFocus || window.isEditingPath)
+                return;
+            if (!quickLook.visible && window.gridKeyboardReady) {
+                window.spaceHeldForQuickLook = true;
+                window.toggleQuickLook();
+            } else if (quickLook.visible) {
+                window.spaceHeldForQuickLook = false;
+                quickLook.close();
+            }
+        }
+        // Tap (short press): opens and stays. Hold: closes on release.
+        // A press shorter than the hold threshold is a toggle, not a hold.
+        function onSpaceReleased(heldDuration) {
+            if (!quickLook.visible || !window.spaceHeldForQuickLook)
+                return;
+            if (heldDuration >= 400) {
+                window.spaceHeldForQuickLook = false;
+                quickLook.close();
+            }
+        }
     }
 
     // Active portal picker windows keyed by D-Bus handle.
@@ -439,6 +465,8 @@ ApplicationWindow {
         if (path.indexOf("mtp:") === 0) core.preview_mtp(path);
         else quickLook.showFor(path);
     }
+
+    property bool spaceHeldForQuickLook: false
 
     function toggleQuickLook() {
         if (quickLook.visible) {
@@ -1079,7 +1107,8 @@ ApplicationWindow {
     function startEditingPath() {
         pathInput.text = window.activeView === "pc" ? "pc://"
             : (window.activeView === "settings" ? window.settingsUrl()
-            : ((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : ""));
+            : ((engine.location_kind === "dir" || engine.location_kind === "mtp" || engine.location_kind === "archive")
+                ? engine.current_path : ""));
         isEditingPath = true;
         pathInput.forceActiveFocus();
         pathInput.selectAll();
@@ -1105,7 +1134,8 @@ ApplicationWindow {
                 settingsLoader.item.activeTab = window.settingsTab;
         } else {
             showFiles();
-            engine.set_path(raw);
+            if (!engine.set_path(raw))
+                window.toast("error", qsTr("Cannot navigate to “%1”").arg(raw));
         }
         globalKeyHandler.forceActiveFocus();
     }
@@ -1140,7 +1170,12 @@ ApplicationWindow {
                 id: navChip
                 Layout.preferredHeight: 42
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
+                // Ruleset: every floating pill carries a 1px outlineVariant
+                // border at rest; focus/active upgrades to 2px primary.
+                border.width: 1
+                border.color: theme.outlineAlpha(theme.outlineVariant)
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 readonly property bool canBack: engine.can_go_back || window.isAuxView || engine.is_searching_everywhere
                 readonly property bool canForward: engine.can_go_forward && !window.isAuxView && !engine.is_searching_everywhere
                 readonly property bool showBack: theme.toolbarOperations !== "hidden"
@@ -1189,7 +1224,10 @@ ApplicationWindow {
                 Layout.preferredWidth: (theme.showNewTabButton && theme.showNewWindowButton) ? 82 : 44
                 Layout.minimumWidth: Layout.preferredWidth
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: theme.outlineAlpha(theme.outlineVariant)
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -1228,13 +1266,32 @@ ApplicationWindow {
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 42
                 radius: theme.radiusFull
-                color: window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer
+                color: theme.backdropSurface(window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer)
+                border.width: window.isEditingPath ? 2 : 1
+                border.color: window.isEditingPath ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                 clip: true
 
                 MouseArea {
+                    id: pathBarMouse
                     anchors.fill: parent
+                    enabled: !window.isEditingPath
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: theme.pathBarMode === "text" ? Qt.IBeamCursor : Qt.ArrowCursor
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.RightButton) {
+                            if (engine.location_kind === "dir") {
+                                var pt = mapToItem(window.contentItem, mouse.x, mouse.y);
+                                crumbMenu.showFor(engine.current_path, pt.x, pt.y);
+                            }
+                        } else if (theme.pathBarMode === "text") {
+                            window.startEditingPath();
+                        } else {
+                            window.defocusInputs();
+                        }
+                    }
                     onDoubleClicked: window.startEditingPath()
-                    onClicked: window.defocusInputs()
                 }
 
                 RowLayout {
@@ -1242,12 +1299,21 @@ ApplicationWindow {
                     anchors.leftMargin: 14
                     anchors.rightMargin: 6
                     spacing: 8
-                    visible: window.isEditingPath || (window.activeView === "files" && theme.pathBarMode === "text")
+                    visible: window.isEditingPath || theme.pathBarMode === "text"
 
-                    LoafIcon { name: "folder"; size: 16; color: theme.primary }
+                    LoafIcon {
+                        name: window.activeView === "pc"
+                            ? (core.device_type === "laptop" ? "laptop" : "desktop")
+                            : (window.activeView === "settings"
+                                ? "gear"
+                                : (engine.location_kind === "search" ? "magnifying-glass" : "folder"))
+                        size: 16
+                        color: theme.primary
+                    }
                     TextInput {
                         id: pathInput
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         visible: window.isEditingPath
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
@@ -1268,16 +1334,27 @@ ApplicationWindow {
                             }
                             event.accepted = true;
                         }
-                        onActiveFocusChanged: if (!activeFocus && window.isEditingPath) window.isEditingPath = false
+                        onActiveFocusChanged: {
+                            if (!activeFocus && window.isEditingPath) {
+                                Qt.callLater(function() {
+                                    if (window.isEditingPath && !pathInput.activeFocus) {
+                                        window.isEditingPath = false;
+                                    }
+                                });
+                            }
+                        }
                     }
                     // Read-only path mirror for "text only" mode.
                     Text {
                         visible: !window.isEditingPath
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         text: window.activeView === "pc"
                             ? "pc://"
-                            : (engine.location_kind === "dir" || engine.location_kind === "archive" || engine.location_kind === "mtp"
-                                ? engine.current_path : engine.location_kind + "://")
+                            : (window.activeView === "settings"
+                                ? window.settingsUrl()
+                                : ((engine.location_kind === "dir" || engine.location_kind === "archive" || engine.location_kind === "mtp")
+                                    ? engine.current_path : engine.location_kind + "://"))
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
                         font.family: "monospace"
@@ -1342,7 +1419,7 @@ ApplicationWindow {
                                 radius: theme.radiusFull
                                 color: chip.dropHover ? theme.primaryContainer
                                     : (crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay))
-                                border.color: chip.dropHover ? theme.primary : (crumbDelegate.modelData.is_forward ? theme.outline : "transparent")
+                                border.color: chip.dropHover ? theme.primary : (crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent")
                                 border.width: (chip.dropHover || crumbDelegate.modelData.is_forward) ? 1 : 0
                                 opacity: (chip.dropHover || chip.isCurrent || crumbDelegate.modelData.is_forward || chipMouse.containsMouse) ? 1.0 : 0.0
                                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
@@ -1420,7 +1497,7 @@ ApplicationWindow {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -1431,7 +1508,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     spacing: 6
-                    visible: window.activeView !== "files" && !window.isEditingPath
+                    visible: window.activeView !== "files" && !window.isEditingPath && theme.pathBarMode !== "text"
 
                     RowLayout {
                         visible: window.activeView === "settings"
@@ -1447,7 +1524,7 @@ ApplicationWindow {
                         visible: window.activeView === "settings"
                         name: "caret-right"
                         size: 11
-                        color: theme.outline
+                        color: theme.outlineAlpha(theme.outline)
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Rectangle {
@@ -1490,9 +1567,9 @@ ApplicationWindow {
                 Layout.minimumWidth: window.width < 760 ? 80 : 120
                 Layout.maximumWidth: searchBar.Layout.preferredWidth
                 radius: theme.radiusFull
-                color: searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer
-                border.width: searchInput.activeFocus ? 1.5 : 0
-                border.color: theme.primary
+                color: theme.backdropSurface(searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
+                border.width: searchInput.activeFocus ? 2 : 1
+                border.color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
                 Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1508,7 +1585,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: engine.searching ? "hourglass" : "magnifying-glass"
                         size: 16
-                        color: searchInput.activeFocus ? theme.primary : theme.outline
+                        color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outline)
                     }
 
                     TextInput {
@@ -1525,7 +1602,7 @@ ApplicationWindow {
                         Text {
                             text: window.activeView === "settings" ? qsTr("Search settings…")
                                 : (engine.is_searching_everywhere ? qsTr("Search…") : qsTr("Filter this folder…"))
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(13)
                             visible: !searchInput.text && !searchInput.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -1624,7 +1701,9 @@ ApplicationWindow {
                 Layout.preferredWidth: viewRow.implicitWidth + 20
                 Layout.minimumWidth: viewRow.implicitWidth + 20
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 RowLayout {
@@ -1667,7 +1746,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             spacing: 5
                             Text { visible: window.width >= 900; text: qsTr("View"); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outline }
+                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outlineAlpha(theme.outline) }
                         }
 
                         MouseArea {
@@ -1688,12 +1767,50 @@ ApplicationWindow {
                 }
             }
 
-            LoafButton {
+            Rectangle {
+                id: mainEmptyTrashChip
                 visible: window.activeView === "files" && engine.location_kind === "trash" && engine.item_count > 0
-                text: window.width < 900 ? "" : qsTr("Empty Trash")
-                icon: "trash"
-                variant: "danger"
-                onClicked: window.confirmEmptyTrash()
+                Layout.preferredHeight: 42
+                Layout.preferredWidth: emptyTrashRow.implicitWidth + 24
+                Layout.minimumWidth: Layout.preferredWidth
+                radius: theme.radiusFull
+                color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
+                clip: true
+
+                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+
+                RowLayout {
+                    id: emptyTrashRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    LoafIcon {
+                        name: "trash"
+                        size: 16
+                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                    }
+
+                    Text {
+                        visible: window.width >= 900
+                        text: qsTr("Empty Trash")
+                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMain
+                        font.pixelSize: theme.fs(13)
+                        font.bold: true
+                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                    }
+                }
+
+                MouseArea {
+                    id: emptyTrashMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: window.confirmEmptyTrash()
+                }
             }
         }
         RowLayout {
@@ -1851,8 +1968,11 @@ ApplicationWindow {
                             : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
                         height: 34
                         radius: theme.radiusFull
-                        color: current ? theme.secondaryContainer : (tabMouse.containsMouse ? theme.hoverOverlay : theme.surfaceContainer)
-                        Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                        border.width: 1
+                        border.color: current ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
+                        Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
+                        color: current ? theme.backdropSurface(theme.secondaryContainer) : (tabMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer))
+                        Behavior on width { enabled: theme.animate; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
                         MouseArea {
@@ -1901,6 +2021,8 @@ ApplicationWindow {
                                     color: tabDelegate.current ? theme.secondaryContainerFg : theme.textMain
                                     font.pixelSize: theme.fs(12)
                                     font.bold: tabDelegate.current && (!tabDelegate.isSplit || window.activePane === pane0)
+                                    font.weight: theme.fw(tabDelegate.current && (!tabDelegate.isSplit || window.activePane === pane0))
+                                    font.family: theme.fontFamily
                                     elide: Text.ElideRight
                                 }
                             }
@@ -1908,7 +2030,7 @@ ApplicationWindow {
                                 visible: tabDelegate.isSplit
                                 width: 1
                                 height: 16
-                                color: tabDelegate.current ? theme.secondaryContainerFg : theme.outlineVariant
+                                color: tabDelegate.current ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outlineVariant)
                                 opacity: 0.35
                             }
                             Item {
@@ -1923,6 +2045,8 @@ ApplicationWindow {
                                     color: tabDelegate.current ? theme.secondaryContainerFg : theme.textMain
                                     font.pixelSize: theme.fs(12)
                                     font.bold: tabDelegate.current && tabDelegate.isSplit && pane1Loader.item && window.activePane === pane1Loader.item
+                                    font.weight: theme.fw(tabDelegate.current && tabDelegate.isSplit && pane1Loader.item && window.activePane === pane1Loader.item)
+                                    font.family: theme.fontFamily
                                     elide: Text.ElideRight
                                 }
                             }
@@ -1973,7 +2097,7 @@ ApplicationWindow {
                             color: theme.backdropSurface(theme.surfaceContainerLow)
                             clip: true
                             border.width: (window.splitView && window.activePane === pane0) ? 2 : (window.keyboardNavActive ? 2 : 1)
-                            border.color: (window.splitView && window.activePane === pane0) ? theme.primary : (window.keyboardNavActive ? theme.primary : theme.outlineVariant)
+                            border.color: (window.splitView && window.activePane === pane0) ? theme.primary : (window.keyboardNavActive ? theme.primary : theme.outlineAlpha(theme.outlineVariant))
                             Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
 
@@ -1999,7 +2123,7 @@ ApplicationWindow {
                             color: theme.backdropSurface(theme.surfaceContainerLow)
                             clip: true
                             border.width: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? 2 : 1
-                            border.color: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? theme.primary : theme.outlineVariant
+                            border.color: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                             Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
 
@@ -2391,6 +2515,12 @@ ApplicationWindow {
         }
 
         var inArchive = kind === "archive";
+        var preloadedOpenData = null;
+        if (!item.is_dir && !inArchive) {
+            Qt.callLater(function() {
+                preloadedOpenData = openWithData(paths);
+            });
+        }
         m.push({ text: qsTr("Open"), icon: "arrow-square-out", itemKey: "open", action: function() { pane.openSelected(); } });
         if (item.is_dir && !inArchive)
             m.push({ text: qsTr("Open in New Tab"), icon: "tabs", itemKey: "new_tab", action: function() { for (var i = 0; i < paths.length; ++i) window.newTab(paths[i]); } });
@@ -2402,13 +2532,24 @@ ApplicationWindow {
                 pane.pendingSelect = [target];
             } });
         if (!item.is_dir && !inArchive) {
-            var openData = openWithData(paths);
-            var openSub = openWithMenu(paths, openData);
-            if (openSub.length > 0)
-                m.push({ text: qsTr("Open With"), icon: "app-window", itemKey: "open_with", submenu: openSub });
-            var defSub = setDefaultMenu(paths, openData);
-            if (defSub.length > 0)
-                m.push({ text: qsTr("Set Default Application"), icon: "check-square", itemKey: "set_default", submenu: defSub });
+            m.push({
+                text: qsTr("Open With"),
+                icon: "app-window",
+                itemKey: "open_with",
+                submenu: function() {
+                    var openData = preloadedOpenData || openWithData(paths);
+                    return openWithMenu(paths, openData);
+                }
+            });
+            m.push({
+                text: qsTr("Set Default Application"),
+                icon: "check-square",
+                itemKey: "set_default",
+                submenu: function() {
+                    var openData = preloadedOpenData || openWithData(paths);
+                    return setDefaultMenu(paths, openData);
+                }
+            });
             if (core.is_archive_file(item.path)) {
                 m.push({ text: qsTr("Browse Archive"), icon: "folder-open", itemKey: "browse_archive", action: function() { pane.engine.set_path("archive://" + item.path + "#"); } });
                 m.push({ text: qsTr("Extract Here"), icon: "archive", itemKey: "extract", action: function() { core.extract(item.path, false, ""); } });
@@ -2696,7 +2837,7 @@ ApplicationWindow {
             }
         }
 
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
 
         Text {
             Layout.leftMargin: 8
@@ -2951,7 +3092,7 @@ ApplicationWindow {
                     Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
                     LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
                 LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
                 LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
@@ -2966,7 +3107,7 @@ ApplicationWindow {
                     value: engine.group_ascending ? "asc" : "desc"
                     onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
                 LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
                 LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
@@ -2987,12 +3128,14 @@ ApplicationWindow {
                     value: engine.folder_position
                     onSelected: function(v) { engine.change_folder_position(v); }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
                 LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
             }
         }
     }
+    // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
+    LoafTooltip { id: tooltip }
     QuickLook { id: quickLook }
     PropertiesDialog { id: propsDialog }
     BatchRenameDialog { id: batchRename }
@@ -3424,7 +3567,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
+                            color: dragHandleArea.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
                         }
                         MouseArea {
                             id: dragHandleArea
@@ -3452,7 +3595,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
                         size: 16
-                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
+                        color: placeRow.modelData.hidden ? theme.outlineAlpha(theme.outline) : theme.primary
                     }
 
                     Text {
@@ -3484,7 +3627,7 @@ ApplicationWindow {
                 }
             }
         }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.outlineAlpha(theme.separator) }
         LoafSwitch {
             label: qsTr("Hide Trash when empty (shows when dragging)")
             checked: theme.hideTrashWhenEmpty
@@ -3630,7 +3773,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: actionDragHandle.containsMouse ? theme.primary : theme.outline
+                            color: actionDragHandle.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
                         }
                         MouseArea {
                             id: actionDragHandle
@@ -3652,7 +3795,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: actionRow.modelData.icon || "circle"
                         size: 16
-                        color: actionRow.isHidden ? theme.outline : theme.primary
+                        color: actionRow.isHidden ? theme.outlineAlpha(theme.outline) : theme.primary
                     }
 
                     Text {

@@ -23,7 +23,7 @@ Rectangle {
     radius: theme.radiusL
     color: theme.surfaceContainer
     border.width: 1
-    border.color: theme.borderSubtle
+    border.color: theme.outlineAlpha(theme.borderSubtle)
     implicitHeight: cardLayout.implicitHeight + 2 * padding
     implicitWidth: 200
 

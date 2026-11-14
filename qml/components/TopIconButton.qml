@@ -57,10 +57,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (button.accessibleName.length > 0 && typeof tooltip !== "undefined")
+            tooltip.show(button, button.accessibleName)
+        onExited: if (typeof tooltip !== "undefined") tooltip.hide(button)
         onClicked: button.clicked()
     }
-
-    ToolTip.visible: mouseArea.containsMouse && button.accessibleName.length > 0
-    ToolTip.text: button.accessibleName
-    ToolTip.delay: 600
 }

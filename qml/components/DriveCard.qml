@@ -115,7 +115,7 @@ Item {
         readonly property real r: theme.radiusXl
 
         ShapePath {
-            strokeColor: theme.outlineVariant
+            strokeColor: theme.outlineAlpha(theme.outlineVariant)
             strokeWidth: 1
             fillColor: "transparent"
             strokeStyle: ShapePath.DashLine

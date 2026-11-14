@@ -158,6 +158,7 @@ fn main() {
             .qml_file("qml/components/DriveCard.qml")
             .qml_file("qml/components/RemoteCard.qml")
             .qml_file("qml/components/TopIconButton.qml")
+            .qml_file("qml/components/LoafTooltip.qml")
             .qml_file("qml/settings/SettingDivider.qml")
             .qml_file("qml/settings/SettingRow.qml")
             .qml_file("qml/settings/SettingCard.qml")

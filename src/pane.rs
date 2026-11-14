@@ -117,7 +117,7 @@ pub mod qobject {
 
     unsafe extern "RustQt" {
         #[qinvokable]
-        fn set_path(self: Pin<&mut LoafEngine>, path: &QString);
+        fn set_path(self: Pin<&mut LoafEngine>, path: &QString) -> bool;
         #[qinvokable]
         fn navigate_up(self: Pin<&mut LoafEngine>);
         #[qinvokable]
@@ -1031,13 +1031,32 @@ impl qobject::LoafEngine {
         });
     }
 
-    pub fn set_path(self: Pin<&mut Self>, path: &QString) {
-        if let Some(loc) = Loc::parse(&path.to_string()) {
-            if loc == self.loc && !matches!(loc, Loc::Search { .. }) {
-                return self.refresh();
-            }
-            self.go_to(loc, true);
+    pub fn set_path(self: Pin<&mut Self>, path: &QString) -> bool {
+        let p_str = path.to_string();
+        if p_str.trim().is_empty() {
+            return false;
         }
+        let loc = Loc::parse(&p_str).or_else(|| {
+            if let Loc::Dir(cur) = &self.loc {
+                let joined = cur.join(p_str.trim());
+                if let Ok(canon) = joined.canonicalize() {
+                    Loc::parse(&canon.to_string_lossy())
+                } else if joined.is_dir() {
+                    Some(Loc::Dir(joined))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        let Some(loc) = loc else { return false };
+        if loc == self.loc && !matches!(loc, Loc::Search { .. }) {
+            self.refresh();
+            return true;
+        }
+        self.go_to(loc, true);
+        true
     }
 
     pub fn navigate_up(self: Pin<&mut Self>) {
