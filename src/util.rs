@@ -48,7 +48,9 @@ pub fn which(name: &str) -> Option<PathBuf> {
     found
 }
 
-fn is_executable(p: &Path) -> bool {
+/// True when `p` is a regular file with any execute bit set. Symlinks follow
+/// their target; folders are never "executable" here.
+pub fn is_executable(p: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     std::fs::metadata(p)
         .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
@@ -197,6 +199,26 @@ mod tests {
         assert!(write_atomic(&target, b"content").is_ok());
         assert_eq!(std::fs::read(&target).unwrap(), b"content");
         let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn is_executable_checks_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = std::env::temp_dir().join(format!("loaf_util_exec_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let exe = tmp.join("prog");
+        std::fs::write(&exe, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(is_executable(&exe));
+        // Symlinks follow their target.
+        let link = tmp.join("link-to-prog");
+        std::os::unix::fs::symlink(&exe, &link).unwrap();
+        assert!(is_executable(&link));
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(!is_executable(&exe));
+        // Folders are never runnable.
+        assert!(!is_executable(&tmp));
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]

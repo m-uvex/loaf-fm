@@ -95,6 +95,8 @@ pub mod qobject {
         #[qinvokable]
         fn reload_wallpaper_colors(self: Pin<&mut LoafCore>) -> bool;
         #[qinvokable]
+        fn wallpaperPaletteSourcesJson(self: &LoafCore) -> QString;
+        #[qinvokable]
         fn resolve_icon(self: &LoafCore, theme: &QString, name: &QString) -> QString;
         #[qinvokable]
         fn icon_themes_json(self: &LoafCore) -> QString;
@@ -255,6 +257,9 @@ pub mod qobject {
         /// shared GTK bookmarks file) with the system's default handler.
         #[qinvokable]
         fn open_uri(self: Pin<&mut LoafCore>, uri: &QString);
+        /// Runs an executable file directly (context-menu "Run Executable").
+        #[qinvokable]
+        fn run_executable(self: Pin<&mut LoafCore>, path: &QString);
         #[qinvokable]
         fn quick_look(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -272,6 +277,9 @@ pub mod qobject {
         ) -> QString;
         #[qinvokable]
         fn is_archive_file(self: &LoafCore, path: &QString) -> bool;
+        /// True when the file can be executed directly (exec bit set).
+        #[qinvokable]
+        fn is_runnable(self: &LoafCore, path: &QString) -> bool;
         #[qinvokable]
         fn mime_type(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -491,7 +499,6 @@ pub struct CoreRust {
     drive_generation: Arc<AtomicU64>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
-    color_watcher: Option<watcher::DirWatcher>,
 }
 
 impl Default for CoreRust {
@@ -530,7 +537,6 @@ impl Default for CoreRust {
             drive_generation: Arc::new(AtomicU64::new(0)),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
-            color_watcher: None,
         }
     }
 }
@@ -811,23 +817,6 @@ fn secret_get(key: &str) -> String {
     }
 }
 
-/// Wallpaper color files live in these folders; watched for changes.
-fn wallpaper_dirs() -> Vec<PathBuf> {
-    let h = util::home();
-    [
-        ".local/state/quickshell/user/generated",
-        ".cache/wal",
-        ".cache/matugen",
-        ".config/matugen",
-        ".cache/DankMaterialShell",
-        ".cache",
-    ]
-    .iter()
-    .map(|d| h.join(d))
-    .filter(|d| d.is_dir())
-    .collect()
-}
-
 impl qobject::LoafCore {
     fn publish_ops(mut self: Pin<&mut Self>) {
         let list: Vec<serde_json::Value> = self
@@ -1063,7 +1052,8 @@ impl qobject::LoafCore {
 
     pub fn reload_wallpaper_colors(mut self: Pin<&mut Self>) -> bool {
         icons::reload_system_theme();
-        let Some((_, content, _)) = theme::read_wallpaper_colors_source() else {
+        let preferred = state::get("wallpaperPaletteSource").unwrap_or_default();
+        let Some((_, content, _)) = theme::read_wallpaper_colors_source_for(&preferred) else {
             return false;
         };
         if content == self.wallpaper_colors_json().to_string() {
@@ -1071,6 +1061,11 @@ impl qobject::LoafCore {
         }
         self.as_mut().set_wallpaper_colors_json(q(&content));
         true
+    }
+
+    #[allow(non_snake_case)]
+    pub fn wallpaperPaletteSourcesJson(&self) -> QString {
+        q(&theme::wallpaper_color_sources_json())
     }
 
     pub fn resolve_icon(&self, theme_name: &QString, name: &QString) -> QString {
@@ -2317,6 +2312,25 @@ impl qobject::LoafCore {
             );
         }
     }
+
+    /// Runs a file directly (context-menu "Run Executable"). Like launching
+    /// from a desktop icon: the child is detached, console output goes
+    /// nowhere, and the working directory is the file's folder.
+    pub fn run_executable(mut self: Pin<&mut Self>, path: &QString) {
+        let p = PathBuf::from(path.to_string());
+        let mut cmd = std::process::Command::new(&p);
+        if let Some(parent) = p.parent() {
+            if parent.is_dir() {
+                cmd.current_dir(parent);
+            }
+        }
+        if let Err(e) = util::spawn_detached(cmd) {
+            self.as_mut().notify(
+                q("error"),
+                q(&format!("Could not run “{}”: {}", file_name(&p), e)),
+            );
+        }
+    }
     pub fn preview_mtp(self: Pin<&mut Self>, path: &QString) {
         let path = path.to_string();
         let thread = self.qt_thread();
@@ -2392,6 +2406,13 @@ impl qobject::LoafCore {
 
     pub fn is_archive_file(&self, path: &QString) -> bool {
         archive::is_archive(Path::new(&path.to_string()))
+    }
+
+    /// True when the file itself can be executed (any execute bit set on a
+    /// regular file; symlinks follow their target). Drives the context-menu
+    /// "Run Executable" item.
+    pub fn is_runnable(&self, path: &QString) -> bool {
+        util::is_executable(Path::new(&path.to_string()))
     }
 
     pub fn mime_type(&self, path: &QString) -> QString {
@@ -3743,23 +3764,6 @@ impl cxx_qt::Initialize for qobject::LoafCore {
         // Populate the sidebar on a fresh launch, before the first hotplug or
         // mount-table event. Discovery runs off the GUI thread.
         self.as_mut().load_drives();
-        // Follow wallpaper palette changes without polling.
-        let t2 = self.qt_thread();
-        let cw = watcher::DirWatcher::new(move || {
-            let _ = t2.queue(|core| {
-                core.reload_wallpaper_colors();
-            });
-        });
-        if let Some(w) = cw.as_ref() {
-            if let Some(dir) = theme::read_wallpaper_colors_source()
-                .and_then(|(p, _, _)| Path::new(&p).parent().map(|x| x.to_path_buf()))
-                .or_else(|| wallpaper_dirs().into_iter().next())
-            {
-                w.watch(&dir);
-            }
-        }
-        self.as_mut().rust_mut().color_watcher = cw;
-
         // Monitor real-time system color-scheme changes (desktop portal & gsettings)
         let t_portal = self.qt_thread();
         std::thread::Builder::new()

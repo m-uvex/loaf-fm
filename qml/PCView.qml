@@ -11,9 +11,9 @@ import app.loaf
 Item {
     id: pcView
 
-    readonly property var knownSections: ["places", "frequent", "internal", "external", "network"]
+    readonly property var knownSections: ["places", "frequent", "internal", "external", "remotes", "network"]
 
-    property var sectionOrder: ["places", "frequent", "internal", "external", "network"]
+    property var sectionOrder: ["places", "frequent", "internal", "external", "remotes", "network"]
     property var sectionConfig: pcView.defaultConfig()
     property bool isCustomizing: false
 
@@ -31,6 +31,7 @@ Item {
             "frequent": { visible: true, view: "carousel" },
             "internal": { visible: true, view: "cards" },
             "external": { visible: true, view: "cards" },
+            "remotes": { visible: true, view: "grid" },
             "network": { visible: true, view: "grid" }
         };
     }
@@ -82,6 +83,8 @@ Item {
             return pcView.externalDrives.length > 0;
         if (secKey === "internal")
             return pcView.internalDrives.length > 0;
+        if (secKey === "remotes")
+            return pcView.remoteItems.length > 0;
         if (secKey === "network")
             return theme.smbAutoDiscovery && pcView.discoveredServers.length > 0;
         return true;
@@ -154,6 +157,57 @@ Item {
             return [];
         }
     }
+    readonly property var remoteItems: {
+        var out = [];
+        try {
+            var profiles = JSON.parse(core.network_profiles_json || "[]");
+            for (var i = 0; i < profiles.length; ++i) {
+                var p = profiles[i];
+                out.push({
+                    id: p.id,
+                    kind: "profile",
+                    protocol: p.protocol || "smb",
+                    name: p.label || p.name || p.server || qsTr("Network Drive"),
+                    server: p.server || "",
+                    share: p.share || "",
+                    username: p.username || "",
+                    domain: p.domain || "",
+                    port: p.port || 0,
+                    ssl: p.ssl !== false,
+                    connected: p.connected === true,
+                    path: p.path || "",
+                    icon: p.icon || (p.protocol === "webdav" ? "globe" : "network")
+                });
+            }
+        } catch (e) {}
+        try {
+            var places = JSON.parse(core.places_json || "[]");
+            for (var j = 0; j < places.length; ++j) {
+                var pl = places[j];
+                if (pl.kind !== "network" || pl.profile_id)
+                    continue;
+                out.push({
+                    id: pl.id,
+                    kind: "bookmark",
+                    protocol: "",
+                    name: pl.name || pl.path || qsTr("Remote URL"),
+                    server: "",
+                    share: "",
+                    username: "",
+                    domain: "",
+                    port: 0,
+                    ssl: false,
+                    connected: false,
+                    path: pl.path || "",
+                    icon: pl.icon || "globe"
+                });
+            }
+        } catch (e) {}
+        return out;
+    }
+    readonly property int connectedRemotes: pcView.remoteItems.filter(function (r) {
+        return r.connected === true;
+    }).length
 
     function serverSubtitle(entry) {
         var parts = [];
@@ -334,6 +388,75 @@ Item {
         driveMenu.openAt(sceneX, sceneY);
     }
 
+    function openRemote(r) {
+        if (!r)
+            return;
+        if (r.kind === "bookmark") {
+            if (r.path)
+                core.open_uri(r.path);
+            return;
+        }
+        if (r.connected && r.path) {
+            window.showFiles();
+            engine.set_path(r.path);
+            return;
+        }
+        core.connect_network(r.id, "", false);
+    }
+
+    function remoteMenuModel(r) {
+        var items = [];
+        if (!r)
+            return items;
+        if (r.kind === "bookmark") {
+            items.push({
+                "text": qsTr("Open"),
+                "icon": "folder-open",
+                "action": function () { pcView.openRemote(r); }
+            });
+            return items;
+        }
+        items.push({
+            "text": qsTr("Open"),
+            "icon": "folder-open",
+            "enabled": r.connected === true,
+            "action": function () { pcView.openRemote(r); }
+        });
+        if (!r.connected) {
+            items.push({
+                "text": qsTr("Connect"),
+                "icon": "plug",
+                "separatorBefore": true,
+                "action": function () { core.connect_network(r.id, "", false); }
+            });
+        } else {
+            items.push({
+                "text": qsTr("Disconnect"),
+                "icon": "plug-slash",
+                "separatorBefore": true,
+                "action": function () { core.disconnect_network(r.id); }
+            });
+        }
+        items.push({
+            "text": qsTr("Edit Remote…"),
+            "icon": "pencil-simple",
+            "separatorBefore": true,
+            "action": function () { window.openSmbEditor(r); }
+        });
+        items.push({
+            "text": qsTr("Remove Remote"),
+            "icon": "x",
+            "danger": true,
+            "action": function () { window.removeNetworkDrive(r.id, r.name); }
+        });
+        return items;
+    }
+
+    function openRemoteMenu(r, sceneX, sceneY) {
+        remoteMenu.model = pcView.remoteMenuModel(r);
+        remoteMenu.openAt(sceneX, sceneY);
+    }
+
     Component.onCompleted: {
         try {
             var order = core.get_setting("pcSectionOrder");
@@ -501,16 +624,22 @@ Item {
                         icon: sectionDelegate.secKey === "places" ? "folder"
                               : (sectionDelegate.secKey === "frequent" ? "clock"
                               : (sectionDelegate.secKey === "internal" ? "hard-drives"
-                              : (sectionDelegate.secKey === "external" ? "usb" : "network")))
+                              : (sectionDelegate.secKey === "external" ? "usb"
+                              : (sectionDelegate.secKey === "remotes" ? "plugs-connected" : "network"))))
                         title: sectionDelegate.secKey === "places" ? qsTr("Places")
                                : (sectionDelegate.secKey === "frequent" ? qsTr("Frequent")
                                : (sectionDelegate.secKey === "internal" ? qsTr("Internal Storage")
-                               : (sectionDelegate.secKey === "external" ? qsTr("External Storage") : qsTr("Network Shares"))))
+                               : (sectionDelegate.secKey === "external" ? qsTr("External Storage")
+                               : (sectionDelegate.secKey === "remotes" ? qsTr("Remotes") : qsTr("Network Shares")))))
                         subtitle: sectionDelegate.secKey === "external"
-                                  ? qsTr("%n drive(s) connected", "", pcView.externalDrives.length)
-                                  : (sectionDelegate.secKey === "network"
-                                     ? qsTr("%n server(s) found", "", pcView.discoveredServers.length)
-                                     : "")
+                                  ? theme.plural(pcView.externalDrives.length, qsTr("1 drive connected"), qsTr("%1 drives connected"))
+                                  : (sectionDelegate.secKey === "remotes"
+                                     ? (pcView.connectedRemotes > 0
+                                        ? qsTr("%1 connected · %2 total").arg(pcView.connectedRemotes).arg(pcView.remoteItems.length)
+                                        : theme.plural(pcView.remoteItems.length, qsTr("1 remote saved"), qsTr("%1 remotes saved")))
+                                     : (sectionDelegate.secKey === "network"
+                                        ? theme.plural(pcView.discoveredServers.length, qsTr("1 server found"), qsTr("%1 servers found"))
+                                        : ""))
                         LoafButton {
                             visible: sectionDelegate.secKey === "network" && !pcView.customizing
                             text: qsTr("Scan")
@@ -518,6 +647,13 @@ Item {
                             variant: "tonal"
                             enabled: core.smb_discovery_scanning !== true
                             onClicked: core.refresh_smb_discovery()
+                        }
+                        LoafButton {
+                            visible: sectionDelegate.secKey === "remotes" && !pcView.customizing
+                            text: qsTr("Add")
+                            icon: "plus"
+                            variant: "tonal"
+                            onClicked: window.openSmbEditor({})
                         }
                         LoafButton {
                             visible: pcView.customizing
@@ -914,6 +1050,25 @@ Item {
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
+                        spacing: 12
+                        visible: sectionDelegate.secVisible
+                                 && sectionDelegate.secKey === "remotes"
+                                 && pcView.remoteItems.length > 0
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: pcView.columnCount(340)
+                            columnSpacing: 12
+                            rowSpacing: 12
+
+                            Repeater {
+                                model: pcView.remoteItems
+                                delegate: remoteDelegate
+                            }
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: 10
                         visible: sectionDelegate.secVisible
                                  && sectionDelegate.secKey === "network"
@@ -1032,8 +1187,29 @@ Item {
             }
         }
     }
+    Component {
+        id: remoteDelegate
+
+        RemoteCard {
+            id: remoteCard
+            remote: modelData
+
+            onActivated: pcView.openRemote(remoteCard.remote)
+            onActionRequested: pcView.openRemote(remoteCard.remote)
+            onContextRequested: function (mx, my) {
+                var p = remoteCard.mapToItem(null, mx - remoteCard.x, my - remoteCard.y);
+                pcView.openRemoteMenu(remoteCard.remote, p.x, p.y);
+            }
+        }
+    }
     LoafMenu {
         id: driveMenu
+        parent: Overlay.overlay
+        model: []
+        menuMinWidth: 208
+    }
+    LoafMenu {
+        id: remoteMenu
         parent: Overlay.overlay
         model: []
         menuMinWidth: 208

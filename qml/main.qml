@@ -313,7 +313,9 @@ ApplicationWindow {
             core.open_item(item.path);
         } else if (pane.engine.location_kind === "trash") {
             quickLook.showFor(item.path);
-        } else if (theme.browseArchives && core.is_archive_file(item.path)) {
+        } else if (core.is_archive_file(item.path) && theme.archiveOpenAction === "extract") {
+            core.extract(item.path, true, "");
+        } else if (theme.browseArchives && theme.archiveOpenAction === "browse" && core.is_archive_file(item.path)) {
             pane.engine.set_path("archive://" + item.path + "#");
         } else {
             core.open_item(item.path);
@@ -781,19 +783,19 @@ ApplicationWindow {
         }
         globalKeyHandler.forceActiveFocus();
     }
-    Shortcut { sequences: [StandardKey.Undo]; enabled: core.can_undo && !window.anyModalOpen && !searchInput.activeFocus; onActivated: core.undo() }
-    Shortcut { sequences: ["Ctrl+Y", "Ctrl+Shift+Z"]; enabled: core.can_redo && !window.anyModalOpen && !searchInput.activeFocus; onActivated: core.redo() }
-    Shortcut { sequence: "Ctrl+C"; enabled: window.gridKeyboardReady; onActivated: window.copySelection(false) }
-    Shortcut { sequence: "Ctrl+X"; enabled: window.gridKeyboardReady; onActivated: window.copySelection(true) }
-    Shortcut { sequence: "Ctrl+V"; enabled: window.gridKeyboardReady && (engine.location_kind === "dir" || (engine.location_kind === "mtp" && !engine.read_only)); onActivated: window.pasteInto(engine.current_path) }
-    Shortcut { sequence: "Ctrl+A"; enabled: window.gridKeyboardReady; onActivated: window.activePane.selectAll() }
-    Shortcut { sequence: "Ctrl+Shift+I"; enabled: window.gridKeyboardReady; onActivated: window.activePane.invertSelection() }
-    Shortcut { sequence: "Ctrl+S"; enabled: window.gridKeyboardReady; onActivated: patternModal.openFor() }
-    Shortcut { sequence: "Ctrl+H"; onActivated: engine.toggle_show_hidden() }
-    Shortcut { sequences: ["Ctrl+L", "Alt+D"]; onActivated: window.startEditingPath() }
-    Shortcut { sequence: "Ctrl+F"; onActivated: { window.showFiles(); searchInput.forceActiveFocus(); searchInput.selectAll(); } }
+    Shortcut { sequence: theme.shortcutFor("undo"); enabled: core.can_undo && !window.anyModalOpen && !searchInput.activeFocus; onActivated: core.undo() }
+    Shortcut { sequences: [theme.shortcutFor("redo"), "Ctrl+Y"]; enabled: core.can_redo && !window.anyModalOpen && !searchInput.activeFocus; onActivated: core.redo() }
+    Shortcut { sequence: theme.shortcutFor("copy"); enabled: window.gridKeyboardReady; onActivated: window.copySelection(false) }
+    Shortcut { sequence: theme.shortcutFor("cut"); enabled: window.gridKeyboardReady; onActivated: window.copySelection(true) }
+    Shortcut { sequence: theme.shortcutFor("paste"); enabled: window.gridKeyboardReady && (engine.location_kind === "dir" || (engine.location_kind === "mtp" && !engine.read_only)); onActivated: window.pasteInto(engine.current_path) }
+    Shortcut { sequence: theme.shortcutFor("selectAll"); enabled: window.gridKeyboardReady; onActivated: window.activePane.selectAll() }
+    Shortcut { sequence: theme.shortcutFor("invertSelection"); enabled: window.gridKeyboardReady; onActivated: window.activePane.invertSelection() }
+    Shortcut { sequence: theme.shortcutFor("selectPattern"); enabled: window.gridKeyboardReady; onActivated: patternModal.openFor() }
+    Shortcut { sequence: theme.shortcutFor("toggleHidden"); onActivated: engine.toggle_show_hidden() }
+    Shortcut { sequences: [theme.shortcutFor("editPath"), "Alt+D"]; onActivated: window.startEditingPath() }
+    Shortcut { sequence: theme.shortcutFor("search"); onActivated: { window.showFiles(); searchInput.forceActiveFocus(); searchInput.selectAll(); } }
     Shortcut {
-        sequence: "F2"
+        sequence: theme.shortcutFor("rename")
         enabled: window.gridKeyboardReady && (engine.location_kind !== "mtp" || (!engine.read_only && window.selectedPaths().length === 1))
         onActivated: {
             if (window.selectedPaths().length > 1)
@@ -802,11 +804,11 @@ ApplicationWindow {
                 window.activePane.startRename();
         }
     }
-    Shortcut { sequence: "Space"; enabled: quickLook.visible || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
-    Shortcut { sequence: "Delete"; enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
-    Shortcut { sequence: "Shift+Delete"; enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
+    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: quickLook.visible || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
+    Shortcut { sequence: theme.shortcutFor("trash"); enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
+    Shortcut { sequence: theme.shortcutFor("deletePermanent"); enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
     Shortcut {
-        sequences: ["Alt+Left", StandardKey.Back]
+        sequences: [theme.shortcutFor("back"), StandardKey.Back]
         enabled: !window.anyModalOpen && (engine.can_go_back || window.isAuxView || engine.is_searching_everywhere)
         onActivated: {
             if (engine.is_searching_everywhere) {
@@ -820,38 +822,44 @@ ApplicationWindow {
         }
     }
     Shortcut {
-        sequences: ["Alt+Right", StandardKey.Forward]
+        sequences: [theme.shortcutFor("forward"), StandardKey.Forward]
         enabled: !window.anyModalOpen && engine.can_go_forward && !window.isAuxView && !engine.is_searching_everywhere
         onActivated: engine.go_forward()
     }
-    Shortcut { sequence: "Alt+Up"; onActivated: engine.navigate_up() }
-    Shortcut { sequence: "Alt+Home"; onActivated: { window.showFiles(); engine.set_path(core.user_dir("HOME")); } }
-    Shortcut { sequence: "Backspace"; enabled: window.gridKeyboardReady && engine.can_go_back; onActivated: engine.go_back() }
-    Shortcut { sequences: ["F5", "Ctrl+R"]; onActivated: engine.refresh() }
-    Shortcut { sequence: "Ctrl+T"; onActivated: window.newTab((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
-    Shortcut { sequence: "Ctrl+W"; onActivated: window.closeTab(window.currentTab) }
-    Shortcut { sequences: ["Ctrl+Tab", "Ctrl+PgDown"]; onActivated: window.switchTab((window.currentTab + 1) % window.tabs.length) }
-    Shortcut { sequences: ["Ctrl+Shift+Tab", "Ctrl+PgUp"]; onActivated: window.switchTab((window.currentTab + window.tabs.length - 1) % window.tabs.length) }
-    Shortcut { sequence: "Ctrl+N"; onActivated: core.open_new_window((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
-    Shortcut { sequence: "Ctrl+Shift+N"; enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
-    Shortcut { sequence: "F3"; onActivated: window.toggleSplit() }
-    Shortcut { sequence: "F9"; onActivated: sidebar.expanded = !sidebar.expanded }
-    Shortcut { sequences: ["Ctrl+=", "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
-    Shortcut { sequences: ["Ctrl+-", StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
-    Shortcut { sequence: "Ctrl+0"; onActivated: theme.zoomIndex = 2 }
-    Shortcut { sequence: "Ctrl+1"; onActivated: engine.set_view("grid") }
-    Shortcut { sequence: "Ctrl+2"; onActivated: engine.set_view("list") }
-    Shortcut { sequence: "Ctrl+D"; enabled: engine.location_kind === "dir"; onActivated: core.add_bookmark(engine.current_path) }
-    Shortcut { sequence: "Ctrl+Shift+C"; enabled: window.gridKeyboardReady; onActivated: window.copyPathOfSelection() }
+    Shortcut { sequence: theme.shortcutFor("up"); onActivated: engine.navigate_up() }
+    Shortcut { sequence: theme.shortcutFor("home"); onActivated: { window.showFiles(); engine.set_path(core.user_dir("HOME")); } }
+    Shortcut { sequence: theme.shortcutFor("backAlt"); enabled: window.gridKeyboardReady && engine.can_go_back; onActivated: engine.go_back() }
+    Shortcut { sequences: [theme.shortcutFor("refresh"), "Ctrl+R"]; onActivated: engine.refresh() }
+    Shortcut { sequence: theme.shortcutFor("newTab"); onActivated: window.newTab((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
+    Shortcut { sequence: theme.shortcutFor("closeTab"); onActivated: window.closeTab(window.currentTab) }
+    Shortcut { sequences: [theme.shortcutFor("nextTab"), "Ctrl+PgDown"]; onActivated: window.switchTab((window.currentTab + 1) % window.tabs.length) }
+    Shortcut { sequences: [theme.shortcutFor("prevTab"), "Ctrl+PgUp"]; onActivated: window.switchTab((window.currentTab + window.tabs.length - 1) % window.tabs.length) }
+    Shortcut { sequence: theme.shortcutFor("newWindow"); onActivated: core.open_new_window((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
+    Shortcut { sequence: theme.shortcutFor("newFolder"); enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
+    Shortcut { sequence: theme.shortcutFor("toggleSplit"); onActivated: window.toggleSplit() }
+    Shortcut { sequence: theme.shortcutFor("toggleSidebar"); onActivated: sidebar.expanded = !sidebar.expanded }
+    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
+    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
+    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: theme.zoomIndex = 2 }
+    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: engine.set_view("grid") }
+    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: engine.set_view("list") }
+    Shortcut { sequence: theme.shortcutFor("bookmark"); enabled: engine.location_kind === "dir"; onActivated: core.add_bookmark(engine.current_path) }
+    Shortcut { sequence: theme.shortcutFor("copyPath"); enabled: window.gridKeyboardReady; onActivated: window.copyPathOfSelection() }
     Shortcut {
-        sequences: ["Alt+Return", "Alt+Enter"]
+        sequences: [theme.shortcutFor("properties"), "Alt+Enter"]
         enabled: window.gridKeyboardReady
         onActivated: {
             var p = window.selectedPaths();
             window.showProperties(p.length > 0 ? p : [engine.current_path]);
         }
     }
-    Shortcut { sequence: "Ctrl+Q"; onActivated: window.close() }
+    Shortcut { sequence: theme.shortcutFor("quit"); onActivated: window.close() }
+    Shortcut { sequence: "Shift+Up"; enabled: window.gridKeyboardReady; onActivated: { window.keyboardNavActive = true; window.activePane.moveSelection(0, -1, true); } }
+    Shortcut { sequence: "Shift+Down"; enabled: window.gridKeyboardReady; onActivated: { window.keyboardNavActive = true; window.activePane.moveSelection(0, 1, true); } }
+    Shortcut { sequence: "Shift+Left"; enabled: window.gridKeyboardReady && !window.activePane.isList(); onActivated: { window.keyboardNavActive = true; window.activePane.moveSelection(-1, 0, true); } }
+    Shortcut { sequence: "Shift+Right"; enabled: window.gridKeyboardReady && !window.activePane.isList(); onActivated: { window.keyboardNavActive = true; window.activePane.moveSelection(1, 0, true); } }
+    Shortcut { sequence: "Shift+Home"; enabled: window.gridKeyboardReady; onActivated: { window.keyboardNavActive = true; window.activePane.selectRow(0, false, true); window.activePane.ensureVisible(0); } }
+    Shortcut { sequence: "Shift+End"; enabled: window.gridKeyboardReady; onActivated: { window.keyboardNavActive = true; window.activePane.selectRow(engine.item_count - 1, false, true); window.activePane.ensureVisible(engine.item_count - 1); } }
 
     // Mouse back / forward buttons.
     MouseArea {
@@ -2411,6 +2419,8 @@ ApplicationWindow {
         if (!inArchive) {
             var termDir = item.is_dir ? item.path : (item.parent_path || pane.engine.current_path);
             m.push({ text: qsTr("Open in Terminal"), icon: "terminal", itemKey: "terminal", action: function() { core.open_terminal(termDir); } });
+            if (single && !item.is_dir && core.is_runnable(item.path))
+                m.push({ text: qsTr("Run Executable"), icon: "play", itemKey: "run", action: function() { core.run_executable(item.path); } });
 
             m.push({ text: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X", itemKey: "cut", separatorBefore: true, action: function() { window.copySelection(true); } });
             m.push({ text: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C", itemKey: "copy", action: function() { window.copySelection(false); } });
@@ -3529,6 +3539,7 @@ ApplicationWindow {
             { id: "open_containing", name: qsTr("Open Containing Folder"), icon: "folder-open", shortcut: "" },
             { id: "quick_look", name: qsTr("Quick Look"), icon: "eye", shortcut: "Space" },
             { id: "terminal", name: qsTr("Open in Terminal"), icon: "terminal", shortcut: "" },
+            { id: "run", name: qsTr("Run Executable"), icon: "play", shortcut: "" },
             { id: "cut", name: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X" },
             { id: "copy", name: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C" },
             { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C" },

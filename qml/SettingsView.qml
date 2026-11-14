@@ -26,6 +26,7 @@ Item {
             t.push({ id: "share", index: 5, name: qsTr("Share"), iconName: "share-network", subtitle: qsTr("Cloudflare tunnel file hosting and active streams") });
         }
         t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("Saved network drives and auto discovery") });
+        t.push({ id: "shortcuts", index: 7, name: qsTr("Shortcuts"), iconName: "keyboard", subtitle: qsTr("Customize keyboard shortcuts across Loaf") });
         return t;
     }
 
@@ -48,6 +49,7 @@ Item {
         + tabExperimental.matchCount
         + (theme.shareViaLinkEnabled ? tabShare.matchCount : 0)
         + tabNetwork.matchCount
+        + tabShortcuts.matchCount
         + tabAbout.matchCount
 
     function getTabMatchCount(tabId) {
@@ -57,6 +59,7 @@ Item {
         if (tabId === "experimental") return tabExperimental.matchCount;
         if (tabId === "share") return tabShare.matchCount;
         if (tabId === "network") return tabNetwork.matchCount;
+        if (tabId === "shortcuts") return tabShortcuts.matchCount;
         if (tabId === "about") return tabAbout.matchCount;
         return 0;
     }
@@ -604,6 +607,21 @@ Item {
                         opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 1.0 : 0.0
                         transform: Translate {
                             y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 0 : 8
+                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Tab 7: Shortcuts
+                    ShortcutsTab {
+                        id: tabShortcuts
+                        searchQuery: settingsView.searchQuery
+                        visible: settingsView.searchQuery.length > 0
+                            ? (tabShortcuts.matchCount > 0)
+                            : (settingsView.activeTab === 7)
+                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 7) ? 1.0 : 0.0
+                        transform: Translate {
+                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 7) ? 0 : 8
                             Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         }
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }

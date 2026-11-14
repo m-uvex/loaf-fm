@@ -21,6 +21,7 @@ ColumnLayout {
     }
 
     readonly property bool matchOpenDirs: matches("open folders directories navigation split view new tab current view")
+    readonly property bool matchArchives: matches("open archives zip tar 7z enter extract browse default app")
     readonly property bool matchDrag: matches("left click drag action selection box pan scroll view rubberband marquee mouse")
     readonly property bool matchHidden: matches("show hidden files dot dotfiles folders")
     readonly property bool matchDisambig: matches("disambiguate duplicate names parent folder prefix search")
@@ -29,7 +30,7 @@ ColumnLayout {
     readonly property bool matchSession: matches("session restore tabs remember last folder window startup launch")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
-        ? ((matchOpenDirs ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
+        ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
             + (matchDisambig ? 1 : 0) + (matchRename ? 1 : 0) + (matchSearch ? 1 : 0) + (matchSession ? 1 : 0))
         : 0
 
@@ -38,7 +39,7 @@ ColumnLayout {
 
     // Category 1: Browsing & Navigation
     SettingCard {
-        visible: root.matchOpenDirs || root.matchDrag || root.matchHidden || root.matchDisambig
+        visible: root.matchOpenDirs || root.matchArchives || root.matchDrag || root.matchHidden || root.matchDisambig
         title: qsTr("Browsing & Navigation")
         subtitle: qsTr("Folder opening mode, drag actions, and file visibility")
         icon: "folder-notch-open"
@@ -62,7 +63,27 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchOpenDirs && (root.matchDrag || root.matchHidden || root.matchDisambig) }
+        SettingDivider { visible: root.matchOpenDirs && (root.matchArchives || root.matchDrag || root.matchHidden || root.matchDisambig) }
+
+        SettingRow {
+            visible: root.matchArchives
+            icon: "archive"
+            title: qsTr("Open archives on Enter")
+            subtitle: qsTr("Choose whether pressing Enter or double-clicking an archive browses, extracts, or opens it")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
+                options: [
+                    { value: "browse", label: qsTr("Browse"), icon: "folder-open", shortLabel: "Browse" },
+                    { value: "extract", label: qsTr("Extract"), icon: "archive", shortLabel: "Extract" },
+                    { value: "open", label: qsTr("Default App"), icon: "arrow-square-out", shortLabel: "App" }
+                ]
+                value: theme.archiveOpenAction
+                onSelected: function(v) { theme.archiveOpenAction = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchArchives && (root.matchDrag || root.matchHidden || root.matchDisambig) }
 
         SettingRow {
             visible: root.matchDrag

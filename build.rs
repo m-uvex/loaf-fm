@@ -156,6 +156,7 @@ fn main() {
             .qml_file("qml/components/UsageBar.qml")
             .qml_file("qml/components/LoafShape.qml")
             .qml_file("qml/components/DriveCard.qml")
+            .qml_file("qml/components/RemoteCard.qml")
             .qml_file("qml/components/TopIconButton.qml")
             .qml_file("qml/settings/SettingDivider.qml")
             .qml_file("qml/settings/SettingRow.qml")
@@ -166,6 +167,7 @@ fn main() {
             .qml_file("qml/settings/ExperimentalTab.qml")
             .qml_file("qml/settings/ShareTab.qml")
             .qml_file("qml/settings/NetworkTab.qml")
+            .qml_file("qml/settings/ShortcutsTab.qml")
             .qml_file("qml/settings/AboutTab.qml"),
     )
     .qt_module("DBus")

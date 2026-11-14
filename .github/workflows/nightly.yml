@@ -120,6 +120,12 @@ jobs:
           echo "commit=$CHOSEN" >> $GITHUB_OUTPUT
           echo "short=$(git rev-parse --short $CHOSEN)" >> $GITHUB_OUTPUT
           echo "subject=$(git log -1 --pretty=format:'%s' $CHOSEN)" >> $GITHUB_OUTPUT
+          # Full commit message (subject + body) for descriptive release notes.
+          {
+            echo 'message<<LOAFMSG'
+            git log -1 --pretty=%B "$CHOSEN"
+            echo LOAFMSG
+          } >> $GITHUB_OUTPUT
 
       - name: Checkout verified commit
         run: |
@@ -163,24 +169,64 @@ jobs:
           target_commitish: ${{ steps.find_commit.outputs.commit }}
           name: "Loaf Nightly (${{ steps.find_commit.outputs.short }})"
           body: |
-            Automated rolling nightly build for Loaf.
-            
-            - **Commit**: [${{ steps.find_commit.outputs.short }}](https://github.com/m-uvex/loaf-fm/commit/${{ steps.find_commit.outputs.commit }})
-            - **Summary**: ${{ steps.find_commit.outputs.subject }}
-            
-            This release has passed automated tests and startup verification before publishing.
+            ## What changed
+
+            Rolling nightly of commit [${{ steps.find_commit.outputs.short }}](https://github.com/m-uvex/loaf-fm/commit/${{ steps.find_commit.outputs.commit }}) on `main`:
+
+            ${{ steps.find_commit.outputs.message }}
+
+            This build was compiled in release mode and passed an automated startup smoke test before publishing.
+
+            ---
+
+            ## Install this nightly
+
+            **One-liner** — auto-detects your distro and picks the right package:
+
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash -s -- --nightly
+            ```
+
+            **Manual install** — pick your package (x86_64):
+
+            | Platform | Asset | Install |
+            |---|---|---|
+            | Debian / Ubuntu / Mint | `loaf_nightly_amd64.deb` | `sudo apt install ./loaf_nightly_amd64.deb` |
+            | Fedora / RHEL / openSUSE | `loaf-nightly.x86_64.rpm` | `sudo dnf install ./loaf-nightly.x86_64.rpm` |
+            | Arch / Manjaro / CachyOS | `loaf-nightly-x86_64.pkg.tar.zst` | `sudo pacman -U ./loaf-nightly-x86_64.pkg.tar.zst` |
+            | Anywhere (AppImage) | `Loaf-nightly-x86_64.AppImage` | `chmod +x Loaf-nightly-x86_64.AppImage && ./Loaf-nightly-x86_64.AppImage` |
+            | Portable tarball | `loaf-nightly-linux-x86_64.tar.gz` | `tar -xzf loaf-nightly-linux-x86_64.tar.gz && ./loaf-v*/bin/loaf` |
+            | Raw binary | `loaf-nightly-linux-x86_64` | `chmod +x loaf-nightly-linux-x86_64 && ./loaf-nightly-linux-x86_64` |
+
+            **AUR** (community-maintained):
+
+            ```bash
+            yay -S loaf-fm-nightly-bin   # prebuilt nightly binary
+            yay -S loaf-fm-nightly-git  # build from main
+            ```
+
+            **Nix / NixOS** (tracks `main`, i.e. this build):
+
+            ```bash
+            nix run github:m-uvex/loaf-fm
+            ```
+
+            ---
+
+            ⚠️ **Nightly is a rolling prerelease** — it moves with `main` and may be broken. For a tested build use [Releases](https://github.com/m-uvex/loaf-fm/releases) instead. Verify downloads against the attached `SHA256SUMS`.
           draft: false
           prerelease: true
           make_latest: false
+          # Each asset must match exactly one glob. Overlapping patterns (e.g.
+          # `loaf_nightly*` and `loaf_*.deb`) produced duplicate upload tasks that
+          # raced on the same asset id, so the second delete returned 404.
           files: |
-            packaging/dist/loaf_nightly*
-            packaging/dist/loaf-nightly*
-            packaging/dist/Loaf-nightly*
             packaging/dist/loaf_*.deb
             packaging/dist/loaf-*.rpm
             packaging/dist/loaf-*.pkg.tar.zst
             packaging/dist/loaf-*.tar.gz
             packaging/dist/loaf-v*-linux-x86_64
+            packaging/dist/loaf-nightly-linux-x86_64
             packaging/dist/Loaf-*.AppImage
             packaging/dist/SHA256SUMS
         env:
