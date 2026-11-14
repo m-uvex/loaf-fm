@@ -117,7 +117,7 @@ pub mod qobject {
 
     unsafe extern "RustQt" {
         #[qinvokable]
-        fn set_path(self: Pin<&mut LoafEngine>, path: &QString);
+        fn set_path(self: Pin<&mut LoafEngine>, path: &QString) -> bool;
         #[qinvokable]
         fn navigate_up(self: Pin<&mut LoafEngine>);
         #[qinvokable]
@@ -201,6 +201,7 @@ pub mod qobject {
 }
 
 use crate::listing::{self, Change, Entry, SortSpec};
+use crate::message::{Message, MessageKey};
 use crate::{archive, state, trash, util, watcher, xdg};
 use core::pin::Pin;
 use cxx_qt::{CxxQtType, Threading};
@@ -412,7 +413,7 @@ impl Default for PaneRust {
 
 // Model roles (Qt::UserRole + n).
 const ROLE_BASE: i32 = 0x0100;
-const ROLES: [&str; 20] = [
+const ROLES: [&str; 19] = [
     "name",
     "path",
     "is_dir",
@@ -421,7 +422,6 @@ const ROLES: [&str; 20] = [
     "size",
     "size_str",
     "modified",
-    "modified_str",
     "icon",
     "system_icon",
     "category",
@@ -444,43 +444,6 @@ pub fn hex_path(p: &str) -> String {
     s
 }
 
-/// "Just now", "5m ago", ... or a date.
-pub fn relative_time(ts: i64) -> String {
-    if ts <= 0 {
-        return "-".into();
-    }
-    let now = unsafe { libc::time(std::ptr::null_mut()) } as i64;
-    let elapsed = now - ts;
-    if (0..60).contains(&elapsed) {
-        "Just now".into()
-    } else if (0..3600).contains(&elapsed) {
-        format!("{}m ago", elapsed / 60)
-    } else if (0..86400).contains(&elapsed) {
-        format!("{}h ago", elapsed / 3600)
-    } else if (0..86400 * 7).contains(&elapsed) {
-        format!("{}d ago", elapsed / 86400)
-    } else {
-        format_date(ts)
-    }
-}
-
-pub fn format_date(ts: i64) -> String {
-    let t = ts as libc::time_t;
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    unsafe {
-        libc::localtime_r(&t, &mut tm);
-    }
-    const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    format!(
-        "{} {}, {}",
-        MONTHS[tm.tm_mon.clamp(0, 11) as usize],
-        tm.tm_mday,
-        tm.tm_year + 1900
-    )
-}
-
 fn entry_json(
     e: &Entry,
     starred: bool,
@@ -498,7 +461,6 @@ fn entry_json(
         "size": e.size,
         "size_str": if e.is_dir { "-".to_string() } else { util::format_size(e.size) },
         "modified": e.modified,
-        "modified_str": relative_time(e.modified),
         "icon": e.icon,
         "system_icon": e.system_icon,
         "category": e.category,
@@ -640,7 +602,6 @@ impl qobject::LoafEngine {
                 util::format_size(e.size)
             }),
             "modified" => QVariant::from(&e.modified),
-            "modified_str" => s(&relative_time(e.modified)),
             "icon" => s(e.icon),
             "system_icon" => s(e.system_icon),
             "category" => s(e.category),
@@ -986,9 +947,11 @@ impl qobject::LoafEngine {
             let result: Result<Vec<Entry>, String> = match &loc {
                 Loc::Dir(p) => listing::scan(p, &cancelled).map_err(|e| match e.kind() {
                     std::io::ErrorKind::PermissionDenied => {
-                        "You don't have permission to view this folder".to_string()
+                        Message::key(MessageKey::PaneErrorPermission).to_string()
                     }
-                    std::io::ErrorKind::NotFound => "This folder no longer exists".to_string(),
+                    std::io::ErrorKind::NotFound => {
+                        Message::key(MessageKey::PaneErrorNotfound).to_string()
+                    }
                     _ => e.to_string(),
                 }),
                 Loc::Trash => Ok(trash::list()
@@ -1068,13 +1031,32 @@ impl qobject::LoafEngine {
         });
     }
 
-    pub fn set_path(self: Pin<&mut Self>, path: &QString) {
-        if let Some(loc) = Loc::parse(&path.to_string()) {
-            if loc == self.loc && !matches!(loc, Loc::Search { .. }) {
-                return self.refresh();
-            }
-            self.go_to(loc, true);
+    pub fn set_path(self: Pin<&mut Self>, path: &QString) -> bool {
+        let p_str = path.to_string();
+        if p_str.trim().is_empty() {
+            return false;
         }
+        let loc = Loc::parse(&p_str).or_else(|| {
+            if let Loc::Dir(cur) = &self.loc {
+                let joined = cur.join(p_str.trim());
+                if let Ok(canon) = joined.canonicalize() {
+                    Loc::parse(&canon.to_string_lossy())
+                } else if joined.is_dir() {
+                    Some(Loc::Dir(joined))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        let Some(loc) = loc else { return false };
+        if loc == self.loc && !matches!(loc, Loc::Search { .. }) {
+            self.refresh();
+            return true;
+        }
+        self.go_to(loc, true);
+        true
     }
 
     pub fn navigate_up(self: Pin<&mut Self>) {

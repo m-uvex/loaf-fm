@@ -16,10 +16,12 @@ Item {
 
     signal selected(string value)
 
+    readonly property var optionList: Array.isArray(root.options) ? root.options : []
     readonly property var current: {
-        for (var i = 0; i < root.options.length; i++) {
-            if (root.options[i].value === root.value)
-                return root.options[i];
+        var list = optionList;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i] && list[i].value === root.value)
+                return list[i];
         }
         return null;
     }
@@ -40,9 +42,9 @@ Item {
     function openMenu() {
         var p = root.mapToItem(null, 0, root.height + 6);
         menu.menuMinWidth = root.width;
-        menu.model = root.options.map(function (o) {
+        menu.model = optionList.map(function (o) {
             return {
-                "text": o.label,
+                "text": o.label || "",
                 "iconUrl": o.iconUrl || "",
                 "checkable": true,
                 "checked": o.value === root.value,
@@ -57,7 +59,7 @@ Item {
         radius: theme.radiusFull
         color: mouse.containsMouse || root.open ? Qt.lighter(theme.surfaceContainerHigh, 1.08) : theme.surfaceContainerHigh
         border.width: root.open ? 2 : 1
-        border.color: root.open ? theme.primary : theme.outlineVariant
+        border.color: root.open ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
         Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }

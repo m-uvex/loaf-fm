@@ -83,7 +83,7 @@ Item {
             radius: theme.radiusFull
             color: root.checked ? theme.primary : theme.surfaceContainerHighest
             border.width: root.checked ? 0 : 1
-            border.color: switchMouse.containsMouse && !root.checked ? theme.primary : theme.outline
+            border.color: switchMouse.containsMouse && !root.checked ? theme.primary : theme.outlineAlpha(theme.outline)
 
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
             Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: 140 } }
@@ -96,7 +96,7 @@ Item {
                 y: (track.height - height) / 2
                 width: switchMouse.pressed ? 24 : (switchMouse.containsMouse ? 20 : 18)
                 x: root.checked ? (track.width - width - 4) : 4
-                color: root.checked ? theme.primaryFg : theme.outline
+                color: root.checked ? theme.primaryFg : theme.outlineAlpha(theme.outline)
 
                 Behavior on x { enabled: theme.animate; SpringAnimation { spring: 4; damping: 0.7 } }
                 Behavior on width { enabled: theme.animate; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }

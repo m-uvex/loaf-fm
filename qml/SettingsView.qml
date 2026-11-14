@@ -19,13 +19,14 @@ Item {
         var t = [
             { id: "interface", index: 0, name: qsTr("Interface"), iconName: "palette", subtitle: qsTr("Theme, appearance, top bar and icon styling") },
             { id: "behavior", index: 1, name: qsTr("Behavior"), iconName: "gear", subtitle: qsTr("Folder opening, drag behavior, and session restore") },
-            { id: "accessibility", index: 2, name: qsTr("Accessibility"), iconName: "person-arms-spread", subtitle: qsTr("Performance, motion, scaling and background effects") },
-            { id: "experimental", index: 3, name: qsTr("Experimental"), iconName: "sparkle", subtitle: qsTr("Preview features, advanced archives and link sharing") }
+            { id: "accessibility", index: 2, name: qsTr("Accessibility"), iconName: "person-arms-spread", subtitle: qsTr("Performance, motion, scaling and background effects") }
         ];
         if (theme.shareViaLinkEnabled) {
             t.push({ id: "share", index: 5, name: qsTr("Share"), iconName: "share-network", subtitle: qsTr("Cloudflare tunnel file hosting and active streams") });
         }
         t.push({ id: "network", index: 6, name: qsTr("Network"), iconName: "network", subtitle: qsTr("Saved network drives and auto discovery") });
+        t.push({ id: "experimental", index: 3, name: qsTr("Experimental"), iconName: "sparkle", subtitle: qsTr("Preview features, advanced archives and link sharing") });
+        t.push({ id: "shortcuts", index: 7, name: qsTr("Shortcuts"), iconName: "keyboard", subtitle: qsTr("Customize keyboard shortcuts across Loaf") });
         return t;
     }
 
@@ -48,6 +49,7 @@ Item {
         + tabExperimental.matchCount
         + (theme.shareViaLinkEnabled ? tabShare.matchCount : 0)
         + tabNetwork.matchCount
+        + tabShortcuts.matchCount
         + tabAbout.matchCount
 
     function getTabMatchCount(tabId) {
@@ -57,6 +59,7 @@ Item {
         if (tabId === "experimental") return tabExperimental.matchCount;
         if (tabId === "share") return tabShare.matchCount;
         if (tabId === "network") return tabNetwork.matchCount;
+        if (tabId === "shortcuts") return tabShortcuts.matchCount;
         if (tabId === "about") return tabAbout.matchCount;
         return 0;
     }
@@ -180,7 +183,7 @@ Item {
                     Layout.preferredHeight: 1
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
-                    color: theme.separator
+                    color: theme.outlineAlpha(theme.separator)
                 }
 
                 // Scrollable Category Tabs List (matches Sidebar.qml ListView)
@@ -261,6 +264,7 @@ Item {
                             color: tabItem.isCurrent ? theme.primaryContainerFg : (tabItem.isHovered ? theme.textMain : theme.textMuted)
                             font.pixelSize: theme.fs(13)
                             font.bold: tabItem.isCurrent
+                            font.family: theme.fontFamily
                             elide: Text.ElideRight
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         }
@@ -291,9 +295,8 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            ToolTip.visible: settingsView.isCompact && tabMouse.containsMouse
-                            ToolTip.text: modelData.name
-                            ToolTip.delay: 250
+                            onEntered: if (settingsView.isCompact) tooltip.show(tabMouse, modelData.name)
+                            onExited: tooltip.hide(tabMouse)
                             onClicked: {
                                 if (settingsView.searchQuery.length > 0) {
                                     settingsView.searchCleared();
@@ -311,7 +314,7 @@ Item {
                     Layout.preferredHeight: 1
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
-                    color: theme.separator
+                    color: theme.outlineAlpha(theme.separator)
                 }
 
                 // Bottom Pinned: About Loaf Button (Matches main Sidebar Settings position)
@@ -388,9 +391,8 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        ToolTip.visible: settingsView.isCompact && aboutMouse.containsMouse
-                        ToolTip.text: qsTr("About Loaf")
-                        ToolTip.delay: 250
+                        onEntered: if (settingsView.isCompact) tooltip.show(aboutMouse, qsTr("About Loaf"))
+                        onExited: tooltip.hide(aboutMouse)
                         onClicked: {
                             if (settingsView.searchQuery.length > 0) {
                                 settingsView.searchCleared();
@@ -464,7 +466,7 @@ Item {
                                 Text {
                                     id: summaryCountTxt
                                     anchors.centerIn: parent
-                                    text: settingsView.totalMatches + " found"
+                                    text: qsTr("%1 found").arg(settingsView.totalMatches)
                                     color: theme.primaryContainerFg
                                     font.pixelSize: theme.fs(11)
                                     font.bold: true
@@ -562,28 +564,14 @@ Item {
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
 
-                    // Tab 3: Experimental
-                    ExperimentalTab {
-                        id: tabExperimental
-                        searchQuery: settingsView.searchQuery
-                        visible: settingsView.searchQuery.length > 0
-                            ? (tabExperimental.matchCount > 0)
-                            : (settingsView.activeTab === 3)
-                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 1.0 : 0.0
-                        transform: Translate {
-                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 0 : 8
-                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        }
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    }
-
-                    // Tab 5: Share
+                    // Tab 5: Share (only when Cloudflare sharing is enabled)
                     ShareTab {
                         id: tabShare
                         searchQuery: settingsView.searchQuery
-                        visible: theme.shareViaLinkEnabled && (settingsView.searchQuery.length > 0
-                            ? (tabShare.matchCount > 0)
-                            : (settingsView.activeTab === 5))
+                        visible: theme.shareViaLinkEnabled
+                            && (settingsView.searchQuery.length > 0
+                                ? (tabShare.matchCount > 0)
+                                : (settingsView.activeTab === 5))
                         opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 1.0 : 0.0
                         transform: Translate {
                             y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 0 : 8
@@ -604,6 +592,36 @@ Item {
                         opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 1.0 : 0.0
                         transform: Translate {
                             y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 6) ? 0 : 8
+                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Tab 3: Experimental
+                    ExperimentalTab {
+                        id: tabExperimental
+                        searchQuery: settingsView.searchQuery
+                        visible: settingsView.searchQuery.length > 0
+                            ? (tabExperimental.matchCount > 0)
+                            : (settingsView.activeTab === 3)
+                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 1.0 : 0.0
+                        transform: Translate {
+                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 3) ? 0 : 8
+                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Tab 7: Shortcuts
+                    ShortcutsTab {
+                        id: tabShortcuts
+                        searchQuery: settingsView.searchQuery
+                        visible: settingsView.searchQuery.length > 0
+                            ? (tabShortcuts.matchCount > 0)
+                            : (settingsView.activeTab === 7)
+                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 7) ? 1.0 : 0.0
+                        transform: Translate {
+                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 7) ? 0 : 8
                             Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         }
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }

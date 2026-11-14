@@ -6,6 +6,8 @@ Item {
 
     property string themeMode: "auto" // "auto", "light", "dark"
 
+    property string language: ""
+
     // How much of the desktop shows through the window itself.
     property real backgroundOpacity: 1.0
     // How solid the surfaces drawn on top of it are: file panes, the sidebar
@@ -35,6 +37,11 @@ Item {
         return Qt.rgba(color.r, color.g, color.b, effectivePanelOpacity);
     }
     property string accentName: "wallpaper" // "wallpaper", "lavender", "amber", "catppuccin", "nord", "tokyonight", "gruvbox", "rosepine"
+    // Which wallpaper palette source to extract colors from when accentName is "wallpaper".
+    // "auto" uses the first detected generated palette or KDE accent source.
+    property string wallpaperPaletteSource: "auto"
+    // Detected wallpaper palette sources: [{ id, label, path }]. Populated from core.
+    property var availableWallpaperPaletteSources: []
     property string iconSource: "phosphor" // "phosphor", "system", "adwaita" or "custom"
     property string customIconTheme: "" // icon theme folder name used when iconSource is "custom"
     property string phosphorWeight: "regular" // "regular", "bold", "fill", "duotone", "light", "thin"
@@ -62,7 +69,129 @@ Item {
     property bool showNewWindowButton: true
     property string pathBarMode: "chips" // "chips", "text"
     property string openFolderMode: "current" // "current", "split", "tab"
+    property string archiveOpenAction: "browse" // "browse", "extract", "open"
+    property string clickToOpen: "double" // "double", "single"
+    // Which file-view icons pick up the accent tint.
+    property string iconColorMode: "folders" // "folders", "files", "all", "none"
+    // The foreground Material color used for the tint above.
+    property string iconColor: "primary" // "primary", "secondary", "tertiary", "danger", "textMain", "textMuted"
+    // Hover tooltips on icon-only controls.
+    property bool showTooltips: true
+    // Chrome outlines (borders on floating pills, cards, inputs). Optional,
+    // with an intensity slider that scales their alpha.
+    property bool showOutlines: true
+    property int outlineIntensity: 100
     property bool showBackgroundShapes: true
+
+    property var keybindings: ({})
+    readonly property var defaultKeybindings: ({
+        "undo": "Ctrl+Z",
+        "redo": "Ctrl+Shift+Z",
+        "copy": "Ctrl+C",
+        "cut": "Ctrl+X",
+        "paste": "Ctrl+V",
+        "selectAll": "Ctrl+A",
+        "invertSelection": "Ctrl+Shift+I",
+        "selectPattern": "Ctrl+S",
+        "toggleHidden": "Ctrl+H",
+        "editPath": "Ctrl+L",
+        "search": "Ctrl+F",
+        "rename": "F2",
+        "quickLook": "Space",
+        "trash": "Delete",
+        "deletePermanent": "Shift+Delete",
+        "back": "Alt+Left",
+        "forward": "Alt+Right",
+        "up": "Alt+Up",
+        "home": "Alt+Home",
+        "backAlt": "Backspace",
+        "refresh": "F5",
+        "newTab": "Ctrl+T",
+        "closeTab": "Ctrl+W",
+        "nextTab": "Ctrl+Tab",
+        "prevTab": "Ctrl+Shift+Tab",
+        "newWindow": "Ctrl+N",
+        "newFolder": "Ctrl+Shift+N",
+        "toggleSplit": "F3",
+        "toggleSidebar": "F9",
+        "zoomIn": "Ctrl+=",
+        "zoomOut": "Ctrl+-",
+        "zoomReset": "Ctrl+0",
+        "viewGrid": "Ctrl+1",
+        "viewList": "Ctrl+2",
+        "bookmark": "Ctrl+D",
+        "copyPath": "Ctrl+Shift+C",
+        "properties": "Alt+Return",
+        "quit": "Ctrl+Q"
+    })
+
+    function shortcutFor(id) {
+        if (keybindings && typeof keybindings[id] === "string" && keybindings[id].length > 0)
+            return keybindings[id];
+        return defaultKeybindings[id] || "";
+    }
+
+    function setShortcut(id, seq) {
+        var next = Object.assign({}, keybindings || {});
+        if (!seq || seq === defaultKeybindings[id])
+            delete next[id];
+        else
+            next[id] = seq;
+        keybindings = next;
+    }
+
+    function resetShortcut(id) {
+        setShortcut(id, "");
+    }
+
+    function resetAllKeybindings() {
+        keybindings = ({});
+    }
+
+    function keyEventToSequence(event) {
+        var k = event.key;
+        if (k === Qt.Key_Control || k === Qt.Key_Shift || k === Qt.Key_Alt || k === Qt.Key_Meta || k === Qt.Key_AltGr)
+            return "";
+        var parts = [];
+        if (event.modifiers & Qt.ControlModifier) parts.push("Ctrl");
+        if (event.modifiers & Qt.AltModifier) parts.push("Alt");
+        if (event.modifiers & Qt.ShiftModifier) parts.push("Shift");
+        if (event.modifiers & Qt.MetaModifier) parts.push("Meta");
+        var keyName = "";
+        switch (k) {
+        case Qt.Key_Space: keyName = "Space"; break;
+        case Qt.Key_Return: keyName = "Return"; break;
+        case Qt.Key_Enter: keyName = "Enter"; break;
+        case Qt.Key_Delete: keyName = "Delete"; break;
+        case Qt.Key_Backspace: keyName = "Backspace"; break;
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab: keyName = "Tab"; break;
+        case Qt.Key_Left: keyName = "Left"; break;
+        case Qt.Key_Right: keyName = "Right"; break;
+        case Qt.Key_Up: keyName = "Up"; break;
+        case Qt.Key_Down: keyName = "Down"; break;
+        case Qt.Key_Home: keyName = "Home"; break;
+        case Qt.Key_End: keyName = "End"; break;
+        case Qt.Key_PageUp: keyName = "PgUp"; break;
+        case Qt.Key_PageDown: keyName = "PgDown"; break;
+        case Qt.Key_Plus:
+        case Qt.Key_Equal: keyName = (k === Qt.Key_Plus) ? "+" : "="; break;
+        case Qt.Key_Minus: keyName = "-"; break;
+        default:
+            if (k >= Qt.Key_F1 && k <= Qt.Key_F12)
+                keyName = "F" + (k - Qt.Key_F1 + 1);
+            else if (k >= Qt.Key_A && k <= Qt.Key_Z)
+                keyName = String.fromCharCode(k);
+            else if (k >= Qt.Key_0 && k <= Qt.Key_9)
+                keyName = String.fromCharCode(k);
+            else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) > 32)
+                keyName = event.text.toUpperCase();
+        }
+        if (!keyName)
+            return "";
+        parts.push(keyName);
+        return parts.join("+");
+    }
 
     // Low-power mode activates automatically when running on software rendering or low-end hardware.
     property string lowPowerSetting: "auto" // "auto", "on", "off"
@@ -101,15 +230,97 @@ Item {
         return Math.round(px * fontScale);
     }
 
+    // True when a file-view icon should be tinted with the accent colour.
+    // Shared by the grid card, the list row and the grouped list so the
+    // setting can never drift between views.
+    function tintIcon(isDir) {
+        if (iconColorMode === "all") return true;
+        if (iconColorMode === "none") return false;
+        if (iconColorMode === "files") return !isDir;
+        return isDir;
+    }
+
+    // The foreground Material color the tint uses. Resolved once so every
+    // view picks the same swatch for "Icon color".
+    readonly property color iconColorValue: iconColor === "secondary" ? secondaryContainerFg
+        : iconColor === "tertiary" ? tertiaryContainer
+        : iconColor === "danger" ? danger
+        : iconColor === "textMain" ? textMain
+        : iconColor === "textMuted" ? textMuted
+        : primary
+
+    // Outline chrome: one switch + one intensity knob drive every resting
+    // border in the app. Intensity scales the border alpha; off hides it.
+    function outlineAlpha(base) {
+        if (!showOutlines) return "transparent";
+        return Qt.rgba(base.r, base.g, base.b, base.a * Math.max(0, Math.min(100, outlineIntensity)) / 100);
+    }
+
+    // Black or white, whichever reads on top of c. Used for marks on swatches.
+    function onColor(c) {
+        var l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+        return l > 0.45 ? "#000000" : "#ffffff";
+    }
+
     // English singular/plural without a translation catalogue loaded:
     // plural(n, qsTr("1 item"), qsTr("%1 items")).
+    function plural(n, one, many) {
+        return n === 1 ? one : many.arg(number(n));
+    }
+
     // "100,000" (grouped the way the user's locale writes numbers).
     function number(n) {
         return Number(n).toLocaleString(Qt.locale(), "f", 0);
     }
 
-    function plural(n, one, many) {
-        return n === 1 ? one : many.arg(number(n));
+    function relativeTime(timestampSeconds) {
+        var ts = Number(timestampSeconds) || 0;
+        if (ts <= 0) return "-";
+        var elapsed = Math.floor(Date.now() / 1000) - ts;
+        if (elapsed < 0) elapsed = 0;
+        if (elapsed < 60) return qsTr("Just now");
+        if (elapsed < 3600) return qsTr("%1m ago").arg(number(Math.floor(elapsed / 60)));
+        if (elapsed < 86400) return qsTr("%1h ago").arg(number(Math.floor(elapsed / 3600)));
+        if (elapsed < 86400 * 7) return qsTr("%1d ago").arg(number(Math.floor(elapsed / 86400)));
+        return Qt.formatDate(new Date(ts * 1000), Qt.locale(), Locale.ShortFormat);
+    }
+
+
+    function substitute(template, values) {
+        return template.replace(/%(\d+)/g, function (m, index) { var value = values[Number(index) - 1]; return value === undefined || value === null ? m : String(value); });
+    }
+
+    Messages { id: messages }
+
+    // Rust emits {key,args} JSON for strings lupdate cannot see.
+    // Non-JSON text (OS/tool errors) is shown verbatim.
+    function resolveRustMessage(text) {
+        if (!text || text.length === 0 || text.charAt(0) !== "{") return text || "";
+        var decoded;
+        try { decoded = JSON.parse(text); } catch (e) { return text; }
+        if (!decoded || decoded.v !== 1) return text;
+        if (typeof decoded.raw === "string") return decoded.raw;
+        var key = decoded && decoded.key;
+        var a = (decoded && decoded.args) || [];
+        var resolvedArgs = a.map(function (item) { return (item !== null && typeof item === "object") ? resolveRustMessage(JSON.stringify(item)) : item; });
+        var out = messages.resolve(key, resolvedArgs);
+        if (out === undefined) return text;
+        return substitute(out, resolvedArgs);
+    }
+
+    function categoryName(key) {
+        if (key === "folder") return qsTr("Folder");
+        if (key === "image") return qsTr("Image");
+        if (key === "video") return qsTr("Video");
+        if (key === "audio") return qsTr("Audio");
+        if (key === "code") return qsTr("Code");
+        if (key === "archive") return qsTr("Archive");
+        if (key === "document") return qsTr("Document");
+        if (key === "text") return qsTr("Text");
+        if (key === "font") return qsTr("Font");
+        if (key === "application") return qsTr("Application");
+        if (key === "file") return qsTr("File");
+        return key || "";
     }
 
     // Single click on a selected item's name starts renaming.
@@ -120,6 +331,42 @@ Item {
     readonly property string iconFontFile: ({ bold: "Phosphor-Bold", fill: "Phosphor-Fill", duotone: "Phosphor-Duotone",
                                               light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
     FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
+
+    property string fontChoice: "system" // "system", "google_flex", "opendyslexic"
+    FontLoader { id: googleFlexFont; source: "qrc:/loaf/fonts/GoogleSansFlex-Regular.ttf" }
+    FontLoader { id: openDyslexicFont; source: "qrc:/loaf/fonts/OpenDyslexic-Regular.ttf" }
+
+    readonly property string defaultFontFamily: {
+        if (fontChoice === "google_flex")
+            return googleFlexFont.status === FontLoader.Ready ? googleFlexFont.name : "Google Sans Flex";
+        if (fontChoice === "opendyslexic")
+            return openDyslexicFont.status === FontLoader.Ready ? openDyslexicFont.name : "OpenDyslexic";
+        return "";
+    }
+    readonly property string fontFamily: defaultFontFamily
+
+    property int fontWeight: 400 // 200 to 800
+
+    function fw(isBold) {
+        return isBold ? Math.min(900, Math.max(600, fontWeight + 250)) : fontWeight;
+    }
+
+    function weightName(w) {
+        if (w <= 200) return qsTr("Thin");
+        if (w <= 300) return qsTr("Light");
+        if (w <= 400) return qsTr("Regular");
+        if (w <= 500) return qsTr("Medium");
+        if (w <= 600) return qsTr("SemiBold");
+        if (w <= 700) return qsTr("Bold");
+        return qsTr("Heavy");
+    }
+
+    function syncAppFont() {
+        if (typeof nativeBridge !== "undefined" && nativeBridge)
+            nativeBridge.setApplicationFont(defaultFontFamily, fontWeight);
+    }
+
+    property bool highContrast: false
 
     function getFontFamily() {
         return iconFont.status === FontLoader.Ready ? iconFont.name : iconFontFile;
@@ -1972,32 +2219,65 @@ Item {
     readonly property var activePalette: palettes[accentName] || palettes["lavender"]
 
     // Background & Surfaces
-    readonly property color background: isDark ? activePalette.darkBg : activePalette.lightBg
-    readonly property color surfaceDim: isDark ? activePalette.darkBg : activePalette.lightSurfaceLow
-    readonly property color surface: isDark ? activePalette.darkBg : activePalette.lightBg
-    readonly property color surfaceBright: isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceLowest
-    readonly property color surfaceContainerLowest: isDark ? activePalette.darkSurfaceLowest : activePalette.lightSurfaceLowest
-    readonly property color surfaceContainerLow: isDark ? activePalette.darkSurfaceLow : activePalette.lightSurfaceLow
-    readonly property color surfaceContainer: isDark ? activePalette.darkSurface : activePalette.lightSurface
-    readonly property color surfaceContainerHigh: isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceHigh
-    readonly property color surfaceContainerHighest: isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceHighest
+    readonly property color background: highContrast
+        ? (isDark ? "#000000" : "#ffffff")
+        : (isDark ? activePalette.darkBg : activePalette.lightBg)
+    readonly property color surfaceDim: highContrast
+        ? (isDark ? "#080808" : "#f0f0f0")
+        : (isDark ? activePalette.darkBg : activePalette.lightSurfaceLow)
+    readonly property color surface: highContrast
+        ? (isDark ? "#0c0c0e" : "#f8f8fa")
+        : (isDark ? activePalette.darkBg : activePalette.lightBg)
+    readonly property color surfaceBright: highContrast
+        ? (isDark ? "#2a2a30" : "#ffffff")
+        : (isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceLowest)
+    readonly property color surfaceContainerLowest: highContrast
+        ? (isDark ? "#050505" : "#ffffff")
+        : (isDark ? activePalette.darkSurfaceLowest : activePalette.lightSurfaceLowest)
+    readonly property color surfaceContainerLow: highContrast
+        ? (isDark ? "#101014" : "#f2f2f4")
+        : (isDark ? activePalette.darkSurfaceLow : activePalette.lightSurfaceLow)
+    readonly property color surfaceContainer: highContrast
+        ? (isDark ? "#18181c" : "#e8e8ec")
+        : (isDark ? activePalette.darkSurface : activePalette.lightSurface)
+    readonly property color surfaceContainerHigh: highContrast
+        ? (isDark ? "#222228" : "#dedee4")
+        : (isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceHigh)
+    readonly property color surfaceContainerHighest: highContrast
+        ? (isDark ? "#2c2c34" : "#d4d4dc")
+        : (isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceHighest)
 
     // Primary Accents
-    readonly property color primary: isDark ? activePalette.darkPrimary : activePalette.lightPrimary
+    readonly property color rawPrimary: isDark ? activePalette.darkPrimary : activePalette.lightPrimary
+    readonly property color primary: highContrast
+        ? (isDark ? Qt.lighter(rawPrimary, 1.25) : Qt.darker(rawPrimary, 1.35))
+        : rawPrimary
     readonly property color primaryFg: isDark ? activePalette.darkFg : activePalette.lightFg
     readonly property color primaryContainer: isDark ? activePalette.darkContainer : activePalette.lightContainer
-    readonly property color primaryContainerFg: isDark ? activePalette.darkContainerFg : activePalette.lightContainerFg
+    readonly property color primaryContainerFg: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkContainerFg : activePalette.lightContainerFg)
 
     // Secondary Accents
     readonly property color secondaryContainer: isDark ? activePalette.darkSecondaryContainer : activePalette.lightSecondaryContainer
-    readonly property color secondaryContainerFg: isDark ? activePalette.darkSecondaryContainerFg : activePalette.lightSecondaryContainerFg
+    readonly property color secondaryContainerFg: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkSecondaryContainerFg : activePalette.lightSecondaryContainerFg)
     readonly property color tertiaryContainer: isDark ? activePalette.darkTertiaryContainer : activePalette.lightTertiaryContainer
 
     // Text & Outlines
-    readonly property color textMain: isDark ? activePalette.darkTextMain : activePalette.lightTextMain
-    readonly property color textMuted: isDark ? activePalette.darkTextMuted : activePalette.lightTextMuted
-    readonly property color outline: isDark ? activePalette.darkOutline : activePalette.lightOutline
-    readonly property color outlineVariant: isDark ? activePalette.darkOutlineVariant : activePalette.lightOutlineVariant
+    readonly property color textMain: highContrast
+        ? (isDark ? "#ffffff" : "#000000")
+        : (isDark ? activePalette.darkTextMain : activePalette.lightTextMain)
+    readonly property color textMuted: highContrast
+        ? (isDark ? "#e4e4e8" : "#242428")
+        : (isDark ? activePalette.darkTextMuted : activePalette.lightTextMuted)
+    readonly property color outline: highContrast
+        ? (isDark ? "#dcdce2" : "#24242c")
+        : (isDark ? activePalette.darkOutline : activePalette.lightOutline)
+    readonly property color outlineVariant: highContrast
+        ? (isDark ? "#8e8e98" : "#60606a")
+        : (isDark ? activePalette.darkOutlineVariant : activePalette.lightOutlineVariant)
 
     // Semantic component tokens (derived so components never pick raw surface tokens)
     readonly property color menuSurface: isDark ? activePalette.darkSurfaceHigh : activePalette.lightSurfaceLowest
@@ -2047,6 +2327,8 @@ Item {
 
         value = readSetting("themeMode");
         if (value.length > 0) themeMode = value;
+        value = readSetting("language");
+        if (value.length > 0) language = value;
         value = readSetting("backgroundOpacity");
         if (value.trim().length > 0 && isFinite(Number(value)))
             backgroundOpacity = Math.max(0.0, Math.min(1.0, Number(value)));
@@ -2057,6 +2339,16 @@ Item {
         if (value.length > 0) accentName = value;
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
             core.reload_wallpaper_colors();
+        value = readSetting("wallpaperPaletteSource");
+        if (value.length > 0) wallpaperPaletteSource = value;
+        if (typeof core !== "undefined" && core) {
+            try {
+                availableWallpaperPaletteSources =
+                    JSON.parse(core.wallpaperPaletteSourcesJson() || "[]");
+            } catch (e) {
+                availableWallpaperPaletteSources = [];
+            }
+        }
         value = readSetting("iconSource");
         if (value.length > 0) iconSource = value;
         value = readSetting("customIconTheme");
@@ -2138,9 +2430,39 @@ Item {
         if (value.length > 0) pathBarMode = value;
         value = readSetting("openFolderMode");
         if (value.length > 0) openFolderMode = value;
+        value = readSetting("archiveOpenAction");
+        if (value === "browse" || value === "extract" || value === "open") archiveOpenAction = value;
+        value = readSetting("keybindings");
+        if (value.length > 0) {
+            try { keybindings = JSON.parse(value); } catch (e) { keybindings = {}; }
+        }
+        value = readSetting("clickToOpen");
+        if (value.length > 0) clickToOpen = value;
+        value = readSetting("iconColorMode");
+        if (value === "folders" || value === "files" || value === "all" || value === "none")
+            iconColorMode = value;
+        value = readSetting("iconColor");
+        if (value === "primary" || value === "secondary" || value === "tertiary"
+            || value === "danger" || value === "textMain" || value === "textMuted")
+            iconColor = value;
+        value = readSetting("showOutlines");
+        if (value.length > 0) showOutlines = (value !== "false");
+        value = readSetting("outlineIntensity");
+        if (value.length > 0 && isFinite(parseInt(value)))
+            outlineIntensity = Math.max(0, Math.min(100, parseInt(value)));
+        value = readSetting("showTooltips");
+        if (value.length > 0) showTooltips = (value !== "false");
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
+        value = readSetting("fontChoice");
+        if (value.length > 0) fontChoice = value;
+        value = readSetting("fontWeight");
+        if (value.length > 0 && isFinite(parseInt(value)))
+            fontWeight = Math.max(200, Math.min(800, parseInt(value)));
+        value = readSetting("highContrast");
+        if (value.length > 0) highContrast = (value === "true");
         loaded = true;
+        syncAppFont();
     }
 
     // Writes are skipped until the stored values have been read.
@@ -2153,6 +2475,11 @@ Item {
     onPanelOpacityChanged: writeSetting("panelOpacity", panelOpacity)
     onAccentNameChanged: {
         writeSetting("accentName", accentName);
+        if (accentName === "wallpaper" && typeof core !== "undefined" && core)
+            core.reload_wallpaper_colors();
+    }
+    onWallpaperPaletteSourceChanged: {
+        writeSetting("wallpaperPaletteSource", wallpaperPaletteSource);
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
             core.reload_wallpaper_colors();
     }
@@ -2192,5 +2519,17 @@ Item {
     onShowNewWindowButtonChanged: writeSetting("showNewWindowButton", showNewWindowButton ? "true" : "false")
     onPathBarModeChanged: writeSetting("pathBarMode", pathBarMode)
     onOpenFolderModeChanged: writeSetting("openFolderMode", openFolderMode)
+    onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
+    onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
+    onClickToOpenChanged: writeSetting("clickToOpen", clickToOpen)
+    onIconColorModeChanged: writeSetting("iconColorMode", iconColorMode)
+    onIconColorChanged: writeSetting("iconColor", iconColor)
+    onShowOutlinesChanged: writeSetting("showOutlines", showOutlines ? "true" : "false")
+    onOutlineIntensityChanged: writeSetting("outlineIntensity", String(outlineIntensity))
+    onShowTooltipsChanged: writeSetting("showTooltips", showTooltips ? "true" : "false")
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
+    onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }
+    onFontWeightChanged: { writeSetting("fontWeight", fontWeight); syncAppFont(); }
+    onDefaultFontFamilyChanged: syncAppFont()
+    onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")
 }

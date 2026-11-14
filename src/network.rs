@@ -1,3 +1,4 @@
+use crate::message::{Message, MessageKey};
 use crate::{state, util};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -584,7 +585,8 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
 }
 
 fn run_gio(args: &[String]) -> Result<String, String> {
-    let bin = util::which("gio").ok_or("GVfs (gio) is not installed")?;
+    let bin = util::which("gio")
+        .ok_or_else(|| Message::key(MessageKey::NetworkErrorGioMissing).to_string())?;
     let mut cmd = Command::new(bin);
     cmd.env("LC_MESSAGES", "C");
     cmd.args(args);
@@ -595,9 +597,9 @@ fn run_gio(args: &[String]) -> Result<String, String> {
         let stderr_line = err.lines().map(str::trim).rfind(|line| !line.is_empty());
         let stdout_line = out.lines().map(str::trim).rfind(|line| !line.is_empty());
         let message = stderr_line
-            .or(stdout_line)
-            .unwrap_or("the share could not be mounted")
-            .to_string();
+            .map(str::to_string)
+            .or_else(|| stdout_line.map(str::to_string))
+            .unwrap_or_else(|| Message::key(MessageKey::NetworkErrorMountFailed).to_string());
         Err(message)
     }
 }
@@ -631,10 +633,9 @@ pub fn mount(profile: &NetworkProfile) -> Result<String, MountError> {
     }
     Err(MountError {
         needs_password: false,
-        message: format!(
-            "{} mounted, but its local folder was not found",
-            profile.label()
-        ),
+        message: Message::key(MessageKey::NetworkErrorFolderNotFound)
+            .text(profile.label())
+            .to_string(),
     })
 }
 

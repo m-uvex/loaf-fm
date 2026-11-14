@@ -32,6 +32,14 @@ pub mod ffi {
         /// WM_CLASS) to `window_class`.
         fn set_application_identity(version: &str, window_class: &str);
 
+        /// Stores the override locale chosen before the application object
+        /// exists (empty = follow the system locale).
+        fn set_application_language(locale_name: &str);
+
+        /// Switches the running UI to the requested locale (empty = system).
+        fn apply_language(locale_name: &str);
+
+        fn languages_json() -> String;
         fn list_kmtp_devices_json() -> String;
         fn list_mtp_directory(url: &str) -> String;
         fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String;
@@ -44,6 +52,18 @@ pub fn list_kmtp_devices_json() -> String {
 
 pub fn list_mtp_directory(url: &str) -> String {
     ffi::list_mtp_directory(url)
+}
+
+pub fn set_application_language(locale: &str) {
+    ffi::set_application_language(locale);
+}
+
+pub fn apply_language(locale: &str) {
+    ffi::apply_language(locale);
+}
+
+pub fn languages_json() -> String {
+    ffi::languages_json()
 }
 
 pub fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String {

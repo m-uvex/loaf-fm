@@ -9,6 +9,6 @@ Rectangle {
     Layout.bottomMargin: 0
     Layout.leftMargin: 36
     implicitHeight: 1
-    color: theme.outlineVariant
+    color: theme.outlineAlpha(theme.outlineVariant)
     opacity: 0.18
 }

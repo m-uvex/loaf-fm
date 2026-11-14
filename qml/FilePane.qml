@@ -576,7 +576,7 @@ Item {
                 Text {
                     id: selLabel
                     anchors.centerIn: parent
-                    text: qsTr("%1 selected").arg(theme.number(pane.selectedCount))
+                    text: qsTr("%n selected", "", pane.selectedCount)
                     color: theme.primaryContainerFg
                     font.pixelSize: theme.fs(11)
                     font.bold: true
@@ -599,8 +599,8 @@ Item {
                     id: countLabel
                     anchors.centerIn: parent
                     text: paneEngine.is_searching_everywhere
-                        ? theme.plural(paneEngine.item_count, qsTr("1 result"), qsTr("%1 results"))
-                        : theme.plural(paneEngine.item_count, qsTr("1 item"), qsTr("%1 items"))
+                        ? qsTr("%n result(s)", "", paneEngine.item_count)
+                        : qsTr("%n item(s)", "", paneEngine.item_count)
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
                     font.bold: true
@@ -1001,7 +1001,7 @@ Item {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: paneEngine.error_text.length > 0 ? paneEngine.error_text
+                    text: paneEngine.error_text.length > 0 ? theme.resolveRustMessage(paneEngine.error_text)
                         : (paneEngine.filter_text.length > 0 ? qsTr("No matching files")
                         : (paneEngine.is_searching_everywhere ? qsTr("No results")
                         : (paneEngine.location_kind === "trash" ? qsTr("Trash is empty")
@@ -1078,21 +1078,12 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: gridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
                 }
 
-                WheelHandler {
-                    target: null
-                    acceptedModifiers: Qt.NoModifier
-                    onWheel: function(event) {
-                        var step = 80 * pane.zoom;
-                        var maxY = Math.max(0, gridView.contentHeight - gridView.height);
-                        gridView.contentY = Math.max(0, Math.min(maxY, gridView.contentY - (event.angleDelta.y > 0 ? step : -step)));
-                    }
-                }
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
@@ -1268,7 +1259,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: groupedGridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1424,7 +1415,7 @@ Item {
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 1
-                                color: theme.outlineVariant
+                                color: theme.outlineAlpha(theme.outlineVariant)
                                 opacity: 0.5
                             }
                         }
@@ -1474,7 +1465,9 @@ Item {
                 anchors.right: parent.right
                 height: 32
                 radius: theme.radiusM
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 z: 2
 
                 RowLayout {
@@ -1570,7 +1563,7 @@ Item {
                         Rectangle {
                             Layout.fillWidth: true
                             height: 1
-                            color: theme.outlineVariant
+                            color: theme.outlineAlpha(theme.outlineVariant)
                             opacity: 0.5
                         }
                     }
@@ -1595,7 +1588,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: listScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1766,7 +1759,7 @@ Item {
                     required property string system_icon
                     required property string category
                     required property string size_str
-                    required property string modified_str
+                    required property int modified
                     required property bool thumbable
                     required property string thumb_id
                     required property string detail
@@ -1814,7 +1807,8 @@ Item {
                                     anchors.centerIn: parent
                                     name: row.isCut ? (row.is_dir ? "folder-dashed" : "file-dashed") : (row.icon || "file")
                                     size: 18
-                                    color: row.isSelected ? theme.secondaryContainerFg : (row.is_dir ? theme.primary : theme.textMain)
+                                    color: row.isSelected ? theme.secondaryContainerFg
+                                        : (theme.tintIcon(row.is_dir) ? theme.iconColorValue : theme.textMain)
                                 }
                                 Image {
                                     visible: !row.hasThumb && theme.iconSource !== "phosphor"
@@ -1844,7 +1838,7 @@ Item {
                                     visible: row.is_symlink
                                     width: 10; height: 10; radius: 5
                                     color: theme.surfaceContainer
-                                    border.color: theme.outlineVariant
+                                    border.color: theme.outlineAlpha(theme.outlineVariant)
                                     border.width: 1
                                     anchors.bottom: parent.bottom
                                     anchors.right: parent.right
@@ -1867,6 +1861,8 @@ Item {
                                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMain
                                             font.pixelSize: theme.fs(13)
                                             font.bold: row.is_dir || row.isSelected
+                                            font.weight: theme.fw(row.is_dir || row.isSelected)
+                                            font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                             verticalAlignment: Text.AlignVCenter
                                         }
@@ -1877,6 +1873,8 @@ Item {
                                             text: row.detail
                                             color: theme.textMuted
                                             font.pixelSize: theme.fs(10)
+                                            font.weight: theme.fontWeight
+                                            font.family: theme.fontFamily
                                             elide: Text.ElideMiddle
                                         }
                                     }
@@ -1905,7 +1903,7 @@ Item {
                             visible: pane.width >= 560
                             Layout.preferredWidth: 150
                             Layout.minimumWidth: 96
-                            text: row.modified_str
+                            text: theme.relativeTime(row.modified)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
@@ -1914,8 +1912,8 @@ Item {
                             visible: pane.width >= 720
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
-                            text: row.category
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.outline
+                            text: theme.categoryName(row.category)
+                            color: row.isSelected ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
                         }
@@ -2002,6 +2000,10 @@ Item {
                                 window.openItemMenu(pane, row.index, pt.x, pt.y);
                             } else {
                                 contextMenu.close();
+                                if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
+                                    pane.openRow(row.index);
+                                    return;
+                                }
                                 pane.selectRow(row.index, !!(mouse.modifiers & Qt.ControlModifier), !!(mouse.modifiers & Qt.ShiftModifier));
                             }
                         }

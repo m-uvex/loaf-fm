@@ -21,7 +21,7 @@ LoafDialog {
     readonly property bool multiple: paths.length > 1
     readonly property string sizeKey: "props:" + paths.join("\n")
 
-    title: multiple ? theme.plural(paths.length, qsTr("1 item"), qsTr("%1 items")) : (info.name || qsTr("Properties"))
+    title: multiple ? qsTr("%n item(s)", "", paths.length) : (info.name || qsTr("Properties"))
 
     function showFor(list) {
         paths = list;
@@ -82,13 +82,13 @@ LoafDialog {
         }
 
         Key { text: qsTr("Type"); visible: !dlg.multiple }
-        Val { text: (dlg.info.type || "-") + (dlg.info.mime && !dlg.info.is_dir ? "  (" + dlg.info.mime + ")" : ""); visible: !dlg.multiple }
+        Val { text: ((dlg.info.is_dir ? theme.categoryName("folder") : (dlg.info.type || "-")) + (dlg.info.mime && !dlg.info.is_dir ? "  (" + dlg.info.mime + ")" : "")); visible: !dlg.multiple }
 
         Key { text: qsTr("Size") }
         Val { text: dlg.sizeText.length > 0 ? dlg.sizeText : (dlg.info.size_str || "-") }
 
         Key { text: qsTr("Contents"); visible: !dlg.multiple && dlg.info.is_dir === true }
-        Val { text: theme.plural(dlg.info.items || 0, qsTr("1 item"), qsTr("%1 items")); visible: !dlg.multiple && dlg.info.is_dir === true }
+        Val { text: qsTr("%n item(s)", "", dlg.info.items || 0); visible: !dlg.multiple && dlg.info.is_dir === true }
 
         Key { text: qsTr("Location"); visible: !dlg.multiple }
         Val { text: dlg.info.parent || "-"; visible: !dlg.multiple }
@@ -97,13 +97,13 @@ LoafDialog {
         Val { text: dlg.info.link_target || ""; visible: dlg.info.is_symlink === true }
 
         Key { text: qsTr("Modified"); visible: !dlg.multiple }
-        Val { text: dlg.info.modified || "-"; visible: !dlg.multiple }
+        Val { text: theme.relativeTime(dlg.info.modified_ts || 0); visible: !dlg.multiple }
 
         Key { text: qsTr("Accessed"); visible: !dlg.multiple }
-        Val { text: dlg.info.accessed || "-"; visible: !dlg.multiple }
+        Val { text: theme.relativeTime(dlg.info.accessed_ts || 0); visible: !dlg.multiple }
 
         Key { text: qsTr("Created"); visible: !dlg.multiple }
-        Val { text: dlg.info.created || "-"; visible: !dlg.multiple }
+        Val { text: theme.relativeTime(dlg.info.created_ts || 0); visible: !dlg.multiple }
 
         Key { text: qsTr("Free space"); visible: !dlg.multiple }
         Val { text: dlg.info.free_space || "-"; visible: !dlg.multiple }

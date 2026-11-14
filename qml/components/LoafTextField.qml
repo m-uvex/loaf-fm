@@ -19,6 +19,6 @@ TextField {
         radius: theme.radiusS
         color: theme.surfaceContainerHighest
         border.width: field.activeFocus ? 2 : 1
-        border.color: field.activeFocus ? theme.primary : theme.borderSubtle
+        border.color: field.activeFocus ? theme.primary : theme.outlineAlpha(theme.borderSubtle)
     }
 }

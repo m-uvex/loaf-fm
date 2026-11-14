@@ -115,7 +115,7 @@ Item {
         readonly property real r: theme.radiusXl
 
         ShapePath {
-            strokeColor: theme.outlineVariant
+            strokeColor: theme.outlineAlpha(theme.outlineVariant)
             strokeWidth: 1
             fillColor: "transparent"
             strokeStyle: ShapePath.DashLine
@@ -174,7 +174,7 @@ Item {
                 spacing: 2
 
                 Text {
-                    text: (root.drive && root.drive.name) ? root.drive.name : ""
+                    text: (root.drive && root.drive.name) ? theme.resolveRustMessage(root.drive.name) : ""
                     color: theme.textMain
                     font.pixelSize: theme.fs(15)
                     font.bold: true
@@ -214,7 +214,7 @@ Item {
             spacing: 8
 
             Text {
-                text: root.formatBytes(root.usedBytes) + " used"
+                text: qsTr("%1 used").arg(root.formatBytes(root.usedBytes))
                 color: theme.textMuted
                 font.pixelSize: theme.fs(11)
                 elide: Text.ElideRight
@@ -222,7 +222,7 @@ Item {
             }
 
             Text {
-                text: root.formatBytes(Math.max(0, root.totalBytes - root.usedBytes)) + " free of " + root.formatBytes(root.totalBytes)
+                text: qsTr("%1 free of %2").arg(root.formatBytes(Math.max(0, root.totalBytes - root.usedBytes))).arg(root.formatBytes(root.totalBytes))
                 color: theme.textMuted
                 font.pixelSize: theme.fs(11)
                 horizontalAlignment: Text.AlignRight

@@ -11,10 +11,6 @@ LoafPopup {
     modal: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    // Window shortcuts are blocked while a modal popup is open, so Space
-    // (which opened Quick Look) needs its own shortcut to close it again.
-    Shortcut { sequence: "Space"; enabled: quickLook.visible; onActivated: quickLook.close() }
-
     transformOrigin: Item.Center
     scale: 0.15
     opacity: 0.0
@@ -128,7 +124,7 @@ LoafPopup {
 
     function highlightCode(code, language) {
         var keywords = keywordsFor(language);
-        var commentColor = theme.outline;
+        var commentColor = theme.outlineAlpha(theme.outline);
         var stringColor = theme.syntaxString;
         var numberColor = theme.syntaxNumber;
         var keywordColor = theme.syntaxKeyword;
@@ -182,7 +178,7 @@ LoafPopup {
 
             if (/^```/.test(trimmed)) {
                 inCode = !inCode;
-                html += span(theme.outline, trimmed) + "<br>";
+                html += span(theme.outlineAlpha(theme.outline), trimmed) + "<br>";
                 continue;
             }
             if (inCode) {
@@ -201,7 +197,7 @@ LoafPopup {
                 continue;
             }
             if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-                html += span(theme.outline, "──────────") + "<br>";
+                html += span(theme.outlineAlpha(theme.outline), "──────────") + "<br>";
                 continue;
             }
             if (/^>\s?/.test(trimmed)) {
@@ -265,7 +261,7 @@ LoafPopup {
                 Text {
                     Layout.fillWidth: true
                     text: (quickLook.info.size_str || "-") + "  ·  "
-                        + (quickLook.info.modified_str || "-") + "  ·  "
+                        + theme.relativeTime(quickLook.info.modified || 0) + "  ·  "
                         + (quickLook.info.path || "")
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
@@ -277,7 +273,7 @@ LoafPopup {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            color: theme.separator
+            color: theme.outlineAlpha(theme.separator)
         }
 
         Item {
@@ -357,7 +353,7 @@ LoafPopup {
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: true
-                text: quickLook.info.note || ""
+                text: theme.resolveRustMessage(quickLook.info.note || "")
                 color: theme.textMuted
                 font.pixelSize: theme.fs(13)
                 horizontalAlignment: Text.AlignHCenter

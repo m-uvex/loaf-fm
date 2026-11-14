@@ -40,10 +40,10 @@ Rectangle {
     height: 46
     radius: theme.radiusFull
     color: kind === "error" ? theme.dangerContainer : theme.surfaceContainerHighest
-    border.color: theme.outlineVariant
+    border.color: theme.outlineAlpha(theme.outlineVariant)
     border.width: 1
     Accessible.role: Accessible.AlertMessage
-    Accessible.name: message
+    Accessible.name: theme.resolveRustMessage(toast.message)
 
     Timer { id: hideTimer; onTriggered: toast.dismiss() }
 
@@ -59,7 +59,7 @@ Rectangle {
             color: toast.kind === "error" ? theme.danger : theme.primary
         }
         Text {
-            text: toast.message
+            text: theme.resolveRustMessage(toast.message)
             color: toast.kind === "error" ? theme.danger : theme.textMain
             font.pixelSize: theme.fs(12)
             elide: Text.ElideRight

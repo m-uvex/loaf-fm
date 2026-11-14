@@ -198,7 +198,7 @@ ColumnLayout {
         radius: theme.radiusXl
         color: theme.surfaceContainer
         border.width: 1
-        border.color: theme.borderSubtle
+        border.color: theme.outlineAlpha(theme.borderSubtle)
         implicitHeight: heroCol.implicitHeight + (root.isCompact ? 36 : 56)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
@@ -256,7 +256,7 @@ ColumnLayout {
                         Text {
                             id: verTxt
                             anchors.centerIn: parent
-                            text: qsTr("Version ") + Qt.application.version
+                            text: qsTr("Version %1").arg(Qt.application.version)
                             color: theme.secondaryContainerFg
                             font.pixelSize: theme.fs(11)
                             font.bold: true
@@ -316,7 +316,7 @@ ColumnLayout {
             text: root.contributorsLoading
                 ? qsTr("Loading contributors…")
                 : (root.contributors.length > 0
-                    ? theme.plural(root.contributors.length, qsTr("1 contributor"), qsTr("%1 contributors"))
+                    ? qsTr("%n contributor(s)", "", root.contributors.length)
                     : (root.contributorsError.length > 0 ? root.contributorsError : qsTr("No contributors listed yet.")))
             color: theme.textMuted
             font.pixelSize: theme.fs(12)
@@ -342,7 +342,7 @@ ColumnLayout {
                     radius: theme.radiusM
                     color: hovered ? theme.primaryContainer : theme.surfaceContainerHigh
                     border.width: 1
-                    border.color: hovered ? theme.primary : theme.outlineVariant
+                    border.color: hovered ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                     scale: chipMouse.pressed ? 0.97 : (hovered ? 1.03 : 1.0)
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -414,15 +414,13 @@ ColumnLayout {
                         }
                     }
 
-                    ToolTip.visible: hovered
-                    ToolTip.text: "@" + modelData.login
-                    ToolTip.delay: 700
-
                     MouseArea {
                         id: chipMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+                        onEntered: tooltip.show(chipMouse, "@" + modelData.login)
+                        onExited: tooltip.hide(chipMouse)
                         onClicked: Qt.openUrlExternally(root.repoUrl + "/graphs/contributors")
                     }
                 }

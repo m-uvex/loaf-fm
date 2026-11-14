@@ -33,13 +33,13 @@ Item {
     width: expanded ? 340 : pill.implicitWidth
     height: expanded ? list.implicitHeight + 24 : 44
     Accessible.role: Accessible.ProgressBar
-    Accessible.name: ops.length > 0 ? ops[0].title : ""
+    Accessible.name: ops.length > 0 ? theme.resolveRustMessage(ops[0].title) : ""
 
     Rectangle {
         anchors.fill: parent
         radius: panel.expanded ? theme.radiusL : theme.radiusFull
         color: theme.surfaceContainerHighest
-        border.color: theme.outlineVariant
+        border.color: theme.outlineAlpha(theme.outlineVariant)
         border.width: 1
     }
 
@@ -61,7 +61,7 @@ Item {
                     var ctx = getContext("2d");
                     ctx.reset();
                     ctx.lineWidth = 3;
-                    ctx.strokeStyle = theme.outlineVariant;
+                    ctx.strokeStyle = theme.outlineAlpha(theme.outlineVariant);
                     ctx.beginPath();
                     ctx.arc(13, 13, 10, 0, Math.PI * 2);
                     ctx.stroke();
@@ -78,7 +78,7 @@ Item {
             }
         }
         Text {
-            text: panel.ops.length === 1 ? panel.ops[0].title : qsTr("%1 operations").arg(panel.ops.length)
+            text: panel.ops.length === 1 ? theme.resolveRustMessage(panel.ops[0].title) : qsTr("%n operation(s)", "", panel.ops.length)
             color: theme.textMain
             font.pixelSize: theme.fs(12)
             font.bold: true
@@ -119,7 +119,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: modelData.title
+                        text: theme.resolveRustMessage(modelData.title)
                         color: theme.textMain
                         font.pixelSize: theme.fs(12)
                         elide: Text.ElideMiddle
@@ -140,7 +140,7 @@ Item {
                     indeterminate: modelData.progress < 0
                 }
                 Text {
-                    text: [modelData.detail, modelData.current].filter(function(s) { return s && s.length > 0; }).join("  ·  ")
+                    text: [theme.resolveRustMessage(modelData.detail), theme.resolveRustMessage(modelData.current)].filter(function(s) { return s && s.length > 0; }).join("  ·  ")
                     color: theme.textMuted
                     font.pixelSize: theme.fs(10)
                     elide: Text.ElideMiddle

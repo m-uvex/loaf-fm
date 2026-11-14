@@ -4,6 +4,7 @@
 //! Everything is read once and cached; a right-click never re-reads the
 //! applications folders.
 
+use crate::message::{Message, MessageKey};
 use crate::util::{self, lock};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -546,7 +547,7 @@ pub fn open_terminal_in(dir: &Path) -> std::io::Result<()> {
     }
     Err(std::io::Error::new(
         std::io::ErrorKind::NotFound,
-        "no terminal emulator found",
+        Message::key(MessageKey::NotifyNoTerminal).to_string(),
     ))
 }
 
@@ -556,7 +557,7 @@ pub fn launch(app: &DesktopApp, files: &[PathBuf]) -> std::io::Result<()> {
     if argv.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "empty Exec line",
+            Message::key(MessageKey::NotifyEmptyExec).to_string(),
         ));
     }
     if app.terminal {
