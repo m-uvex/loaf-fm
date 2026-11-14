@@ -58,9 +58,12 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
-                    { value: "auto", label: qsTr("Auto"), shortLabel: "A", icon: "gauge" },
-                    { value: "on", label: qsTr("On"), shortLabel: "On", icon: "toggle-right" },
-                    { value: "off", label: qsTr("Off"), shortLabel: "Off", icon: "toggle-left" }
+                    //: Short label for Auto in low-power segment control. Must stay short.
+                    { value: "auto", label: qsTr("Auto"), shortLabel: qsTr("A"), icon: "gauge" },
+                    //: Short label for On in low-power segment control. Must stay short.
+                    { value: "on", label: qsTr("On"), shortLabel: qsTr("On"), icon: "toggle-right" },
+                    //: Short label for Off in low-power segment control. Must stay short.
+                    { value: "off", label: qsTr("Off"), shortLabel: qsTr("Off"), icon: "toggle-left" }
                 ]
                 value: theme.lowPowerSetting
                 onSelected: function(v) { theme.lowPowerSetting = v; }

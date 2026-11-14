@@ -20,22 +20,24 @@ ColumnLayout {
         return true;
     }
 
-    readonly property bool matchTheme: matches("theme appearance light dark auto mode color scheme")
-    readonly property bool matchOpacity: matches("background opacity panel backing transparency translucent translucency frosted blur appearance")
-    readonly property bool matchPalette: matches("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing")
-    readonly property bool matchIconStyle: matches("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze")
-    readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
-    readonly property bool matchIconColor: matches("icon color colour tint colorize colorise accent monochrome folders files all none hue saturation")
-    readonly property bool matchOutlines: matches("outline outlines border borders edge edges chrome intensity thickness stroke strength")
-    readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
-    readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
-    readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
+    readonly property bool matchTheme: matches(qsTr("theme appearance light dark auto mode color scheme"))
+    readonly property bool matchOpacity: matches(qsTr("background opacity panel backing transparency translucent translucency frosted blur appearance"))
+    readonly property bool matchPalette: matches(qsTr("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing"))
+    readonly property bool matchIconStyle: matches(qsTr("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze"))
+    readonly property bool matchIconWeight: matches(qsTr("phosphor weight variant thin light regular bold fill duotone stroke thickness"))
+    readonly property bool matchIconColor: matches(qsTr("icon color colour tint colorize colorise accent monochrome folders files all none hue saturation"))
+    readonly property bool matchOutlines: matches(qsTr("outline outlines border borders edge edges chrome intensity thickness stroke strength"))
+    readonly property bool matchTopBar: matches(qsTr("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb"))
+    readonly property bool matchThisPc: matches(qsTr("this pc computer hostname name label device system"))
+    readonly property bool matchMenus: matches(qsTr("menus context menu right click sidebar customize places navigation layout minimal"))
+    readonly property bool matchLanguage: matches(qsTr("language locale translation bahasa indonesia"))
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchOutlines ? 1 : 0) + (matchPalette ? 1 : 0)
             + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchIconColor ? 1 : 0) + (matchTopBar ? 1 : 0)
-            + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0))
+            + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0))
         : 0
+    readonly property var languageOptions: [{ value: "", label: qsTr("System default") }].concat(JSON.parse(core.available_languages() || "[]"))
 
     Layout.fillWidth: true
     spacing: 16
@@ -144,6 +146,33 @@ ColumnLayout {
                 enabled: theme.showOutlines
                 accessibleName: qsTr("Outline intensity")
                 onMoved: function(v) { theme.outlineIntensity = v; }
+            }
+        }
+    }
+
+    // Category: Language
+    SettingCard {
+        visible: root.matchLanguage
+        title: qsTr("Language")
+        subtitle: core.language_overridden_by_env() ? qsTr("Set by the LOAF_LANG environment variable") : qsTr("Applies immediately")
+        icon: "translate"
+
+        SettingRow {
+            visible: true
+            icon: "translate"
+            title: qsTr("Language")
+            subtitle: core.language_overridden_by_env() ? qsTr("Set by the LOAF_LANG environment variable") : qsTr("Applies immediately")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
+                accessibleName: qsTr("Language")
+                options: root.languageOptions
+                value: core.language_overridden_by_env() ? core.effective_language() : theme.language
+                enabled: !core.language_overridden_by_env()
+                onSelected: function(v) {
+                    theme.language = v;
+                    core.set_language(v);
+                }
             }
         }
     }
@@ -324,12 +353,18 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
-                    { value: "thin", label: qsTr("Thin"), shortLabel: "Th" },
-                    { value: "light", label: qsTr("Light"), shortLabel: "Lt" },
-                    { value: "regular", label: qsTr("Regular"), shortLabel: "Reg" },
-                    { value: "bold", label: qsTr("Bold"), shortLabel: "Bd" },
-                    { value: "fill", label: qsTr("Fill"), shortLabel: "Fil" },
-                    { value: "duotone", label: qsTr("Duotone"), shortLabel: "Duo" }
+                    //: Short label for Thin icon weight. Must stay short.
+                    { value: "thin", label: qsTr("Thin"), shortLabel: qsTr("Th") },
+                    //: Short label for Light icon weight. Must stay short.
+                    { value: "light", label: qsTr("Light"), shortLabel: qsTr("Lt") },
+                    //: Short label for Regular icon weight. Must stay short.
+                    { value: "regular", label: qsTr("Regular"), shortLabel: qsTr("Reg") },
+                    //: Short label for Bold icon weight. Must stay short.
+                    { value: "bold", label: qsTr("Bold"), shortLabel: qsTr("Bd") },
+                    //: Short label for Fill icon weight. Must stay short.
+                    { value: "fill", label: qsTr("Fill"), shortLabel: qsTr("Fil") },
+                    //: Short label for Duotone icon weight. Must stay short.
+                    { value: "duotone", label: qsTr("Duotone"), shortLabel: qsTr("Duo") }
                 ]
                 value: theme.phosphorWeight
                 onSelected: function(v) { theme.phosphorWeight = v; }
@@ -429,9 +464,12 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
-                    { value: "auto", label: qsTr("Automatic"), icon: "arrows-clockwise", shortLabel: "Auto" },
-                    { value: "always", label: qsTr("Always"), icon: "arrow-left", shortLabel: "Show" },
-                    { value: "hidden", label: qsTr("Hidden"), icon: "eye-slash", shortLabel: "Hide" }
+                    //: Short label for Automatic toolbar buttons. Must stay short.
+                    { value: "auto", label: qsTr("Automatic"), icon: "arrows-clockwise", shortLabel: qsTr("Auto") },
+                    //: Short label for Always toolbar buttons. Must stay short.
+                    { value: "always", label: qsTr("Always"), icon: "arrow-left", shortLabel: qsTr("Show") },
+                    //: Short label for Hidden toolbar buttons. Must stay short.
+                    { value: "hidden", label: qsTr("Hidden"), icon: "eye-slash", shortLabel: qsTr("Hide") }
                 ]
                 value: theme.toolbarOperations
                 onSelected: function(v) { theme.toolbarOperations = v; }
@@ -474,8 +512,10 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
-                    { value: "chips", label: qsTr("Breadcrumbs"), icon: "bread", shortLabel: "Chips" },
-                    { value: "text", label: qsTr("Text Only"), icon: "text-t", shortLabel: "Text" }
+                    //: Short label for Breadcrumbs path bar mode. Must stay short.
+                    { value: "chips", label: qsTr("Breadcrumbs"), icon: "bread", shortLabel: qsTr("Chips") },
+                    //: Short label for Text Only path bar mode. Must stay short.
+                    { value: "text", label: qsTr("Text Only"), icon: "text-t", shortLabel: qsTr("Text") }
                 ]
                 value: theme.pathBarMode
                 onSelected: function(v) { theme.pathBarMode = v; }
@@ -528,9 +568,11 @@ ColumnLayout {
                 LoafSegmented {
                     Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                     options: [
-                        { value: "full", label: qsTr("Full"), shortLabel: "Full", icon: "list-bullets" },
-                        { value: "minimal", label: qsTr("Minimal"), shortLabel: "Min", icon: "minus" },
-                        { value: "custom", label: qsTr("Custom"), shortLabel: "Edit", icon: "pencil-simple" }
+                        { value: "full", label: qsTr("Full"), shortLabel: qsTr("Full"), icon: "list-bullets" },
+                        //: Short label for Minimal context menu mode. Must stay short.
+                        { value: "minimal", label: qsTr("Minimal"), shortLabel: qsTr("Min"), icon: "minus" },
+                        //: Short label for Custom context menu mode. Must stay short.
+                        { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Edit"), icon: "pencil-simple" }
                     ]
                     value: theme.contextMenuMode
                     onSelected: function(v) {

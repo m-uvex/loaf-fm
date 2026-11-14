@@ -256,7 +256,7 @@ ColumnLayout {
                         Text {
                             id: verTxt
                             anchors.centerIn: parent
-                            text: qsTr("Version ") + Qt.application.version
+                            text: qsTr("Version %1").arg(Qt.application.version)
                             color: theme.secondaryContainerFg
                             font.pixelSize: theme.fs(11)
                             font.bold: true
@@ -316,7 +316,7 @@ ColumnLayout {
             text: root.contributorsLoading
                 ? qsTr("Loading contributors…")
                 : (root.contributors.length > 0
-                    ? theme.plural(root.contributors.length, qsTr("1 contributor"), qsTr("%1 contributors"))
+                    ? qsTr("%n contributor(s)", "", root.contributors.length)
                     : (root.contributorsError.length > 0 ? root.contributorsError : qsTr("No contributors listed yet.")))
             color: theme.textMuted
             font.pixelSize: theme.fs(12)

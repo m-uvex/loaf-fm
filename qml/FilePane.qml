@@ -576,7 +576,7 @@ Item {
                 Text {
                     id: selLabel
                     anchors.centerIn: parent
-                    text: qsTr("%1 selected").arg(theme.number(pane.selectedCount))
+                    text: qsTr("%n selected", "", pane.selectedCount)
                     color: theme.primaryContainerFg
                     font.pixelSize: theme.fs(11)
                     font.bold: true
@@ -599,8 +599,8 @@ Item {
                     id: countLabel
                     anchors.centerIn: parent
                     text: paneEngine.is_searching_everywhere
-                        ? theme.plural(paneEngine.item_count, qsTr("1 result"), qsTr("%1 results"))
-                        : theme.plural(paneEngine.item_count, qsTr("1 item"), qsTr("%1 items"))
+                        ? qsTr("%n result(s)", "", paneEngine.item_count)
+                        : qsTr("%n item(s)", "", paneEngine.item_count)
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
                     font.bold: true
@@ -1001,7 +1001,7 @@ Item {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: paneEngine.error_text.length > 0 ? paneEngine.error_text
+                    text: paneEngine.error_text.length > 0 ? theme.resolveRustMessage(paneEngine.error_text)
                         : (paneEngine.filter_text.length > 0 ? qsTr("No matching files")
                         : (paneEngine.is_searching_everywhere ? qsTr("No results")
                         : (paneEngine.location_kind === "trash" ? qsTr("Trash is empty")
@@ -1759,7 +1759,7 @@ Item {
                     required property string system_icon
                     required property string category
                     required property string size_str
-                    required property string modified_str
+                    required property int modified
                     required property bool thumbable
                     required property string thumb_id
                     required property string detail
@@ -1903,7 +1903,7 @@ Item {
                             visible: pane.width >= 560
                             Layout.preferredWidth: 150
                             Layout.minimumWidth: 96
-                            text: row.modified_str
+                            text: theme.relativeTime(row.modified)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
@@ -1912,7 +1912,7 @@ Item {
                             visible: pane.width >= 720
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
-                            text: row.category
+                            text: theme.categoryName(row.category)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight

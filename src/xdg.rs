@@ -2,6 +2,7 @@
 //! XDG user folders (localized names), GTK bookmarks, recently used files,
 //! templates, Nautilus scripts, and Loaf's own starred list.
 
+use crate::message::{Message, MessageKey};
 use crate::util;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -92,7 +93,7 @@ pub fn default_places() -> Vec<Place> {
     let home = util::home();
     let mut v = vec![Place {
         id: "home".into(),
-        name: "Home".into(),
+        name: Message::key(MessageKey::PlaceHome).to_string(),
         path: home.to_string_lossy().to_string(),
         icon: "house".into(),
         system_icon: "user-home".into(),
@@ -115,10 +116,12 @@ pub fn default_places() -> Vec<Place> {
         }
         v.push(Place {
             id: key.into(),
-            name: p
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| key.into()),
+            name: Message::raw(
+                &p.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| key.into()),
+            )
+            .to_string(),
             path: p.to_string_lossy().to_string(),
             icon: icon.into(),
             system_icon: sys.into(),
@@ -145,10 +148,12 @@ pub fn default_places() -> Vec<Place> {
         if p.is_dir() {
             v.push(Place {
                 id: "PROJECTS".into(),
-                name: p
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "Projects".into()),
+                name: Message::raw(
+                    &p.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "Projects".into()),
+                )
+                .to_string(),
                 path: p.to_string_lossy().to_string(),
                 icon: "code".into(),
                 system_icon: "folder-development".into(),
@@ -166,10 +171,12 @@ pub fn default_places() -> Vec<Place> {
         if p.is_dir() {
             v.push(Place {
                 id: "GAMES".into(),
-                name: p
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "Games".into()),
+                name: Message::raw(
+                    &p.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "Games".into()),
+                )
+                .to_string(),
                 path: p.to_string_lossy().to_string(),
                 icon: "game-controller".into(),
                 system_icon: "applications-games".into(),

@@ -19,6 +19,8 @@ Item {
     signal clicked()
 
     readonly property bool iconOnly: text.length === 0
+    readonly property alias containsMouse: mouse.containsMouse
+    readonly property alias hovered: mouse.containsMouse
 
     implicitHeight: 34
     implicitWidth: iconOnly ? 34 : (contentRow.implicitWidth + 28)

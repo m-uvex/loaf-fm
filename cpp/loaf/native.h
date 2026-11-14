@@ -31,7 +31,6 @@ private:
 
 std::unique_ptr<MimeFilterMatcher> new_mime_filter_matcher(const rust::Vec<rust::String> &filterMimes);
 
-
 class LoafNative : public QObject
 {
     Q_OBJECT
@@ -150,6 +149,18 @@ bool forward_to_running_instance(const rust::Vec<rust::String> &paths, rust::Str
 // Registers D-Bus services, the `native` context property, the thumbnail
 // image provider and translations, and queues `paths` for opening.
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode);
+
+// Stores the override locale chosen before the application object exists
+// (empty = follow the system locale) and makes it the default locale.
+void set_application_language(rust::Str localeName);
+
+// Loads the translator for `localeName` (empty = system locale), installs
+// it in place of the previous one, and retranslates the QML engine so the
+// whole UI re-renders in the new language. Falls back to English when no
+// catalogue matches.
+void apply_language(rust::Str localeName);
+
+rust::String languages_json();
 
 // Enumerates MTP devices via KDE kiod6 / kmtpd over D-Bus without blocking the UI thread.
 // Returns a JSON-encoded array of MTP device objects:

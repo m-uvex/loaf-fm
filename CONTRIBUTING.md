@@ -55,22 +55,23 @@ If you prefer building directly on your host distribution:
    - `qtdeclarative` (QML and Quick engine)
    - `qtsvg`
    - `qtwayland`
+   - `qttools` (provides `lupdate`/`lrelease` for the translation catalogues)
 4. **Build Tools**: `cmake`, `ninja`, `pkg-config`.
 
 **Fedora / RHEL / CentOS:**
 ```bash
-sudo dnf install qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel qt6-qtsvg-devel qt6-qtwayland-devel cmake ninja-build pkg-config
+sudo dnf install qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel qt6-qtsvg-devel qt6-qtwayland-devel qt6-qttools-devel cmake ninja-build pkg-config
 ```
 
 **Ubuntu / Debian / Pop!_OS:**
 ```bash
 sudo apt install build-essential cmake ninja-build pkg-config \
-    qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-svg-dev libqt6waylandclient6-dev
+    qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-svg-dev qt6-tools-dev libqt6waylandclient6-dev
 ```
 
 **Arch Linux / Manjaro / EndeavourOS:**
 ```bash
-sudo pacman -S --needed base-devel cmake ninja pkgconf qt6-base qt6-declarative qt6-svg qt6-wayland
+sudo pacman -S --needed base-devel cmake ninja pkgconf qt6-base qt6-declarative qt6-svg qt6-tools qt6-wayland
 ```
 
 Then build and run:

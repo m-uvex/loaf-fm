@@ -8,6 +8,7 @@
 //!   local-time `DeletionDate`, and use a topdir-relative `Path` outside home.
 //! * Symlinks are trashed as links; their targets are never touched.
 
+use crate::message::{Message, MessageKey};
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
@@ -92,9 +93,12 @@ pub fn local_timestamp() -> String {
 /// The absolute path of `p` with its parent resolved but the last component
 /// left alone (so a symlink stays a symlink).
 pub fn absolute_no_follow(p: &Path) -> io::Result<PathBuf> {
-    let name = p
-        .file_name()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
+    let name = p.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            Message::key(MessageKey::TrashErrorNoFilename).to_string(),
+        )
+    })?;
     let parent = match p.parent() {
         Some(x) if !x.as_os_str().is_empty() => x.to_path_buf(),
         _ => std::env::current_dir()?,
@@ -154,7 +158,7 @@ fn ensure_trash_dirs(root: &Path) -> io::Result<()> {
     } else {
         Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "unsafe trash directory",
+            Message::key(MessageKey::TrashErrorUnsafe).to_string(),
         ))
     }
 }
@@ -201,12 +205,17 @@ fn trash_for(abs: &Path) -> io::Result<(PathBuf, Option<PathBuf>)> {
         ensure_trash_dirs(&home)?;
         return Ok((home, None));
     }
-    let top = topdir_of(abs).ok_or_else(|| io::Error::other("no mount point"))?;
+    let top = topdir_of(abs).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::Other,
+            Message::key(MessageKey::TrashErrorNoMountpoint).to_string(),
+        )
+    })?;
     match topdir_trash(&top, true) {
         Some(t) => Ok((t, Some(top))),
         None => Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "this drive has no usable trash folder",
+            Message::key(MessageKey::TrashErrorNoUsable).to_string(),
         )),
     }
 }
@@ -257,12 +266,17 @@ pub fn trash(path: &Path) -> io::Result<TrashedItem> {
     let name = abs
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                Message::key(MessageKey::TrashErrorNoFilename).to_string(),
+            )
+        })?;
     let (root, topdir) = trash_for(&abs)?;
     if abs.starts_with(&root) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "item is already in the trash",
+            Message::key(MessageKey::TrashErrorAlready).to_string(),
         ));
     }
     let shown_path = match &topdir {

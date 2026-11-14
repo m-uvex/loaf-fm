@@ -165,6 +165,22 @@ nix develop --command cargo build --release
 * *Debian/Ubuntu:* `sudo apt install qt6-base-dev qt6-base-private-dev qt6-declarative-dev libqt6svg6-dev qt6-wayland-dev`
 * *Arch:* `sudo pacman -S qt6-base qt6-declarative qt6-svg qt6-wayland`
 
+Qt Linguist tools (`lupdate`/`lrelease`) compile the `translations/*.ts` catalogues into the
+binary. The UI language follows the system locale, can be changed in Settings → Interface →
+Language, or overridden for one launch with `LOAF_LANG` (e.g. `LOAF_LANG=id_ID ./target/release/loaf`).
+
+Contributors: to regenerate the master catalogue, run
+`lupdate cpp qml translations/loaf_<locale>.ts`. Edit translations with Qt Linguist (`linguist`), compile them with
+`lrelease translations/loaf_<locale>.ts -qm loaf_<locale>.qm`, and list each locale in
+`qml/settings/languages.json` so the Language picker shows it.
+
+Optional at runtime (features degrade gracefully without them):
+- `7zip`/`p7zip` (zip, 7z, rar, iso, encrypted archives), `tar`, `zstd`, `cpio`
+- `udisks2` (mount, eject, unlock encrypted drives, rename labels)
+- Optional MTP USB phone support: `kio-extras` package on Arch (`pacman -S kio-extras`), Debian/Ubuntu (`apt install kio-extras`), or `pkgs.kdePackages.kio-extras` on NixOS. This package provides the canonical session D-Bus service `org.kde.kmtpd5` (executed via `kio-extras-service`/`kiod6`) for USB phone browsing and read/write transfers. On NixOS, install it at the system level (`environment.systemPackages = [ pkgs.kdePackages.kio-extras ];` and `services.dbus.packages = [ pkgs.kdePackages.kio-extras ];`) so its D-Bus service is registered in the session activation registry, rather than merely in a transient `nix-shell`. A full KDE Plasma desktop environment or manually running daemon is not required (the host D-Bus session bus activates the service on demand across Hyprland, Sway, GNOME, etc., provided the service file is registered). When absent or unregistered, MTP devices degrade cleanly without affecting local disk browsing or causing UI hangs; KIOFuse is not required.
+- `ffmpegthumbnailer` / `evince-thumbnailer` (video and PDF thumbnails)
+- `xdg-utils`, `libsecret` (`secret-tool`, to remember drive passphrases), `polkit` (Open as Administrator)
+
 
 #### 2. Optional Runtime Dependencies
 

@@ -1,6 +1,7 @@
 //! MTP file operations: metadata, mkdir, rename, delete, transfer, and local caching.
 
 use crate::fsops::Monitor;
+use crate::message::{Message, MessageKey};
 use crate::mtp::Location;
 use crate::native;
 use serde::Deserialize;
@@ -33,11 +34,14 @@ struct OpResponse {
 
 pub fn metadata(url: &str) -> Result<Option<Metadata>, String> {
     if Location::parse(url).is_none() {
-        return Err("Invalid MTP URL".to_string());
+        return Err(Message::key(MessageKey::MtpErrorInvalidUrl).to_string());
     }
     let res = native::mtp_operation_json("stat", url, "");
-    let reply: StatResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse MTP stat response: {}", e))?;
+    let reply: StatResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
@@ -49,7 +53,7 @@ pub fn metadata(url: &str) -> Result<Option<Metadata>, String> {
             .and_then(|loc| loc.child(&name))
             .is_none()
         {
-            return Err("Invalid filename returned by phone".to_string());
+            return Err(Message::key(MessageKey::MtpErrorInvalidFilename).to_string());
         }
         Ok(Some(Metadata {
             name,
@@ -63,17 +67,20 @@ pub fn metadata(url: &str) -> Result<Option<Metadata>, String> {
 }
 
 pub fn mkdir(parent_url: &str, name: &str) -> Result<String, String> {
-    let parent_loc =
-        Location::parse(parent_url).ok_or_else(|| "Invalid parent MTP URL".to_string())?;
+    let parent_loc = Location::parse(parent_url)
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
     if parent_loc.is_root() {
-        return Err("Cannot create directory in device root".to_string());
+        return Err(Message::key(MessageKey::MtpErrorRootMkdir).to_string());
     }
     let child_loc = parent_loc
         .child(name)
-        .ok_or_else(|| "Invalid directory name".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidDirName).to_string())?;
     let res = native::mtp_operation_json("mkdir", &parent_loc.url(), name);
-    let reply: OpResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse MTP mkdir response: {}", e))?;
+    let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
@@ -82,30 +89,34 @@ pub fn mkdir(parent_url: &str, name: &str) -> Result<String, String> {
     if reply.ok == Some(true) {
         Ok(child_loc.url())
     } else {
-        Err("Failed to create directory on MTP device".to_string())
+        Err(Message::key(MessageKey::MtpErrorMkdirFailed).to_string())
     }
 }
 
 pub fn rename(url: &str, name: &str) -> Result<String, String> {
-    let loc = Location::parse(url).ok_or_else(|| "Invalid MTP URL".to_string())?;
+    let loc = Location::parse(url)
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
     if loc.is_root() || loc.dirs().is_empty() && loc.storage().is_some() {
-        return Err("Cannot rename device or storage root".to_string());
+        return Err(Message::key(MessageKey::MtpErrorRootRename).to_string());
     }
     let parent = loc
         .parent()
-        .ok_or_else(|| "Target has no parent".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorNoParent).to_string())?;
     let new_loc = parent
         .child(name)
-        .ok_or_else(|| "Invalid new name for rename".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidRename).to_string())?;
     if new_loc == loc {
         return Ok(loc.url());
     }
     if metadata(&new_loc.url())?.is_some() {
-        return Err("An item with that name already exists on the phone".to_string());
+        return Err(Message::key(MessageKey::MtpErrorAlreadyExists).to_string());
     }
     let res = native::mtp_operation_json("rename", &loc.url(), name);
-    let reply: OpResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse MTP rename response: {}", e))?;
+    let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
@@ -114,67 +125,78 @@ pub fn rename(url: &str, name: &str) -> Result<String, String> {
     if reply.ok == Some(true) {
         Ok(new_loc.url())
     } else {
-        Err("Failed to rename object on MTP device".to_string())
+        Err(Message::key(MessageKey::MtpErrorRenameFailed).to_string())
     }
 }
 
 pub fn remove(paths: &[String], mon: &dyn Monitor) -> Result<(), String> {
     for p in paths {
         if mon.cancelled() {
-            return Err("cancelled".to_string());
+            return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
         }
-        let loc = Location::parse(p).ok_or_else(|| format!("Invalid MTP URL: {}", p))?;
+        let loc = Location::parse(p)
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
         if loc.is_root() || loc.dirs().is_empty() && loc.storage().is_some() {
-            return Err("Cannot delete device or storage root".to_string());
+            return Err(Message::key(MessageKey::MtpErrorRootDelete).to_string());
         }
         let res = native::mtp_operation_json("delete", &loc.url(), "");
-        let reply: OpResponse = serde_json::from_str(&res)
-            .map_err(|e| format!("Failed to parse MTP delete response: {}", e))?;
+        let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+            Message::key(MessageKey::MtpErrorParseResponse)
+                .text(e.to_string())
+                .to_string()
+        })?;
         if let Some(err) = reply.error {
             if !err.is_empty() {
                 return Err(err);
             }
         }
         if reply.ok != Some(true) {
-            return Err(format!("Failed to delete {}", p));
+            return Err(Message::key(MessageKey::MtpErrorDeleteFailed)
+                .text(p.clone())
+                .to_string());
         }
     }
     Ok(())
 }
 
 pub fn local_copy(url: &str, mon: &dyn Monitor) -> Result<PathBuf, String> {
-    let loc = Location::parse(url).ok_or_else(|| "Invalid MTP URL".to_string())?;
+    let loc = Location::parse(url)
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
     if loc.is_root() || loc.dirs().is_empty() && loc.storage().is_some() {
-        return Err("Cannot download device or storage root as a file".to_string());
+        return Err(Message::key(MessageKey::MtpErrorRootDownload).to_string());
     }
-    let meta = metadata(&loc.url())?.ok_or_else(|| "File not found on MTP device".to_string())?;
+    let meta = metadata(&loc.url())?
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorFileNotFound).to_string())?;
     if meta.is_dir {
-        return Err("Cannot download directory as a single file".to_string());
+        return Err(Message::key(MessageKey::MtpErrorDirSingleDownload).to_string());
     }
 
     let private = tempfile_staging_dir()?;
     let target = private.join(sanitize_filename(&loc.title()));
 
     if mon.cancelled() {
-        return Err("cancelled".to_string());
+        return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
     }
 
     let target_str = target
         .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in target path".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUtf8).to_string())?;
     let res = native::mtp_operation_json("download", &loc.url(), target_str);
-    let reply: OpResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse download response: {}", e))?;
+    let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
         }
     }
     if reply.ok != Some(true) {
-        return Err("Failed to download file from MTP device".to_string());
+        return Err(Message::key(MessageKey::MtpErrorDownloadFailed).to_string());
     }
     if fs::metadata(&target).map_err(|e| e.to_string())?.len() != meta.size {
-        return Err("Downloaded phone file has an unexpected size".to_string());
+        return Err(Message::key(MessageKey::MtpErrorDownloadSize).to_string());
     }
     mon.advance(meta.size, &target);
     Ok(target)
@@ -187,7 +209,8 @@ fn source_snapshot(
 ) -> Result<Vec<(String, bool, u64, i128)>, String> {
     let mut result = Vec::new();
     if let Some(location) = Location::parse(path) {
-        let meta = metadata(&location.url())?.ok_or("Source disappeared during move")?;
+        let meta = metadata(&location.url())?
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorSourceDisappeared).to_string())?;
         result.push((
             location.url(),
             meta.is_dir,
@@ -205,10 +228,12 @@ fn source_snapshot(
         };
         while let Some(folder) = stack.pop() {
             if mon.cancelled() {
-                return Err("cancelled; source preserved".into());
+                return Err(Message::key(MessageKey::MtpErrorCancelledPreserved).to_string());
             }
             for entry in crate::mtp::list(&folder)? {
-                let child = folder.child(&entry.name).ok_or("Invalid phone filename")?;
+                let child = folder
+                    .child(&entry.name)
+                    .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidFilename).to_string())?;
                 result.push((
                     child.url(),
                     entry.is_dir,
@@ -229,11 +254,13 @@ fn source_snapshot(
         let mut stack = vec![PathBuf::from(path)];
         while let Some(item) = stack.pop() {
             if mon.cancelled() {
-                return Err("cancelled; source preserved".into());
+                return Err(Message::key(MessageKey::MtpErrorCancelledPreserved).to_string());
             }
             let meta = fs::symlink_metadata(&item).map_err(|e| e.to_string())?;
             if !meta.is_dir() && !meta.is_file() {
-                return Err("Unsupported source type for MTP move".into());
+                return Err(Message::key(MessageKey::MtpErrorUnsupportedType)
+                    .text(path.to_string())
+                    .to_string());
             }
             result.push((
                 item.to_string_lossy().into_owned(),
@@ -263,7 +290,7 @@ fn check_move_source(
 ) -> Result<(), String> {
     if let Some(before) = before {
         if &source_snapshot(path, mon)? != before {
-            return Err("Source changed during transfer; it has been preserved".into());
+            return Err(Message::key(MessageKey::MtpErrorSourceChanged).to_string());
         }
     }
     Ok(())
@@ -279,27 +306,24 @@ pub fn transfer(
     let any_src_mtp = paths.iter().any(|p| p.starts_with("mtp://"));
 
     if !is_dest_mtp && !any_src_mtp {
-        return Err(
-            "Neither source nor destination is an MTP path (use fsops for local transfers)"
-                .to_string(),
-        );
+        return Err(Message::key(MessageKey::MtpErrorNotMtpPath).to_string());
     }
 
     if !matches!(mode, "copy" | "move") {
-        return Err("MTP supports copy and move, not links".to_string());
+        return Err(Message::key(MessageKey::MtpErrorNoLinks).to_string());
     }
     let mut completed = Vec::new();
 
     if is_dest_mtp && !any_src_mtp {
         // Upload from local filesystem to MTP device.
-        let dest_loc =
-            Location::parse(dest).ok_or_else(|| "Invalid destination MTP URL".to_string())?;
+        let dest_loc = Location::parse(dest)
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
         if dest_loc.is_root() {
-            return Err("Cannot transfer directly to device root".to_string());
+            return Err(Message::key(MessageKey::MtpErrorRootTransfer).to_string());
         }
         for src_str in paths {
             if mon.cancelled() {
-                return Err("cancelled".to_string());
+                return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
             }
             let before = if mode == "move" {
                 Some(source_snapshot(src_str, mon)?)
@@ -307,17 +331,28 @@ pub fn transfer(
                 None
             };
             let src_path = PathBuf::from(src_str);
-            let meta = fs::symlink_metadata(&src_path)
-                .map_err(|e| format!("Failed to stat source {}: {}", src_str, e))?;
+            let meta = fs::symlink_metadata(&src_path).map_err(|e| {
+                Message::key(MessageKey::MtpErrorStatSource)
+                    .text(src_str.clone())
+                    .text(e.to_string())
+                    .to_string()
+            })?;
             if meta.file_type().is_symlink()
                 || !meta.file_type().is_dir() && !meta.file_type().is_file()
             {
-                return Err(format!("Unsupported file type for MTP: {}", src_str));
+                return Err(Message::key(MessageKey::MtpErrorUnsupportedType)
+                    .text(src_str.clone())
+                    .to_string());
             }
             let file_name = src_path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .ok_or_else(|| format!("Invalid source file name: {}", src_str))?;
+                .ok_or_else(|| {
+                    Message::key(MessageKey::MtpErrorStatSource)
+                        .text(src_str.clone())
+                        .text("invalid name")
+                        .to_string()
+                })?;
 
             let final_name = find_unique_mtp_name(&dest_loc, file_name)?;
             let item_url = if meta.is_dir() {
@@ -327,16 +362,22 @@ pub fn transfer(
             };
             if mode == "move" {
                 if mon.cancelled() {
-                    return Err("cancelled; source preserved".to_string());
+                    return Err(Message::key(MessageKey::MtpErrorCancelledPreserved).to_string());
                 }
                 check_move_source(src_str, &before, mon)?;
                 if meta.is_dir() {
                     fs::remove_dir_all(&src_path).map_err(|e| {
-                        format!("Failed to clean up source directory {}: {}", src_str, e)
+                        Message::key(MessageKey::MtpErrorCleanupSource)
+                            .text(src_str.clone())
+                            .text(e.to_string())
+                            .to_string()
                     })?;
                 } else {
                     fs::remove_file(&src_path).map_err(|e| {
-                        format!("Failed to clean up source file {}: {}", src_str, e)
+                        Message::key(MessageKey::MtpErrorCleanupSource)
+                            .text(src_str.clone())
+                            .text(e.to_string())
+                            .to_string()
                     })?;
                 }
             }
@@ -346,16 +387,16 @@ pub fn transfer(
         // Download from MTP device to local filesystem.
         let dest_path = PathBuf::from(dest);
         if !dest_path.is_dir() {
-            return Err("Local destination must be an existing directory".to_string());
+            return Err(Message::key(MessageKey::MtpErrorDestNotDir).to_string());
         }
         for src_url in paths {
             if mon.cancelled() {
-                return Err("cancelled".to_string());
+                return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
             }
             let src_loc = Location::parse(src_url)
-                .ok_or_else(|| format!("Invalid source MTP URL: {}", src_url))?;
+                .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
             if src_loc.is_root() || src_loc.dirs().is_empty() && src_loc.storage().is_some() {
-                return Err("Cannot transfer device or storage root".to_string());
+                return Err(Message::key(MessageKey::MtpErrorRootTransfer).to_string());
             }
             let before = if mode == "move" {
                 Some(source_snapshot(src_url, mon)?)
@@ -363,7 +404,7 @@ pub fn transfer(
                 None
             };
             let meta = metadata(src_url)?
-                .ok_or_else(|| format!("Source not found on MTP device: {}", src_url))?;
+                .ok_or_else(|| Message::key(MessageKey::MtpErrorFileNotFound).to_string())?;
             let final_name = find_unique_local_name(&dest_path, &meta.name);
             let target_item = dest_path.join(&final_name);
 
@@ -381,22 +422,22 @@ pub fn transfer(
         }
     } else {
         // Transfer between MTP locations.
-        let dest_loc =
-            Location::parse(dest).ok_or_else(|| "Invalid destination MTP URL".to_string())?;
+        let dest_loc = Location::parse(dest)
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
         if dest_loc.is_root() {
-            return Err("Cannot transfer directly to device root".to_string());
+            return Err(Message::key(MessageKey::MtpErrorRootTransfer).to_string());
         }
         for src_url in paths {
             if mon.cancelled() {
-                return Err("cancelled".to_string());
+                return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
             }
             let src_loc = Location::parse(src_url)
-                .ok_or_else(|| format!("Invalid source MTP URL: {}", src_url))?;
+                .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
             if src_loc.is_root() || src_loc.dirs().is_empty() && src_loc.storage().is_some() {
-                return Err("Cannot transfer device or storage root".to_string());
+                return Err(Message::key(MessageKey::MtpErrorRootTransfer).to_string());
             }
             if dest_loc == src_loc || dest_loc.url().starts_with(&(src_loc.url() + "/")) {
-                return Err("Cannot copy a directory into itself or its descendant".to_string());
+                return Err(Message::key(MessageKey::MtpErrorCopyIntoSelf).to_string());
             }
 
             let before = if mode == "move" {
@@ -405,7 +446,7 @@ pub fn transfer(
                 None
             };
             let meta = metadata(src_url)?
-                .ok_or_else(|| format!("Source not found on MTP device: {}", src_url))?;
+                .ok_or_else(|| Message::key(MessageKey::MtpErrorFileNotFound).to_string())?;
 
             if mode == "move" && src_loc.parent() == Some(dest_loc.clone()) {
                 completed.push(src_loc.url());
@@ -449,29 +490,34 @@ fn upload_file(
     mon: &dyn Monitor,
 ) -> Result<String, String> {
     if mon.cancelled() {
-        return Err("cancelled".to_string());
+        return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
     }
     let target_loc = dest_loc
         .child(dest_name)
-        .ok_or_else(|| "Invalid target file name".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidFilename).to_string())?;
     let src_str = src_file
         .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in source file path".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUtf8).to_string())?;
 
     let res = native::mtp_operation_json("upload", &target_loc.url(), src_str);
-    let reply: OpResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse upload response: {}", e))?;
+    let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
         }
     }
     if reply.ok != Some(true) {
-        return Err(format!("Failed to upload file to {}", target_loc.url()));
+        return Err(Message::key(MessageKey::MtpErrorUploadFailed)
+            .text(target_loc.url())
+            .to_string());
     }
     let sz = fs::metadata(src_file).map(|m| m.len()).unwrap_or(0);
     if metadata(&target_loc.url())?.map(|entry| entry.size) != Some(sz) {
-        return Err("Phone upload size could not be verified; source preserved".to_string());
+        return Err(Message::key(MessageKey::MtpErrorUploadVerify).to_string());
     }
     mon.advance(sz, src_file);
     Ok(target_loc.url())
@@ -484,22 +530,21 @@ fn upload_dir_recursive(
     mon: &dyn Monitor,
 ) -> Result<String, String> {
     if mon.cancelled() {
-        return Err("cancelled".to_string());
+        return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
     }
     let created_url = mkdir(&dest_parent.url(), dir_name)?;
     let created_loc = Location::parse(&created_url)
-        .ok_or_else(|| "Failed to parse created MTP directory URL".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUrl).to_string())?;
 
     let rd = fs::read_dir(src_dir).map_err(|e| {
-        format!(
-            "Failed to read source directory {}: {}",
-            src_dir.display(),
-            e
-        )
+        Message::key(MessageKey::MtpErrorReadDir)
+            .text(src_dir.display().to_string())
+            .text(e.to_string())
+            .to_string()
     })?;
     for entry in rd {
         if mon.cancelled() {
-            return Err("cancelled".to_string());
+            return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
         }
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
@@ -507,12 +552,14 @@ fn upload_dir_recursive(
         if meta.file_type().is_symlink()
             || !meta.file_type().is_dir() && !meta.file_type().is_file()
         {
-            return Err(format!("Unsupported file type for MTP: {}", path.display()));
+            return Err(Message::key(MessageKey::MtpErrorUnsupportedType)
+                .text(path.display().to_string())
+                .to_string());
         }
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or("Invalid filename")?;
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidFilename).to_string())?;
         let unique_name = find_unique_mtp_name(&created_loc, name)?;
         if meta.is_dir() {
             upload_dir_recursive(&path, &created_loc, &unique_name, mon)?;
@@ -530,24 +577,29 @@ fn download_file(
     mon: &dyn Monitor,
 ) -> Result<(), String> {
     if mon.cancelled() {
-        return Err("cancelled".to_string());
+        return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
     }
     let dest_str = dest_file
         .to_str()
-        .ok_or_else(|| "Invalid UTF-8 in destination file path".to_string())?;
+        .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidUtf8).to_string())?;
     let res = native::mtp_operation_json("download", &src_loc.url(), dest_str);
-    let reply: OpResponse = serde_json::from_str(&res)
-        .map_err(|e| format!("Failed to parse download response: {}", e))?;
+    let reply: OpResponse = serde_json::from_str(&res).map_err(|e| {
+        Message::key(MessageKey::MtpErrorParseResponse)
+            .text(e.to_string())
+            .to_string()
+    })?;
     if let Some(err) = reply.error {
         if !err.is_empty() {
             return Err(err);
         }
     }
     if reply.ok != Some(true) {
-        return Err(format!("Failed to download file from {}", src_loc.url()));
+        return Err(Message::key(MessageKey::MtpErrorDownloadFailed)
+            .text(src_loc.url())
+            .to_string());
     }
     if fs::metadata(dest_file).map_err(|e| e.to_string())?.len() != size {
-        return Err("Phone download was incomplete; source preserved".to_string());
+        return Err(Message::key(MessageKey::MtpErrorDownloadIncomplete).to_string());
     }
     mon.advance(size, dest_file);
     Ok(())
@@ -559,24 +611,23 @@ fn download_dir_recursive(
     mon: &dyn Monitor,
 ) -> Result<(), String> {
     if mon.cancelled() {
-        return Err("cancelled".to_string());
+        return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
     }
     fs::create_dir(dest_dir).map_err(|e| {
-        format!(
-            "Failed to create local directory {}: {}",
-            dest_dir.display(),
-            e
-        )
+        Message::key(MessageKey::MtpErrorCreateLocalDir)
+            .text(dest_dir.display().to_string())
+            .text(e.to_string())
+            .to_string()
     })?;
 
     let entries = crate::mtp::list(src_loc)?;
     for entry in entries {
         if mon.cancelled() {
-            return Err("cancelled".to_string());
+            return Err(Message::key(MessageKey::ArchiveErrorCancelled).to_string());
         }
         let child_loc = src_loc
             .child(&entry.name)
-            .ok_or_else(|| format!("Invalid child name: {}", entry.name))?;
+            .ok_or_else(|| Message::key(MessageKey::MtpErrorInvalidFilename).to_string())?;
         let unique_name = find_unique_local_name(dest_dir, &entry.name);
         let child_dest = dest_dir.join(&unique_name);
         if entry.is_dir {

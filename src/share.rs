@@ -1,4 +1,5 @@
 use crate::archive;
+use crate::message::{Message, MessageKey};
 use crate::util;
 use std::collections::HashMap;
 use std::fs::File;
@@ -80,7 +81,10 @@ pub fn ensure_cloudflared_installed(on_complete: Box<dyn FnOnce(bool, String) + 
 
     let mgr = get_manager();
     if mgr.cloudflared_installing.swap(true, Ordering::SeqCst) {
-        on_complete(false, "Installation already in progress".into());
+        on_complete(
+            false,
+            Message::key(MessageKey::ShareErrorInstallInProgress).to_string(),
+        );
         return;
     }
 
@@ -98,7 +102,11 @@ pub fn ensure_cloudflared_installed(on_complete: Box<dyn FnOnce(bool, String) + 
 
 fn install_cloudflared_sync() -> Result<PathBuf, String> {
     let dest_dir = util::data_home().join("loaf/bin");
-    std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Failed to create bin dir: {}", e))?;
+    std::fs::create_dir_all(&dest_dir).map_err(|e| {
+        Message::key(MessageKey::ShareErrorCreateBinDir)
+            .text(e.to_string())
+            .to_string()
+    })?;
     let dest_bin = dest_dir.join("cloudflared");
     let tmp_bin = dest_dir.join("cloudflared.tmp");
 
@@ -106,7 +114,11 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
         "x86_64" => "amd64",
         "aarch64" => "arm64",
         "arm" => "arm",
-        other => return Err(format!("Unsupported architecture: {}", other)),
+        other => {
+            return Err(Message::key(MessageKey::ShareErrorUnsupportedArch)
+                .text(other.to_string())
+                .to_string())
+        }
     };
 
     let url = format!(
@@ -133,12 +145,12 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
         let status = Command::new(py).args(["-c", &py_script]).status();
         matches!(status, Ok(s) if s.success())
     } else {
-        return Err("Neither curl, wget, nor python3 was found to download cloudflared".into());
+        return Err(Message::key(MessageKey::ShareErrorToolMissing).to_string());
     };
 
     if !downloaded || !tmp_bin.exists() {
         let _ = std::fs::remove_file(&tmp_bin);
-        return Err("Download failed".into());
+        return Err(Message::key(MessageKey::ShareErrorDownloadFailed).to_string());
     }
 
     // Set executable permission (0o755)
@@ -148,7 +160,11 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
         let _ = std::fs::set_permissions(&tmp_bin, perms);
     }
 
-    std::fs::rename(&tmp_bin, &dest_bin).map_err(|e| format!("Failed to move binary: {}", e))?;
+    std::fs::rename(&tmp_bin, &dest_bin).map_err(|e| {
+        Message::key(MessageKey::ShareErrorMoveBinary)
+            .text(e.to_string())
+            .to_string()
+    })?;
     Ok(dest_bin)
 }
 
@@ -228,10 +244,11 @@ where
 
 fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), String> {
     if params.paths.is_empty() {
-        return Err("No files selected".into());
+        return Err(Message::key(MessageKey::ShareErrorNoFiles).to_string());
     }
 
-    let cloudflared_bin = find_cloudflared().ok_or("cloudflared is not installed".to_string())?;
+    let cloudflared_bin = find_cloudflared()
+        .ok_or_else(|| Message::key(MessageKey::ShareErrorCloudflaredMissing).to_string())?;
 
     // Determine target file to serve
     let single = params.paths.len() == 1;
@@ -283,7 +300,11 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
             &params.password,
             &|| false,
         )
-        .map_err(|e| format!("Compression failed: {}", e))?;
+        .map_err(|e| {
+            Message::key(MessageKey::ShareErrorCompressionFailed)
+                .text(e.to_string())
+                .to_string()
+        })?;
 
         let name = format!("{}.{}", base, ext);
         (archive_target.clone(), name, Some(archive_target))
@@ -300,8 +321,11 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
     let file_size = file_meta.len();
 
     // Start local TCP listener on random port (127.0.0.1:0)
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .map_err(|e| format!("Failed to bind local port: {}", e))?;
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| {
+        Message::key(MessageKey::ShareErrorBindPort)
+            .text(e.to_string())
+            .to_string()
+    })?;
     let local_port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
     let share_id = format!(
@@ -384,14 +408,16 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let mut child = cloudflared_cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn cloudflared: {}", e))?;
+    let mut child = cloudflared_cmd.spawn().map_err(|e| {
+        Message::key(MessageKey::ShareErrorSpawnCloudflared)
+            .text(e.to_string())
+            .to_string()
+    })?;
 
     let stderr = child
         .stderr
         .take()
-        .ok_or("Failed to capture cloudflared stderr")?;
+        .ok_or_else(|| Message::key(MessageKey::ShareErrorCaptureStderr).to_string())?;
 
     // Read stderr until we find https://*.trycloudflare.com
     let (url_tx, url_rx) = std::sync::mpsc::channel();
@@ -421,7 +447,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
             }
         }
         if !found {
-            let _ = url_tx.send(Err("Tunnel did not produce a public URL".into()));
+            let _ = url_tx.send(Err(Message::key(MessageKey::ShareErrorNoUrl).to_string()));
         }
     });
 
@@ -435,7 +461,7 @@ fn run_share_pipeline(params: CreateShareParams) -> Result<(String, String), Str
         Err(_) => {
             let _ = child.kill();
             get_manager().stop_share(&share_id);
-            return Err("Timed out waiting for Cloudflare Tunnel to connect".into());
+            return Err(Message::key(MessageKey::ShareErrorTimeout).to_string());
         }
     };
 

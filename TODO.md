@@ -47,7 +47,6 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [~] **Multi-Language Support (i18n)**: Full localization pipeline supporting multiple UI languages, locale-aware date/number formatting, and right-to-left layout support. (PR #103 wires Qt Linguist `.ts`/`.qm` pipeline, dynamic runtime language switching, and `languages.json` picker).
 - [ ] **Crowdsourced Translation Platform**: Connect repository to an open-source translation platform (Weblate or Crowdin) so community members can translate strings across the app from their browser, with automated PR/commit synchronization of `translations/loaf_*.ts` catalogues.
 
-
 ---
 
 ## Drives & System Storage Overview

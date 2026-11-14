@@ -204,6 +204,7 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: renameBtn
                         icon: "tag"
                         variant: "ghost"
                         Accessible.name: qsTr("Rename drive")
@@ -212,6 +213,7 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: editBtn
                         icon: "pencil-simple"
                         variant: "ghost"
                         Accessible.name: qsTr("Edit drive")
@@ -220,6 +222,7 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: removeBtn
                         icon: "trash"
                         variant: "ghost"
                         Accessible.name: qsTr("Remove drive")
@@ -370,6 +373,7 @@ ColumnLayout {
                     }
 
                     LoafButton {
+                        id: ignoreBtn
                         icon: entry.ignored ? "eye" : "eye-slash"
                         variant: "ghost"
                         Accessible.name: entry.ignored ? qsTr("Show drive") : qsTr("Ignore drive")
@@ -377,9 +381,9 @@ ColumnLayout {
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
                                 if (entry.ignored)
-                                    core.unignore_smb_discovered(entry.server);
+                                    core.unignore_smb_server(entry.server);
                                 else
-                                    core.ignore_smb_discovered(entry.server);
+                                    core.ignore_smb_server(entry.server);
                             }
                         }
                     }

@@ -4,6 +4,7 @@
 //! Nothing in here touches Qt so it can run on worker threads and be unit
 //! tested on its own.
 
+use crate::message::{Message, MessageKey};
 use std::ffi::CString;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -198,7 +199,7 @@ pub fn copy_tree(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> {
     if is_inside(dst, src) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "cannot copy a folder into itself",
+            Message::key(MessageKey::FsopsErrorCopyIntoSelf).to_string(),
         ));
     }
     let result = copy_tree_inner(src, dst, mon);
@@ -277,13 +278,13 @@ pub fn move_path(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> {
     if is_inside(dst, src) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "cannot move a folder into itself",
+            Message::key(MessageKey::FsopsErrorMoveIntoSelf).to_string(),
         ));
     }
     if fs::symlink_metadata(dst).is_ok() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
-            "destination exists",
+            Message::key(MessageKey::FsopsErrorDestExists).to_string(),
         ));
     }
     match fs::rename(src, dst) {
@@ -334,7 +335,7 @@ pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::
     if is_inside(dst, src) || is_inside(src, dst) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "source and destination overlap",
+            Message::key(MessageKey::FsopsErrorOverlap).to_string(),
         ));
     }
     let staged = staging_name(dst, "new");
@@ -373,7 +374,7 @@ pub fn replace_with_link(src: &Path, dst: &Path) -> io::Result<()> {
         if a == b {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "source and destination are the same item",
+                Message::key(MessageKey::FsopsErrorSameItem).to_string(),
             ));
         }
     }
