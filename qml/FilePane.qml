@@ -530,7 +530,8 @@ Item {
     readonly property real chromeScale: Math.min(1, zoom)
     readonly property int iconBox: Math.round(46 * zoom)
     readonly property int cellW: Math.round(Math.max(124 * chromeScale, iconBox + 48))
-    readonly property int cellH: Math.round(iconBox + 68 * chromeScale)
+    readonly property int cellH: Math.round(iconBox + 68 * chromeScale * theme.densityFactor)
+    readonly property int listRowH: Math.round(38 * Math.max(0.85, Math.min(1.3, zoom)) * theme.densityFactor)
     readonly property int iconSize: Math.round(42 * zoom)
     // Thumbnails are requested for the zoom being animated to, not every
     // step of the spring, so a zoom change loads each one once.
@@ -772,7 +773,7 @@ Item {
                     traced = traced || {};
                     var on = function (n) { return n >= 0 && !!traced[n] && !!sel[n]; };
                     if (pane.isList()) {
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
+                        var rowH = pane.listRowH;
                         var pitch = rowH + listView.spacing;
                         var itemTop = idx * pitch;
                         if (paneEngine.sort_by === "modified") {
@@ -844,7 +845,7 @@ Item {
                     if (count <= 0)
                         return out;
                     if (pane.isList()) {
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom))) + 3;
+                        var rowH = pane.listRowH + 3;
                         if (paneEngine.sort_by === "modified") {
                             var groups = [];
                             try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
@@ -1633,7 +1634,7 @@ Item {
                         var w = Math.abs(mx - sx), h = Math.abs(my - sy);
                         listBand.x = x; listBand.y = y; listBand.width = w; listBand.height = h;
                         var sel = Object.assign({}, base);
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
+                        var rowH = pane.listRowH;
                         var pitch = rowH + listView.spacing;
                         if (paneEngine.sort_by === "modified") {
                             var groups = [];
@@ -1748,7 +1749,7 @@ Item {
                     id: row
                     ListView.onPooled: rowMouse.dragging = false
                     width: listView.width
-                    height: Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)))
+                    height: pane.listRowH
 
                     required property int index
                     required property string name

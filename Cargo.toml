@@ -19,3 +19,8 @@ strum = { version = "0.26", features = ["derive"] }
 
 [build-dependencies]
 cxx-qt-build = "0.10.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
