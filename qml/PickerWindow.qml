@@ -443,7 +443,7 @@ Window {
                         visible: pathEditing
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         selectByMouse: true
                         verticalAlignment: TextInput.AlignVCenter
                         clip: true
@@ -484,7 +484,7 @@ Window {
                             ? pane.engine.current_path : pane.engine.location_kind + "://"
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         elide: Text.ElideMiddle
                         verticalAlignment: Text.AlignVCenter
                         Accessible.role: Accessible.StaticText

@@ -25,9 +25,9 @@ ColumnLayout {
     readonly property bool matchThumbnails: matches("picture thumbnails preview image photo svg gallery")
     readonly property bool matchThumbShape: matches("thumbnail shape square crop original aspect ratio preview image photo")
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
-    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
+    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom density compact comfortable spacious")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
-    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility")
+    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system custom family monospace weight accessibility")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
     readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
 
@@ -205,14 +205,75 @@ ColumnLayout {
             subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 240 : 420
                 options: [
                     { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
-                    { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },
-                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") }
+                    { value: "google_flex", label: qsTr("Google Flex"), shortLabel: qsTr("Flex") },
+                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") },
+                    { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Custom") }
                 ]
                 value: theme.fontChoice
                 onSelected: function(v) { theme.fontChoice = v; }
+            }
+        }
+
+        SettingRow {
+            visible: root.matchFontChoice && theme.fontChoice === "custom"
+            icon: "text-aa"
+            title: qsTr("Custom font family")
+            subtitle: qsTr("Pick any installed system font for the interface")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
+                accessibleName: qsTr("Custom font family")
+                options: (theme.fontChoice === "custom" && typeof nativeBridge !== "undefined" && nativeBridge)
+                    ? [{ value: "", label: qsTr("System Default") }].concat(
+                        nativeBridge.systemFontFamilies().map(function (f) { return { value: f, label: f }; })
+                      )
+                    : [{ value: "", label: qsTr("System Default") }]
+                value: theme.customFontFamily
+                onSelected: function(v) { theme.customFontFamily = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontChoice
+            icon: "code"
+            title: qsTr("Monospace font")
+            subtitle: qsTr("Font used for paths, permissions, checksums, and terminal commands")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
+                accessibleName: qsTr("Monospace font")
+                options: (typeof nativeBridge !== "undefined" && nativeBridge)
+                    ? [{ value: "", label: qsTr("System Monospace") }].concat(
+                        nativeBridge.monospaceFontFamilies().map(function (f) { return { value: f, label: f }; })
+                      )
+                    : [{ value: "", label: qsTr("System Monospace") }]
+                value: theme.monoFontFamily
+                onSelected: function(v) { theme.monoFontFamily = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontSize
+            icon: "rows"
+            title: qsTr("Layout density")
+            subtitle: qsTr("Adjust vertical spacing and row height in file lists and grids")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 360
+                options: [
+                    { value: "compact", label: qsTr("Compact"), shortLabel: qsTr("Compact") },
+                    { value: "comfortable", label: qsTr("Comfortable"), shortLabel: qsTr("Normal") },
+                    { value: "spacious", label: qsTr("Spacious"), shortLabel: qsTr("Spacious") }
+                ]
+                value: theme.density
+                onSelected: function(v) { theme.density = v; }
             }
         }
 

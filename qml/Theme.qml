@@ -280,18 +280,26 @@ Item {
                                               light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
     FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
 
-    property string fontChoice: "system" // "system", "google_flex", "opendyslexic"
-    FontLoader { id: googleFlexFont; source: "qrc:/loaf/fonts/GoogleSansFlex-Regular.ttf" }
-    FontLoader { id: openDyslexicFont; source: "qrc:/loaf/fonts/OpenDyslexic-Regular.ttf" }
+    property string fontChoice: "system" // "system", "google_flex", "opendyslexic", "custom"
+    property string customFontFamily: ""
+    property string monoFontFamily: ""
+    property string density: "comfortable" // "compact", "comfortable", "spacious"
+    readonly property real densityFactor: density === "compact" ? 0.85 : (density === "spacious" ? 1.18 : 1.0)
+    // Only load bundled fonts when selected so unused TTFs stay out of RAM at startup.
+    FontLoader { id: googleFlexFont; source: fontChoice === "google_flex" ? "qrc:/loaf/fonts/GoogleSansFlex-Regular.ttf" : "" }
+    FontLoader { id: openDyslexicFont; source: fontChoice === "opendyslexic" ? "qrc:/loaf/fonts/OpenDyslexic-Regular.ttf" : "" }
 
     readonly property string defaultFontFamily: {
         if (fontChoice === "google_flex")
             return googleFlexFont.status === FontLoader.Ready ? googleFlexFont.name : "Google Sans Flex";
         if (fontChoice === "opendyslexic")
             return openDyslexicFont.status === FontLoader.Ready ? openDyslexicFont.name : "OpenDyslexic";
+        if (fontChoice === "custom")
+            return customFontFamily;
         return "";
     }
     readonly property string fontFamily: defaultFontFamily
+    readonly property string monoFont: monoFontFamily.length > 0 ? monoFontFamily : "monospace"
 
     property int fontWeight: 400 // 200 to 800
 
@@ -2402,6 +2410,12 @@ Item {
         if (value.length > 0) showBackgroundShapes = (value !== "false");
         value = readSetting("fontChoice");
         if (value.length > 0) fontChoice = value;
+        value = readSetting("customFontFamily");
+        if (value.length > 0) customFontFamily = value;
+        value = readSetting("monoFontFamily");
+        if (value.length > 0) monoFontFamily = value;
+        value = readSetting("density");
+        if (value === "compact" || value === "comfortable" || value === "spacious") density = value;
         value = readSetting("fontWeight");
         if (value.length > 0 && isFinite(parseInt(value)))
             fontWeight = Math.max(200, Math.min(800, parseInt(value)));
@@ -2475,6 +2489,9 @@ Item {
     onShowTooltipsChanged: writeSetting("showTooltips", showTooltips ? "true" : "false")
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }
+    onCustomFontFamilyChanged: { writeSetting("customFontFamily", customFontFamily); syncAppFont(); }
+    onMonoFontFamilyChanged: writeSetting("monoFontFamily", monoFontFamily)
+    onDensityChanged: writeSetting("density", density)
     onFontWeightChanged: { writeSetting("fontWeight", fontWeight); syncAppFont(); }
     onDefaultFontFamilyChanged: syncAppFont()
     onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")

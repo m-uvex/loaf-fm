@@ -18,6 +18,11 @@ LoafDialog {
     // Editable permission bits (owner, group, others) x (r, w, x).
     property int mode: 0
     property bool recursive: false
+    property bool checksumLoading: false
+    property string md5Text: ""
+    property string sha256Text: ""
+    property string checksumError: ""
+    property string compareHash: ""
     readonly property bool multiple: paths.length > 1
     readonly property string sizeKey: "props:" + paths.join("\n")
 
@@ -28,6 +33,11 @@ LoafDialog {
         tab = 0;
         recursive = false;
         sizeText = "";
+        checksumLoading = false;
+        md5Text = "";
+        sha256Text = "";
+        checksumError = "";
+        compareHash = "";
         info = multiple ? ({}) : JSON.parse(core.get_item_info(list[0]) || "{}");
         mode = (info.mode_bits || 0) & 0o777;
         apps = [];
@@ -52,13 +62,31 @@ LoafDialog {
         }
     }
 
+    Connections {
+        target: nativeBridge
+        function onChecksumsReady(path, md5, sha256, error) {
+            if (dlg.paths.length === 1 && path === dlg.paths[0]) {
+                dlg.checksumLoading = false;
+                dlg.md5Text = md5;
+                dlg.sha256Text = sha256;
+                dlg.checksumError = error;
+            }
+        }
+    }
+
     LoafSegmented {
         visible: !dlg.multiple
         options: dlg.info.is_dir
             ? [{ value: 0, label: qsTr("General") }, { value: 1, label: qsTr("Permissions") }]
-            : [{ value: 0, label: qsTr("General") }, { value: 1, label: qsTr("Permissions") }, { value: 2, label: qsTr("Open With") }]
+            : [{ value: 0, label: qsTr("General") }, { value: 1, label: qsTr("Permissions") }, { value: 2, label: qsTr("Open With") }, { value: 3, label: qsTr("Checksums") }]
         value: dlg.tab
-        onSelected: function(v) { dlg.tab = v; }
+        onSelected: function(v) {
+            dlg.tab = v;
+            if (v === 3 && !dlg.multiple && !dlg.info.is_dir && !dlg.checksumLoading && dlg.md5Text.length === 0 && dlg.checksumError.length === 0) {
+                dlg.checksumLoading = true;
+                nativeBridge.computeChecksums(dlg.paths[0]);
+            }
+        }
     }
 
     GridLayout {
@@ -185,7 +213,7 @@ LoafDialog {
             text: qsTr("Mode: %1").arg(("000" + dlg.mode.toString(8)).slice(-3))
             color: theme.textMuted
             font.pixelSize: theme.fs(11)
-            font.family: "monospace"
+            font.family: theme.monoFont
         }
 
         LoafCheckBox {
@@ -247,6 +275,94 @@ LoafDialog {
             font.pixelSize: theme.fs(12)
             wrapMode: Text.Wrap
             Layout.fillWidth: true
+        }
+    }
+
+    ColumnLayout {
+        visible: dlg.tab === 3 && !dlg.multiple && !dlg.info.is_dir
+        Layout.fillWidth: true
+        spacing: 10
+
+        Text {
+            visible: dlg.checksumLoading
+            text: qsTr("Calculating MD5 and SHA-256…")
+            color: theme.textMuted
+            font.pixelSize: theme.fs(12)
+        }
+
+        Text {
+            visible: !dlg.checksumLoading && dlg.checksumError.length > 0
+            text: dlg.checksumError
+            color: theme.danger
+            font.pixelSize: theme.fs(12)
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
+
+        ColumnLayout {
+            visible: !dlg.checksumLoading && dlg.md5Text.length > 0
+            Layout.fillWidth: true
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Text { text: "MD5"; color: theme.textMuted; font.pixelSize: theme.fs(12); Layout.preferredWidth: 56 }
+                Text {
+                    text: dlg.md5Text
+                    color: theme.textMain
+                    font.pixelSize: theme.fs(11)
+                    font.family: theme.monoFont
+                    wrapMode: Text.WrapAnywhere
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                }
+                LoafButton {
+                    text: qsTr("Copy")
+                    variant: "tonal"
+                    onClicked: { nativeBridge.setClipboardText(dlg.md5Text); window.toast("info", qsTr("MD5 copied")); }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Text { text: "SHA-256"; color: theme.textMuted; font.pixelSize: theme.fs(12); Layout.preferredWidth: 56 }
+                Text {
+                    text: dlg.sha256Text
+                    color: theme.textMain
+                    font.pixelSize: theme.fs(11)
+                    font.family: theme.monoFont
+                    wrapMode: Text.WrapAnywhere
+                    Layout.fillWidth: true
+                    textFormat: Text.PlainText
+                }
+                LoafButton {
+                    text: qsTr("Copy")
+                    variant: "tonal"
+                    onClicked: { nativeBridge.setClipboardText(dlg.sha256Text); window.toast("info", qsTr("SHA-256 copied")); }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                LoafTextField {
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Paste expected MD5 or SHA-256 to verify…")
+                    text: dlg.compareHash
+                    onTextChanged: dlg.compareHash = text
+                }
+                Text {
+                    readonly property string trimmed: dlg.compareHash.trim().toLowerCase()
+                    readonly property bool isMatch: trimmed.length > 0 && (trimmed === dlg.md5Text || trimmed === dlg.sha256Text)
+                    visible: trimmed.length > 0
+                    text: isMatch ? qsTr("Match") : qsTr("Mismatch")
+                    color: isMatch ? theme.primary : theme.danger
+                    font.pixelSize: theme.fs(12)
+                    font.bold: true
+                }
+            }
         }
     }
 
