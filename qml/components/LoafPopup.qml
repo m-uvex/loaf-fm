@@ -11,7 +11,7 @@ Popup {
 
     property real contentPadding: 10
     property color surfaceColor: theme.menuSurface
-    property color borderColor: theme.borderSubtle
+    property color borderColor: theme.outlineAlpha(theme.borderSubtle)
     property real surfaceRadius: theme.radiusL
 
     // Children land in the host ColumnLayout.

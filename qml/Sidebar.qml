@@ -139,7 +139,7 @@ Rectangle {
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
     border.width: 1
-    border.color: theme.outlineVariant
+    border.color: theme.outlineAlpha(theme.outlineVariant)
     clip: true
     implicitWidth: expanded ? 200 : 68
     Behavior on implicitWidth { enabled: theme.animate; NumberAnimation { duration: 230; easing.type: Easing.OutCubic } }
@@ -331,7 +331,7 @@ Rectangle {
             Layout.preferredHeight: 1
             Layout.leftMargin: 12
             Layout.rightMargin: 12
-            color: theme.separator
+            color: theme.outlineAlpha(theme.separator)
             opacity: 0.45
         }
 
@@ -364,7 +364,7 @@ Rectangle {
                 Rectangle {
                     visible: entry.headerHeight > 0
                     x: 12; width: parent.width - 24; height: 1
-                    color: theme.separator; opacity: 0.35
+                    color: theme.outlineAlpha(theme.separator); opacity: 0.35
                 }
                 RailButton {
                     id: entryButton

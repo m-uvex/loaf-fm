@@ -71,8 +71,14 @@ Item {
     property string clickToOpen: "double" // "double", "single"
     // Which file-view icons pick up the accent tint.
     property string iconColorMode: "folders" // "folders", "files", "all", "none"
+    // The foreground Material color used for the tint above.
+    property string iconColor: "primary" // "primary", "secondary", "tertiary", "danger", "textMain", "textMuted"
     // Hover tooltips on icon-only controls.
     property bool showTooltips: true
+    // Chrome outlines (borders on floating pills, cards, inputs). Optional,
+    // with an intensity slider that scales their alpha.
+    property bool showOutlines: true
+    property int outlineIntensity: 100
     property bool showBackgroundShapes: true
 
     property var keybindings: ({})
@@ -230,6 +236,28 @@ Item {
         if (iconColorMode === "none") return false;
         if (iconColorMode === "files") return !isDir;
         return isDir;
+    }
+
+    // The foreground Material color the tint uses. Resolved once so every
+    // view picks the same swatch for "Icon color".
+    readonly property color iconColorValue: iconColor === "secondary" ? secondaryContainerFg
+        : iconColor === "tertiary" ? tertiaryContainer
+        : iconColor === "danger" ? danger
+        : iconColor === "textMain" ? textMain
+        : iconColor === "textMuted" ? textMuted
+        : primary
+
+    // Outline chrome: one switch + one intensity knob drive every resting
+    // border in the app. Intensity scales the border alpha; off hides it.
+    function outlineAlpha(base) {
+        if (!showOutlines) return "transparent";
+        return Qt.rgba(base.r, base.g, base.b, base.a * Math.max(0, Math.min(100, outlineIntensity)) / 100);
+    }
+
+    // Black or white, whichever reads on top of c. Used for marks on swatches.
+    function onColor(c) {
+        var l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+        return l > 0.45 ? "#000000" : "#ffffff";
     }
 
     // English singular/plural without a translation catalogue loaded:
@@ -2359,6 +2387,15 @@ Item {
         value = readSetting("iconColorMode");
         if (value === "folders" || value === "files" || value === "all" || value === "none")
             iconColorMode = value;
+        value = readSetting("iconColor");
+        if (value === "primary" || value === "secondary" || value === "tertiary"
+            || value === "danger" || value === "textMain" || value === "textMuted")
+            iconColor = value;
+        value = readSetting("showOutlines");
+        if (value.length > 0) showOutlines = (value !== "false");
+        value = readSetting("outlineIntensity");
+        if (value.length > 0 && isFinite(parseInt(value)))
+            outlineIntensity = Math.max(0, Math.min(100, parseInt(value)));
         value = readSetting("showTooltips");
         if (value.length > 0) showTooltips = (value !== "false");
         value = readSetting("showBackgroundShapes");
@@ -2432,6 +2469,9 @@ Item {
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onClickToOpenChanged: writeSetting("clickToOpen", clickToOpen)
     onIconColorModeChanged: writeSetting("iconColorMode", iconColorMode)
+    onIconColorChanged: writeSetting("iconColor", iconColor)
+    onShowOutlinesChanged: writeSetting("showOutlines", showOutlines ? "true" : "false")
+    onOutlineIntensityChanged: writeSetting("outlineIntensity", String(outlineIntensity))
     onShowTooltipsChanged: writeSetting("showTooltips", showTooltips ? "true" : "false")
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }

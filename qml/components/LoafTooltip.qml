@@ -121,7 +121,7 @@ Item {
         radius: theme.radiusM
         color: theme.backdropSurface(theme.surfaceContainerHighest)
         border.width: 1
-        border.color: theme.outlineVariant
+        border.color: theme.outlineAlpha(theme.outlineVariant)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
         Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }

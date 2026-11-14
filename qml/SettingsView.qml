@@ -183,7 +183,7 @@ Item {
                     Layout.preferredHeight: 1
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
-                    color: theme.separator
+                    color: theme.outlineAlpha(theme.separator)
                 }
 
                 // Scrollable Category Tabs List (matches Sidebar.qml ListView)
@@ -314,7 +314,7 @@ Item {
                     Layout.preferredHeight: 1
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
-                    color: theme.separator
+                    color: theme.outlineAlpha(theme.separator)
                 }
 
                 // Bottom Pinned: About Loaf Button (Matches main Sidebar Settings position)

@@ -124,7 +124,7 @@ LoafPopup {
 
     function highlightCode(code, language) {
         var keywords = keywordsFor(language);
-        var commentColor = theme.outline;
+        var commentColor = theme.outlineAlpha(theme.outline);
         var stringColor = theme.syntaxString;
         var numberColor = theme.syntaxNumber;
         var keywordColor = theme.syntaxKeyword;
@@ -178,7 +178,7 @@ LoafPopup {
 
             if (/^```/.test(trimmed)) {
                 inCode = !inCode;
-                html += span(theme.outline, trimmed) + "<br>";
+                html += span(theme.outlineAlpha(theme.outline), trimmed) + "<br>";
                 continue;
             }
             if (inCode) {
@@ -197,7 +197,7 @@ LoafPopup {
                 continue;
             }
             if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-                html += span(theme.outline, "──────────") + "<br>";
+                html += span(theme.outlineAlpha(theme.outline), "──────────") + "<br>";
                 continue;
             }
             if (/^>\s?/.test(trimmed)) {
@@ -273,7 +273,7 @@ LoafPopup {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            color: theme.separator
+            color: theme.outlineAlpha(theme.separator)
         }
 
         Item {

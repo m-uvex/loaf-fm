@@ -184,7 +184,7 @@ Item {
             visible: root.hasSubmenu
             name: "caret-right"
             size: 12
-            color: theme.outline
+            color: theme.outlineAlpha(theme.outline)
         }
 
         LoafIcon {
@@ -197,7 +197,7 @@ Item {
         Text {
             visible: root.showTrailingShortcut
             text: root.shortcut
-            color: theme.outline
+            color: theme.outlineAlpha(theme.outline)
             font.pixelSize: theme.fs(11)
             font.family: theme.fontFamily
         }

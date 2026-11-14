@@ -554,7 +554,7 @@ Item {
                         visible: pcView.customizing && !sectionDelegate.secVisible
                         radius: theme.radiusM
                         color: "transparent"
-                        border.color: theme.outline
+                        border.color: theme.outlineAlpha(theme.outline)
                         border.width: 1
 
                         RowLayout {
@@ -930,7 +930,7 @@ Item {
                                 radius: theme.radiusXl
                                 color: theme.surfaceContainerHigh
                                 border.width: 1
-                                border.color: theme.borderSubtle
+                                border.color: theme.outlineAlpha(theme.borderSubtle)
 
                                 RowLayout {
                                     id: networkRow

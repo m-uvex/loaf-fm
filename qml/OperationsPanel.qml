@@ -39,7 +39,7 @@ Item {
         anchors.fill: parent
         radius: panel.expanded ? theme.radiusL : theme.radiusFull
         color: theme.surfaceContainerHighest
-        border.color: theme.outlineVariant
+        border.color: theme.outlineAlpha(theme.outlineVariant)
         border.width: 1
     }
 
@@ -61,7 +61,7 @@ Item {
                     var ctx = getContext("2d");
                     ctx.reset();
                     ctx.lineWidth = 3;
-                    ctx.strokeStyle = theme.outlineVariant;
+                    ctx.strokeStyle = theme.outlineAlpha(theme.outlineVariant);
                     ctx.beginPath();
                     ctx.arc(13, 13, 10, 0, Math.PI * 2);
                     ctx.stroke();

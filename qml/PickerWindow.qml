@@ -404,7 +404,7 @@ Window {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: pathEditing ? 2 : 1
-                border.color: pathEditing ? theme.primary : theme.outlineVariant
+                border.color: pathEditing ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                 Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                 clip: true
@@ -545,7 +545,7 @@ Window {
                                 anchors.fill: parent
                                 radius: theme.radiusFull
                                 color: crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay)
-                                border.color: crumbDelegate.modelData.is_forward ? theme.outline : "transparent"
+                                border.color: crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent"
                                 border.width: crumbDelegate.modelData.is_forward ? 1 : 0
                                 opacity: (chip.isCurrent || crumbDelegate.modelData.is_forward || chipMouse.containsMouse) ? 1.0 : 0.0
                                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
@@ -594,7 +594,7 @@ Window {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -610,7 +610,7 @@ Window {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(searchField.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchField.activeFocus ? 2 : 1
-                border.color: searchField.activeFocus ? theme.primary : theme.outlineVariant
+                border.color: searchField.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
                 RowLayout {
                     anchors.fill: parent
@@ -637,7 +637,7 @@ Window {
 
                         Text {
                             text: pane.engine.location_kind === "search" ? qsTr("Search…") : qsTr("Filter this folder…")
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(13)
                             visible: !searchField.text && !searchField.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -738,7 +738,7 @@ Window {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            color: theme.outlineVariant
+            color: theme.outlineAlpha(theme.outlineVariant)
         }
 
         ColumnLayout {

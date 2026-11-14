@@ -34,7 +34,7 @@ RadioButton {
             radius: 9
             color: "transparent"
             border.color: control.checked ? theme.primary
-                : (control.hovered ? theme.primary : theme.outline)
+                : (control.hovered ? theme.primary : theme.outlineAlpha(theme.outline))
             border.width: 2
             scale: control.hovered ? 1.08 : 1.0
 

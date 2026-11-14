@@ -386,7 +386,7 @@ LoafPopup {
                 Layout.bottomMargin: 5
                 Layout.leftMargin: 10
                 Layout.rightMargin: 10
-                color: theme.separator
+                color: theme.outlineAlpha(theme.separator)
                 visible: rowWrap.entry ? rowWrap.entry.separatorBefore === true : false
 
                 SequentialAnimation {

@@ -69,7 +69,7 @@ Item {
         anchors.leftMargin: 1
         anchors.rightMargin: 1
         radius: theme.radiusFull
-        color: theme.outlineVariant
+        color: theme.outlineAlpha(theme.outlineVariant)
         opacity: 0.55
     }
 
@@ -79,7 +79,7 @@ Item {
         radius: theme.radiusFull
         color: mouse.containsMouse ? root.hoverBg : root.bgColor
         border.width: root.variant === "outlined" ? 1 : 0
-        border.color: theme.outline
+        border.color: theme.outlineAlpha(theme.outline)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: 120 } }
     }

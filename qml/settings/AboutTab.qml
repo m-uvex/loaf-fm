@@ -198,7 +198,7 @@ ColumnLayout {
         radius: theme.radiusXl
         color: theme.surfaceContainer
         border.width: 1
-        border.color: theme.borderSubtle
+        border.color: theme.outlineAlpha(theme.borderSubtle)
         implicitHeight: heroCol.implicitHeight + (root.isCompact ? 36 : 56)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
@@ -342,7 +342,7 @@ ColumnLayout {
                     radius: theme.radiusM
                     color: hovered ? theme.primaryContainer : theme.surfaceContainerHigh
                     border.width: 1
-                    border.color: hovered ? theme.primary : theme.outlineVariant
+                    border.color: hovered ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                     scale: chipMouse.pressed ? 0.97 : (hovered ? 1.03 : 1.0)
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }

@@ -52,7 +52,7 @@ ColumnLayout {
             subtitle: qsTr("Where newly clicked directories should navigate")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "current", label: qsTr("Current"), icon: "folder", shortLabel: "Current" },
                     { value: "split", label: qsTr("Split"), icon: "columns", shortLabel: "Split" },
@@ -72,7 +72,7 @@ ColumnLayout {
             subtitle: qsTr("Choose whether a single click or a double click opens files and folders")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "double", label: qsTr("Double-click"), shortLabel: qsTr("Double"), icon: "cursor-click" },
                     { value: "single", label: qsTr("Single-click"), shortLabel: qsTr("Single"), icon: "cursor" }
@@ -111,7 +111,7 @@ ColumnLayout {
             subtitle: qsTr("Choose whether dragging on empty space creates a selection box or pans the view")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 90 : 260
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "select", label: qsTr("Selection Box"), icon: "bounding-box" },
                     { value: "scroll", label: qsTr("Pan View"), icon: "hand-grabbing" }

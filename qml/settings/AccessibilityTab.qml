@@ -56,7 +56,7 @@ ColumnLayout {
                 : qsTr("Disables background effects, blur masks, and complex transitions for older machines and battery savings")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "auto", label: qsTr("Auto"), shortLabel: "A", icon: "gauge" },
                     { value: "on", label: qsTr("On"), shortLabel: "On", icon: "toggle-right" },
@@ -165,7 +165,7 @@ ColumnLayout {
             subtitle: qsTr("Crop picture thumbnails to a square, or keep their original aspect ratio")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 enabled: theme.showThumbnails
                 options: [
                     { value: "square", label: qsTr("Square"), shortLabel: qsTr("Square"), icon: "square" },
@@ -205,7 +205,7 @@ ColumnLayout {
             subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 340
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
                     { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },

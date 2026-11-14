@@ -1174,7 +1174,7 @@ ApplicationWindow {
                 // Ruleset: every floating pill carries a 1px outlineVariant
                 // border at rest; focus/active upgrades to 2px primary.
                 border.width: 1
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 readonly property bool canBack: engine.can_go_back || window.isAuxView || engine.is_searching_everywhere
                 readonly property bool canForward: engine.can_go_forward && !window.isAuxView && !engine.is_searching_everywhere
@@ -1226,7 +1226,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
                 RowLayout {
@@ -1268,7 +1268,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: window.isEditingPath ? 2 : 1
-                border.color: window.isEditingPath ? theme.primary : theme.outlineVariant
+                border.color: window.isEditingPath ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                 Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                 clip: true
@@ -1419,7 +1419,7 @@ ApplicationWindow {
                                 radius: theme.radiusFull
                                 color: chip.dropHover ? theme.primaryContainer
                                     : (crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay))
-                                border.color: chip.dropHover ? theme.primary : (crumbDelegate.modelData.is_forward ? theme.outline : "transparent")
+                                border.color: chip.dropHover ? theme.primary : (crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent")
                                 border.width: (chip.dropHover || crumbDelegate.modelData.is_forward) ? 1 : 0
                                 opacity: (chip.dropHover || chip.isCurrent || crumbDelegate.modelData.is_forward || chipMouse.containsMouse) ? 1.0 : 0.0
                                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
@@ -1497,7 +1497,7 @@ ApplicationWindow {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -1524,7 +1524,7 @@ ApplicationWindow {
                         visible: window.activeView === "settings"
                         name: "caret-right"
                         size: 11
-                        color: theme.outline
+                        color: theme.outlineAlpha(theme.outline)
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Rectangle {
@@ -1569,7 +1569,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchInput.activeFocus ? 2 : 1
-                border.color: searchInput.activeFocus ? theme.primary : theme.outlineVariant
+                border.color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
                 Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1585,7 +1585,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: engine.searching ? "hourglass" : "magnifying-glass"
                         size: 16
-                        color: searchInput.activeFocus ? theme.primary : theme.outline
+                        color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outline)
                     }
 
                     TextInput {
@@ -1602,7 +1602,7 @@ ApplicationWindow {
                         Text {
                             text: window.activeView === "settings" ? qsTr("Search settings…")
                                 : (engine.is_searching_everywhere ? qsTr("Search…") : qsTr("Filter this folder…"))
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(13)
                             visible: !searchInput.text && !searchInput.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -1703,7 +1703,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 RowLayout {
@@ -1746,7 +1746,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             spacing: 5
                             Text { visible: window.width >= 900; text: qsTr("View"); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outline }
+                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outlineAlpha(theme.outline) }
                         }
 
                         MouseArea {
@@ -1776,7 +1776,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineVariant
+                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1969,7 +1969,7 @@ ApplicationWindow {
                         height: 34
                         radius: theme.radiusFull
                         border.width: 1
-                        border.color: current ? theme.primary : theme.outlineVariant
+                        border.color: current ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                         Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                         color: current ? theme.backdropSurface(theme.secondaryContainer) : (tabMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer))
                         Behavior on width { enabled: theme.animate; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -2030,7 +2030,7 @@ ApplicationWindow {
                                 visible: tabDelegate.isSplit
                                 width: 1
                                 height: 16
-                                color: tabDelegate.current ? theme.secondaryContainerFg : theme.outlineVariant
+                                color: tabDelegate.current ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outlineVariant)
                                 opacity: 0.35
                             }
                             Item {
@@ -2097,7 +2097,7 @@ ApplicationWindow {
                             color: theme.backdropSurface(theme.surfaceContainerLow)
                             clip: true
                             border.width: (window.splitView && window.activePane === pane0) ? 2 : (window.keyboardNavActive ? 2 : 1)
-                            border.color: (window.splitView && window.activePane === pane0) ? theme.primary : (window.keyboardNavActive ? theme.primary : theme.outlineVariant)
+                            border.color: (window.splitView && window.activePane === pane0) ? theme.primary : (window.keyboardNavActive ? theme.primary : theme.outlineAlpha(theme.outlineVariant))
                             Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
 
@@ -2123,7 +2123,7 @@ ApplicationWindow {
                             color: theme.backdropSurface(theme.surfaceContainerLow)
                             clip: true
                             border.width: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? 2 : 1
-                            border.color: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? theme.primary : theme.outlineVariant
+                            border.color: (window.splitView && pane1Loader.item && window.activePane === pane1Loader.item) ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                             Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
 
@@ -2835,7 +2835,7 @@ ApplicationWindow {
             }
         }
 
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
 
         Text {
             Layout.leftMargin: 8
@@ -3090,7 +3090,7 @@ ApplicationWindow {
                     Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
                     LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
                 LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
                 LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
@@ -3105,7 +3105,7 @@ ApplicationWindow {
                     value: engine.group_ascending ? "asc" : "desc"
                     onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
                 LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
                 LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
@@ -3126,7 +3126,7 @@ ApplicationWindow {
                     value: engine.folder_position
                     onSelected: function(v) { engine.change_folder_position(v); }
                 }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.separator }
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
                 LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
                 LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
             }
@@ -3560,7 +3560,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
+                            color: dragHandleArea.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
                         }
                         MouseArea {
                             id: dragHandleArea
@@ -3588,7 +3588,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
                         size: 16
-                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
+                        color: placeRow.modelData.hidden ? theme.outlineAlpha(theme.outline) : theme.primary
                     }
 
                     Text {
@@ -3620,7 +3620,7 @@ ApplicationWindow {
                 }
             }
         }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.outlineAlpha(theme.separator) }
         LoafSwitch {
             label: qsTr("Hide Trash when empty (shows when dragging)")
             checked: theme.hideTrashWhenEmpty
@@ -3765,7 +3765,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: actionDragHandle.containsMouse ? theme.primary : theme.outline
+                            color: actionDragHandle.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
                         }
                         MouseArea {
                             id: actionDragHandle
@@ -3787,7 +3787,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: actionRow.modelData.icon || "circle"
                         size: 16
-                        color: actionRow.isHidden ? theme.outline : theme.primary
+                        color: actionRow.isHidden ? theme.outlineAlpha(theme.outline) : theme.primary
                     }
 
                     Text {

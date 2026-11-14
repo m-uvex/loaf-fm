@@ -1078,7 +1078,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: gridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1259,7 +1259,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: groupedGridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1415,7 +1415,7 @@ Item {
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 1
-                                color: theme.outlineVariant
+                                color: theme.outlineAlpha(theme.outlineVariant)
                                 opacity: 0.5
                             }
                         }
@@ -1467,7 +1467,7 @@ Item {
                 radius: theme.radiusM
                 color: theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 z: 2
 
                 RowLayout {
@@ -1563,7 +1563,7 @@ Item {
                         Rectangle {
                             Layout.fillWidth: true
                             height: 1
-                            color: theme.outlineVariant
+                            color: theme.outlineAlpha(theme.outlineVariant)
                             opacity: 0.5
                         }
                     }
@@ -1588,7 +1588,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outline : theme.outlineVariant)
+                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: listScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1808,7 +1808,7 @@ Item {
                                     name: row.isCut ? (row.is_dir ? "folder-dashed" : "file-dashed") : (row.icon || "file")
                                     size: 18
                                     color: row.isSelected ? theme.secondaryContainerFg
-                                        : (theme.tintIcon(row.is_dir) ? theme.primary : theme.textMain)
+                                        : (theme.tintIcon(row.is_dir) ? theme.iconColorValue : theme.textMain)
                                 }
                                 Image {
                                     visible: !row.hasThumb && theme.iconSource !== "phosphor"
@@ -1838,7 +1838,7 @@ Item {
                                     visible: row.is_symlink
                                     width: 10; height: 10; radius: 5
                                     color: theme.surfaceContainer
-                                    border.color: theme.outlineVariant
+                                    border.color: theme.outlineAlpha(theme.outlineVariant)
                                     border.width: 1
                                     anchors.bottom: parent.bottom
                                     anchors.right: parent.right
@@ -1913,7 +1913,7 @@ Item {
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
                             text: row.category
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.outline
+                            color: row.isSelected ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
                         }

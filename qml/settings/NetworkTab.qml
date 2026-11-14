@@ -125,7 +125,7 @@ ColumnLayout {
                 radius: theme.radiusM
                 color: theme.surfaceContainerHigh
                 border.width: 1
-                border.color: theme.borderSubtle
+                border.color: theme.outlineAlpha(theme.borderSubtle)
 
                 RowLayout {
                     id: driveRow
@@ -304,7 +304,7 @@ ColumnLayout {
                 radius: theme.radiusM
                 color: theme.surfaceContainerHigh
                 border.width: 1
-                border.color: theme.borderSubtle
+                border.color: theme.outlineAlpha(theme.borderSubtle)
                 opacity: entry.ignored ? 0.55 : 1.0
 
                 RowLayout {

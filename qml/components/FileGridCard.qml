@@ -97,7 +97,7 @@ Item {
                 name: card.isCut ? (card.itemIsDir ? "folder-dashed" : "file-dashed") : (card.itemIcon || "file")
                 size: viewPane ? viewPane.iconSize : 24
                 color: card.isSelected ? theme.secondaryContainerFg
-                    : (theme.tintIcon(card.itemIsDir) ? theme.primary : theme.textMain)
+                    : (theme.tintIcon(card.itemIsDir) ? theme.iconColorValue : theme.textMain)
             }
 
             Image {
@@ -140,7 +140,7 @@ Item {
                     anchors.fill: parent
                     radius: Math.min(width, height) / 6
                     color: "transparent"
-                    border.color: card.isSelected ? theme.primary : theme.outlineVariant
+                    border.color: card.isSelected ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                     border.width: 1
                     opacity: card.isSelected ? 0.75 : 0.35
                 }
@@ -149,7 +149,7 @@ Item {
                 visible: card.itemIsSymlink
                 width: 14; height: 14; radius: 7
                 color: theme.surfaceContainer
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 border.width: 1
                 anchors.bottom: parent.bottom
                 anchors.right: parent.right
