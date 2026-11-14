@@ -60,24 +60,85 @@ export function CommandCard({ showOptionsLink = true }: { showOptionsLink?: bool
     <div className="installer-card">
       <div className="command-line">
         <span className="prompt-symbol" aria-hidden="true">$</span>
-        <textarea id="install-command" aria-label="Loaf installer command for Linux" readOnly rows={2} value={installCommand} onFocus={(event) => event.currentTarget.select()} spellCheck={false} />
-      </div>
-      <div className="installer-actions">
-        <button className={`copy-button${copied ? " is-copied" : ""}`} type="button" onClick={copyCommand} aria-label={copied ? "Installer command copied" : "Copy installer command"}>
-          {copied ? <Check size={17} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-          {copied ? "Copied" : "Copy command"}
+        <textarea
+          id="install-command"
+          aria-label="Loaf installer command for Linux"
+          readOnly
+          rows={3}
+          value={`${installCommand}\n# Paste into a terminal, then choose Try or Install.`}
+          onFocus={(event) => event.currentTarget.select()}
+          spellCheck={false}
+        />
+        <button
+          className={`command-copy${copied ? " is-copied" : ""}`}
+          type="button"
+          onClick={copyCommand}
+          aria-label={copied ? "Installer command copied" : "Copy installer command"}
+        >
+          {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
         </button>
-        {showOptionsLink && (
-          <a className="install-docs" href="/install.html">All install options <ArrowUpRight size={15} aria-hidden="true" /></a>
-        )}
       </div>
-      <p className="copy-status" aria-live="polite">
-        {copied
-          ? "# Copied. Paste it into a terminal, then choose Try or Install."
-          : copyError
-            ? "# Select the command above to copy it."
-            : "# Paste into a terminal, then choose Try or Install."}
-      </p>
+      {showOptionsLink && (
+        <div className="installer-actions">
+          <a className="install-docs" href="/install.html">All install options <ArrowUpRight size={15} aria-hidden="true" /></a>
+        </div>
+      )}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Copied to clipboard." : copyError ? "Select the command to copy it." : ""}
+      </span>
+    </div>
+  );
+}
+
+export function MiniCommand({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+  return (
+    <div className="mini-command">
+      <span className="prompt-symbol" aria-hidden="true">$</span>
+      <code>{code}</code>
+      <button
+        className={`term-copy${copied ? " is-copied" : ""}`}
+        type="button"
+        onClick={copy}
+        aria-label={copied ? "Copied" : "Copy command"}
+      >
+        {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+      </button>
+    </div>
+  );
+}
+
+export function Snippet({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+  return (
+    <div className="alt-pre-wrap">
+      <pre className="alt-pre"><code>{code}</code></pre>
+      <button
+        className={`term-copy pre-copy${copied ? " is-copied" : ""}`}
+        type="button"
+        onClick={copy}
+        aria-label={copied ? "Copied" : "Copy snippet"}
+      >
+        {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+      </button>
     </div>
   );
 }

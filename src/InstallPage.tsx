@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Download, RefreshCw, TriangleAlert } from "lucide-react";
-import { Brand, CommandCard, FooterIslands, repo } from "./components";
+import { ArrowUpRight, Download, Menu, RefreshCw, TriangleAlert, X } from "lucide-react";
+import { Brand, CommandCard, FooterIslands, MiniCommand, Snippet, repo } from "./components";
 import { Markdown } from "./markdown";
 
 const API = "https://api.github.com/repos/m-uvex/loaf-fm/releases?per_page=6";
@@ -9,6 +9,7 @@ type Asset = { name: string; browser_download_url: string; size: number };
 type Release = {
   tag_name: string;
   name: string;
+  target_commitish: string;
   prerelease: boolean;
   draft: boolean;
   published_at: string;
@@ -40,23 +41,21 @@ function fmtDate(iso: string) {
 }
 
 function ChannelCard({ release, kind }: { release: Release; kind: "stable" | "nightly" }) {
+  const isNightly = kind === "nightly";
+  const title = isNightly ? release.target_commitish.slice(0, 7) : release.tag_name;
   const assets = WANTED.map((w) => ({ label: w.label, asset: release.assets.find((a) => w.match(a.name)) })).filter(
     (x): x is { label: string; asset: Asset } => Boolean(x.asset),
   );
   return (
     <section className={`channel-card channel-card--${kind}`} aria-labelledby={`channel-${kind}`}>
       <header className="channel-head">
-        <span className={`channel-pill channel-pill--${kind}`}>{kind === "stable" ? "Stable" : "Nightly"}</span>
-        <h2 id={`channel-${kind}`}>{release.tag_name}</h2>
-        <p className="channel-date">
-          {fmtDate(release.published_at)}
-          {" · "}
-          <a href={release.html_url} target="_blank" rel="noreferrer">
-            Release notes <ArrowUpRight size={13} aria-hidden="true" />
-          </a>
-        </p>
-        {kind === "nightly" && (
-          <p className="nightly-note">Every merge to main, built and published automatically. The freshest fixes and the freshest bugs.</p>
+        <span className={`channel-pill channel-pill--${kind}`}>{isNightly ? "Nightly" : "Stable"}</span>
+        <time className="channel-date" dateTime={release.published_at}>{fmtDate(release.published_at)}</time>
+        <h2 id={`channel-${kind}`}>
+          <a href={release.html_url} target="_blank" rel="noreferrer" title="Open release notes on GitHub">{title}</a>
+        </h2>
+        {isNightly && (
+          <p className="nightly-note">Rebuilt from <code>main</code> on every merge. Fresh fixes, fresh bugs.</p>
         )}
       </header>
       <div className="asset-grid">
@@ -68,22 +67,18 @@ function ChannelCard({ release, kind }: { release: Release; kind: "stable" | "ni
           </a>
         ))}
       </div>
-      {kind === "nightly" && (
+      {isNightly && (
         <div className="nightly-commands">
-          <div className="mini-command">
-            <span className="prompt-symbol" aria-hidden="true">$</span>
-            <code>curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash -s -- --nightly</code>
-          </div>
-          <div className="mini-command">
-            <span className="prompt-symbol" aria-hidden="true">$</span>
-            <code>nix run github:m-uvex/loaf-fm/nightly</code>
-          </div>
+          <MiniCommand code="curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash -s -- --nightly" />
+          <MiniCommand code="nix run github:m-uvex/loaf-fm/nightly" />
         </div>
       )}
       <details className="changelog">
         <summary>Changelog</summary>
-        <div className="changelog-body">
-          <Markdown source={release.body || "No notes for this release yet."} />
+        <div className="changelog-wrap">
+          <div className="changelog-body">
+            <Markdown source={release.body || "No notes for this release yet."} />
+          </div>
         </div>
       </details>
     </section>
@@ -93,6 +88,8 @@ function ChannelCard({ release, kind }: { release: Release; kind: "stable" | "ni
 export default function Install() {
   const [releases, setReleases] = useState<Release[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     fetch(API)
@@ -115,28 +112,38 @@ export default function Install() {
       <div className="hero-wrap install-hero">
         <nav className="hero-nav" aria-label="Site">
           <Brand />
-          <div className="hero-nav-links">
-            <a href="/">Home</a>
-            <a href="#channels">Channels</a>
-            <a href="#alternatives">Other ways in</a>
+          <button
+            className="menu-toggle"
+            type="button"
+            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={menuOpen}
+            aria-controls="install-navigation"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={21} aria-hidden="true" /> : <Menu size={21} aria-hidden="true" />}
+          </button>
+          <div id="install-navigation" className={`primary-nav${menuOpen ? " is-open" : ""}`}>
+            <a href="/" onClick={closeMenu}>Home</a>
+            <a href="#channels" onClick={closeMenu}>Channels</a>
+            <a href="#alternatives" onClick={closeMenu}>Other ways in</a>
+            <a className="nav-cta" href={repo} target="_blank" rel="noreferrer">
+              Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
           </div>
-          <a className="nav-cta" href={repo} target="_blank" rel="noreferrer">
-            Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
-          </a>
         </nav>
 
         <section id="install-content" className="install-head" aria-labelledby="install-title">
-          <p className="section-eyebrow">Installation</p>
-          <h1 id="install-title">Get Loaf running.<br /><span>Pick a channel, run one line.</span></h1>
-          <p className="install-lead">The installer asks a single question: Try it now, or Install it for good. Everything below is pulled live from the releases feed when you open this page.</p>
+          <div className="install-hero-grid">
+            <div className="install-hero-copy">
+              <h1 id="install-title">Get Loaf running.</h1>
+              <p className="install-lead">One command, then choose Try or Install. Below is the latest stable release and the current nightly, fetched from GitHub every time this page opens.</p>
+            </div>
+            <CommandCard showOptionsLink={false} />
+          </div>
         </section>
-
-        <div className="install-terminal section-pad">
-          <CommandCard showOptionsLink={false} />
-        </div>
       </div>
 
-      <div id="channels" className="channel-grid section-pad">
+      <div id="channels" className="channel-grid section-pad" aria-label="Release channels">
         {releases === null && !failed && (
           <>
             <div className="channel-card is-loading"><RefreshCw className="spin" size={22} aria-hidden="true" /><p>Reading the release feed…</p></div>
@@ -179,22 +186,13 @@ export default function Install() {
           <div className="alt-card">
             <h3>AUR (Arch)</h3>
             <p>Community-maintained binary package.</p>
-            <div className="mini-command">
-              <span className="prompt-symbol" aria-hidden="true">$</span>
-              <code>yay -S loaf-fm-bin</code>
-            </div>
+            <MiniCommand code="yay -S loaf-fm-bin" />
           </div>
           <div className="alt-card">
             <h3>Nix / NixOS</h3>
-            <p>Run it directly, or set it up declaratively with your flake.</p>
-            <div className="mini-command">
-              <span className="prompt-symbol" aria-hidden="true">$</span>
-              <code>nix run github:m-uvex/loaf-fm</code>
-            </div>
-            <pre className="alt-pre"><code>{`inputs.loaf.url = "github:m-uvex/loaf-fm";
-# configuration.nix
-nixpkgs.overlays = [ inputs.loaf.overlays.default ];
-environment.systemPackages = [ pkgs.loaf ];`}</code></pre>
+            <p>Run it directly, or wire it into your flake.</p>
+            <MiniCommand code="nix run github:m-uvex/loaf-fm" />
+            <Snippet code={`inputs.loaf.url = "github:m-uvex/loaf-fm";\n# configuration.nix\nnixpkgs.overlays = [ inputs.loaf.overlays.default ];\nenvironment.systemPackages = [ pkgs.loaf ];`} />
           </div>
           <div className="alt-card">
             <h3>Source</h3>

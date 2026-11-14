@@ -22,6 +22,8 @@ function inline(text: string): ReactNode[] {
   return nodes;
 }
 
+const HTML_TAG = /<\/?(?:img|p|div|br|hr|picture|source|video|audio|iframe|details|summary|table|thead|tbody|tfoot|tr|td|th|h[1-6]|ul|ol|li|a|code|pre|span|strong|em|sub|sup|kbd|s|b|i|u|center|blockquote)(?:\s[^>]*)?>/gi;
+
 export function Markdown({ source }: { source: string }) {
   const nodes: ReactNode[] = [];
   const lines = source.replace(/!\[[^\]]*\]\([^)]+\)/g, "").split(/\r?\n/);
@@ -59,11 +61,12 @@ export function Markdown({ source }: { source: string }) {
       fence = [];
       continue;
     }
-    if (/^\s*$/.test(line)) {
+    const clean = line.replace(HTML_TAG, "");
+    if (/^\s*$/.test(clean)) {
       flushList();
       continue;
     }
-    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    const h = clean.match(/^(#{1,6})\s+(.*)$/);
     if (h) {
       flushList();
       nodes.push(
@@ -75,18 +78,18 @@ export function Markdown({ source }: { source: string }) {
       );
       continue;
     }
-    if (/^\s*---+\s*$/.test(line)) {
+    if (/^\s*---+\s*$/.test(clean)) {
       flushList();
       nodes.push(<hr key={nodes.length} />);
       continue;
     }
-    const li = line.match(/^\s*[-*]\s+(.*)$/);
+    const li = clean.match(/^\s*[-*]\s+(.*)$/);
     if (li) {
       list.push(li[1]);
       continue;
     }
     flushList();
-    nodes.push(<p key={nodes.length}>{inline(line)}</p>);
+    nodes.push(<p key={nodes.length}>{inline(clean)}</p>);
   }
   if (fence !== null) {
     nodes.push(

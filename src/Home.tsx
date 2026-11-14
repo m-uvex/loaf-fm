@@ -140,10 +140,7 @@ export default function Home() {
 
       <section id="features" className="features-section section-pad" aria-labelledby="features-title">
         <div className="section-heading">
-          <div>
-            <p className="section-eyebrow">Features</p>
-            <h2 id="features-title">The good bits</h2>
-          </div>
+          <h2 id="features-title">The good bits</h2>
         </div>
 
         <div className="feature-grid">
