@@ -72,6 +72,8 @@ RowLayout {
                 color: theme.textMain
                 font.pixelSize: theme.fs(13)
                 font.bold: true
+                font.weight: theme.fw(true)
+                font.family: theme.fontFamily
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
@@ -83,6 +85,8 @@ RowLayout {
                 text: root.subtitle
                 color: theme.textMuted
                 font.pixelSize: theme.fs(11)
+                font.weight: theme.fontWeight
+                font.family: theme.fontFamily
                 lineHeight: 1.15
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true

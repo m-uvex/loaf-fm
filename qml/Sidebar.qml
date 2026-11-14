@@ -41,7 +41,10 @@ Rectangle {
         }
     }
 
-    readonly property var entries: {
+    property var cachedEntries: []
+    property string entriesFingerprint: ""
+
+    function rebuildEntries() {
         var standardPlaces = [];
         var networkPlaces = [];
 
@@ -77,9 +80,51 @@ Rectangle {
             };
         });
 
-        // Order: regular places, then storage drives, then network shares directly under them
-        return standardPlaces.concat(availableDrives).concat(networkPlaces);
+        var newEntries = standardPlaces.concat(availableDrives).concat(networkPlaces);
+        var fp = newEntries.map(function(e) {
+            return (e.id || "") + "|" + (e.name || "") + "|" + (e.path || "") + "|" + (e.drive ? (e.drive.is_mounted ? "1" : "0") : "") + "|" + (e.missing || false) + "|" + (e.connected || false);
+        }).join(";;;");
+
+        if (fp === entriesFingerprint && cachedEntries.length === newEntries.length) {
+            for (var j = 0; j < cachedEntries.length; ++j) {
+                if (cachedEntries[j].drive && newEntries[j] && newEntries[j].drive) {
+                    cachedEntries[j].drive = newEntries[j].drive;
+                }
+            }
+            return;
+        }
+
+        var savedY = placeList ? placeList.contentY : 0;
+        var focusedId = (focusedButton && focusedButton.entryData) ? focusedButton.entryData.id : "";
+        var wasFocused = (focusedButton && focusedButton.activeFocus);
+
+        entriesFingerprint = fp;
+        cachedEntries = newEntries;
+
+        if (placeList) {
+            Qt.callLater(function() {
+                if (placeList) {
+                    placeList.contentY = Math.max(0, Math.min(placeList.contentHeight - placeList.height, savedY));
+                    if (wasFocused && focusedId.length > 0) {
+                        for (var k = 0; k < placeList.count; ++k) {
+                            var item = placeList.itemAtIndex(k);
+                            if (item && item.modelData && item.modelData.id === focusedId && item.button) {
+                                item.button.forceActiveFocus();
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
+
+    readonly property var entries: cachedEntries
+
+    onPlacesChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
+    onDrivesChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
+    onPickerModeChanged: { rebuildEntries(); Qt.callLater(updateHighlight); }
+    Component.onCompleted: rebuildEntries()
 
     readonly property var trashPlace: {
         for (var i = 0; i < places.length; ++i) {
@@ -94,7 +139,7 @@ Rectangle {
     radius: theme.radiusXl
     color: theme.backdropSurface(theme.surfaceContainer)
     border.width: 1
-    border.color: theme.outlineVariant
+    border.color: theme.outlineAlpha(theme.outlineVariant)
     clip: true
     implicitWidth: expanded ? 200 : 68
     Behavior on implicitWidth { enabled: theme.animate; NumberAnimation { duration: 230; easing.type: Easing.OutCubic } }
@@ -128,7 +173,7 @@ Rectangle {
         y: targetY
 
         Behavior on y {
-            enabled: theme.animate
+            enabled: theme.animate && !placeList.moving && !placeList.flicking
             SpringAnimation { spring: 4.2; damping: 0.38 }
         }
         Behavior on width {
@@ -180,7 +225,6 @@ Rectangle {
     onActiveIdChanged: Qt.callLater(updateHighlight)
     onShowTrashChanged: Qt.callLater(updateHighlight)
     onExpandedChanged: Qt.callLater(updateHighlight)
-    onDrivesChanged: Qt.callLater(updateHighlight)
 
     ColumnLayout {
         anchors.fill: parent
@@ -287,7 +331,7 @@ Rectangle {
             Layout.preferredHeight: 1
             Layout.leftMargin: 12
             Layout.rightMargin: 12
-            color: theme.separator
+            color: theme.outlineAlpha(theme.separator)
             opacity: 0.45
         }
 
@@ -320,10 +364,11 @@ Rectangle {
                 Rectangle {
                     visible: entry.headerHeight > 0
                     x: 12; width: parent.width - 24; height: 1
-                    color: theme.separator; opacity: 0.35
+                    color: theme.outlineAlpha(theme.separator); opacity: 0.35
                 }
                 RailButton {
                     id: entryButton
+                    entryData: entry.modelData
                     anchors.bottom: parent.bottom
                     width: parent.width
                     iconName: entry.modelData.icon
@@ -410,8 +455,10 @@ Rectangle {
                 selected: rail.activeId === "trash"
                 accessibleName: qsTr("Trash")
                 acceptsTrashDrop: true
+                emptyTrashAction: true
                 onClicked: rail.placeClicked(rail.trashPlace, false)
                 onMiddleClicked: rail.placeClicked(rail.trashPlace, true)
+                onEmptyTrashRequested: window.confirmEmptyTrash()
                 onMenuRequested: function(x, y) { rail.placeMenuRequested(rail.trashPlace, x, y); }
                 onFilesDropped: function(paths, asCopy, d) {
                     if (dragManager.isRmb) {
@@ -449,12 +496,21 @@ Rectangle {
         property bool dimmed: false
         property string dropPath: ""
         property bool acceptsTrashDrop: false
+        // Trash tab only: while the pointer is over the row, the icon turns
+        // into a broom button that empties the trash instead of opening it.
+        property bool emptyTrashAction: false
         property string accessibleName: label
+        property var entryData: null
+        readonly property bool containsMouse: mouse.containsMouse
+        readonly property bool showBroom: btn.emptyTrashAction && mouse.containsMouse
+            && typeof core !== "undefined" && core && !core.trash_empty
 
         signal clicked()
         signal middleClicked()
         signal menuRequested(real x, real y)
         signal filesDropped(var paths, bool asCopy, var dropEvent)
+        // Raised instead of clicked() when the broom is showing (hovering the trash tab).
+        signal emptyTrashRequested()
 
         implicitHeight: 44
         height: 44
@@ -471,8 +527,8 @@ Rectangle {
         Keys.onEnterPressed: btn.clicked()
         Keys.onSpacePressed: btn.clicked()
         Accessible.role: Accessible.Button
-        Accessible.name: accessibleName
-        Accessible.onPressAction: btn.clicked()
+        Accessible.name: btn.showBroom ? qsTr("Empty Trash") : accessibleName
+        Accessible.onPressAction: if (btn.showBroom) btn.emptyTrashRequested(); else btn.clicked()
 
         readonly property bool dropHover: drop.containsDrag
 
@@ -498,15 +554,38 @@ Rectangle {
             scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.10 : 1.0)
             Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
 
+            // Trash hold-to-empty: the row's own icon becomes the button,
+            // wrapped in a rotating M3 cookie shape that only appears on hover.
+            LoafShape {
+                anchors.centerIn: parent
+                width: 38
+                height: 38
+                shape: "cookie6"
+                visible: btn.showBroom
+                opacity: btn.showBroom ? 1.0 : 0.0
+                rotation: btn.showBroom ? 135 : 0
+                color: theme.dangerContainer
+                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 3.2; damping: 0.32 } }
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            }
+
             LoafIcon {
-                visible: theme.iconSource === "phosphor" || btn.systemIcon.length === 0
+                visible: (theme.iconSource === "phosphor" || btn.systemIcon.length === 0) && !btn.showBroom
                 anchors.centerIn: parent
                 name: btn.iconName
                 size: 20
                 color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             }
+
+            LoafIcon {
+                visible: btn.showBroom
+                anchors.centerIn: parent
+                name: "broom"
+                size: 18
+                color: theme.danger
+            }
             Image {
-                visible: theme.iconSource !== "phosphor" && btn.systemIcon.length > 0
+                visible: theme.iconSource !== "phosphor" && btn.systemIcon.length > 0 && !btn.showBroom
                 anchors.centerIn: parent
                 source: visible ? window.systemIcon(btn.systemIcon) : ""
                 width: 20
@@ -521,7 +600,7 @@ Rectangle {
             anchors.left: iconBox.right
             anchors.leftMargin: 6
             anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.rightMargin: btn.showLabel ? 52 : 16
             anchors.verticalCenter: parent.verticalCenter
             visible: opacity > 0.01
             opacity: btn.showLabel ? (btn.dimmed ? 0.5 : 1.0) : 0.0
@@ -537,12 +616,10 @@ Rectangle {
             color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             font.pixelSize: theme.fs(13)
             font.bold: btn.selected
+            font.weight: theme.fw(btn.selected)
+            font.family: theme.fontFamily
             elide: Text.ElideRight
         }
-
-        ToolTip.visible: !btn.showLabel && mouse.containsMouse && btn.label.length > 0
-        ToolTip.text: btn.label
-        ToolTip.delay: 500
 
         DropArea {
             id: drop
@@ -565,12 +642,22 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+            onEntered: {
+                if (btn.showLabel)
+                    return;
+                var label = btn.showBroom ? qsTr("Empty Trash") : btn.label;
+                if (label.length > 0)
+                    tooltip.show(btn, label);
+            }
+            onExited: tooltip.hide(btn)
             onClicked: function(m) {
                 if (m.button === Qt.RightButton) {
                     var p = mapToItem(window.contentItem, m.x, m.y);
                     btn.menuRequested(p.x, p.y);
                 } else if (m.button === Qt.MiddleButton) {
                     btn.middleClicked();
+                } else if (btn.showBroom) {
+                    btn.emptyTrashRequested();
                 } else {
                     btn.clicked();
                 }

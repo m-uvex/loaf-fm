@@ -12,6 +12,8 @@ Item {
     property string variant: "text"
     property bool checked: false
     property string accessibleName: ""
+    // Hover label shown after the shared tooltip delay; empty keeps it silent.
+    property string tooltipText: ""
     Accessible.name: accessibleName.length > 0 ? accessibleName : (text.length > 0 ? text : icon)
 
     signal clicked()
@@ -67,7 +69,7 @@ Item {
         anchors.leftMargin: 1
         anchors.rightMargin: 1
         radius: theme.radiusFull
-        color: theme.outlineVariant
+        color: theme.outlineAlpha(theme.outlineVariant)
         opacity: 0.55
     }
 
@@ -77,7 +79,7 @@ Item {
         radius: theme.radiusFull
         color: mouse.containsMouse ? root.hoverBg : root.bgColor
         border.width: root.variant === "outlined" ? 1 : 0
-        border.color: theme.outline
+        border.color: theme.outlineAlpha(theme.outline)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: 120 } }
     }
@@ -100,6 +102,8 @@ Item {
             color: root.fgColor
             font.pixelSize: theme.fs(13)
             font.bold: root.variant === "filled" || root.variant === "tonal"
+            font.weight: theme.fw(root.variant === "filled" || root.variant === "tonal")
+            font.family: theme.fontFamily
         }
     }
 
@@ -109,6 +113,8 @@ Item {
         hoverEnabled: true
         enabled: root.enabled
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (root.tooltipText.length > 0 && typeof tooltip !== "undefined") tooltip.show(root, root.tooltipText)
+        onExited: if (typeof tooltip !== "undefined") tooltip.hide(root)
         onClicked: root.clicked()
     }
 }

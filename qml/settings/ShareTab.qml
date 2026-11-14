@@ -53,7 +53,7 @@ ColumnLayout {
             subtitle: qsTr("Host directly from your machine or use hosted cloud relay")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 110 : 280
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "local", label: qsTr("Own Machine"), icon: "desktop" },
                     { value: "cloud", label: qsTr("Loaf Cloud (Soon)"), icon: "cloud", disabled: true }
@@ -125,7 +125,7 @@ ColumnLayout {
                 radius: theme.radiusM
                 color: theme.surfaceContainerHigh
                 border.width: 1
-                border.color: theme.borderSubtle
+                border.color: theme.outlineAlpha(theme.borderSubtle)
 
                 RowLayout {
                     id: shareItemRow
@@ -216,7 +216,7 @@ ColumnLayout {
             subtitle: qsTr("Select archive format for shared folders or stream raw files")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 280
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "off", label: qsTr("Off"), shortLabel: "Off" },
                     { value: "zip", label: ".zip", shortLabel: ".zip" },
@@ -243,7 +243,7 @@ ColumnLayout {
             subtitle: qsTr("Compress standalone files into an archive before uploading")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 280
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "off", label: qsTr("Off"), shortLabel: "Off" },
                     { value: "zip", label: ".zip", shortLabel: ".zip" },
@@ -343,7 +343,7 @@ ColumnLayout {
             subtitle: qsTr("Automatically terminate the stream and revoke the link after this period")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 160 : 320
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: 1, label: qsTr("1 Hour"), shortLabel: "1h" },
                     { value: 6, label: qsTr("6 Hours"), shortLabel: "6h" },

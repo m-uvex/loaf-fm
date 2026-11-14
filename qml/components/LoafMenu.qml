@@ -110,6 +110,19 @@ LoafPopup {
         return Math.min(menu.menuMaxWidth, Math.ceil(cw + 2 * menu.contentPadding));
     }
 
+    function computeHeight() {
+        var opts = menu.model;
+        if (!opts || opts.length === 0)
+            return 2 * menu.contentPadding;
+        var total = 2 * menu.contentPadding;
+        for (var i = 0; i < opts.length; ++i) {
+            total += 36;
+            if (opts[i] && opts[i].separatorBefore)
+                total += 11;
+        }
+        return Math.min(total, menu.maxMenuHeight);
+    }
+
     function animatableRows() {
         var out = [];
         var kids = rowsView.contentItem ? rowsView.contentItem.children : [];
@@ -134,7 +147,7 @@ LoafPopup {
         var list = menu.animatableRows();
         for (var i = 0; i < list.length; i++) {
             var item = list[i];
-            var delay = i * 22;
+            var delay = Math.min(i * 18, 180);
             if (typeof item.playPop === "function")
                 item.playPop(delay);
             else if (typeof item.popIn === "function")
@@ -235,6 +248,10 @@ LoafPopup {
         obj.parentMenu = menu;
         if (parentItem)
             obj.parent = parentItem;
+        obj.closed.connect(function() {
+            if (!menu.contentHovered)
+                menu.highlightIndex = -1;
+        });
         menu.currentSubmenu = obj;
         return obj;
     }
@@ -250,7 +267,12 @@ LoafPopup {
             return;
         sm.model = submenuModel;
         sm.parentMenu = menu;
-        sm.openRightOf(anchorItem);
+        sm.openAdjacentTo(anchorItem, menu);
+        // The popup is already open when hopping between sibling submenus, so
+        // Popup.aboutToShow never fires and the new rows would appear frozen.
+        // Re-run the entrance curve after the delegates exist.
+        if (sm.opened)
+            Qt.callLater(function() { if (sm) sm.animateIn(); });
     }
 
     function openSubmenuAt(index) {
@@ -274,6 +296,8 @@ LoafPopup {
         hideTimer.stop();
         if (menu.currentSubmenu && menu.currentSubmenu.opened)
             menu.currentSubmenu.close();
+        if (!menu.contentHovered)
+            menu.highlightIndex = -1;
     }
 
     function isNestedMenu() {
@@ -339,6 +363,7 @@ LoafPopup {
         boundsBehavior: Flickable.StopAtBounds
         model: menu.model
         ScrollBar.vertical: ScrollBar { policy: rowsView.contentHeight > rowsView.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+        onContentHeightChanged: if (menu.opened) menu.reposition()
 
         delegate: ColumnLayout {
             id: rowWrap
@@ -361,7 +386,7 @@ LoafPopup {
                 Layout.bottomMargin: 5
                 Layout.leftMargin: 10
                 Layout.rightMargin: 10
-                color: theme.separator
+                color: theme.outlineAlpha(theme.separator)
                 visible: rowWrap.entry ? rowWrap.entry.separatorBefore === true : false
 
                 SequentialAnimation {
@@ -404,12 +429,18 @@ LoafPopup {
                 onTriggered: menu.activate(rowWrap.rowIndex)
                 onSubmenuHovered: menu.openSubmenuAt(rowWrap.rowIndex)
                 onHoveredChanged: {
-                    if (!row.hovered)
-                        return;
-                    if (row.hasSubmenu)
-                        menu.openSubmenuAt(rowWrap.rowIndex);
-                    else
-                        menu.hideSubmenuSoon();
+                    if (row.hovered) {
+                        menu.highlightIndex = rowWrap.rowIndex;
+                        if (row.hasSubmenu)
+                            menu.openSubmenuAt(rowWrap.rowIndex);
+                        else
+                            menu.hideSubmenuSoon();
+                    } else {
+                        if (!row.hasSubmenu || !menu.currentSubmenu || !menu.currentSubmenu.opened) {
+                            if (menu.highlightIndex === rowWrap.rowIndex)
+                                menu.highlightIndex = -1;
+                        }
+                    }
                 }
             }
         }

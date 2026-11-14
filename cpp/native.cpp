@@ -35,9 +35,16 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QQuickItem>
+#include <QFont>
+#include <QWheelEvent>
+#include <QKeyEvent>
+#include <QDateTime>
+#include <QStyleHints>
 #include <QTimer>
 #include <QTranslator>
 #include <QUrl>
+#include <algorithm>
 
 namespace loaf {
 
@@ -296,6 +303,149 @@ bool forward_to_running_instance(const rust::Vec<rust::String> &paths, rust::Str
     return reply.type() == QDBusMessage::ReplyMessage;
 }
 
+int LoafNative::systemScrollLines() const
+{
+    int lines = QGuiApplication::styleHints()->wheelScrollLines();
+    return lines > 0 ? lines : 3;
+}
+
+void LoafNative::setApplicationFont(const QString &family, int weight)
+{
+    QFont f;
+    if (!family.trimmed().isEmpty()) {
+        f.setFamily(family.trimmed());
+    }
+    if (weight > 0) {
+        f.setWeight(static_cast<QFont::Weight>(std::clamp(weight, 100, 900)));
+    }
+    QGuiApplication::setFont(f);
+}
+
+class WheelEventFilter : public QObject
+{
+public:
+    explicit WheelEventFilter(LoafNative *native, QObject *parent = nullptr)
+        : QObject(parent), m_native(native) {}
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() == QEvent::KeyPress) {
+            auto *ke = static_cast<QKeyEvent *>(event);
+            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
+                m_spacePressTime = QDateTime::currentMSecsSinceEpoch();
+                m_spaceHeld = true;
+                Q_EMIT m_native->spacePressed();
+            }
+        } else if (event->type() == QEvent::KeyRelease) {
+            auto *ke = static_cast<QKeyEvent *>(event);
+            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
+                qint64 held = QDateTime::currentMSecsSinceEpoch() - m_spacePressTime;
+                bool wasHeld = m_spaceHeld;
+                m_spaceHeld = false;
+                if (wasHeld) {
+                    Q_EMIT m_native->spaceReleased(held);
+                }
+            }
+        } else if (event->type() == QEvent::Wheel) {
+            auto *we = static_cast<QWheelEvent *>(event);
+            if (we->modifiers() & Qt::ControlModifier) {
+                int dy = we->angleDelta().y();
+                if (dy == 0)
+                    dy = we->pixelDelta().y() * 40;
+                m_accumulatedZoomDelta += dy;
+                if (std::abs(m_accumulatedZoomDelta) >= 120) {
+                    int steps = m_accumulatedZoomDelta / 120;
+                    m_accumulatedZoomDelta %= 120;
+                    Q_EMIT m_native->ctrlScroll(steps > 0 ? 1 : -1);
+                }
+                we->accept();
+                return true;
+            }
+
+            m_accumulatedZoomDelta = 0;
+
+            auto *window = qobject_cast<QQuickWindow *>(watched);
+            if (!window) {
+                if (auto *item = qobject_cast<QQuickItem *>(watched))
+                    window = item->window();
+            }
+            if (window && window->contentItem()) {
+                QQuickItem *flickable = findScrollableAt(window->contentItem(), we->position());
+                if (flickable) {
+                    int lines = m_native->systemScrollLines();
+                    qreal stepPerLine = 40.0;
+                    qreal dy = 0.0;
+                    qreal dx = 0.0;
+
+                    if (we->pixelDelta().y() != 0) {
+                        dy = we->pixelDelta().y() * (lines / 3.0);
+                    } else if (we->angleDelta().y() != 0) {
+                        dy = (we->angleDelta().y() / 120.0) * lines * stepPerLine;
+                    }
+
+                    if (we->pixelDelta().x() != 0) {
+                        dx = we->pixelDelta().x() * (lines / 3.0);
+                    } else if (we->angleDelta().x() != 0) {
+                        dx = (we->angleDelta().x() / 120.0) * lines * stepPerLine;
+                    }
+
+                    qreal contentY = flickable->property("contentY").toReal();
+                    qreal contentHeight = flickable->property("contentHeight").toReal();
+                    qreal h = flickable->height();
+                    qreal maxY = std::max(0.0, contentHeight - h);
+
+                    qreal contentX = flickable->property("contentX").toReal();
+                    qreal contentWidth = flickable->property("contentWidth").toReal();
+                    qreal w = flickable->width();
+                    qreal maxX = std::max(0.0, contentWidth - w);
+
+                    if (maxY > 0.0 && dy != 0.0) {
+                        qreal newY = std::max(0.0, std::min(maxY, contentY - dy));
+                        flickable->setProperty("contentY", newY);
+                        we->accept();
+                        return true;
+                    } else if (maxX > 0.0 && (dx != 0.0 || dy != 0.0)) {
+                        qreal scrollDelta = (dx != 0.0) ? dx : dy;
+                        qreal newX = std::max(0.0, std::min(maxX, contentX - scrollDelta));
+                        flickable->setProperty("contentX", newX);
+                        we->accept();
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+private:
+    static QQuickItem *findScrollableAt(QQuickItem *parent, const QPointF &pos)
+    {
+        if (!parent || !parent->isVisible() || !parent->isEnabled())
+            return nullptr;
+        const auto children = parent->childItems();
+        for (int i = children.size() - 1; i >= 0; --i) {
+            QQuickItem *child = children.at(i);
+            if (!child->isVisible() || !child->isEnabled())
+                continue;
+            QPointF childPos = child->mapFromItem(parent, pos);
+            if (child->contains(childPos)) {
+                QQuickItem *found = findScrollableAt(child, childPos);
+                if (found)
+                    return found;
+            }
+        }
+        if (parent->inherits("QQuickFlickable"))
+            return parent;
+        return nullptr;
+    }
+
+    LoafNative *m_native;
+    int m_accumulatedZoomDelta = 0;
+    qint64 m_spacePressTime = 0;
+    bool m_spaceHeld = false;
+};
+
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode)
 {
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
@@ -356,6 +506,9 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
 
     engine.rootContext()->setContextProperty(QStringLiteral("nativeBridge"), native);
     engine.addImageProvider(QStringLiteral("thumb"), new ThumbnailProvider);
+
+    auto *wheelFilter = new WheelEventFilter(native, &engine);
+    QCoreApplication::instance()->installEventFilter(wheelFilter);
 }
 
 rust::String mime_type_for(rust::Str path, bool sniff)

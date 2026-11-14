@@ -40,7 +40,7 @@ Rectangle {
     height: 46
     radius: theme.radiusFull
     color: kind === "error" ? theme.dangerContainer : theme.surfaceContainerHighest
-    border.color: theme.outlineVariant
+    border.color: theme.outlineAlpha(theme.outlineVariant)
     border.width: 1
     Accessible.role: Accessible.AlertMessage
     Accessible.name: message

@@ -78,8 +78,13 @@ public:
     bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
     bool alphaBuffer() const;
+    Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
 
 Q_SIGNALS:
+    void ctrlScroll(int delta);
+    void spacePressed();
+    void spaceReleased(qint64 heldDuration);
     void clipboardChanged();
     void mtpDevicesChanged();
     // mode: "tab" (open folders), "select" (show items), "properties",

@@ -37,6 +37,11 @@ Window {
     property bool answered: false
     property bool pathEditing: false
 
+    // One shared hover tooltip for this window (components/LoafTooltip.qml),
+    // so icon-only controls here get the same 1s delay and toggle as the main
+    // window.
+    LoafTooltip { id: tooltip }
+
     readonly property string acceptLabel: {
         if ((request.accept_label || "").length > 0)
             return request.accept_label.replace(/_(_)?/g, function(match, escaped) { return escaped ? "_" : ""; });
@@ -397,13 +402,25 @@ Window {
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
-                color: pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer
+                color: theme.backdropSurface(pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer)
+                border.width: pathEditing ? 2 : 1
+                border.color: pathEditing ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                 clip: true
 
                 MouseArea {
+                    id: pathBarMouse
                     anchors.fill: parent
+                    enabled: !pathEditing
+                    cursorShape: theme.pathBarMode === "text" ? Qt.IBeamCursor : Qt.ArrowCursor
+                    onClicked: {
+                        if (theme.pathBarMode === "text")
+                            startEditingPath();
+                        else
+                            defocusInputs();
+                    }
                     onDoubleClicked: startEditingPath()
-                    onClicked: defocusInputs()
                 }
 
                 RowLayout {
@@ -422,6 +439,7 @@ Window {
                     TextInput {
                         id: pathInput
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         visible: pathEditing
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
@@ -446,13 +464,22 @@ Window {
                             }
                             event.accepted = true;
                         }
-                        onActiveFocusChanged: if (!activeFocus && pathEditing) pathEditing = false
+                        onActiveFocusChanged: {
+                            if (!activeFocus && pathEditing) {
+                                Qt.callLater(function() {
+                                    if (pathEditing && !pathInput.activeFocus) {
+                                        pathEditing = false;
+                                    }
+                                });
+                            }
+                        }
                     }
 
                     // Read-only path mirror for "text only" mode.
                     Text {
                         visible: !pathEditing
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         text: pane.engine.location_kind === "dir" || pane.engine.location_kind === "archive"
                             ? pane.engine.current_path : pane.engine.location_kind + "://"
                         color: theme.textMain
@@ -518,7 +545,7 @@ Window {
                                 anchors.fill: parent
                                 radius: theme.radiusFull
                                 color: crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay)
-                                border.color: crumbDelegate.modelData.is_forward ? theme.outline : "transparent"
+                                border.color: crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent"
                                 border.width: crumbDelegate.modelData.is_forward ? 1 : 0
                                 opacity: (chip.isCurrent || crumbDelegate.modelData.is_forward || chipMouse.containsMouse) ? 1.0 : 0.0
                                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
@@ -567,7 +594,7 @@ Window {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -581,9 +608,9 @@ Window {
                 Layout.preferredWidth: 230
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
-                color: theme.surfaceContainer
+                color: theme.backdropSurface(searchField.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchField.activeFocus ? 2 : 1
-                border.color: searchField.activeFocus ? theme.primary : theme.outlineVariant
+                border.color: searchField.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
                 RowLayout {
                     anchors.fill: parent
@@ -610,7 +637,7 @@ Window {
 
                         Text {
                             text: pane.engine.location_kind === "search" ? qsTr("Search…") : qsTr("Filter this folder…")
-                            color: theme.outline
+                            color: theme.outlineAlpha(theme.outline)
                             font.pixelSize: theme.fs(13)
                             visible: !searchField.text && !searchField.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -711,7 +738,7 @@ Window {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            color: theme.outlineVariant
+            color: theme.outlineAlpha(theme.outlineVariant)
         }
 
         ColumnLayout {

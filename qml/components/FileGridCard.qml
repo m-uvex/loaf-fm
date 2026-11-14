@@ -96,7 +96,8 @@ Item {
                 anchors.centerIn: parent
                 name: card.isCut ? (card.itemIsDir ? "folder-dashed" : "file-dashed") : (card.itemIcon || "file")
                 size: viewPane ? viewPane.iconSize : 24
-                color: card.isSelected ? theme.secondaryContainerFg : (card.itemIsDir ? theme.primary : theme.textMain)
+                color: card.isSelected ? theme.secondaryContainerFg
+                    : (theme.tintIcon(card.itemIsDir) ? theme.iconColorValue : theme.textMain)
             }
 
             Image {
@@ -139,7 +140,7 @@ Item {
                     anchors.fill: parent
                     radius: Math.min(width, height) / 6
                     color: "transparent"
-                    border.color: card.isSelected ? theme.primary : theme.outlineVariant
+                    border.color: card.isSelected ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                     border.width: 1
                     opacity: card.isSelected ? 0.75 : 0.35
                 }
@@ -148,7 +149,7 @@ Item {
                 visible: card.itemIsSymlink
                 width: 14; height: 14; radius: 7
                 color: theme.surfaceContainer
-                border.color: theme.outlineVariant
+                border.color: theme.outlineAlpha(theme.outlineVariant)
                 border.width: 1
                 anchors.bottom: parent.bottom
                 anchors.right: parent.right
@@ -178,6 +179,8 @@ Item {
                     color: card.isSelected ? theme.secondaryContainerFg : theme.textMain
                     font.pixelSize: theme.fs(11)
                     font.bold: card.itemIsDir || card.isSelected
+                    font.weight: theme.fw(card.itemIsDir || card.isSelected)
+                    font.family: theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignTop
                     wrapMode: Text.WrapAnywhere
@@ -255,6 +258,10 @@ Item {
                 }
             } else {
                 if (typeof contextMenu !== "undefined" && contextMenu) contextMenu.close();
+                if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
+                    if (viewPane) viewPane.openRow(card.itemIndex);
+                    return;
+                }
                 var wasOnlySelected = card.isSelected && viewPane && viewPane.selectedCount === 1;
                 if (viewPane)
                     viewPane.selectRow(card.itemIndex, !!(mouse.modifiers & Qt.ControlModifier), !!(mouse.modifiers & Qt.ShiftModifier));

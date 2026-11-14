@@ -57,7 +57,7 @@ Item {
         radius: theme.radiusFull
         color: mouse.containsMouse || root.open ? Qt.lighter(theme.surfaceContainerHigh, 1.08) : theme.surfaceContainerHigh
         border.width: root.open ? 2 : 1
-        border.color: root.open ? theme.primary : theme.outlineVariant
+        border.color: root.open ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
         Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }

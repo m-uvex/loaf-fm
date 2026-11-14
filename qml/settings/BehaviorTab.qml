@@ -22,6 +22,7 @@ ColumnLayout {
 
     readonly property bool matchOpenDirs: matches("open folders directories navigation split view new tab current view")
     readonly property bool matchArchives: matches("open archives zip tar 7z enter extract browse default app")
+    readonly property bool matchClickToOpen: matches("click to open single click double click behavior folder file")
     readonly property bool matchDrag: matches("left click drag action selection box pan scroll view rubberband marquee mouse")
     readonly property bool matchHidden: matches("show hidden files dot dotfiles folders")
     readonly property bool matchDisambig: matches("disambiguate duplicate names parent folder prefix search")
@@ -30,7 +31,7 @@ ColumnLayout {
     readonly property bool matchSession: matches("session restore tabs remember last folder window startup launch")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
-        ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
+        ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchClickToOpen ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
             + (matchDisambig ? 1 : 0) + (matchRename ? 1 : 0) + (matchSearch ? 1 : 0) + (matchSession ? 1 : 0))
         : 0
 
@@ -39,7 +40,7 @@ ColumnLayout {
 
     // Category 1: Browsing & Navigation
     SettingCard {
-        visible: root.matchOpenDirs || root.matchArchives || root.matchDrag || root.matchHidden || root.matchDisambig
+        visible: root.matchOpenDirs || root.matchArchives || root.matchClickToOpen || root.matchDrag || root.matchHidden || root.matchDisambig
         title: qsTr("Browsing & Navigation")
         subtitle: qsTr("Folder opening mode, drag actions, and file visibility")
         icon: "folder-notch-open"
@@ -51,7 +52,7 @@ ColumnLayout {
             subtitle: qsTr("Where newly clicked directories should navigate")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 280
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "current", label: qsTr("Current"), icon: "folder", shortLabel: "Current" },
                     { value: "split", label: qsTr("Split"), icon: "columns", shortLabel: "Split" },
@@ -62,7 +63,26 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchOpenDirs && (root.matchArchives || root.matchDrag || root.matchHidden || root.matchDisambig) }
+        SettingDivider { visible: root.matchOpenDirs && (root.matchArchives || root.matchClickToOpen || root.matchDrag || root.matchHidden || root.matchDisambig) }
+
+        SettingRow {
+            visible: root.matchClickToOpen
+            icon: "cursor-click"
+            title: qsTr("Click to open")
+            subtitle: qsTr("Choose whether a single click or a double click opens files and folders")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
+                options: [
+                    { value: "double", label: qsTr("Double-click"), shortLabel: qsTr("Double"), icon: "cursor-click" },
+                    { value: "single", label: qsTr("Single-click"), shortLabel: qsTr("Single"), icon: "cursor" }
+                ]
+                value: theme.clickToOpen
+                onSelected: function(v) { theme.clickToOpen = v; }
+            }
+        }
+
+        SettingDivider { visible: (root.matchOpenDirs || root.matchClickToOpen) && (root.matchArchives || root.matchDrag || root.matchHidden || root.matchDisambig) }
 
         SettingRow {
             visible: root.matchArchives
@@ -82,7 +102,7 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchArchives && (root.matchDrag || root.matchHidden || root.matchDisambig) }
+        SettingDivider { visible: (root.matchOpenDirs || root.matchClickToOpen || root.matchArchives) && (root.matchDrag || root.matchHidden || root.matchDisambig) }
 
         SettingRow {
             visible: root.matchDrag
@@ -91,7 +111,7 @@ ColumnLayout {
             subtitle: qsTr("Choose whether dragging on empty space creates a selection box or pans the view")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 90 : 260
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
                 options: [
                     { value: "select", label: qsTr("Selection Box"), icon: "bounding-box" },
                     { value: "scroll", label: qsTr("Pan View"), icon: "hand-grabbing" }

@@ -11,7 +11,7 @@ Popup {
 
     property real contentPadding: 10
     property color surfaceColor: theme.menuSurface
-    property color borderColor: theme.borderSubtle
+    property color borderColor: theme.outlineAlpha(theme.borderSubtle)
     property real surfaceRadius: theme.radiusL
 
     // Children land in the host ColumnLayout.
@@ -26,10 +26,11 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     transformOrigin: Item.Center
-    scale: 0.85
+    scale: 0.8
     opacity: 0.0
 
     enter: Transition {
+        enabled: theme.animate
         ParallelAnimation {
             NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 220; easing.type: Easing.OutCubic }
             NumberAnimation { property: "scale"; from: 0.8; to: 1.0; duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
@@ -37,6 +38,7 @@ Popup {
     }
 
     exit: Transition {
+        enabled: theme.animate
         ParallelAnimation {
             NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 160; easing.type: Easing.InCubic }
             NumberAnimation { property: "scale"; from: 1.0; to: 0.85; duration: 160; easing.type: Easing.InCubic }
@@ -96,8 +98,7 @@ Popup {
     function openAt(px, py) {
         popup.requestedX = px;
         popup.requestedY = py;
-        popup.x = px;
-        popup.y = py;
+        popup.reposition();
         popup.open();
         popup.reposition();
     }
@@ -105,7 +106,8 @@ Popup {
     function reposition() {
         var margin = 10;
         var w = popup.width > 0 ? popup.width : (popup.implicitWidth > 0 ? popup.implicitWidth : 200);
-        var h = popup.height > 0 ? popup.height : (popup.implicitHeight > 0 ? popup.implicitHeight : 120);
+        var h = (typeof popup.computeHeight === "function") ? popup.computeHeight()
+            : (popup.height > 0 ? popup.height : (popup.implicitHeight > 0 ? popup.implicitHeight : 120));
         var winW = popup.winWidth();
         var winH = popup.winHeight();
 
@@ -125,6 +127,7 @@ Popup {
     }
 
     onOpened: popup.reposition()
+    onHeightChanged: if (popup.opened) popup.reposition()
 
     function openBelow(anchorItem) {
         if (!anchorItem || !anchorItem.mapToItem) return;
@@ -136,5 +139,37 @@ Popup {
         if (!anchorItem || !anchorItem.mapToItem) return;
         var p = anchorItem.mapToItem(null, anchorItem.width, 0);
         popup.openAt(p.x, p.y);
+    }
+
+    function openAdjacentTo(anchorItem, parentMenu) {
+        if (!anchorItem || !anchorItem.mapToItem) return;
+        var p = anchorItem.mapToItem(null, 0, 0);
+        var winW = popup.winWidth();
+        var winH = popup.winHeight();
+        var margin = 10;
+        var w = popup.width > 0 ? popup.width : (popup.implicitWidth > 0 ? popup.implicitWidth : 200);
+        var h = (typeof popup.computeHeight === "function") ? popup.computeHeight()
+            : (popup.height > 0 ? popup.height : 120);
+
+        var parentX = parentMenu ? parentMenu.x : p.x;
+        var parentW = parentMenu ? parentMenu.width : anchorItem.width;
+
+        var tx = parentX + parentW - 4;
+        if (tx + w > winW - margin) {
+            tx = Math.max(margin, parentX - w + 4);
+        }
+
+        var ty = p.y - popup.contentPadding;
+        if (ty + h > winH - margin) {
+            ty = Math.max(margin, winH - h - margin);
+        }
+        ty = Math.max(margin, ty);
+
+        popup.requestedX = tx;
+        popup.requestedY = ty;
+        popup.x = tx;
+        popup.y = ty;
+        popup.open();
+        popup.reposition();
     }
 }
