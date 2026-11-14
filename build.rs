@@ -47,6 +47,7 @@ fn main() {
             .qml_file("qml/settings/ExperimentalTab.qml")
             .qml_file("qml/settings/ShareTab.qml")
             .qml_file("qml/settings/NetworkTab.qml")
+            .qml_file("qml/settings/ShortcutsTab.qml")
             .qml_file("qml/settings/AboutTab.qml"),
     )
     .qt_module("DBus")
