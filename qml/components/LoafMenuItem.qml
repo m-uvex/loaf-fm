@@ -223,4 +223,8 @@ Item {
                 root.triggered();
         }
     }
+
+    Accessible.role: root.checkable ? Accessible.RadioButton : Accessible.Button
+    Accessible.name: root.text
+    Accessible.checked: root.checkable && root.checked
 }

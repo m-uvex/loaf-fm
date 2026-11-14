@@ -13,8 +13,15 @@ Item {
 
     property bool checked: false
     property string label: ""
+    // Optional shortcut hint rendered between the label and the track.
+    property string shortcut: ""
 
     signal toggled(bool checked)
+
+    function toggle() {
+        root.checked = !root.checked;
+        root.toggled(root.checked);
+    }
 
     transform: Translate { id: switchTranslate; y: 0 }
 
@@ -59,6 +66,15 @@ Item {
             font.pixelSize: theme.fs(13)
             Layout.fillWidth: root.label.length > 0
             elide: Text.ElideRight
+        }
+
+        Text {
+            visible: root.shortcut.length > 0
+            text: root.shortcut
+            color: theme.outlineAlpha(theme.outline)
+            font.pixelSize: theme.fs(11)
+            font.family: theme.fontFamily
+            Layout.alignment: Qt.AlignHCenter
         }
 
         Rectangle {
@@ -108,11 +124,12 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.checked = !root.checked;
-                    root.toggled(root.checked);
-                }
+                onClicked: root.toggle()
             }
         }
     }
+
+    Accessible.role: Accessible.CheckBox
+    Accessible.name: root.label
+    Accessible.description: root.checked ? qsTr("On") : qsTr("Off")
 }

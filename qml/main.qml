@@ -1694,79 +1694,167 @@ ApplicationWindow {
                     }
                 }
             }
+            // M3E segmented pair: one pill silhouette, two independent
+            // buttons. The group clip gives the outer corners the full pill
+            // radius while each half paints its own small radius, so the seam
+            // corners read square and the pair reads as connected.
             Rectangle {
-                id: viewDropdownButton
+                id: viewBtnGroup
                 visible: window.activeView === "files"
                 Layout.preferredHeight: 42
-                Layout.preferredWidth: viewRow.implicitWidth + 20
-                Layout.minimumWidth: viewRow.implicitWidth + 20
+                Layout.preferredWidth: 42 + 1 + viewTextRow.implicitWidth + 20
+                Layout.minimumWidth: 42 + 1 + viewTextRow.implicitWidth + 20
                 radius: theme.radiusFull
                 color: theme.backdropSurface(theme.surfaceContainer)
-                border.width: 1
-                border.color: theme.outlineAlpha(theme.outlineVariant)
+                border.width: viewIconBtn.activeFocus || viewTextView.activeFocus ? 2 : 1
+                border.color: viewIconBtn.activeFocus || viewTextView.activeFocus
+                    ? theme.primary
+                    : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 RowLayout {
-                    id: viewRow
-                    anchors.centerIn: parent
-                    spacing: 4
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    spacing: 0
+
                     Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: cycleMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                        id: viewIconBtn
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 42
+                        Layout.minimumWidth: 42
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("Toggle grid or list view")
+                        Accessible.onPressAction: viewIconBtn.toggleView()
+                        Keys.onReturnPressed: viewIconBtn.toggleView()
+                        Keys.onEnterPressed: viewIconBtn.toggleView()
+                        Keys.onSpacePressed: function(event) { viewIconBtn.toggleView(); event.accepted = true; }
+
+                        function toggleView() {
+                            engine.set_view(engine.view_mode === "grid" ? "list" : "grid");
+                        }
+
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewIconBtn.height; height: viewIconBtn.height
+                            radius: viewIconBtn.height / 2
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: viewIconBtn.height / 2; y: 0
+                            width: viewIconBtn.width - viewIconBtn.height / 2
+                            height: viewIconBtn.height
+                            radius: theme.radiusS
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+
                         LoafIcon {
                             anchors.centerIn: parent
                             name: engine.view_mode === "list" ? "list" : "squares-four"
                             size: 16
-                            color: theme.primary
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainerFg
+                                : theme.primary
                         }
+
                         MouseArea {
-                            id: cycleMouse
+                            id: viewIconArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: engine.set_view(engine.view_mode === "grid" ? "list" : "grid")
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewIconBtn, viewIconBtn.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewIconBtn)
+                            onClicked: viewIconBtn.toggleView()
                         }
                     }
-                    Item {
-                        implicitWidth: dropRow.implicitWidth + 10
-                        implicitHeight: 32
+
+                    Rectangle {
+                        id: viewSeam
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 1
+                        color: theme.outlineAlpha(theme.outlineVariant)
+                    }
+
+                    Rectangle {
+                        id: viewTextView
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: viewTextRow.implicitWidth + 20
+                        Layout.minimumWidth: viewTextRow.implicitWidth + 20
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("View options")
+                        Accessible.onPressAction: viewTextView.toggleMenu()
+                        Keys.onReturnPressed: viewTextView.toggleMenu()
+                        Keys.onEnterPressed: viewTextView.toggleMenu()
+                        Keys.onSpacePressed: function(event) { viewTextView.toggleMenu(); event.accepted = true; }
+
+                        function toggleMenu() {
+                            if (viewMenu.visible)
+                                viewMenu.close();
+                            else
+                                viewMenu.openViewMenu();
+                        }
 
                         Rectangle {
-                            anchors.fill: parent
-                            radius: 16
-                            color: dropMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            x: viewTextView.width - viewTextView.height; y: 0
+                            width: viewTextView.height; height: viewTextView.height
+                            radius: viewTextView.height / 2
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewTextView.width - viewTextView.height / 2
+                            height: viewTextView.height
+                            radius: theme.radiusS
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
                         }
 
                         RowLayout {
-                            id: dropRow
+                            id: viewTextRow
                             anchors.centerIn: parent
-                            spacing: 5
-                            Text { visible: window.width >= 900; text: qsTr("View"); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outlineAlpha(theme.outline) }
+                            spacing: 6
+                            Text {
+                                visible: window.width >= 900
+                                text: qsTr("View")
+                                font.pixelSize: theme.fs(12)
+                                font.bold: true
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.textMain
+                            }
+                            LoafIcon {
+                                name: "caret-down"
+                                size: 11
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.outlineAlpha(theme.outline)
+                                rotation: viewMenu.visible ? 180 : 0
+                                Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 160 } }
+                            }
                         }
 
                         MouseArea {
-                            id: dropMouse
+                            id: viewTextArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (viewMenuPopup.visible) {
-                                    viewMenuPopup.close();
-                                } else {
-                                    var pt = mapToItem(window.contentItem, viewDropdownButton.width - viewMenuPopup.width, viewDropdownButton.height + 6);
-                                    viewMenuPopup.openAt(pt.x, pt.y);
-                                }
-                            }
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewTextView, viewTextView.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewTextView)
+                            onClicked: viewTextView.toggleMenu()
                         }
                     }
                 }
             }
-
             Rectangle {
                 id: mainEmptyTrashChip
                 visible: window.activeView === "files" && engine.location_kind === "trash" && engine.item_count > 0
@@ -3056,82 +3144,42 @@ ApplicationWindow {
         }
     }
     LoafMenu {
-        id: viewMenuPopup
-        menuMinWidth: 290
-        menuMaxWidth: 340
+        id: viewMenu
+        menuMinWidth: 240
+        menuMaxWidth: 320
         model: []
 
-        Flickable {
-            id: viewMenuFlickable
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(viewMenuContent.implicitHeight, Math.max(120, window.height - 40))
-            contentWidth: width
-            contentHeight: viewMenuContent.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar { policy: viewMenuFlickable.contentHeight > viewMenuFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+        // Rebuilt on every open so checkmarks track engine state exactly.
+        // Same LoafMenu the RMB context menu uses; the button drops it
+        // below itself, right-aligned.
+        function openViewMenu() {
+            var sortKeys = ["name", "modified", "size", "type"];
+            var sortLabels = [qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
+            var groupKeys = ["none", "name", "modified", "size", "type"];
+            var groupLabels = [qsTr("None"), qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
 
-            ColumnLayout {
-                id: viewMenuContent
-                width: viewMenuFlickable.width
-                spacing: 4
-
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("VIEW MODE"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "grid", label: qsTr("Grid"), icon: "squares-four" }, { value: "list", label: qsTr("List"), icon: "list" }]
-                    value: engine.view_mode
-                    onSelected: function(v) { engine.set_view(v); }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 8; Layout.rightMargin: 8
-                    Text { text: qsTr("Icon size"); color: theme.textMain; font.pixelSize: theme.fs(12); Layout.fillWidth: true }
-                    LoafButton { icon: "magnifying-glass-minus"; variant: "tonal"; enabled: theme.zoomIndex > 0; onClicked: theme.stepZoom(-1) }
-                    Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                    LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.group_by === "modified"; onTriggered: engine.set_group("modified", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.group_by === "size"; onTriggered: engine.set_group("size", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.group_by === "type"; onTriggered: engine.set_group("type", engine.group_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    visible: engine.group_by !== "none"
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.group_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.sort_by === "size"; onTriggered: engine.set_sort("size", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.sort_by === "type"; onTriggered: engine.set_sort("type", engine.sort_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.sort_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_sort(engine.sort_by, v === "asc"); }
-                }
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("FOLDERS"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "first", label: qsTr("First") }, { value: "last", label: qsTr("Last") }, { value: "mixed", label: qsTr("Mixed") }]
-                    value: engine.folder_position
-                    onSelected: function(v) { engine.change_folder_position(v); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
-                LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
-            }
+            var m = [];
+            m.push({ text: qsTr("Grid"), icon: "squares-four", checkable: true, checked: engine.view_mode === "grid", action: function() { engine.set_view("grid"); } });
+            m.push({ text: qsTr("List"), icon: "list", checkable: true, checked: engine.view_mode === "list", action: function() { engine.set_view("list"); } });
+            m.push({ text: qsTr("Icon Size"), icon: "magnifying-glass", separatorBefore: true, submenu: theme.zoomLevels.map(function(z, i) {
+                return { text: Math.round(z * 100) + "%", checkable: true, checked: theme.zoomIndex === i, action: function() { theme.zoomIndex = i; } };
+            }) });
+            m.push({ text: qsTr("Folders"), icon: "folder", separatorBefore: true, submenu: ["first", "last", "mixed"].map(function(v) {
+                var label = v === "first" ? qsTr("Folders First") : (v === "last" ? qsTr("Folders Last") : qsTr("Mixed"));
+                return { text: label, checkable: true, checked: engine.folder_position === v, action: function() { engine.change_folder_position(v); } };
+            }) });
+            m.push({ text: qsTr("Sort By"), icon: "arrow-down", separatorBefore: true, submenu: sortKeys.map(function(k, i) {
+                return { text: sortLabels[i], checkable: true, checked: engine.sort_by === k, action: function() { engine.set_sort(k, engine.sort_ascending); } };
+            }) });
+            m.push({ text: qsTr("Reverse Order"), icon: "arrows-down-up", checkable: true, checked: !engine.sort_ascending, action: function() { engine.set_sort(engine.sort_by, !engine.sort_ascending); } });
+            m.push({ text: qsTr("Group By"), icon: "rows", separatorBefore: true, submenu: groupKeys.map(function(k, i) {
+                return { text: groupLabels[i], checkable: true, checked: engine.group_by === k, action: function() { engine.set_group(k, engine.group_ascending); } };
+            }) });
+            m.push({ text: qsTr("Reverse Group Order"), icon: "arrows-down-up", checkable: true, enabled: engine.group_by !== "none", checked: !engine.group_ascending, action: function() { engine.set_group(engine.group_by, !engine.group_ascending); } });
+            m.push({ text: qsTr("Show Hidden Files"), icon: "eye", separatorBefore: true, checkable: true, checked: window.showHidden, shortcut: theme.shortcutFor("toggleHidden"), action: function() { window.toggleShowHidden(); } });
+            m.push({ text: qsTr("Split View"), icon: "columns", checkable: true, checked: window.splitView, shortcut: theme.shortcutFor("toggleSplit"), action: function() { window.toggleSplit(); } });
+            model = m;
+            openBelowRight(viewTextView);
         }
     }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).

@@ -16,6 +16,11 @@ Item {
     property string tooltipText: ""
     Accessible.name: accessibleName.length > 0 ? accessibleName : (text.length > 0 ? text : icon)
 
+    // Hover signals for callers that want their own hover handling (e.g.
+    // tooltip wiring from outside this file).
+    signal hoverEntered()
+    signal hoverExited()
+
     signal clicked()
 
     readonly property bool iconOnly: text.length === 0
@@ -115,8 +120,16 @@ Item {
         hoverEnabled: true
         enabled: root.enabled
         cursorShape: Qt.PointingHandCursor
-        onEntered: if (root.tooltipText.length > 0 && typeof tooltip !== "undefined") tooltip.show(root, root.tooltipText)
-        onExited: if (typeof tooltip !== "undefined") tooltip.hide(root)
+        onEntered: {
+            root.hoverEntered();
+            if (root.tooltipText.length > 0 && typeof tooltip !== "undefined")
+                tooltip.show(root, root.tooltipText)
+        }
+        onExited: {
+            root.hoverExited();
+            if (typeof tooltip !== "undefined")
+                tooltip.hide(root)
+        }
         onClicked: root.clicked()
     }
 }
