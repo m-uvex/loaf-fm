@@ -10,4 +10,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        install: path.resolve(__dirname, "install.html"),
+      },
+    },
+  },
 });
