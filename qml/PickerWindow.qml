@@ -37,6 +37,11 @@ Window {
     property bool answered: false
     property bool pathEditing: false
 
+    // One shared hover tooltip for this window (components/LoafTooltip.qml),
+    // so icon-only controls here get the same 1s delay and toggle as the main
+    // window.
+    LoafTooltip { id: tooltip }
+
     readonly property string acceptLabel: {
         if ((request.accept_label || "").length > 0)
             return request.accept_label.replace(/_(_)?/g, function(match, escaped) { return escaped ? "_" : ""; });
@@ -398,12 +403,24 @@ Window {
                 Layout.preferredHeight: 40
                 radius: theme.radiusFull
                 color: theme.backdropSurface(pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer)
+                border.width: pathEditing ? 2 : 1
+                border.color: pathEditing ? theme.primary : theme.outlineVariant
+                Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
                 clip: true
 
                 MouseArea {
+                    id: pathBarMouse
                     anchors.fill: parent
+                    enabled: !pathEditing
+                    cursorShape: theme.pathBarMode === "text" ? Qt.IBeamCursor : Qt.ArrowCursor
+                    onClicked: {
+                        if (theme.pathBarMode === "text")
+                            startEditingPath();
+                        else
+                            defocusInputs();
+                    }
                     onDoubleClicked: startEditingPath()
-                    onClicked: defocusInputs()
                 }
 
                 RowLayout {
@@ -422,6 +439,7 @@ Window {
                     TextInput {
                         id: pathInput
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         visible: pathEditing
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
@@ -446,13 +464,22 @@ Window {
                             }
                             event.accepted = true;
                         }
-                        onActiveFocusChanged: if (!activeFocus && pathEditing) pathEditing = false
+                        onActiveFocusChanged: {
+                            if (!activeFocus && pathEditing) {
+                                Qt.callLater(function() {
+                                    if (pathEditing && !pathInput.activeFocus) {
+                                        pathEditing = false;
+                                    }
+                                });
+                            }
+                        }
                     }
 
                     // Read-only path mirror for "text only" mode.
                     Text {
                         visible: !pathEditing
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         text: pane.engine.location_kind === "dir" || pane.engine.location_kind === "archive"
                             ? pane.engine.current_path : pane.engine.location_kind + "://"
                         color: theme.textMain
