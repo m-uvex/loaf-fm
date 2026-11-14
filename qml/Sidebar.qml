@@ -173,7 +173,7 @@ Rectangle {
         y: targetY
 
         Behavior on y {
-            enabled: theme.animate
+            enabled: theme.animate && !placeList.moving && !placeList.flicking
             SpringAnimation { spring: 4.2; damping: 0.38 }
         }
         Behavior on width {
@@ -455,8 +455,10 @@ Rectangle {
                 selected: rail.activeId === "trash"
                 accessibleName: qsTr("Trash")
                 acceptsTrashDrop: true
+                emptyTrashAction: true
                 onClicked: rail.placeClicked(rail.trashPlace, false)
                 onMiddleClicked: rail.placeClicked(rail.trashPlace, true)
+                onEmptyTrashRequested: window.confirmEmptyTrash()
                 onMenuRequested: function(x, y) { rail.placeMenuRequested(rail.trashPlace, x, y); }
                 onFilesDropped: function(paths, asCopy, d) {
                     if (dragManager.isRmb) {
@@ -466,46 +468,6 @@ Rectangle {
                         core.trash_items(JSON.stringify(paths));
                     }
                 }
-            }
-
-            // Quick empty trash button on hover (only when sidebar is expanded so it never breaks icon centering)
-            Rectangle {
-                id: quickEmptyTrashBtn
-                visible: rail.expanded && typeof core !== "undefined" && core && !core.trash_empty
-                anchors.right: parent.right
-                anchors.rightMargin: 20
-                anchors.verticalCenter: parent.verticalCenter
-                width: 28
-                height: 28
-                radius: 14
-                z: 3
-                color: quickEmptyTrashMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                opacity: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.0
-                scale: (trashButton.containsMouse || quickEmptyTrashMouse.containsMouse) ? 1.0 : 0.85
-                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 120 } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.35 } }
-
-                LoafIcon {
-                    anchors.centerIn: parent
-                    name: "trash"
-                    size: 16
-                    color: quickEmptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
-                }
-
-                MouseArea {
-                    id: quickEmptyTrashMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: function(mouse) {
-                        mouse.accepted = true;
-                        window.confirmEmptyTrash();
-                    }
-                }
-
-                ToolTip.visible: quickEmptyTrashMouse.containsMouse
-                ToolTip.text: qsTr("Empty Trash")
-                ToolTip.delay: 350
             }
         }
 
@@ -534,14 +496,21 @@ Rectangle {
         property bool dimmed: false
         property string dropPath: ""
         property bool acceptsTrashDrop: false
+        // Trash tab only: while the pointer is over the row, the icon turns
+        // into a broom button that empties the trash instead of opening it.
+        property bool emptyTrashAction: false
         property string accessibleName: label
         property var entryData: null
         readonly property bool containsMouse: mouse.containsMouse
+        readonly property bool showBroom: btn.emptyTrashAction && mouse.containsMouse
+            && typeof core !== "undefined" && core && !core.trash_empty
 
         signal clicked()
         signal middleClicked()
         signal menuRequested(real x, real y)
         signal filesDropped(var paths, bool asCopy, var dropEvent)
+        // Raised instead of clicked() when the broom is showing (hovering the trash tab).
+        signal emptyTrashRequested()
 
         implicitHeight: 44
         height: 44
@@ -558,8 +527,8 @@ Rectangle {
         Keys.onEnterPressed: btn.clicked()
         Keys.onSpacePressed: btn.clicked()
         Accessible.role: Accessible.Button
-        Accessible.name: accessibleName
-        Accessible.onPressAction: btn.clicked()
+        Accessible.name: btn.showBroom ? qsTr("Empty Trash") : accessibleName
+        Accessible.onPressAction: if (btn.showBroom) btn.emptyTrashRequested(); else btn.clicked()
 
         readonly property bool dropHover: drop.containsDrag
 
@@ -585,15 +554,38 @@ Rectangle {
             scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.10 : 1.0)
             Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
 
+            // Trash hold-to-empty: the row's own icon becomes the button,
+            // wrapped in a rotating M3 cookie shape that only appears on hover.
+            LoafShape {
+                anchors.centerIn: parent
+                width: 38
+                height: 38
+                shape: "cookie6"
+                visible: btn.showBroom
+                opacity: btn.showBroom ? 1.0 : 0.0
+                rotation: btn.showBroom ? 135 : 0
+                color: theme.dangerContainer
+                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 3.2; damping: 0.32 } }
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            }
+
             LoafIcon {
-                visible: theme.iconSource === "phosphor" || btn.systemIcon.length === 0
+                visible: (theme.iconSource === "phosphor" || btn.systemIcon.length === 0) && !btn.showBroom
                 anchors.centerIn: parent
                 name: btn.iconName
                 size: 20
                 color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             }
+
+            LoafIcon {
+                visible: btn.showBroom
+                anchors.centerIn: parent
+                name: "broom"
+                size: 18
+                color: theme.danger
+            }
             Image {
-                visible: theme.iconSource !== "phosphor" && btn.systemIcon.length > 0
+                visible: theme.iconSource !== "phosphor" && btn.systemIcon.length > 0 && !btn.showBroom
                 anchors.centerIn: parent
                 source: visible ? window.systemIcon(btn.systemIcon) : ""
                 width: 20
@@ -629,10 +621,6 @@ Rectangle {
             elide: Text.ElideRight
         }
 
-        ToolTip.visible: !btn.showLabel && mouse.containsMouse && btn.label.length > 0
-        ToolTip.text: btn.label
-        ToolTip.delay: 500
-
         DropArea {
             id: drop
             anchors.fill: parent
@@ -654,12 +642,22 @@ Rectangle {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+            onEntered: {
+                if (btn.showLabel)
+                    return;
+                var label = btn.showBroom ? qsTr("Empty Trash") : btn.label;
+                if (label.length > 0)
+                    tooltip.show(btn, label);
+            }
+            onExited: tooltip.hide(btn)
             onClicked: function(m) {
                 if (m.button === Qt.RightButton) {
                     var p = mapToItem(window.contentItem, m.x, m.y);
                     btn.menuRequested(p.x, p.y);
                 } else if (m.button === Qt.MiddleButton) {
                     btn.middleClicked();
+                } else if (btn.showBroom) {
+                    btn.emptyTrashRequested();
                 } else {
                     btn.clicked();
                 }

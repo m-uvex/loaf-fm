@@ -1466,6 +1466,8 @@ Item {
                 height: 32
                 radius: theme.radiusM
                 color: theme.backdropSurface(theme.surfaceContainer)
+                border.width: 1
+                border.color: theme.outlineVariant
                 z: 2
 
                 RowLayout {
@@ -1805,7 +1807,8 @@ Item {
                                     anchors.centerIn: parent
                                     name: row.isCut ? (row.is_dir ? "folder-dashed" : "file-dashed") : (row.icon || "file")
                                     size: 18
-                                    color: row.isSelected ? theme.secondaryContainerFg : (row.is_dir ? theme.primary : theme.textMain)
+                                    color: row.isSelected ? theme.secondaryContainerFg
+                                        : (theme.tintIcon(row.is_dir) ? theme.primary : theme.textMain)
                                 }
                                 Image {
                                     visible: !row.hasThumb && theme.iconSource !== "phosphor"

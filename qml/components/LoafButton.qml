@@ -12,6 +12,8 @@ Item {
     property string variant: "text"
     property bool checked: false
     property string accessibleName: ""
+    // Hover label shown after the shared tooltip delay; empty keeps it silent.
+    property string tooltipText: ""
     Accessible.name: accessibleName.length > 0 ? accessibleName : (text.length > 0 ? text : icon)
 
     signal clicked()
@@ -111,6 +113,8 @@ Item {
         hoverEnabled: true
         enabled: root.enabled
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (root.tooltipText.length > 0 && typeof tooltip !== "undefined") tooltip.show(root, root.tooltipText)
+        onExited: if (typeof tooltip !== "undefined") tooltip.hide(root)
         onClicked: root.clicked()
     }
 }

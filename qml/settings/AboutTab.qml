@@ -414,15 +414,13 @@ ColumnLayout {
                         }
                     }
 
-                    ToolTip.visible: hovered
-                    ToolTip.text: "@" + modelData.login
-                    ToolTip.delay: 700
-
                     MouseArea {
                         id: chipMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+                        onEntered: tooltip.show(chipMouse, "@" + modelData.login)
+                        onExited: tooltip.hide(chipMouse)
                         onClicked: Qt.openUrlExternally(root.repoUrl + "/graphs/contributors")
                     }
                 }

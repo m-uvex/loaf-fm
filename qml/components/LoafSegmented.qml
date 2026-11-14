@@ -179,9 +179,9 @@ Item {
                             enabled: !segItem.isDisabled
                             hoverEnabled: !segItem.isDisabled
                             cursorShape: segItem.isDisabled ? Qt.ArrowCursor : Qt.PointingHandCursor
-                            ToolTip.visible: segMouse.containsMouse && root.effectiveIconOnly && !!(modelData && modelData.label)
-                            ToolTip.text: (modelData && modelData.label) ? modelData.label : ""
-                            ToolTip.delay: 350
+                            onEntered: if (root.effectiveIconOnly && !!(modelData && modelData.label) && typeof tooltip !== "undefined")
+                                tooltip.show(segMouse, modelData.label)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(segMouse)
 
                             onClicked: {
                                 if (!segItem.isDisabled) {

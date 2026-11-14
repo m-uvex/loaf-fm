@@ -74,8 +74,8 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                 options: [
-                    { value: "double", label: qsTr("Double-click"), shortLabel: qsTr("Double") },
-                    { value: "single", label: qsTr("Single-click"), shortLabel: qsTr("Single") }
+                    { value: "double", label: qsTr("Double-click"), shortLabel: qsTr("Double"), icon: "cursor-click" },
+                    { value: "single", label: qsTr("Single-click"), shortLabel: qsTr("Single"), icon: "cursor" }
                 ]
                 value: theme.clickToOpen
                 onSelected: function(v) { theme.clickToOpen = v; }

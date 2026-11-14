@@ -96,7 +96,8 @@ Item {
                 anchors.centerIn: parent
                 name: card.isCut ? (card.itemIsDir ? "folder-dashed" : "file-dashed") : (card.itemIcon || "file")
                 size: viewPane ? viewPane.iconSize : 24
-                color: card.isSelected ? theme.secondaryContainerFg : (card.itemIsDir ? theme.primary : theme.textMain)
+                color: card.isSelected ? theme.secondaryContainerFg
+                    : (theme.tintIcon(card.itemIsDir) ? theme.primary : theme.textMain)
             }
 
             Image {

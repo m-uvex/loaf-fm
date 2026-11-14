@@ -29,11 +29,12 @@ ColumnLayout {
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
     readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
+    readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
             + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
-            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0))
+            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
         : 0
 
     Layout.fillWidth: true
@@ -57,9 +58,9 @@ ColumnLayout {
             LoafSegmented {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                 options: [
-                    { value: "auto", label: qsTr("Auto"), shortLabel: "A" },
-                    { value: "on", label: qsTr("On"), shortLabel: "On" },
-                    { value: "off", label: qsTr("Off"), shortLabel: "Off" }
+                    { value: "auto", label: qsTr("Auto"), shortLabel: "A", icon: "gauge" },
+                    { value: "on", label: qsTr("On"), shortLabel: "On", icon: "toggle-right" },
+                    { value: "off", label: qsTr("Off"), shortLabel: "Off", icon: "toggle-left" }
                 ]
                 value: theme.lowPowerSetting
                 onSelected: function(v) { theme.lowPowerSetting = v; }
@@ -167,8 +168,8 @@ ColumnLayout {
                 Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
                 enabled: theme.showThumbnails
                 options: [
-                    { value: "square", label: qsTr("Square"), shortLabel: qsTr("Square") },
-                    { value: "original", label: qsTr("Original"), shortLabel: qsTr("Orig.") }
+                    { value: "square", label: qsTr("Square"), shortLabel: qsTr("Square"), icon: "square" },
+                    { value: "original", label: qsTr("Original"), shortLabel: qsTr("Orig."), icon: "image" }
                 ]
                 value: theme.thumbnailShape
                 onSelected: function(v) { theme.thumbnailShape = v; }
@@ -178,7 +179,7 @@ ColumnLayout {
 
     // Category 3: Readability & Vision
     SettingCard {
-        visible: root.matchHighContrast || root.matchFontChoice
+        visible: root.matchHighContrast || root.matchFontChoice || root.matchTooltips
         title: qsTr("Readability & Vision")
         subtitle: qsTr("Typography and contrast adjustments for improved accessibility")
         icon: "eye"
@@ -232,6 +233,20 @@ ColumnLayout {
                 customValueText: theme.weightName(theme.fontWeight)
                 accessibleName: qsTr("Font weight")
                 onMoved: function(v) { theme.fontWeight = Math.round(v); }
+            }
+        }
+
+        SettingDivider { visible: root.matchFontChoice && root.matchTooltips }
+
+        SettingRow {
+            visible: root.matchTooltips
+            icon: "chat-teardrop-text"
+            title: qsTr("Show tooltips")
+            subtitle: qsTr("Reveal a hover label after one second on controls that only show an icon")
+
+            LoafSwitch {
+                checked: theme.showTooltips
+                onToggled: function(c) { theme.showTooltips = c; }
             }
         }
     }

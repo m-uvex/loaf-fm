@@ -25,13 +25,14 @@ ColumnLayout {
     readonly property bool matchPalette: matches("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing")
     readonly property bool matchIconStyle: matches("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze")
     readonly property bool matchIconWeight: matches("phosphor weight variant thin light regular bold fill duotone stroke thickness")
+    readonly property bool matchIconColor: matches("icon color colour tint folder folders files all none accent monochrome")
     readonly property bool matchTopBar: matches("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb")
     readonly property bool matchThisPc: matches("this pc computer hostname name label device system")
     readonly property bool matchMenus: matches("menus context menu right click sidebar customize places navigation layout minimal")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchPalette ? 1 : 0)
-            + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchTopBar ? 1 : 0)
+            + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchIconColor ? 1 : 0) + (matchTopBar ? 1 : 0)
             + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0))
         : 0
 
@@ -228,9 +229,9 @@ ColumnLayout {
 
     // Category 3: Icons
     SettingCard {
-        visible: (theme.showExperimentalIcons && root.matchIconStyle) || (theme.iconSource === "phosphor" && root.matchIconWeight)
+        visible: (theme.showExperimentalIcons && root.matchIconStyle) || (theme.iconSource === "phosphor" && root.matchIconWeight) || root.matchIconColor
         title: qsTr("Icons")
-        subtitle: qsTr("Choose icon style and stroke weight")
+        subtitle: qsTr("Choose icon style, stroke weight and accent tinting")
         icon: "shapes"
 
         SettingRow {
@@ -297,6 +298,25 @@ ColumnLayout {
                 ]
                 value: theme.phosphorWeight
                 onSelected: function(v) { theme.phosphorWeight = v; }
+            }
+        }
+
+        SettingRow {
+            visible: root.matchIconColor
+            icon: "drop-half"
+            title: qsTr("Icon color")
+            subtitle: qsTr("Tint folders, files, both or neither with the accent color")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
+                options: [
+                    { value: "folders", label: qsTr("Folders"), shortLabel: "Fld", icon: "folder" },
+                    { value: "files", label: qsTr("Files"), shortLabel: "Fil", icon: "file" },
+                    { value: "all", label: qsTr("All"), shortLabel: "All", icon: "shapes" },
+                    { value: "none", label: qsTr("None"), shortLabel: "Non", icon: "minus" }
+                ]
+                value: theme.iconColorMode
+                onSelected: function(v) { theme.iconColorMode = v; }
             }
         }
     }
@@ -415,9 +435,9 @@ ColumnLayout {
                 LoafSegmented {
                     Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 140 : 260
                     options: [
-                        { value: "full", label: qsTr("Full"), shortLabel: "Full" },
-                        { value: "minimal", label: qsTr("Minimal"), shortLabel: "Min" },
-                        { value: "custom", label: qsTr("Custom"), shortLabel: "Edit" }
+                        { value: "full", label: qsTr("Full"), shortLabel: "Full", icon: "list-bullets" },
+                        { value: "minimal", label: qsTr("Minimal"), shortLabel: "Min", icon: "minus" },
+                        { value: "custom", label: qsTr("Custom"), shortLabel: "Edit", icon: "pencil-simple" }
                     ]
                     value: theme.contextMenuMode
                     onSelected: function(v) {

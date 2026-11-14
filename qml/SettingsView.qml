@@ -295,9 +295,8 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            ToolTip.visible: settingsView.isCompact && tabMouse.containsMouse
-                            ToolTip.text: modelData.name
-                            ToolTip.delay: 250
+                            onEntered: if (settingsView.isCompact) tooltip.show(tabMouse, modelData.name)
+                            onExited: tooltip.hide(tabMouse)
                             onClicked: {
                                 if (settingsView.searchQuery.length > 0) {
                                     settingsView.searchCleared();
@@ -392,9 +391,8 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        ToolTip.visible: settingsView.isCompact && aboutMouse.containsMouse
-                        ToolTip.text: qsTr("About Loaf")
-                        ToolTip.delay: 250
+                        onEntered: if (settingsView.isCompact) tooltip.show(aboutMouse, qsTr("About Loaf"))
+                        onExited: tooltip.hide(aboutMouse)
                         onClicked: {
                             if (settingsView.searchQuery.length > 0) {
                                 settingsView.searchCleared();
@@ -561,6 +559,22 @@ Item {
                         opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 2) ? 1.0 : 0.0
                         transform: Translate {
                             y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 2) ? 0 : 8
+                            Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    // Tab 5: Share (only when Cloudflare sharing is enabled)
+                    ShareTab {
+                        id: tabShare
+                        searchQuery: settingsView.searchQuery
+                        visible: theme.shareViaLinkEnabled
+                            && (settingsView.searchQuery.length > 0
+                                ? (tabShare.matchCount > 0)
+                                : (settingsView.activeTab === 5))
+                        opacity: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 1.0 : 0.0
+                        transform: Translate {
+                            y: (settingsView.searchQuery.length > 0 || settingsView.activeTab === 5) ? 0 : 8
                             Behavior on y { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         }
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }

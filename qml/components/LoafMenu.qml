@@ -147,10 +147,11 @@ LoafPopup {
         var list = menu.animatableRows();
         for (var i = 0; i < list.length; i++) {
             var item = list[i];
+            var delay = Math.min(i * 18, 180);
             if (typeof item.playPop === "function")
-                item.playPop(0);
+                item.playPop(delay);
             else if (typeof item.popIn === "function")
-                item.popIn(0);
+                item.popIn(delay);
         }
     }
 
@@ -267,6 +268,11 @@ LoafPopup {
         sm.model = submenuModel;
         sm.parentMenu = menu;
         sm.openAdjacentTo(anchorItem, menu);
+        // The popup is already open when hopping between sibling submenus, so
+        // Popup.aboutToShow never fires and the new rows would appear frozen.
+        // Re-run the entrance curve after the delegates exist.
+        if (sm.opened)
+            Qt.callLater(function() { if (sm) sm.animateIn(); });
     }
 
     function openSubmenuAt(index) {

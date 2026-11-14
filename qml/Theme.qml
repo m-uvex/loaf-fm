@@ -69,6 +69,10 @@ Item {
     property string openFolderMode: "current" // "current", "split", "tab"
     property string archiveOpenAction: "browse" // "browse", "extract", "open"
     property string clickToOpen: "double" // "double", "single"
+    // Which file-view icons pick up the accent tint.
+    property string iconColorMode: "folders" // "folders", "files", "all", "none"
+    // Hover tooltips on icon-only controls.
+    property bool showTooltips: true
     property bool showBackgroundShapes: true
 
     property var keybindings: ({})
@@ -216,6 +220,16 @@ Item {
     readonly property real fontScale: fontScaleSetting * systemFontFactor
     function fs(px) {
         return Math.round(px * fontScale);
+    }
+
+    // True when a file-view icon should be tinted with the accent colour.
+    // Shared by the grid card, the list row and the grouped list so the
+    // setting can never drift between views.
+    function tintIcon(isDir) {
+        if (iconColorMode === "all") return true;
+        if (iconColorMode === "none") return false;
+        if (iconColorMode === "files") return !isDir;
+        return isDir;
     }
 
     // English singular/plural without a translation catalogue loaded:
@@ -2342,6 +2356,11 @@ Item {
         }
         value = readSetting("clickToOpen");
         if (value.length > 0) clickToOpen = value;
+        value = readSetting("iconColorMode");
+        if (value === "folders" || value === "files" || value === "all" || value === "none")
+            iconColorMode = value;
+        value = readSetting("showTooltips");
+        if (value.length > 0) showTooltips = (value !== "false");
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
         value = readSetting("fontChoice");
@@ -2412,6 +2431,8 @@ Item {
     onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onClickToOpenChanged: writeSetting("clickToOpen", clickToOpen)
+    onIconColorModeChanged: writeSetting("iconColorMode", iconColorMode)
+    onShowTooltipsChanged: writeSetting("showTooltips", showTooltips ? "true" : "false")
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }
     onFontWeightChanged: { writeSetting("fontWeight", fontWeight); syncAppFont(); }

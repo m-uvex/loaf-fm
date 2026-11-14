@@ -26,22 +26,22 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     transformOrigin: Item.Center
-    scale: 0.96
+    scale: 0.8
     opacity: 0.0
 
     enter: Transition {
         enabled: theme.animate
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 110; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "scale"; from: 0.96; to: 1.0; duration: 110; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 220; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "scale"; from: 0.8; to: 1.0; duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
         }
     }
 
     exit: Transition {
         enabled: theme.animate
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 90; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; from: 1.0; to: 0.96; duration: 90; easing.type: Easing.InCubic }
+            NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 160; easing.type: Easing.InCubic }
+            NumberAnimation { property: "scale"; from: 1.0; to: 0.85; duration: 160; easing.type: Easing.InCubic }
         }
     }
 
