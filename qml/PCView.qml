@@ -383,6 +383,18 @@ Item {
                 "action": function () { pcView.requestRename(d); }
             });
         }
+        var driveId = (d && (d.device || d.name)) || "";
+        if (driveId.length > 0) {
+            var isHiddenInSidebar = theme.isDriveHiddenInSidebar(driveId);
+            items.push({
+                "text": isHiddenInSidebar ? qsTr("Show in Sidebar") : qsTr("Hide from Sidebar"),
+                "icon": isHiddenInSidebar ? "eye" : "eye-slash",
+                "separatorBefore": true,
+                "action": function () {
+                    theme.setDriveHiddenInSidebar(driveId, !isHiddenInSidebar);
+                }
+            });
+        }
         return items;
     }
 
@@ -519,7 +531,7 @@ Item {
                     LoafIcon {
                         anchors.centerIn: parent
                         name: core.device_type === "laptop" ? "laptop" : "desktop"
-                        size: 44
+                        size: 52
                         color: theme.primaryContainerFg
                     }
                     MouseArea {
@@ -759,7 +771,7 @@ Item {
                                             LoafIcon {
                                                 anchors.centerIn: parent
                                                 name: modelData.icon
-                                                size: 24
+                                                size: 30
                                                 color: pcView.placeOnContainer(index)
                                             }
                                         }
@@ -826,7 +838,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: modelData.icon
-                                            size: 18
+                                            size: 22
                                             color: pcView.placeOnContainer(index)
                                         }
                                     }
@@ -974,7 +986,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: "hard-drives"
-                                            size: 26
+                                            size: 30
                                             color: theme.primaryContainerFg
                                         }
                                     }
@@ -1108,7 +1120,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: "network"
-                                            size: 21
+                                            size: 26
                                             color: theme.secondaryContainerFg
                                         }
                                     }
