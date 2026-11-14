@@ -42,6 +42,7 @@ Rectangle {
     }
 
     readonly property var entries: {
+        var list = [];
         var standardPlaces = [];
         var networkPlaces = [];
 
@@ -59,8 +60,63 @@ Rectangle {
             }
         }
 
+        // 1. Places Section
+        if (!rail.pickerMode) {
+            list.push({
+                id: "section:places",
+                kind: "section",
+                sectionKey: "places",
+                name: qsTr("Places"),
+                title: qsTr("Places"),
+                icon: "folder"
+            });
+        }
+        if (rail.pickerMode || !theme.isSectionCollapsed("places")) {
+            list = list.concat(standardPlaces);
+        }
+
+        // 2. Custom Tabs Sections
+        if (!rail.pickerMode && theme.sidebarCustomTabs && theme.sidebarCustomTabs.length > 0) {
+            for (var c = 0; c < theme.sidebarCustomTabs.length; ++c) {
+                var tab = theme.sidebarCustomTabs[c];
+                if (!tab) continue;
+                list.push({
+                    id: "section:custom:" + tab.id,
+                    kind: "section",
+                    sectionKey: tab.id,
+                    name: tab.name,
+                    title: tab.name,
+                    icon: tab.icon || "tag",
+                    isCustom: true,
+                    tabData: tab
+                });
+                if (!theme.isSectionCollapsed(tab.id)) {
+                    var tabItems = tab.items || [];
+                    for (var ti = 0; ti < tabItems.length; ++ti) {
+                        var itm = tabItems[ti];
+                        list.push({
+                            id: "custom_item:" + tab.id + ":" + itm.id,
+                            kind: "custom_place",
+                            name: itm.name,
+                            icon: itm.icon || "folder",
+                            system_icon: "folder-symbolic",
+                            path: itm.path,
+                            customTabId: tab.id,
+                            customItemId: itm.id
+                        });
+                    }
+                }
+            }
+        }
+
+        // 3. Local Storage Drives Section
         var availableDrives = drives.filter(function(d) {
             if (rail.pickerMode && d.provider === "mtp")
+                return false;
+            if (!theme.sidebarShowInternalDrives && !d.is_external && d.provider !== "mtp")
+                return false;
+            var driveId = (d && (d.device || d.name)) || "";
+            if (theme.isDriveHiddenInSidebar(driveId))
                 return false;
             return true;
         }).map(function(d) {
@@ -77,8 +133,45 @@ Rectangle {
             };
         });
 
-        // Order: regular places, then storage drives, then network shares directly under them
-        return standardPlaces.concat(availableDrives).concat(networkPlaces);
+        if (availableDrives.length > 0) {
+            if (!rail.pickerMode) {
+                list.push({
+                    id: "section:drives",
+                    kind: "section",
+                    sectionKey: "drives",
+                    name: qsTr("Drives"),
+                    title: qsTr("Drives"),
+                    icon: "hard-drives"
+                });
+            }
+            if (rail.pickerMode || !theme.isSectionCollapsed("drives")) {
+                list = list.concat(availableDrives);
+            }
+        }
+
+        // 4. Network Drives / Shares Section
+        var filteredNetwork = networkPlaces.filter(function(np) {
+            var netId = np.id || np.path || np.name;
+            return !theme.isDriveHiddenInSidebar(netId);
+        });
+
+        if (filteredNetwork.length > 0) {
+            if (!rail.pickerMode) {
+                list.push({
+                    id: "section:network",
+                    kind: "section",
+                    sectionKey: "network",
+                    name: qsTr("Network"),
+                    title: qsTr("Network"),
+                    icon: "network"
+                });
+            }
+            if (rail.pickerMode || !theme.isSectionCollapsed("network")) {
+                list = list.concat(filteredNetwork);
+            }
+        }
+
+        return list;
     }
 
     readonly property var trashPlace: {
@@ -97,7 +190,7 @@ Rectangle {
     border.color: theme.outlineVariant
     clip: true
     implicitWidth: expanded ? 200 : 68
-    Behavior on implicitWidth { enabled: theme.animate; NumberAnimation { duration: 230; easing.type: Easing.OutCubic } }
+    Behavior on implicitWidth { enabled: theme.animate; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Sidebar")
@@ -119,7 +212,9 @@ Rectangle {
         z: 1
         x: 12
         width: rail.expanded ? (rail.width - 24) : 44
-        height: 44
+        // Height will adapt to the highlighted item
+        property real targetHeight: 44
+        height: targetHeight
         radius: 22
         color: theme.primaryContainer
         visible: opacity > 0.01
@@ -129,31 +224,38 @@ Rectangle {
 
         Behavior on y {
             enabled: theme.animate
-            SpringAnimation { spring: 4.2; damping: 0.38 }
+            SpringAnimation { spring: 6.0; damping: 0.5; epsilon: 0.5 }
+        }
+        Behavior on height {
+            enabled: theme.animate
+            SpringAnimation { spring: 6.0; damping: 0.5; epsilon: 0.5 }
         }
         Behavior on width {
             enabled: theme.animate
-            SpringAnimation { spring: 3.5; damping: 0.35 }
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
         }
         Behavior on opacity {
             enabled: theme.animate
-            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
         }
     }
 
     function updateHighlight() {
         if (!rail.activeId || rail.activeId.length === 0) {
             selectionHighlight.targetY = -100;
+            selectionHighlight.targetHeight = 44;
             return;
         }
         if (rail.activeId === "settings") {
             var pt = settingsBtn.mapToItem(rail, 0, 0);
             selectionHighlight.targetY = pt.y;
+            selectionHighlight.targetHeight = settingsBtn.height;
             return;
         }
         if (rail.activeId === "trash" && rail.showTrash) {
             var ptTrash = trashContainer.mapToItem(rail, 0, 0);
             selectionHighlight.targetY = ptTrash.y;
+            selectionHighlight.targetHeight = trashContainer.height;
             return;
         }
         var filtered = placeList.model || [];
@@ -167,20 +269,46 @@ Rectangle {
                     var listBottom = listTop + placeList.height;
                     if (p.y < listTop || p.y + it.height > listBottom) {
                         selectionHighlight.targetY = -100;
+                        selectionHighlight.targetHeight = 44;
                     } else {
                         selectionHighlight.targetY = p.y;
+                        selectionHighlight.targetHeight = it.height;
                     }
                     return;
                 }
             }
         }
         selectionHighlight.targetY = -100;
+        selectionHighlight.targetHeight = 44;
     }
 
     onActiveIdChanged: Qt.callLater(updateHighlight)
     onShowTrashChanged: Qt.callLater(updateHighlight)
-    onExpandedChanged: Qt.callLater(updateHighlight)
+    onExpandedChanged: {
+        // Layout needs time to reflow after expand/collapse before mapToItem is accurate
+        Qt.callLater(updateHighlight);
+        expandSettleTimer.restart();
+    }
     onDrivesChanged: Qt.callLater(updateHighlight)
+    // Re-run every frame the sidebar animates its width so the highlight tracks instantly
+    onWidthChanged: Qt.callLater(updateHighlight)
+
+    // After the sidebar width animation settles, re-sync the highlight position.
+    // The animation is 160 ms (OutCubic); firing at ~170 ms catches the final layout.
+    Timer {
+        id: expandSettleTimer
+        interval: 170
+        repeat: false
+        onTriggered: rail.updateHighlight()
+    }
+
+    Connections {
+        target: theme
+        function onSidebarShowInternalDrivesChanged() { Qt.callLater(rail.updateHighlight); }
+        function onSidebarHiddenDrivesChanged() { Qt.callLater(rail.updateHighlight); }
+        function onSidebarCollapsedSectionsChanged() { Qt.callLater(rail.updateHighlight); }
+        function onSidebarCustomTabsChanged() { Qt.callLater(rail.updateHighlight); }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -227,8 +355,8 @@ Rectangle {
                         color: theme.textMain
                         opacity: rail.expanded ? 0.0 : 1.0
                         scale: rail.expanded ? 0.65 : 1.0
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.45 } }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 6.0; damping: 0.5; epsilon: 0.001 } }
                     }
 
                     LoafIcon {
@@ -238,8 +366,8 @@ Rectangle {
                         color: theme.primary
                         opacity: rail.expanded ? 1.0 : 0.0
                         scale: rail.expanded ? (headerToggleItem.isHovered ? 1.10 : 1.0) : 0.65
-                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+                        Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 6.0; damping: 0.5; epsilon: 0.001 } }
                     }
                 }
 
@@ -250,7 +378,7 @@ Rectangle {
                     transformOrigin: Item.Left
                     transform: Translate {
                         x: rail.expanded ? 0 : -10
-                        Behavior on x { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                        Behavior on x { enabled: theme.animate; SpringAnimation { spring: 5.5; damping: 0.5; epsilon: 0.5 } }
                     }
                     text: headerToggleItem.isHovered ? qsTr("Collapse") : "Loaf"
                     color: headerToggleItem.isHovered ? theme.primary : theme.textMain
@@ -258,9 +386,9 @@ Rectangle {
                     font.bold: !headerToggleItem.isHovered
                     elide: Text.ElideRight
                     Layout.fillWidth: true
-                    Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180 } }
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
-                    Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                    Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 110 } }
+                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 5.5; damping: 0.5; epsilon: 0.001 } }
+                    Behavior on color { enabled: theme.animate; ColorAnimation { duration: 80 } }
                 }
             }
 
@@ -296,7 +424,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 6
+            spacing: 4
             boundsBehavior: Flickable.StopAtBounds
             model: rail.entries
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
@@ -310,35 +438,143 @@ Rectangle {
                 width: placeList.width
                 required property var modelData
                 required property int index
+                readonly property bool isSection: modelData.kind === "section"
                 readonly property bool isDevice: modelData.kind === "device"
-                readonly property bool isStorage: isDevice || (modelData.kind === "network" || modelData.kind === "smb" || modelData.kind === "smb-discovery")
-                readonly property bool prevIsStorage: index > 0 && (placeList.model[index - 1].kind === "device" || placeList.model[index - 1].kind === "network" || placeList.model[index - 1].kind === "smb" || placeList.model[index - 1].kind === "smb-discovery")
-                readonly property real headerHeight: isStorage && !prevIsStorage && index > 0
-                    ? 12 : 0
+                readonly property bool isCustomPlace: modelData.kind === "custom_place"
                 property alias button: entryButton
-                height: 44 + headerHeight
-                Rectangle {
-                    visible: entry.headerHeight > 0
-                    x: 12; width: parent.width - 24; height: 1
-                    color: theme.separator; opacity: 0.35
+
+                height: isSection ? (rail.expanded ? 28 : 18) : 44
+
+                // SECTION HEADER (Places, Custom Tabs, Drives, Network)
+                Item {
+                    id: sectionHeader
+                    visible: entry.isSection
+                    anchors.fill: parent
+
+                    readonly property bool isCollapsed: theme.isSectionCollapsed(entry.modelData.sectionKey)
+
+                    // Expanded section header with arrow + title
+                    Item {
+                        visible: rail.expanded
+                        anchors.fill: parent
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            radius: theme.radiusS
+                            color: secMouse.containsMouse ? theme.hoverOverlay : "transparent"
+                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 6
+
+                            LoafIcon {
+                                name: "caret-down"
+                                size: 14
+                                color: secMouse.containsMouse ? theme.textMain : theme.textMuted
+                                rotation: sectionHeader.isCollapsed ? -90 : 0
+                                Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: 80 } }
+                            }
+
+                            Text {
+                                text: entry.modelData.title || entry.modelData.name || ""
+                                color: secMouse.containsMouse ? theme.textMain : theme.textMuted
+                                font.pixelSize: theme.fs(11)
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            }
+                        }
+                    }
+
+                    // Collapsed rail mode separator + small arrow
+                    Item {
+                        visible: !rail.expanded
+                        anchors.fill: parent
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width - 24
+                            height: 1
+                            color: theme.separator
+                            opacity: 0.35
+                        }
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 16
+                            height: 14
+                            radius: 3
+                            color: secMouse.containsMouse ? theme.surfaceContainerHighest : theme.surfaceContainer
+
+                            LoafIcon {
+                                anchors.centerIn: parent
+                                name: "caret-down"
+                                size: 10
+                                color: secMouse.containsMouse ? theme.primary : theme.outline
+                                rotation: sectionHeader.isCollapsed ? -90 : 0
+                                Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                            }
+                        }
+                    }
+
+                    DropArea {
+                        anchors.fill: parent
+                        enabled: entry.modelData.isCustom === true
+                        keys: ["text/uri-list"]
+                        onDropped: function(drop) {
+                            var paths = window.urlsToPaths(drop.urls);
+                            for (var i = 0; i < paths.length; ++i) {
+                                theme.addCustomTabItem(entry.modelData.sectionKey, { path: paths[i] });
+                            }
+                            drop.accept(Qt.LinkAction);
+                        }
+                    }
+
+                    MouseArea {
+                        id: secMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: theme.toggleSectionCollapsed(entry.modelData.sectionKey)
+                    }
+
+                    ToolTip.visible: !rail.expanded && secMouse.containsMouse && entry.modelData.title
+                    ToolTip.text: (entry.modelData.title || "") + (sectionHeader.isCollapsed ? " (" + qsTr("collapsed") + ")" : "")
+                    ToolTip.delay: 400
                 }
+
                 RailButton {
                     id: entryButton
+                    visible: !entry.isSection
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    iconName: entry.modelData.icon
-                    systemIcon: entry.modelData.system_icon
-                    label: entry.modelData.name
+                    iconName: entry.modelData.icon || "folder"
+                    systemIcon: entry.modelData.system_icon || ""
+                    label: entry.modelData.name || ""
                     showLabel: rail.expanded
                     selected: rail.activeId === entry.modelData.id
                     dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted)
                         : entry.modelData.missing === true || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected !== true)
                     dropPath: entry.isDevice ? (entry.modelData.drive.is_mounted ? entry.modelData.path : "")
-                        : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected === true)) ? entry.modelData.path : "")
+                        : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || entry.isCustomPlace || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected === true)) ? entry.modelData.path : "")
                     accessibleName: label + (entry.isDevice && entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted ? " (" + qsTr("unmounted") + ")" : "")
                     onActiveFocusChanged: if (activeFocus) placeList.positionViewAtIndex(entry.index, ListView.Contain)
-                    onClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, false) : rail.placeClicked(entry.modelData, false)
-                    onMiddleClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, true) : rail.placeClicked(entry.modelData, true)
+                    onClicked: {
+                        if (entry.isDevice) rail.driveClicked(entry.modelData.drive, false);
+                        else rail.placeClicked(entry.modelData, false);
+                    }
+                    onMiddleClicked: {
+                        if (entry.isDevice) rail.driveClicked(entry.modelData.drive, true);
+                        else rail.placeClicked(entry.modelData, true);
+                    }
                     onMenuRequested: function(x, y) {
                         if (entry.isDevice) rail.driveMenuRequested(entry.modelData.drive, x, y);
                         else rail.placeMenuRequested(entry.modelData, x, y);
@@ -458,8 +694,8 @@ Rectangle {
 
         implicitHeight: 44
         height: 44
-        scale: mouse.pressed ? 0.95 : (mouse.containsMouse ? 1.02 : 1.0)
-        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+        scale: mouse.pressed ? 0.94 : (mouse.containsMouse ? 1.015 : 1.0)
+        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 7.0; damping: 0.55; epsilon: 0.001 } }
         activeFocusOnTab: true
         onActiveFocusChanged: {
             if (activeFocus)
@@ -485,8 +721,8 @@ Rectangle {
                 : (mouse.containsMouse && !btn.selected ? theme.hoverOverlay : "transparent")
             border.width: btn.dropHover || btn.activeFocus ? 2 : 0
             border.color: theme.primary
-            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-            Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+            Behavior on color { enabled: theme.animate; ColorAnimation { duration: 80 } }
+            Behavior on width { enabled: theme.animate; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         }
 
         Item {
@@ -495,8 +731,8 @@ Rectangle {
             width: 44
             height: 44
             opacity: btn.dimmed ? 0.45 : 1.0
-            scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.10 : 1.0)
-            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+            scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.08 : 1.0)
+            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 7.0; damping: 0.55; epsilon: 0.001 } }
 
             LoafIcon {
                 visible: theme.iconSource === "phosphor" || btn.systemIcon.length === 0
@@ -529,10 +765,10 @@ Rectangle {
             transformOrigin: Item.Left
             transform: Translate {
                 x: btn.showLabel ? 0 : -14
-                Behavior on x { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                Behavior on x { enabled: theme.animate; SpringAnimation { spring: 5.5; damping: 0.5; epsilon: 0.5 } }
             }
-            Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 160 } }
-            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+            Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 110 } }
+            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 5.5; damping: 0.5; epsilon: 0.001 } }
             text: btn.label
             color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             font.pixelSize: theme.fs(13)

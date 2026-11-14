@@ -25,7 +25,7 @@ Item {
         LoafIcon {
             visible: root.icon.length > 0
             name: root.icon
-            size: 18
+            size: 20
             color: theme.primary
         }
 

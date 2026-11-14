@@ -325,6 +325,18 @@ Item {
                 "action": function () { pcView.requestRename(d); }
             });
         }
+        var driveId = (d && (d.device || d.name)) || "";
+        if (driveId.length > 0) {
+            var isHiddenInSidebar = theme.isDriveHiddenInSidebar(driveId);
+            items.push({
+                "text": isHiddenInSidebar ? qsTr("Show in Sidebar") : qsTr("Hide from Sidebar"),
+                "icon": isHiddenInSidebar ? "eye" : "eye-slash",
+                "separatorBefore": true,
+                "action": function () {
+                    theme.setDriveHiddenInSidebar(driveId, !isHiddenInSidebar);
+                }
+            });
+        }
         return items;
     }
 
@@ -392,7 +404,7 @@ Item {
                     LoafIcon {
                         anchors.centerIn: parent
                         name: core.device_type === "laptop" ? "laptop" : "desktop"
-                        size: 44
+                        size: 52
                         color: theme.primaryContainerFg
                     }
                     MouseArea {
@@ -618,7 +630,7 @@ Item {
                                             LoafIcon {
                                                 anchors.centerIn: parent
                                                 name: modelData.icon
-                                                size: 24
+                                                size: 30
                                                 color: pcView.placeOnContainer(index)
                                             }
                                         }
@@ -685,7 +697,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: modelData.icon
-                                            size: 18
+                                            size: 22
                                             color: pcView.placeOnContainer(index)
                                         }
                                     }
@@ -739,7 +751,7 @@ Item {
                                     id: freqCardRow
                                     anchors.centerIn: parent
                                     spacing: 8
-                                    LoafIcon { name: modelData.icon || "folder"; size: 16; color: theme.primary }
+                                    LoafIcon { name: modelData.icon || "folder"; size: 18; color: theme.primary }
                                     Text { text: modelData.name; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
                                 }
 
@@ -779,7 +791,7 @@ Item {
                                     RowLayout {
                                         anchors.centerIn: parent
                                         spacing: 8
-                                        LoafIcon { name: modelData.icon || "folder"; size: 16; color: theme.primary }
+                                        LoafIcon { name: modelData.icon || "folder"; size: 18; color: theme.primary }
                                         Text { text: modelData.name; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true; elide: Text.ElideRight }
                                     }
 
@@ -833,7 +845,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: "hard-drives"
-                                            size: 26
+                                            size: 30
                                             color: theme.primaryContainerFg
                                         }
                                     }
@@ -947,7 +959,7 @@ Item {
                                         LoafIcon {
                                             anchors.centerIn: parent
                                             name: "network"
-                                            size: 21
+                                            size: 26
                                             color: theme.secondaryContainerFg
                                         }
                                     }
