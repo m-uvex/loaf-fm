@@ -452,5 +452,18 @@ ColumnLayout {
                 onClicked: if (typeof customizePlaces !== "undefined") customizePlaces.open()
             }
         }
+
+        SettingDivider {}
+
+        SettingRow {
+            icon: "hard-drive"
+            title: qsTr("Show internal drives")
+            subtitle: qsTr("Display internal storage disks and partitions in the navigation rail")
+
+            LoafSwitch {
+                checked: theme.sidebarShowInternalDrives
+                onToggled: function(c) { theme.sidebarShowInternalDrives = c; }
+            }
+        }
     }
 }

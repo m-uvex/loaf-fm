@@ -62,6 +62,11 @@ Item {
     property string contextMenuMode: "full" // "full", "minimal", "custom"
     property var disabledMenuItems: ({})
     property bool hideTrashWhenEmpty: true
+    property bool sidebarShowInternalDrives: true
+    property var sidebarHiddenDrives: ({})
+    property string sidebarTab: "all" // "all", "places", "drives"
+    property var sidebarCollapsedSections: ({})
+    property var sidebarCustomTabs: []
     property string toolbarOperations: "auto" // "auto", "always", "hidden" -- back/forward buttons
     property bool showNewTabButton: true
     property bool showNewWindowButton: true
@@ -2272,7 +2277,134 @@ Item {
         }
         value = readSetting("showBackgroundShapes");
         if (value.length > 0) showBackgroundShapes = (value !== "false");
+        value = readSetting("sidebarShowInternalDrives");
+        if (value.length > 0) sidebarShowInternalDrives = (value === "true");
+        value = readSetting("sidebarHiddenDrives");
+        if (value.length > 0) {
+            try { sidebarHiddenDrives = JSON.parse(value); } catch (e) { sidebarHiddenDrives = {}; }
+        }
+        value = readSetting("sidebarTab");
+        if (value.length > 0) sidebarTab = value;
+        value = readSetting("sidebarCollapsedSections");
+        if (value.length > 0) {
+            try { sidebarCollapsedSections = JSON.parse(value); } catch (e) { sidebarCollapsedSections = {}; }
+        }
+        value = readSetting("sidebarCustomTabs");
+        if (value.length > 0) {
+            try { sidebarCustomTabs = JSON.parse(value); } catch (e) { sidebarCustomTabs = []; }
+        }
         loaded = true;
+    }
+
+    function isDriveHiddenInSidebar(deviceId) {
+        if (!deviceId) return false;
+        return Boolean(sidebarHiddenDrives && sidebarHiddenDrives[deviceId] === true);
+    }
+
+    function setDriveHiddenInSidebar(deviceId, hidden) {
+        if (!deviceId) return;
+        var copy = Object.assign({}, sidebarHiddenDrives);
+        if (hidden) {
+            copy[deviceId] = true;
+        } else {
+            delete copy[deviceId];
+        }
+        sidebarHiddenDrives = copy;
+    }
+
+    function isSectionCollapsed(secKey) {
+        if (!secKey) return false;
+        return Boolean(sidebarCollapsedSections && sidebarCollapsedSections[secKey] === true);
+    }
+
+    function toggleSectionCollapsed(secKey) {
+        if (!secKey) return;
+        var copy = Object.assign({}, sidebarCollapsedSections);
+        copy[secKey] = !copy[secKey];
+        sidebarCollapsedSections = copy;
+    }
+
+    function setSectionCollapsed(secKey, collapsed) {
+        if (!secKey) return;
+        var copy = Object.assign({}, sidebarCollapsedSections);
+        if (collapsed) copy[secKey] = true;
+        else delete copy[secKey];
+        sidebarCollapsedSections = copy;
+    }
+
+    function addCustomTab(name, icon) {
+        var n = String(name || "").trim();
+        if (n.length === 0) return "";
+        var id = "tab_" + Date.now();
+        var arr = (sidebarCustomTabs || []).slice();
+        arr.push({
+            id: id,
+            name: n,
+            icon: icon || "folder-simple",
+            items: []
+        });
+        sidebarCustomTabs = arr;
+        return id;
+    }
+
+    function removeCustomTab(tabId) {
+        if (!tabId) return;
+        var arr = (sidebarCustomTabs || []).filter(function(t) { return t && t.id !== tabId; });
+        sidebarCustomTabs = arr;
+    }
+
+    function renameCustomTab(tabId, newName) {
+        var n = String(newName || "").trim();
+        if (!tabId || n.length === 0) return;
+        var arr = (sidebarCustomTabs || []).map(function(t) {
+            if (t && t.id === tabId) {
+                var copy = Object.assign({}, t);
+                copy.name = n;
+                return copy;
+            }
+            return t;
+        });
+        sidebarCustomTabs = arr;
+    }
+
+    function addCustomTabItem(tabId, item) {
+        if (!tabId || !item || !item.path) return;
+        var arr = (sidebarCustomTabs || []).map(function(t) {
+            if (t && t.id === tabId) {
+                var copy = Object.assign({}, t);
+                var items = (copy.items || []).slice();
+                for (var i = 0; i < items.length; ++i) {
+                    if (items[i] && items[i].path === item.path) return copy;
+                }
+                var p = String(item.path);
+                var defaultName = p.substring(p.lastIndexOf("/") + 1) || p;
+                items.push({
+                    id: item.id || ("item_" + Date.now() + "_" + items.length),
+                    name: item.name || defaultName,
+                    path: item.path,
+                    icon: item.icon || "folder"
+                });
+                copy.items = items;
+                return copy;
+            }
+            return t;
+        });
+        sidebarCustomTabs = arr;
+    }
+
+    function removeCustomTabItem(tabId, itemId) {
+        if (!tabId || !itemId) return;
+        var arr = (sidebarCustomTabs || []).map(function(t) {
+            if (t && t.id === tabId) {
+                var copy = Object.assign({}, t);
+                copy.items = (copy.items || []).filter(function(it) {
+                    return it && it.id !== itemId && it.path !== itemId;
+                });
+                return copy;
+            }
+            return t;
+        });
+        sidebarCustomTabs = arr;
     }
 
     // Writes are skipped until the stored values have been read.
@@ -2332,4 +2464,9 @@ Item {
     onArchiveOpenActionChanged: writeSetting("archiveOpenAction", archiveOpenAction)
     onKeybindingsChanged: writeSetting("keybindings", JSON.stringify(keybindings))
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
+    onSidebarShowInternalDrivesChanged: writeSetting("sidebarShowInternalDrives", sidebarShowInternalDrives ? "true" : "false")
+    onSidebarHiddenDrivesChanged: writeSetting("sidebarHiddenDrives", JSON.stringify(sidebarHiddenDrives))
+    onSidebarTabChanged: writeSetting("sidebarTab", sidebarTab)
+    onSidebarCollapsedSectionsChanged: writeSetting("sidebarCollapsedSections", JSON.stringify(sidebarCollapsedSections))
+    onSidebarCustomTabsChanged: writeSetting("sidebarCustomTabs", JSON.stringify(sidebarCustomTabs))
 }

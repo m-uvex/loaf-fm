@@ -12,6 +12,7 @@ Item {
     property string variant: "text"
     property bool checked: false
     property string accessibleName: ""
+    readonly property bool hovered: mouse.containsMouse
     Accessible.name: accessibleName.length > 0 ? accessibleName : (text.length > 0 ? text : icon)
 
     signal clicked()

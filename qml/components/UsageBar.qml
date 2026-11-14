@@ -16,6 +16,8 @@ Item {
     property real thickness: 4
     property real amplitude: 3
     property real wavelength: 40
+    // Phase of the wavy line; animated so the usage bar undulates smoothly.
+    property real phase: 0
 
     Layout.fillWidth: true
     Layout.preferredHeight: implicitHeight
@@ -25,6 +27,22 @@ Item {
     readonly property real clampedValue: Math.max(0, Math.min(1, isNaN(root.value) ? 0 : root.value))
     property real shown: root.clampedValue
     Behavior on shown { enabled: theme.animate; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
+
+    // Continuously undulate the wavy line so it looks alive instead of static.
+    // Automatically stops in Low-Power Mode or when Reduce Motion is enabled.
+    NumberAnimation on phase {
+        running: theme.animate
+        from: 0; to: 2 * Math.PI; duration: 2400; loops: Animation.Infinite
+        easing.type: Easing.Linear
+    }
+
+    Connections {
+        target: theme
+        function onAnimateChanged() {
+            if (!theme.animate)
+                root.phase = 0;
+        }
+    }
 
     Rectangle {
         visible: !root.wavy
@@ -55,10 +73,11 @@ Item {
         var len = root.activeEnd - root.cap;
         // Flatten the wave while the bar is shorter than one wavelength.
         var amp = root.amplitude * Math.min(1, len / root.wavelength);
-        var steps = Math.max(2, Math.ceil(len / 2));
+        // More steps = smoother curve, especially when animated.
+        var steps = Math.max(8, Math.ceil(len / 4));
         for (var i = 0; i <= steps; i++) {
             var x = root.cap + len * i / steps;
-            pts.push(Qt.point(x, mid + Math.sin((x - root.cap) / root.wavelength * Math.PI * 2) * amp));
+            pts.push(Qt.point(x, mid + Math.sin((x - root.cap) / root.wavelength * Math.PI * 2 + root.phase) * amp));
         }
         return pts;
     }
@@ -66,6 +85,7 @@ Item {
     Shape {
         visible: root.wavy
         anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
             strokeColor: root.trackStart < root.width - root.cap ? root.trackColor : "transparent"

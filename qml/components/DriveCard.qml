@@ -162,7 +162,7 @@ Item {
                 LoafIcon {
                     anchors.centerIn: parent
                     name: root.drive && root.drive.is_locked ? "lock-simple" : root.driveIcon()
-                    size: 24
+                    size: 30
                     color: !root.isMounted ? theme.textMuted
                            : (root.almostFull ? theme.danger : theme.primaryContainerFg)
                 }
