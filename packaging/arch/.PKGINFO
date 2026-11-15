@@ -14,3 +14,5 @@ depend = qt6-base
 depend = qt6-declarative
 depend = qt6-svg
 depend = qt6-wayland
+depend = gvfs
+depend = gvfs-smb
