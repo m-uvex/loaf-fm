@@ -41,12 +41,14 @@ ApplicationWindow {
         viewPrefs.setHidden(!pane0.engine.show_hidden);
     }
 
-    // View preferences live in two scopes: one universal set shared by every
-    // folder, plus optional per-folder sets. The scope pill at the top of the
-    // View menu picks which scope the active folder edits; folders default to
-    // universal and keep their own set once the pill is flipped to This folder.
-    // Exposed as a property so other components (FilePane, settings tabs)
-    // can reach the manager; ids alone are file-scoped.
+    // View preferences resolve by scope: a folder with its own entry uses it,
+    // otherwise it inherits the nearest ancestor's entry, falling back to the
+    // shared universal set at the filesystem root. Entry modes are "dir"
+    // (own set), "universal" (pinned to the universal set) and "parent"
+    // (keep climbing, the default). The scope pill at the top of the View
+    // menu picks the active folder's mode. Exposed as a property so other
+    // components (FilePane, settings tabs) can reach the manager; ids alone
+    // are file-scoped.
     readonly property alias viewPrefs: viewPrefsManager
 
     QtObject {
@@ -58,8 +60,9 @@ ApplicationWindow {
 
         property var universal: null
         property var dirs: ({})
-        // Scope the active folder's edits land in right now.
-        property string mode: "universal"
+        // Effective mode for the active folder: "dir" (own set), "universal"
+        // (universal pin) or "parent" (inheriting from an ancestor).
+        property string mode: "parent"
 
         function load() {
             var u = theme.readSetting(universalKey);
@@ -82,10 +85,33 @@ ApplicationWindow {
             };
         }
 
+        function parentPath(p) {
+            if (!p || p.length <= 1)
+                return "";
+            var i = p.lastIndexOf("/");
+            return i <= 0 ? "/" : p.substring(0, i);
+        }
+
+        // Nearest entry at path or above it, climbing through "parent"
+        // entries and absent folders. Null means nothing pinned anywhere
+        // up to the root, i.e. the universal set applies.
+        function resolveEntry(path) {
+            var cur = path;
+            while (cur && cur.length > 0) {
+                var e = dirs[cur];
+                if (e && e.mode !== "parent")
+                    return e;
+                if (cur === "/")
+                    return null;
+                cur = parentPath(cur);
+            }
+            return null;
+        }
+
         function scopeFor(path, eng) {
             if (eng && eng.location_kind !== "dir")
                 return universal;
-            var e = dirs[path];
+            var e = resolveEntry(path);
             return (e && e.mode === "dir") ? e.prefs : universal;
         }
 
@@ -121,10 +147,12 @@ ApplicationWindow {
             refreshMode();
         }
 
+        // Mode of the active folder's own pin, for the pill display.
+        // Inherited scopes stay invisible; resolution lives in resolveEntry.
         function refreshMode() {
             var eng = window.engine;
             var e = eng && eng.location_kind === "dir" ? dirs[eng.current_path] : null;
-            mode = e ? e.mode : "universal";
+            mode = e ? e.mode : ((eng && eng.location_kind === "dir") ? "parent" : "universal");
         }
 
         function saveUniversal() {
@@ -145,8 +173,21 @@ ApplicationWindow {
             if (!eng)
                 return;
             var path = eng.current_path;
-            if (mode === "dir" && dirs[path]) {
-                dirs[path].prefs[key] = value;
+            // Route by this folder's own entry, not the effective mode: an
+            // inherited dir scope belongs to an ancestor.
+            var selfEntry = eng.location_kind === "dir" ? dirs[path] : null;
+            if (selfEntry && selfEntry.mode === "dir") {
+                selfEntry.prefs[key] = value;
+                saveDirs();
+            } else if (selfEntry && selfEntry.mode === "universal") {
+                universal[key] = value;
+                saveUniversal();
+            } else if (eng.location_kind === "dir") {
+                // Inheriting (or pinned to parent): editing pins an own set
+                // on this folder instead of mutating an ancestor's entry.
+                var prefs = liveSnapshot(eng);
+                prefs[key] = value;
+                dirs[path] = { mode: "dir", prefs: prefs };
                 saveDirs();
             } else {
                 universal[key] = value;
@@ -155,23 +196,21 @@ ApplicationWindow {
             syncAll();
         }
 
-        // Switch between universal and per-folder for the active folder.
-        // The folder's set is kept either way: switching to dir restores it,
-        // switching to universal keeps it stored so flipping back brings it
-        // back.
+        // Switch the active folder between the three modes: "dir" keeps its
+        // own set, "universal" pins the shared set, "parent" resumes
+        // inheriting from the nearest ancestor with a pin. The folder's
+        // stored set is kept through every switch, so flipping back to This
+        // folder restores it.
         function setMode(m) {
             var eng = window.engine;
             if (!eng || eng.location_kind !== "dir")
                 return;
             var path = eng.current_path;
             var e = dirs[path];
-            if (m === "dir") {
-                if (!e)
-                    dirs[path] = { mode: "dir", prefs: liveSnapshot(eng) };
-                else
-                    e.mode = "dir";
-            } else if (e) {
-                e.mode = "universal";
+            if (e) {
+                e.mode = m;
+            } else {
+                dirs[path] = { mode: m, prefs: liveSnapshot(eng) };
             }
             saveDirs();
             syncAll();
@@ -3305,14 +3344,16 @@ ApplicationWindow {
         menuMaxWidth: 320
         model: []
 
-        // Scope pill: which set of view options the active folder edits.
+        // Scope pill: which scope the active folder's edits land in, and
+        // whether it inherits an ancestor's scope at all.
         headerBar: LoafSegmented {
             id: viewScopeToggle
             visible: true
             Accessible.name: qsTr("View options scope")
             options: [
                 { value: "universal", label: qsTr("Universal") },
-                { value: "dir", label: qsTr("This folder") }
+                { value: "dir", label: qsTr("This folder") },
+                { value: "parent", label: qsTr("Parent") }
             ]
             value: viewPrefs.mode
             onSelected: function(v) { viewPrefs.setMode(v); }
