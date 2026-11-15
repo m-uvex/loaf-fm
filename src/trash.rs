@@ -206,10 +206,7 @@ fn trash_for(abs: &Path) -> io::Result<(PathBuf, Option<PathBuf>)> {
         return Ok((home, None));
     }
     let top = topdir_of(abs).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            Message::key(MessageKey::TrashErrorNoMountpoint).to_string(),
-        )
+        io::Error::other(Message::key(MessageKey::TrashErrorNoMountpoint).to_string())
     })?;
     match topdir_trash(&top, true) {
         Some(t) => Ok((t, Some(top))),
@@ -604,8 +601,8 @@ mod tests {
             "[Trash Info]\nPath=docs\n",
         )
         .unwrap();
-        assert!(list_in(&[root.clone()]).is_empty());
-        empty_in(&[root.clone()]).unwrap();
+        assert!(list_in(std::slice::from_ref(&root)).is_empty());
+        empty_in(std::slice::from_ref(&root)).unwrap();
         assert!(victim.join("docs/keep.txt").exists());
 
         let root2 = d.join("t2");

@@ -1551,7 +1551,7 @@ mod tests {
             vec![d.clone(), c.clone(), b.clone(), a.clone()],
         );
         // Removal + insertion are merged into ranges.
-        let changes = diff(&[a.clone(), b.clone(), c.clone()], &[d.clone()]);
+        let changes = diff(&[a.clone(), b.clone(), c.clone()], std::slice::from_ref(&d));
         assert!(changes.len() <= 2, "{:?}", changes);
     }
 
@@ -1568,9 +1568,9 @@ mod tests {
         let pool: Vec<Entry> = (0..12).map(|i| e(&format!("f{}", i), false, i)).collect();
         for _ in 0..500 {
             let pick = |r: &mut dyn FnMut() -> u64| -> Vec<Entry> {
-                let mut v: Vec<Entry> = pool.iter().filter(|_| r() % 2 == 0).cloned().collect();
+                let mut v: Vec<Entry> = pool.iter().filter(|_| (r() & 1) == 0).cloned().collect();
                 for x in v.iter_mut() {
-                    if r() % 4 == 0 {
+                    if (r() & 3) == 0 {
                         x.size += 100;
                     }
                 }

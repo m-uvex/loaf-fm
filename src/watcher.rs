@@ -351,7 +351,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(600));
         let n = hits.load(Ordering::SeqCst);
         assert!(
-            n >= 1 && n <= 2,
+            (1..=2).contains(&n),
             "50 writes coalesce into one or two refreshes, got {}",
             n
         );

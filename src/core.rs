@@ -661,7 +661,7 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "id": format!("network:{}", b.uri),
         "kind": "network",
-        "name": Message::raw(&b.display_name()).to_string(),
+        "name": Message::raw(b.display_name()).to_string(),
         "path": b.uri,
         "icon": "network",
         "system_icon": "folder-remote-symbolic",
@@ -713,7 +713,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
         items.push(serde_json::json!({
             "id": format!("bookmark:{}", path.to_string_lossy()),
             "kind": "bookmark",
-            "name": Message::raw(&b.display_name()).to_string(),
+            "name": Message::raw(b.display_name()).to_string(),
             "path": path.to_string_lossy(),
             "icon": "folder-simple",
             "system_icon": "folder-symbolic",
@@ -1969,7 +1969,7 @@ impl qobject::LoafCore {
         // Never "run" a file by double click; desktop entries and scripts
         // open in their default viewer (text editor), like Nautilus does.
         let launched = match apps::default_for(&mime) {
-            Some(app) => apps::launch(&app, &[path.clone()]).is_ok(),
+            Some(app) => apps::launch(&app, std::slice::from_ref(&path)).is_ok(),
             None => false,
         };
         if !launched {
@@ -2068,10 +2068,14 @@ impl qobject::LoafCore {
             native::mime_type(&p, false)
         };
         let theme_name = self.icon_theme().to_string();
-        static CACHE: Mutex<Option<std::collections::HashMap<(String, String), QString>>> = Mutex::new(None);
+        static CACHE: Mutex<Option<std::collections::HashMap<(String, String), QString>>> =
+            Mutex::new(None);
         let cache_key = (mime.clone(), theme_name.clone());
         if let Ok(mut guard) = CACHE.lock() {
-            if let Some(hit) = guard.get_or_insert_with(std::collections::HashMap::new).get(&cache_key) {
+            if let Some(hit) = guard
+                .get_or_insert_with(std::collections::HashMap::new)
+                .get(&cache_key)
+            {
                 return hit.clone();
             }
         }
@@ -2112,7 +2116,9 @@ impl qobject::LoafCore {
         });
         let res = q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()));
         if let Ok(mut guard) = CACHE.lock() {
-            guard.get_or_insert_with(std::collections::HashMap::new).insert(cache_key, res.clone());
+            guard
+                .get_or_insert_with(std::collections::HashMap::new)
+                .insert(cache_key, res.clone());
         }
         res
     }
@@ -3299,22 +3305,18 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let compress_folders = match self
-            .get_setting(&q("shareCompressFolders"))
-            .to_string()
-            .as_str()
-        {
-            "false" => false,
-            _ => true,
-        };
-        let compress_files = match self
-            .get_setting(&q("shareCompressFiles"))
-            .to_string()
-            .as_str()
-        {
-            "true" => true,
-            _ => false,
-        };
+        let compress_folders = !matches!(
+            self.get_setting(&q("shareCompressFolders"))
+                .to_string()
+                .as_str(),
+            "false"
+        );
+        let compress_files = matches!(
+            self.get_setting(&q("shareCompressFiles"))
+                .to_string()
+                .as_str(),
+            "true"
+        );
         let format = match self
             .get_setting(&q("shareCompressFormat"))
             .to_string()
