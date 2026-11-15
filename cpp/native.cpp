@@ -282,6 +282,11 @@ bool LoafNative::isDirectory(const QString &path) const
     return QFileInfo(path).isDir();
 }
 
+bool LoafNative::isWritable(const QString &path) const
+{
+    return QFileInfo(path).isWritable();
+}
+
 void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
 {
     if (!window)
