@@ -6,14 +6,15 @@ import {
   ArrowUpRight,
   Eye,
   HardDrive,
-  Menu,
   Palette,
   Radio,
   Sparkles,
   Users,
-  X,
 } from "lucide-react";
-import { Brand, CommandCard, FooterIslands, repo, discord } from "./components";
+import { CommandCard, FooterIslands, TopNav, repo, discord } from "./components";
+
+const SHAPES = ["leaf", "arch", "blob", "squircle", "pill", "notch"] as const;
+type Shape = (typeof SHAPES)[number];
 
 const features = [
   {
@@ -60,8 +61,47 @@ const features = [
   },
 ];
 
+function FeatureCard({
+  icon: Icon,
+  title,
+  body,
+  className,
+  wide,
+}: {
+  icon: typeof AppWindow;
+  title: string;
+  body: string;
+  className: string;
+  wide: boolean;
+}) {
+  const [shape, setShape] = useState<Shape>("squircle");
+  const reroll = () => {
+    setShape((prev) => {
+      let next = prev;
+      while (next === prev) next = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+      return next;
+    });
+  };
+
+  return (
+    <article
+      className={`feature-card ${className}${wide ? " feature-card--wide" : ""}`}
+      data-shape={shape}
+      onMouseEnter={reroll}
+    >
+      <div className="feature-copy">
+        <div className="feature-title-row">
+          <span className="feature-icon"><Icon size={24} strokeWidth={1.8} aria-hidden="true" /></span>
+          <h3>{title}</h3>
+        </div>
+        <p>{body}</p>
+      </div>
+      <Icon className="feature-ambient" size={176} strokeWidth={1.1} aria-hidden="true" />
+    </article>
+  );
+}
+
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const artRef = useRef<HTMLDivElement | null>(null);
 
   const tilt = (e: React.MouseEvent) => {
@@ -80,34 +120,12 @@ export default function Home() {
     el.style.setProperty("--ry", "0deg");
   };
 
-  const closeMenu = () => setMenuOpen(false);
-
   return (
     <main id="top" className="site-shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
 
       <div className="hero-wrap">
-        <nav className="hero-nav" aria-label="Site">
-          <Brand />
-          <button
-            className="menu-toggle"
-            type="button"
-            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-expanded={menuOpen}
-            aria-controls="primary-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X size={21} /> : <Menu size={21} />}
-          </button>
-          <div id="primary-navigation" className={`primary-nav${menuOpen ? " is-open" : ""}`}>
-            <a href="#features" onClick={closeMenu}>The good bits</a>
-            <a href="/install.html" onClick={closeMenu}>Installation</a>
-            <a href="#get-involved" onClick={closeMenu}>Get involved</a>
-            <a className="nav-cta" href={repo} target="_blank" rel="noreferrer" onClick={closeMenu}>
-              Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
-            </a>
-          </div>
-        </nav>
+        <TopNav />
 
         <section id="main-content" className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
@@ -144,17 +162,8 @@ export default function Home() {
         </div>
 
         <div className="feature-grid">
-          {features.map(({ icon: Icon, title, body, className, wide }) => (
-            <article key={title} className={`feature-card ${className}${wide ? " feature-card--wide" : ""}`}>
-              <div className="feature-copy">
-                <div className="feature-title-row">
-                  <span className="feature-icon"><Icon size={24} strokeWidth={1.8} aria-hidden="true" /></span>
-                  <h3>{title}</h3>
-                </div>
-                <p>{body}</p>
-              </div>
-              <Icon className="feature-ambient" size={176} strokeWidth={1.1} aria-hidden="true" />
-            </article>
+          {features.map((f) => (
+            <FeatureCard key={f.title} {...f} />
           ))}
         </div>
       </section>

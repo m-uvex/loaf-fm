@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Download, Menu, RefreshCw, TriangleAlert, X } from "lucide-react";
-import { Brand, CommandCard, FooterIslands, MiniCommand, Snippet, repo } from "./components";
+import { ArrowUpRight, Download, RefreshCw, TriangleAlert } from "lucide-react";
+import { CommandCard, FooterIslands, MiniCommand, Snippet, TopNav, repo } from "./components";
 import { Markdown } from "./markdown";
 
 const API = "https://api.github.com/repos/m-uvex/loaf-fm/releases?per_page=6";
@@ -52,21 +52,23 @@ function ChannelCard({ release, kind }: { release: Release; kind: "stable" | "ni
         <span className={`channel-pill channel-pill--${kind}`}>{isNightly ? "Nightly" : "Stable"}</span>
         <time className="channel-date" dateTime={release.published_at}>{fmtDate(release.published_at)}</time>
         <h2 id={`channel-${kind}`}>
-          <a href={release.html_url} target="_blank" rel="noreferrer" title="Open release notes on GitHub">{title}</a>
+          <a href={release.html_url} target="_blank" rel="noreferrer" title="Open this release on GitHub">{title}</a>
         </h2>
         {isNightly && (
           <p className="nightly-note">Rebuilt from <code>main</code> on every merge. Fresh fixes, fresh bugs.</p>
         )}
       </header>
-      <div className="asset-grid">
+      <ul className="asset-list">
         {assets.map(({ label, asset }) => (
-          <a key={label} className="asset-button" href={asset.browser_download_url} target="_blank" rel="noreferrer">
-            <Download size={15} aria-hidden="true" />
-            <span>{label}</span>
-            <small>{fmtSize(asset.size)}</small>
-          </a>
+          <li key={label}>
+            <a className="asset-row" href={asset.browser_download_url} target="_blank" rel="noreferrer">
+              <span className="asset-ic" aria-hidden="true"><Download size={14} /></span>
+              <span className="asset-name">{label}</span>
+              <span className="asset-size">{fmtSize(asset.size)}</span>
+            </a>
+          </li>
         ))}
-      </div>
+      </ul>
       {isNightly && (
         <div className="nightly-commands">
           <MiniCommand code="curl -sSL https://raw.githubusercontent.com/m-uvex/loaf-fm/main/install.sh | bash -s -- --nightly" />
@@ -88,8 +90,6 @@ function ChannelCard({ release, kind }: { release: Release; kind: "stable" | "ni
 export default function Install() {
   const [releases, setReleases] = useState<Release[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     fetch(API)
@@ -110,27 +110,7 @@ export default function Install() {
       <a className="skip-link" href="#install-content">Skip to content</a>
 
       <div className="hero-wrap install-hero">
-        <nav className="hero-nav" aria-label="Site">
-          <Brand />
-          <button
-            className="menu-toggle"
-            type="button"
-            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-expanded={menuOpen}
-            aria-controls="install-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X size={21} aria-hidden="true" /> : <Menu size={21} aria-hidden="true" />}
-          </button>
-          <div id="install-navigation" className={`primary-nav${menuOpen ? " is-open" : ""}`}>
-            <a href="/" onClick={closeMenu}>Home</a>
-            <a href="#channels" onClick={closeMenu}>Channels</a>
-            <a href="#alternatives" onClick={closeMenu}>Other ways in</a>
-            <a className="nav-cta" href={repo} target="_blank" rel="noreferrer">
-              Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
-            </a>
-          </div>
-        </nav>
+        <TopNav />
 
         <section id="install-content" className="install-head" aria-labelledby="install-title">
           <div className="install-hero-grid">

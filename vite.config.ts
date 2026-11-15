@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, "index.html"),
         install: path.resolve(__dirname, "install.html"),
+        gallery: path.resolve(__dirname, "gallery.html"),
       },
     },
   },

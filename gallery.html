@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#faf8f3" />
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem("loaf-theme");
+          var m = v === "light" || v === "dark" ? v : "auto";
+          var d =
+            m === "light"
+              ? "light"
+              : m === "dark"
+                ? "dark"
+                : window.matchMedia("(prefers-color-scheme: dark)").matches
+                  ? "dark"
+                  : "light";
+          document.documentElement.dataset.theme = d;
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="description" content="Loaf in motion: a photo walkthrough of the places view, quick look, search, archives, themes and Beam." />
+    <link rel="icon" type="image/png" href="/loaf-badge.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>Gallery · Loaf File Manager</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/gallery-main.tsx"></script>
+  </body>
+</html>
