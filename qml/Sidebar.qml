@@ -455,7 +455,7 @@ Rectangle {
                 selected: rail.activeId === "trash"
                 accessibleName: qsTr("Trash")
                 acceptsTrashDrop: true
-                emptyTrashAction: true
+                emptyTrashAction: false
                 onClicked: rail.placeClicked(rail.trashPlace, false)
                 onMiddleClicked: rail.placeClicked(rail.trashPlace, true)
                 onEmptyTrashRequested: window.confirmEmptyTrash()
