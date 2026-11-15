@@ -88,7 +88,7 @@ Item {
         id: dashedBorder
         anchors.fill: parent
         visible: !root.active
-        readonly property real r: theme.radiusXl
+        readonly property real r: Math.min(theme.radiusXl, width / 2, height / 2)
 
         ShapePath {
             strokeColor: theme.outlineVariant
@@ -162,7 +162,7 @@ Item {
                     }
 
                     Rectangle {
-                        radius: theme.radiusFull
+                        radius: theme.pillRadius(width, height)
                         color: root.connected ? theme.primaryContainer
                                : (root.bookmark ? theme.secondaryContainer : theme.surfaceContainerHighest)
                         implicitWidth: statusLabel.implicitWidth + 12

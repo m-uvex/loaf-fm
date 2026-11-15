@@ -62,7 +62,7 @@ Item {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 height: 16
-                radius: 8
+                radius: theme.scaledRadius(8)
                 color: theme.surfaceContainerHighest
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
 
@@ -73,7 +73,7 @@ Item {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: Math.max(0, trackArea.handleX - 3)
-                    radius: 8
+                    radius: theme.scaledRadius(8)
                     color: theme.primary
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -87,7 +87,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: trackMouse.pressed ? 8 : (trackMouse.containsMouse ? 7 : 6)
                 height: trackMouse.pressed ? 34 : (trackMouse.containsMouse ? 30 : 26)
-                radius: 3
+                radius: theme.scaledRadius(3)
                 color: theme.primary
 
                 Behavior on width { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -99,7 +99,7 @@ Item {
                     anchors.centerIn: parent
                     width: parent.width + 12
                     height: parent.height + 6
-                    radius: 6
+                    radius: theme.scaledRadius(6)
                     color: theme.primary
                     opacity: trackMouse.pressed ? 0.22 : (trackMouse.containsMouse ? 0.12 : 0.0)
 
@@ -134,7 +134,7 @@ Item {
             Layout.preferredWidth: Math.max(50, valText.implicitWidth + 14)
             Layout.minimumWidth: 50
             implicitWidth: Layout.preferredWidth
-            radius: theme.radiusFull
+            radius: theme.pillRadius(width, height)
             color: theme.surfaceContainerHighest
 
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }

@@ -19,7 +19,7 @@ RadioButton {
             anchors.centerIn: parent
             width: 32
             height: 32
-            radius: width / 2
+            radius: theme.pillRadius(width, height)
             color: theme.primary
             opacity: control.hovered ? 0.12 : 0.0
             visible: opacity > 0.01
@@ -31,7 +31,7 @@ RadioButton {
             anchors.centerIn: parent
             width: 18
             height: 18
-            radius: 9
+            radius: theme.scaledRadius(9)
             color: "transparent"
             border.color: control.checked ? theme.primary
                 : (control.hovered ? theme.primary : theme.outlineAlpha(theme.outline))
@@ -45,7 +45,7 @@ RadioButton {
                 anchors.centerIn: parent
                 width: 8
                 height: 8
-                radius: 4
+                radius: theme.scaledRadius(4)
                 color: theme.primary
                 visible: control.checked
 

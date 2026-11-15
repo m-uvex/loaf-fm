@@ -155,7 +155,7 @@ ColumnLayout {
                             }
 
                             Rectangle {
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: modelData.connected ? theme.primaryContainer : theme.surfaceContainerHighest
                                 implicitWidth: statusTxt.implicitWidth + 10
                                 implicitHeight: 18

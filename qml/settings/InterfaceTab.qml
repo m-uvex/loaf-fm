@@ -335,7 +335,7 @@ ColumnLayout {
                             Rectangle {
                                 implicitWidth: 14
                                 implicitHeight: 14
-                                radius: 7
+                                radius: theme.scaledRadius(7)
                                 color: swatch ? swatch.darkPrimary : theme.primary
                                 border.width: 1
                                 border.color: theme.outlineAlpha(theme.outlineVariant)
@@ -520,7 +520,7 @@ ColumnLayout {
                         id: swatchDot
                         Layout.preferredWidth: 26
                         Layout.preferredHeight: 26
-                        radius: 13
+                        radius: theme.scaledRadius(13)
                         color: modelData.color
                         border.width: theme.iconColor === modelData.value ? 2 : 1
                         border.color: theme.iconColor === modelData.value ? theme.primary : theme.outlineAlpha(theme.outlineVariant)

@@ -165,7 +165,7 @@ Rectangle {
         x: 12
         width: rail.expanded ? (rail.width - 24) : 44
         height: 44
-        radius: 22
+        radius: theme.scaledRadius(22)
         color: theme.primaryContainer
         visible: opacity > 0.01
         opacity: targetY >= 0 ? 1.0 : 0.0
@@ -246,7 +246,7 @@ Rectangle {
                 x: 12
                 width: rail.expanded ? (parent.width - 24) : 44
                 height: 44
-                radius: 22
+                radius: theme.scaledRadius(22)
                 color: headerToggleItem.isHovered ? theme.hoverOverlay : "transparent"
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
@@ -537,7 +537,7 @@ Rectangle {
             x: 12
             width: btn.showLabel ? btn.width - 24 : 44
             height: 44
-            radius: 22
+            radius: theme.scaledRadius(22)
             color: btn.dropHover ? theme.primaryContainer
                 : (mouse.containsMouse && !btn.selected ? theme.hoverOverlay : "transparent")
             border.width: btn.dropHover || btn.activeFocus ? 2 : 0

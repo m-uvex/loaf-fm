@@ -112,7 +112,7 @@ Item {
         id: dashedBorder
         anchors.fill: parent
         visible: !root.isMounted && !(root.drive && root.drive.provider === "mtp")
-        readonly property real r: theme.radiusXl
+        readonly property real r: Math.min(theme.radiusXl, width / 2, height / 2)
 
         ShapePath {
             strokeColor: theme.outlineAlpha(theme.outlineVariant)

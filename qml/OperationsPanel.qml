@@ -37,7 +37,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: panel.expanded ? theme.radiusL : theme.radiusFull
+        radius: panel.expanded ? theme.radiusL : theme.pillRadius(width, height)
         color: theme.surfaceContainerHighest
         border.color: theme.outlineAlpha(theme.outlineVariant)
         border.width: 1

@@ -29,7 +29,7 @@ Item {
     Rectangle {
         visible: !root.wavy
         anchors.fill: parent
-        radius: height / 2
+        radius: theme.pillRadius(width, height)
         color: root.trackColor
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
@@ -38,7 +38,7 @@ Item {
     Rectangle {
         visible: !root.wavy
         height: parent.height
-        radius: height / 2
+        radius: theme.pillRadius(width, height)
         color: root.barColor
         width: parent.width * root.shown
 
@@ -94,7 +94,7 @@ Item {
         visible: root.wavy && root.shown < 0.98
         width: root.thickness
         height: root.thickness
-        radius: width / 2
+        radius: theme.pillRadius(width, height)
         x: root.width - width
         y: (root.height - height) / 2
         color: root.barColor

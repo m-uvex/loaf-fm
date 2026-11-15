@@ -72,7 +72,7 @@ Item {
                 z: -1
                 anchors.fill: parent
                 anchors.margins: -5
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.primary
                 opacity: switchMouse.containsMouse ? (root.checked ? 0.16 : 0.09) : 0.0
                 visible: opacity > 0.01
@@ -80,7 +80,7 @@ Item {
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
-            radius: theme.radiusFull
+            radius: theme.pillRadius(width, height)
             color: root.checked ? theme.primary : theme.surfaceContainerHighest
             border.width: root.checked ? 0 : 1
             border.color: switchMouse.containsMouse && !root.checked ? theme.primary : theme.outlineAlpha(theme.outline)
@@ -92,7 +92,7 @@ Item {
             Rectangle {
                 id: thumb
                 height: width
-                radius: width / 2
+                radius: theme.pillRadius(width, height)
                 y: (track.height - height) / 2
                 width: switchMouse.pressed ? 24 : (switchMouse.containsMouse ? 20 : 18)
                 x: root.checked ? (track.width - width - 4) : 4

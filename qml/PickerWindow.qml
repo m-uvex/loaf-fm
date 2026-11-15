@@ -401,7 +401,7 @@ Window {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 40
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(pathEditing ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: pathEditing ? 2 : 1
                 border.color: pathEditing ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
@@ -543,7 +543,7 @@ Window {
 
                             Rectangle {
                                 anchors.fill: parent
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay)
                                 border.color: crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent"
                                 border.width: crumbDelegate.modelData.is_forward ? 1 : 0
@@ -607,7 +607,7 @@ Window {
                 id: searchBox
                 Layout.preferredWidth: 230
                 Layout.preferredHeight: 40
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(searchField.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchField.activeFocus ? 2 : 1
                 border.color: searchField.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)

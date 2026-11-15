@@ -2307,13 +2307,21 @@ Item {
     readonly property color borderSubtle: outlineVariant
     readonly property color separator: outlineVariant
 
-    // Radii & Motion (cornerRadius 0..24 px; 12 px matches Material 3 defaults)
+    // Radii & Motion (12 px preserves the original card and surface radii)
     property int cornerRadius: 12
-    readonly property real radiusFull: cornerRadius === 0 ? 0.0 : 9999.0
-    readonly property real radiusXl: Math.round(cornerRadius * 28.0 / 12.0)
-    readonly property real radiusL: Math.round(cornerRadius * 18.0 / 12.0)
+    function scaledRadius(base: real): real {
+        return base * cornerRadius / 12;
+    }
+
+    // A capsule reaches a semicircle at the maximum setting.
+    function pillRadius(width: real, height: real): real {
+        return Math.min(width, height) / 2 * cornerRadius / 24;
+    }
+
+    readonly property real radiusXl: scaledRadius(28)
+    readonly property real radiusL: scaledRadius(18)
     readonly property real radiusM: cornerRadius
-    readonly property real radiusS: Math.round(cornerRadius * 8.0 / 12.0)
+    readonly property real radiusS: scaledRadius(8)
 
     readonly property int durationFast: animate ? 150 : 0
     readonly property int durationNormal: animate ? 250 : 0

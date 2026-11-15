@@ -136,7 +136,7 @@ Item {
     Rectangle {
         id: itemBg
         anchors.fill: parent
-        radius: theme.radiusFull
+        radius: theme.pillRadius(width, height)
         color: (itemMouse.containsMouse || root.highlighted)
             ? (root.danger ? theme.dangerContainer : theme.menuItemHover)
             : "transparent"

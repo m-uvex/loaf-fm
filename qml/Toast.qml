@@ -38,7 +38,7 @@ Rectangle {
 
     width: Math.min(row.implicitWidth + 32, parent ? parent.width - 40 : 600)
     height: 46
-    radius: theme.radiusFull
+    radius: theme.pillRadius(width, height)
     color: kind === "error" ? theme.dangerContainer : theme.surfaceContainerHighest
     border.color: theme.outlineAlpha(theme.outlineVariant)
     border.width: 1

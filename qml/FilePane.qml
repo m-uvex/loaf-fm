@@ -572,7 +572,7 @@ Item {
                 visible: pane.selectedCount > 0
                 Layout.preferredHeight: 28
                 Layout.preferredWidth: selLabel.implicitWidth + 20
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.primaryContainer
                 Text {
                     id: selLabel
@@ -594,7 +594,7 @@ Item {
             Rectangle {
                 Layout.preferredHeight: 28
                 Layout.preferredWidth: countLabel.implicitWidth + 18
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.surfaceContainerHigh
                 Text {
                     id: countLabel
@@ -626,6 +626,8 @@ Item {
                 anchors.fill: parent
                 z: 0
                 antialiasing: true
+                readonly property real corner: theme.scaledRadius(pane.isList() ? 11 : 18)
+                onCornerChanged: requestPaint()
 
                 Connections {
                     target: pane
@@ -699,8 +701,6 @@ Item {
                     return sel;
                 }
 
-                function ctxRadius() { return pane.isList() ? 11 : 18; }
-
                 // Canvas styles need CSS strings; the QML `color` type only has
                 // numeric r/g/b/a members, so build one.
                 function cssColor(c) {
@@ -752,10 +752,9 @@ Item {
                     if (segs.length === 0)
                         return;
                     var loops = traceLoops(segs);
-                    var rad = ctxRadius();
                     ctx.beginPath();
                     for (var l = 0; l < loops.length; ++l)
-                        addLoop(ctx, loops[l], rad);
+                        addLoop(ctx, loops[l], corner);
 
                     ctx.fillStyle = cssColor(theme.secondaryContainer);
                     ctx.fill();
@@ -1078,7 +1077,7 @@ Item {
                     padding: 2
                     contentItem: Rectangle {
                         implicitWidth: 6
-                        radius: 3
+                        radius: theme.scaledRadius(3)
                         color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: gridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
@@ -1259,7 +1258,7 @@ Item {
                     padding: 2
                     contentItem: Rectangle {
                         implicitWidth: 6
-                        radius: 3
+                        radius: theme.scaledRadius(3)
                         color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: groupedGridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
@@ -1588,7 +1587,7 @@ Item {
                     padding: 2
                     contentItem: Rectangle {
                         implicitWidth: 6
-                        radius: 3
+                        radius: theme.scaledRadius(3)
                         color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
                         opacity: listScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
@@ -1823,7 +1822,7 @@ Item {
                                 Rectangle {
                                     anchors.fill: parent
                                     visible: row.hasThumb
-                                    radius: 6
+                                    radius: theme.scaledRadius(6)
                                     color: theme.surfaceContainerHigh
                                     clip: true
                                     Image {
@@ -1837,7 +1836,7 @@ Item {
                                 }
                                 Rectangle {
                                     visible: row.is_symlink
-                                    width: 10; height: 10; radius: 5
+                                    width: 10; height: 10; radius: theme.scaledRadius(5)
                                     color: theme.surfaceContainer
                                     border.color: theme.outlineAlpha(theme.outlineVariant)
                                     border.width: 1

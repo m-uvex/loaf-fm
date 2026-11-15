@@ -153,7 +153,7 @@ ColumnLayout {
                                 elide: Text.ElideRight
                             }
                             Rectangle {
-                                radius: 4
+                                radius: theme.scaledRadius(4)
                                 implicitWidth: stText.implicitWidth + 8
                                 implicitHeight: stText.implicitHeight + 4
                                 color: modelData.status === "ready" ? theme.primaryContainer : theme.surfaceContainerHighest
@@ -306,7 +306,7 @@ ColumnLayout {
 
                 Rectangle {
                     implicitHeight: 28
-                    radius: theme.radiusFull
+                    radius: theme.pillRadius(width, height)
                     color: (typeof core !== "undefined" && core && core.cloudflared_ready)
                         ? theme.primaryContainer : theme.surfaceContainerHighest
                     implicitWidth: tunnelStatusRow.implicitWidth + 18
