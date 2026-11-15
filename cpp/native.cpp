@@ -418,7 +418,7 @@ public:
 
             qreal nextVal = value.toReal();
             qreal maxOffset = getMaxOffset(m_activeItem, m_activeAxis);
-            nextVal = std::max(0.0, std::min(maxOffset, nextVal));
+            nextVal = std::clamp(nextVal, getMinOffset(m_activeItem, m_activeAxis), maxOffset);
             m_lastWrittenOffset = nextVal;
             m_activeItem->setProperty(prop, nextVal);
         });
@@ -515,9 +515,11 @@ protected:
             const auto *dev = we->pointingDevice();
             const bool isExplicitTouchPad = (dev && dev->type() == QInputDevice::DeviceType::TouchPad);
             const bool isNotSynthesized = (we->source() == Qt::MouseEventNotSynthesized);
+            // Wayland reports wheel/finger source per event, even with a shared TouchPad device.
+            const bool isWayland = QGuiApplication::platformName().startsWith(QLatin1String("wayland"));
             const bool isDiscreteMouseWheel = (we->phase() == Qt::NoScrollPhase)
                                               && hasAngleDelta
-                                              && !isExplicitTouchPad
+                                              && (!isExplicitTouchPad || isWayland)
                                               && isNotSynthesized;
             const bool isContinuous = !isDiscreteMouseWheel && (hasPixelDelta || (we->phase() != Qt::NoScrollPhase));
 
@@ -550,26 +552,28 @@ protected:
                         dx = (we->angleDelta().x() / 120.0) * lines * stepPerLine;
                     }
 
-                    qreal factor = static_cast<qreal>(m_native->scrollStrength()) / 33.0;
+                    const qreal strength = m_native->scrollStrength();
+                    // Keep the 33% baseline while extending the upper range to the previous 125%.
+                    const qreal extendedStrength = strength <= 33.0 ? strength
+                        : 33.0 + (strength - 33.0) * (125.0 - 33.0) / (100.0 - 33.0);
+                    const qreal factor = extendedStrength / 33.0;
                     dy *= factor;
                     dx *= factor;
 
                     qreal contentY = flickable->property("contentY").toReal();
-                    qreal contentHeight = flickable->property("contentHeight").toReal();
-                    qreal h = flickable->height();
-                    qreal maxY = std::max(0.0, contentHeight - h);
+                    qreal minY = getMinOffset(flickable, Axis::Y);
+                    qreal maxY = getMaxOffset(flickable, Axis::Y);
 
                     qreal contentX = flickable->property("contentX").toReal();
-                    qreal contentWidth = flickable->property("contentWidth").toReal();
-                    qreal w = flickable->width();
-                    qreal maxX = std::max(0.0, contentWidth - w);
+                    qreal minX = getMinOffset(flickable, Axis::X);
+                    qreal maxX = getMaxOffset(flickable, Axis::X);
 
                     Axis targetAxis = Axis::None;
                     qreal delta = 0.0;
-                    if (maxY > 0.0 && dy != 0.0) {
+                    if (maxY > minY && dy != 0.0) {
                         targetAxis = Axis::Y;
                         delta = dy;
-                    } else if (maxX > 0.0 && (dx != 0.0 || dy != 0.0)) {
+                    } else if (maxX > minX && (dx != 0.0 || dy != 0.0)) {
                         targetAxis = Axis::X;
                         delta = (dx != 0.0) ? dx : dy;
                     }
@@ -581,10 +585,10 @@ protected:
                     if (isContinuous || !m_native->animate()) {
                         cancelAnimation();
                         if (targetAxis == Axis::Y) {
-                            qreal newY = std::max(0.0, std::min(maxY, contentY - delta));
+                            qreal newY = std::clamp(contentY - delta, minY, maxY);
                             flickable->setProperty("contentY", newY);
                         } else {
-                            qreal newX = std::max(0.0, std::min(maxX, contentX - delta));
+                            qreal newX = std::clamp(contentX - delta, minX, maxX);
                             flickable->setProperty("contentX", newX);
                         }
                         we->accept();
@@ -600,8 +604,10 @@ protected:
                     }
 
                     const char *prop = (targetAxis == Axis::X) ? "contentX" : "contentY";
-                    qreal currentPos = flickable->property(prop).toReal();
+                    qreal minOffset = (targetAxis == Axis::X) ? minX : minY;
                     qreal maxOffset = (targetAxis == Axis::X) ? maxX : maxY;
+                    qreal currentPos = std::clamp(flickable->property(prop).toReal(), minOffset, maxOffset);
+                    flickable->setProperty(prop, currentPos);
 
                     if (m_anim->state() == QAbstractAnimation::Running) {
                         if (std::abs(currentPos - m_lastWrittenOffset) > 0.5) {
@@ -625,7 +631,7 @@ protected:
                         }
                     }
 
-                    qreal targetPos = std::max(0.0, std::min(maxOffset, baseTarget - delta));
+                    qreal targetPos = std::clamp(baseTarget - delta, minOffset, maxOffset);
                     m_targetOffset = targetPos;
                     m_lastWrittenOffset = currentPos;
 
@@ -649,15 +655,21 @@ protected:
 private:
     enum class Axis { None, X, Y };
 
+    static qreal getMinOffset(QQuickItem *item, Axis axis)
+    {
+        const bool horizontal = axis == Axis::X;
+        return item->property(horizontal ? "originX" : "originY").toReal()
+            - item->property(horizontal ? "leftMargin" : "topMargin").toReal();
+    }
+
     static qreal getMaxOffset(QQuickItem *item, Axis axis)
     {
-        if (!item) return 0.0;
-        if (axis == Axis::X) {
-            return std::max(0.0, item->property("contentWidth").toReal() - item->width());
-        } else if (axis == Axis::Y) {
-            return std::max(0.0, item->property("contentHeight").toReal() - item->height());
-        }
-        return 0.0;
+        const bool horizontal = axis == Axis::X;
+        return std::max(getMinOffset(item, axis),
+            item->property(horizontal ? "originX" : "originY").toReal()
+            + item->property(horizontal ? "contentWidth" : "contentHeight").toReal()
+            - (horizontal ? item->width() : item->height())
+            + item->property(horizontal ? "rightMargin" : "bottomMargin").toReal());
     }
 
     void hookItemSignals(QQuickItem *item)
