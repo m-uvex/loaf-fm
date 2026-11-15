@@ -594,7 +594,7 @@ Window {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -637,7 +637,7 @@ Window {
 
                         Text {
                             text: pane.engine.location_kind === "search" ? qsTr("Search…") : qsTr("Filter this folder…")
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             font.pixelSize: theme.fs(13)
                             visible: !searchField.text && !searchField.activeFocus
                             anchors.verticalCenter: parent.verticalCenter

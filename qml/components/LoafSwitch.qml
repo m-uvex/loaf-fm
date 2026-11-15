@@ -71,7 +71,7 @@ Item {
         Text {
             visible: root.shortcut.length > 0
             text: root.shortcut
-            color: theme.outlineAlpha(theme.outline)
+            color: theme.outline
             font.pixelSize: theme.fs(11)
             font.family: theme.fontFamily
             Layout.alignment: Qt.AlignHCenter
@@ -112,7 +112,7 @@ Item {
                 y: (track.height - height) / 2
                 width: switchMouse.pressed ? 24 : (switchMouse.containsMouse ? 20 : 18)
                 x: root.checked ? (track.width - width - 4) : 4
-                color: root.checked ? theme.primaryFg : theme.outlineAlpha(theme.outline)
+                color: root.checked ? theme.primaryFg : theme.outline
 
                 Behavior on x { enabled: theme.animate; SpringAnimation { spring: 4; damping: 0.7 } }
                 Behavior on width { enabled: theme.animate; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }

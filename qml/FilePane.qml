@@ -1078,7 +1078,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: gridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1259,7 +1259,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: groupedGridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1588,7 +1588,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: listScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1913,7 +1913,7 @@ Item {
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
                             text: theme.categoryName(row.category)
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outline)
+                            color: row.isSelected ? theme.secondaryContainerFg : theme.outline
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
                         }

@@ -1497,7 +1497,7 @@ ApplicationWindow {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -1524,7 +1524,7 @@ ApplicationWindow {
                         visible: window.activeView === "settings"
                         name: "caret-right"
                         size: 11
-                        color: theme.outlineAlpha(theme.outline)
+                        color: theme.outline
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Rectangle {
@@ -1585,7 +1585,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: engine.searching ? "hourglass" : "magnifying-glass"
                         size: 16
-                        color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outline)
+                        color: searchInput.activeFocus ? theme.primary : theme.outline
                     }
 
                     TextInput {
@@ -1602,7 +1602,7 @@ ApplicationWindow {
                         Text {
                             text: window.activeView === "settings" ? qsTr("Search settings…")
                                 : (engine.is_searching_everywhere ? qsTr("Search…") : qsTr("Filter this folder…"))
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             font.pixelSize: theme.fs(13)
                             visible: !searchInput.text && !searchInput.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -1837,7 +1837,7 @@ ApplicationWindow {
                                 size: 11
                                 color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
                                     ? theme.secondaryContainerFg
-                                    : theme.outlineAlpha(theme.outline)
+                                    : theme.outline
                                 rotation: viewMenu.visible ? 180 : 0
                                 Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 160 } }
                             }
@@ -3615,7 +3615,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: dragHandleArea
@@ -3643,7 +3643,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
                         size: 16
-                        color: placeRow.modelData.hidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
                     }
 
                     Text {
@@ -3821,7 +3821,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: actionDragHandle.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: actionDragHandle.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: actionDragHandle
@@ -3843,7 +3843,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: actionRow.modelData.icon || "circle"
                         size: 16
-                        color: actionRow.isHidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: actionRow.isHidden ? theme.outline : theme.primary
                     }
 
                     Text {

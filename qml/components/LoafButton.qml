@@ -76,7 +76,7 @@ Item {
         anchors.leftMargin: 1
         anchors.rightMargin: 1
         radius: theme.radiusFull
-        color: theme.outlineAlpha(theme.outlineVariant)
+        color: theme.outlineVariant
         opacity: 0.55
     }
 
