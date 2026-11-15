@@ -87,6 +87,12 @@ chmod +x Loaf-*.AppImage
 
 ```
 
+For SMB network shares, GVfs and its SMB backend must be installed on the host.
+The install script and native `.deb`, Arch, and RPM packages install these
+automatically; for a manually run AppImage, install `gvfs` plus `gvfs-smb`
+(Arch/Fedora), `gvfs-backends` (Debian/Ubuntu), or `gvfs-backend-samba`
+(openSUSE).
+
 #### Debian / Ubuntu / Mint (`.deb`)
 
 ```bash
@@ -177,6 +183,7 @@ Contributors: to regenerate the master catalogue, run
 Optional at runtime (features degrade gracefully without them):
 - `7zip`/`p7zip` (zip, 7z, rar, iso, encrypted archives), `tar`, `zstd`, `cpio`
 - `udisks2` (mount, eject, unlock encrypted drives, rename labels)
+- `gvfs` and its SMB backend (`gvfs-smb` on Arch/Fedora, `gvfs-backends` on Debian/Ubuntu, `gvfs-backend-samba` on openSUSE) for SMB network shares when running a manually built binary
 - Optional MTP USB phone support: `kio-extras` package on Arch (`pacman -S kio-extras`), Debian/Ubuntu (`apt install kio-extras`), or `pkgs.kdePackages.kio-extras` on NixOS. This package provides the canonical session D-Bus service `org.kde.kmtpd5` (executed via `kio-extras-service`/`kiod6`) for USB phone browsing and read/write transfers. On NixOS, install it at the system level (`environment.systemPackages = [ pkgs.kdePackages.kio-extras ];` and `services.dbus.packages = [ pkgs.kdePackages.kio-extras ];`) so its D-Bus service is registered in the session activation registry, rather than merely in a transient `nix-shell`. A full KDE Plasma desktop environment or manually running daemon is not required (the host D-Bus session bus activates the service on demand across Hyprland, Sway, GNOME, etc., provided the service file is registered). When absent or unregistered, MTP devices degrade cleanly without affecting local disk browsing or causing UI hangs; KIOFuse is not required.
 - `ffmpegthumbnailer` / `evince-thumbnailer` (video and PDF thumbnails)
 - `xdg-utils`, `libsecret` (`secret-tool`, to remember drive passphrases), `polkit` (Open as Administrator)
