@@ -41,6 +41,9 @@
 #include <QTimer>
 #include <QTranslator>
 #include <QUrl>
+#include <QVariantAnimation>
+#include <QEasingCurve>
+#include <QAbstractItemModel>
 #include <algorithm>
 
 namespace loaf {
@@ -354,6 +357,28 @@ int LoafNative::systemScrollLines() const
     return lines > 0 ? lines : 3;
 }
 
+void LoafNative::setScrollStrength(int value)
+{
+    int clamped = std::clamp(value, 1, 100);
+    if (m_scrollStrength != clamped) {
+        m_scrollStrength = clamped;
+        Q_EMIT scrollStrengthChanged();
+    }
+}
+
+void LoafNative::setAnimate(bool value)
+{
+    if (m_animate != value) {
+        m_animate = value;
+        Q_EMIT animateChanged();
+    }
+}
+
+void LoafNative::cancelScrollAnimation()
+{
+    Q_EMIT cancelScrollRequested();
+}
+
 void LoafNative::setApplicationFont(const QString &family, int weight)
 {
     QFont f;
@@ -370,19 +395,89 @@ class WheelEventFilter : public QObject
 {
 public:
     explicit WheelEventFilter(LoafNative *native, QObject *parent = nullptr)
-        : QObject(parent), m_native(native) {}
+        : QObject(parent), m_native(native)
+    {
+        m_anim = new QVariantAnimation(this);
+        m_anim->setDuration(160);
+        m_anim->setEasingCurve(QEasingCurve::OutCubic);
+
+        connect(m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
+            if (!m_activeItem) {
+                m_anim->stop();
+                return;
+            }
+            const char *prop = (m_activeAxis == Axis::X) ? "contentX" : "contentY";
+            qreal currentVal = m_activeItem->property(prop).toReal();
+            if (std::abs(currentVal - m_lastWrittenOffset) > 0.5) {
+                // External or programmatic movement detected; stop animation.
+                m_anim->stop();
+                return;
+            }
+
+            qreal nextVal = value.toReal();
+            qreal maxOffset = getMaxOffset(m_activeItem, m_activeAxis);
+            nextVal = std::max(0.0, std::min(maxOffset, nextVal));
+            m_lastWrittenOffset = nextVal;
+            m_activeItem->setProperty(prop, nextVal);
+        });
+
+        connect(m_anim, &QVariantAnimation::finished, this, [this]() {
+            m_activeItem.clear();
+        });
+
+        connect(m_native, &LoafNative::cancelScrollRequested, this, [this]() {
+            cancelAnimation();
+        });
+        connect(m_native, &LoafNative::animateChanged, this, [this]() {
+            if (!m_native->animate())
+                cancelAnimation();
+        });
+    }
+
+    void cancelAnimation()
+    {
+        if (m_anim && m_anim->state() == QAbstractAnimation::Running) {
+            m_anim->stop();
+        }
+        for (const auto &conn : m_itemConnections) {
+            QObject::disconnect(conn);
+        }
+        m_itemConnections.clear();
+        m_activeItem.clear();
+    }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        if (event->type() == QEvent::KeyPress) {
+        switch (event->type()) {
+        case QEvent::MouseButtonPress:
+        case QEvent::TouchBegin:
+            cancelAnimation();
+            break;
+        case QEvent::KeyPress: {
             auto *ke = static_cast<QKeyEvent *>(event);
+            switch (ke->key()) {
+            case Qt::Key_Up:
+            case Qt::Key_Down:
+            case Qt::Key_Left:
+            case Qt::Key_Right:
+            case Qt::Key_PageUp:
+            case Qt::Key_PageDown:
+            case Qt::Key_Home:
+            case Qt::Key_End:
+                cancelAnimation();
+                break;
+            default:
+                break;
+            }
             if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
                 m_spacePressTime = QDateTime::currentMSecsSinceEpoch();
                 m_spaceHeld = true;
                 Q_EMIT m_native->spacePressed();
             }
-        } else if (event->type() == QEvent::KeyRelease) {
+            break;
+        }
+        case QEvent::KeyRelease: {
             auto *ke = static_cast<QKeyEvent *>(event);
             if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
                 qint64 held = QDateTime::currentMSecsSinceEpoch() - m_spacePressTime;
@@ -392,9 +487,12 @@ protected:
                     Q_EMIT m_native->spaceReleased(held);
                 }
             }
-        } else if (event->type() == QEvent::Wheel) {
+            break;
+        }
+        case QEvent::Wheel: {
             auto *we = static_cast<QWheelEvent *>(event);
             if (we->modifiers() & Qt::ControlModifier) {
+                cancelAnimation();
                 int dy = we->angleDelta().y();
                 if (dy == 0)
                     dy = we->pixelDelta().y() * 40;
@@ -409,6 +507,13 @@ protected:
             }
 
             m_accumulatedZoomDelta = 0;
+
+            const bool hasPixelDelta = (we->pixelDelta().x() != 0 || we->pixelDelta().y() != 0);
+            const bool isContinuous = hasPixelDelta || (we->phase() != Qt::NoScrollPhase);
+
+            if (isContinuous) {
+                cancelAnimation();
+            }
 
             auto *window = qobject_cast<QQuickWindow *>(watched);
             if (!window) {
@@ -435,6 +540,10 @@ protected:
                         dx = (we->angleDelta().x() / 120.0) * lines * stepPerLine;
                     }
 
+                    qreal factor = static_cast<qreal>(m_native->scrollStrength()) / 33.0;
+                    dy *= factor;
+                    dx *= factor;
+
                     qreal contentY = flickable->property("contentY").toReal();
                     qreal contentHeight = flickable->property("contentHeight").toReal();
                     qreal h = flickable->height();
@@ -445,25 +554,141 @@ protected:
                     qreal w = flickable->width();
                     qreal maxX = std::max(0.0, contentWidth - w);
 
+                    Axis targetAxis = Axis::None;
+                    qreal delta = 0.0;
                     if (maxY > 0.0 && dy != 0.0) {
-                        qreal newY = std::max(0.0, std::min(maxY, contentY - dy));
-                        flickable->setProperty("contentY", newY);
-                        we->accept();
-                        return true;
+                        targetAxis = Axis::Y;
+                        delta = dy;
                     } else if (maxX > 0.0 && (dx != 0.0 || dy != 0.0)) {
-                        qreal scrollDelta = (dx != 0.0) ? dx : dy;
-                        qreal newX = std::max(0.0, std::min(maxX, contentX - scrollDelta));
-                        flickable->setProperty("contentX", newX);
+                        targetAxis = Axis::X;
+                        delta = (dx != 0.0) ? dx : dy;
+                    }
+
+                    if (targetAxis == Axis::None)
+                        return false;
+
+                    // If continuous gesture, pixelDelta, or animation disabled: cancel animation & apply immediately
+                    if (isContinuous || !m_native->animate()) {
+                        cancelAnimation();
+                        if (targetAxis == Axis::Y) {
+                            qreal newY = std::max(0.0, std::min(maxY, contentY - delta));
+                            flickable->setProperty("contentY", newY);
+                        } else {
+                            qreal newX = std::max(0.0, std::min(maxX, contentX - delta));
+                            flickable->setProperty("contentX", newX);
+                        }
                         we->accept();
                         return true;
                     }
+
+                    // Discrete wheel event with animate == true
+                    if (m_activeItem != flickable || m_activeAxis != targetAxis) {
+                        cancelAnimation();
+                        m_activeItem = flickable;
+                        m_activeAxis = targetAxis;
+                        hookItemSignals(flickable);
+                    }
+
+                    const char *prop = (targetAxis == Axis::X) ? "contentX" : "contentY";
+                    qreal currentPos = flickable->property(prop).toReal();
+                    qreal maxOffset = (targetAxis == Axis::X) ? maxX : maxY;
+
+                    if (m_anim->state() == QAbstractAnimation::Running) {
+                        if (std::abs(currentPos - m_lastWrittenOffset) > 0.5) {
+                            cancelAnimation();
+                            m_activeItem = flickable;
+                            m_activeAxis = targetAxis;
+                            hookItemSignals(flickable);
+                        }
+                    }
+
+                    qreal startPos = currentPos;
+                    qreal baseTarget = currentPos;
+                    if (m_anim->state() == QAbstractAnimation::Running) {
+                        bool sameDirection = (delta > 0 && m_targetOffset < currentPos) ||
+                                             (delta < 0 && m_targetOffset > currentPos);
+                        if (sameDirection) {
+                            baseTarget = m_targetOffset;
+                        } else {
+                            // Direction reversal: reanchor immediately to current position
+                            baseTarget = currentPos;
+                        }
+                    }
+
+                    qreal targetPos = std::max(0.0, std::min(maxOffset, baseTarget - delta));
+                    m_targetOffset = targetPos;
+                    m_lastWrittenOffset = currentPos;
+
+                    m_anim->stop();
+                    m_anim->setStartValue(startPos);
+                    m_anim->setEndValue(targetPos);
+                    m_anim->start();
+
+                    we->accept();
+                    return true;
                 }
             }
+            break;
+        }
+        default:
+            break;
         }
         return false;
     }
 
 private:
+    enum class Axis { None, X, Y };
+
+    static qreal getMaxOffset(QQuickItem *item, Axis axis)
+    {
+        if (!item) return 0.0;
+        if (axis == Axis::X) {
+            return std::max(0.0, item->property("contentWidth").toReal() - item->width());
+        } else if (axis == Axis::Y) {
+            return std::max(0.0, item->property("contentHeight").toReal() - item->height());
+        }
+        return 0.0;
+    }
+
+    void hookItemSignals(QQuickItem *item)
+    {
+        for (const auto &conn : m_itemConnections) {
+            QObject::disconnect(conn);
+        }
+        m_itemConnections.clear();
+
+        if (!item) return;
+
+        m_itemConnections.push_back(
+            connect(item, &QObject::destroyed, this, [this]() {
+                cancelAnimation();
+            })
+        );
+        m_itemConnections.push_back(
+            connect(item, &QQuickItem::visibleChanged, this, [this]() {
+                if (m_activeItem && !m_activeItem->isVisible())
+                    cancelAnimation();
+            })
+        );
+
+        QVariant modelVar = item->property("model");
+        if (modelVar.isValid()) {
+            auto *model = modelVar.value<QAbstractItemModel *>();
+            if (model) {
+                m_itemConnections.push_back(
+                    connect(model, &QAbstractItemModel::modelAboutToBeReset, this, [this]() {
+                        cancelAnimation();
+                    })
+                );
+                m_itemConnections.push_back(
+                    connect(model, &QAbstractItemModel::layoutAboutToBeChanged, this, [this]() {
+                        cancelAnimation();
+                    })
+                );
+            }
+        }
+    }
+
     static QQuickItem *findScrollableAt(QQuickItem *parent, const QPointF &pos)
     {
         if (!parent || !parent->isVisible() || !parent->isEnabled())
@@ -489,6 +714,13 @@ private:
     int m_accumulatedZoomDelta = 0;
     qint64 m_spacePressTime = 0;
     bool m_spaceHeld = false;
+
+    QVariantAnimation *m_anim = nullptr;
+    QPointer<QQuickItem> m_activeItem;
+    Axis m_activeAxis = Axis::None;
+    qreal m_lastWrittenOffset = 0.0;
+    qreal m_targetOffset = 0.0;
+    std::vector<QMetaObject::Connection> m_itemConnections;
 };
 
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode)

@@ -43,6 +43,8 @@ Item {
     LoafEngine {
         id: paneEngine
         onCurrent_pathChanged: {
+            if (typeof nativeBridge !== "undefined" && nativeBridge && "cancelScrollAnimation" in nativeBridge)
+                nativeBridge.cancelScrollAnimation();
             pane.clearSelection();
             pane.renamingPath = "";
             // Pending selections belong to the folder they were made for.
