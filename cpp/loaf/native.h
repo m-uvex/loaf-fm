@@ -78,6 +78,7 @@ public:
     bool isAdmin() const;
     bool alphaBuffer() const;
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE QString systemFontFamily() const;
     Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
     Q_INVOKABLE QStringList systemFontFamilies() const;
     Q_INVOKABLE QStringList monospaceFontFamilies() const;

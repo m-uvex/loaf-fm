@@ -348,6 +348,8 @@ Item {
             return openDyslexicFont.status === FontLoader.Ready ? openDyslexicFont.name : "OpenDyslexic";
         if (fontChoice === "custom")
             return customFontFamily;
+        if (typeof nativeBridge !== "undefined" && nativeBridge)
+            return nativeBridge.systemFontFamily();
         return "";
     }
     readonly property string fontFamily: defaultFontFamily
@@ -2298,8 +2300,8 @@ Item {
     readonly property color syntaxString: isDark ? tertiaryContainer : primary
     readonly property color syntaxNumber: isDark ? secondaryContainerFg : primary
     readonly property color syntaxKeyword: primary
-    readonly property color danger: isDark ? "#ffb4ab" : "#ba1a1a"
-    readonly property color dangerContainer: isDark ? "#93000a" : "#ffdad6"
+    readonly property color danger: isDark ? "#e8a191" : "#a33d2a"
+    readonly property color dangerContainer: isDark ? "#4d211a" : "#f5ded6"
     readonly property color dangerFg: isDark ? "#690005" : "#ffffff"
     readonly property color track: isDark ? activePalette.darkSurfaceHighest : activePalette.lightSurfaceHigh
     readonly property color borderSubtle: outlineVariant

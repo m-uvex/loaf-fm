@@ -27,14 +27,13 @@ ColumnLayout {
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
     readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom density compact comfortable spacious")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
-    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system custom family monospace weight accessibility")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
     readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
             + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
-            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
+            + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
         : 0
 
     Layout.fillWidth: true
@@ -182,9 +181,9 @@ ColumnLayout {
 
     // Category 3: Readability & Vision
     SettingCard {
-        visible: root.matchHighContrast || root.matchFontChoice || root.matchTooltips
+        visible: root.matchHighContrast || root.matchTooltips
         title: qsTr("Readability & Vision")
-        subtitle: qsTr("Typography and contrast adjustments for improved accessibility")
+        subtitle: qsTr("Contrast and tooltip adjustments for improved accessibility")
         icon: "eye"
 
         SettingRow {
@@ -199,68 +198,7 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchHighContrast && root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-t"
-            title: qsTr("Font chooser")
-            subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
-
-            LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 240 : 420
-                options: [
-                    { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
-                    { value: "google_flex", label: qsTr("Google Flex"), shortLabel: qsTr("Flex") },
-                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") },
-                    { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Custom") }
-                ]
-                value: theme.fontChoice
-                onSelected: function(v) { theme.fontChoice = v; }
-            }
-        }
-
-        SettingRow {
-            visible: root.matchFontChoice && theme.fontChoice === "custom"
-            icon: "text-aa"
-            title: qsTr("Custom font family")
-            subtitle: qsTr("Pick any installed system font for the interface")
-
-            LoafSelect {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
-                accessibleName: qsTr("Custom font family")
-                options: (theme.fontChoice === "custom" && typeof nativeBridge !== "undefined" && nativeBridge)
-                    ? [{ value: "", label: qsTr("System Default") }].concat(
-                        nativeBridge.systemFontFamilies().map(function (f) { return { value: f, label: f }; })
-                      )
-                    : [{ value: "", label: qsTr("System Default") }]
-                value: theme.customFontFamily
-                onSelected: function(v) { theme.customFontFamily = v; }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "code"
-            title: qsTr("Monospace font")
-            subtitle: qsTr("Font used for paths, permissions, checksums, and terminal commands")
-
-            LoafSelect {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 260
-                accessibleName: qsTr("Monospace font")
-                options: (typeof nativeBridge !== "undefined" && nativeBridge)
-                    ? [{ value: "", label: qsTr("System Monospace") }].concat(
-                        nativeBridge.monospaceFontFamilies().map(function (f) { return { value: f, label: f }; })
-                      )
-                    : [{ value: "", label: qsTr("System Monospace") }]
-                value: theme.monoFontFamily
-                onSelected: function(v) { theme.monoFontFamily = v; }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice }
+        SettingDivider { visible: root.matchHighContrast && (root.matchFontSize || root.matchTooltips) }
 
         SettingRow {
             visible: root.matchFontSize
@@ -280,27 +218,7 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-bolder"
-            title: qsTr("Font weight")
-            subtitle: qsTr("Adjust text stroke weight from light to bold across the interface")
-
-            LoafSlider {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
-                from: 200
-                to: 800
-                stepSize: 100
-                value: theme.fontWeight
-                customValueText: theme.weightName(theme.fontWeight)
-                accessibleName: qsTr("Font weight")
-                onMoved: function(v) { theme.fontWeight = Math.round(v); }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice && root.matchTooltips }
+        SettingDivider { visible: (root.matchFontSize || root.matchHighContrast) && root.matchTooltips }
 
         SettingRow {
             visible: root.matchTooltips

@@ -1786,7 +1786,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
+                border.color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1798,16 +1798,16 @@ ApplicationWindow {
                     spacing: 8
 
                     LoafIcon {
-                        name: "trash"
+                        name: "broom"
                         size: 16
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMuted
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     }
 
                     Text {
                         visible: window.width >= 900
-                        text: qsTr("Empty Trash")
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMain
+                        text: window.emptyTrashArmed ? qsTr("Click again to confirm") : qsTr("Empty Trash")
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMain
                         font.pixelSize: theme.fs(13)
                         font.bold: true
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1819,7 +1819,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: window.confirmEmptyTrash()
+                    onClicked: window.confirmEmptyTrash(true)
                 }
             }
         }
@@ -2342,9 +2342,41 @@ ApplicationWindow {
             }
         }
     }
-    function confirmEmptyTrash() {
-        confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
-            qsTr("Empty Trash"), function() { core.empty_trash(); });
+    // Two-step empty trash: first click arms, a hint toast follows half a
+    // second later if no second click comes, second click empties. The
+    // blocking "Empty the trash?" dialog is gone.
+    property bool emptyTrashArmed: false
+    Timer {
+        id: emptyTrashHintTimer
+        interval: 500
+        onTriggered: if (window.emptyTrashArmed)
+            window.toast("info", qsTr("Click again to confirm"))
+    }
+    Timer {
+        id: emptyTrashDisarmTimer
+        interval: 4000
+        onTriggered: window.emptyTrashArmed = false
+    }
+    // Two-step empty trash: first click arms, second click empties. Full-size
+    // header chip shows the hint on its own label; the mini (icon-only) chip
+    // falls back to the confirm dialog; the rail broom gets a toast hint.
+    function confirmEmptyTrash(inButtonLabel) {
+        if (window.emptyTrashArmed) {
+            window.emptyTrashArmed = false;
+            emptyTrashHintTimer.stop();
+            emptyTrashDisarmTimer.stop();
+            core.empty_trash();
+            return;
+        }
+        if (inButtonLabel && window.width < 900) {
+            confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
+                qsTr("Empty Trash"), function() { core.empty_trash(); });
+            return;
+        }
+        window.emptyTrashArmed = true;
+        emptyTrashDisarmTimer.restart();
+        if (!inButtonLabel)
+            emptyTrashHintTimer.restart();
     }
 
     function menuFromTree(tree, onPick) {
@@ -2651,7 +2683,7 @@ ApplicationWindow {
         var m = [];
         if (kind === "trash") {
             if (e.item_count > 0) {
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { core.empty_trash(); } });
                 m.push({ text: qsTr("Select All"), icon: "selection-all", shortcut: "Ctrl+A", itemKey: "select_all", separatorBefore: true, action: function() { pane.selectAll(); } });
             }
             if (m.length === 0)
@@ -3019,7 +3051,7 @@ ApplicationWindow {
                     if (window.pcView) window.pcView.requestPcRename();
                 } });
             if (place.kind === "trash")
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { core.empty_trash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
