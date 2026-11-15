@@ -8,7 +8,11 @@
 
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDBusArgument>
+#include <QFontDatabase>
+#include <QPointer>
+#include <thread>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
@@ -394,6 +398,65 @@ QString LoafNative::systemFontFamily() const
     if (family.isEmpty())
         family = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family();
     return family;
+}
+
+QStringList LoafNative::systemFontFamilies() const
+{
+    return QFontDatabase::families();
+}
+
+QStringList LoafNative::monospaceFontFamilies() const
+{
+    QStringList out;
+    const QStringList all = QFontDatabase::families();
+    for (const QString &fam : all) {
+        if (QFontDatabase::isFixedPitch(fam))
+            out.append(fam);
+    }
+    return out;
+}
+
+void LoafNative::computeChecksums(const QString &path)
+{
+    QPointer<LoafNative> self(this);
+    std::thread([self, path]() {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            const QString err = file.errorString();
+            if (self) {
+                QMetaObject::invokeMethod(self, [self, path, err]() {
+                    if (self) Q_EMIT self->checksumsReady(path, QString(), QString(), err);
+                }, Qt::QueuedConnection);
+            }
+            return;
+        }
+        QCryptographicHash md5(QCryptographicHash::Md5);
+        QCryptographicHash sha256(QCryptographicHash::Sha256);
+        QByteArray buf(256 * 1024, Qt::Uninitialized);
+        while (!file.atEnd()) {
+            const qint64 n = file.read(buf.data(), buf.size());
+            if (n < 0) {
+                const QString err = file.errorString();
+                if (self) {
+                    QMetaObject::invokeMethod(self, [self, path, err]() {
+                        if (self) Q_EMIT self->checksumsReady(path, QString(), QString(), err);
+                    }, Qt::QueuedConnection);
+                }
+                return;
+            }
+            if (n > 0) {
+                md5.addData(QByteArrayView(buf.constData(), n));
+                sha256.addData(QByteArrayView(buf.constData(), n));
+            }
+        }
+        const QString md5Hex = QString::fromLatin1(md5.result().toHex());
+        const QString sha256Hex = QString::fromLatin1(sha256.result().toHex());
+        if (self) {
+            QMetaObject::invokeMethod(self, [self, path, md5Hex, sha256Hex]() {
+                if (self) Q_EMIT self->checksumsReady(path, md5Hex, sha256Hex, QString());
+            }, Qt::QueuedConnection);
+        }
+    }).detach();
 }
 
 class WheelEventFilter : public QObject

@@ -25,7 +25,7 @@ ColumnLayout {
     readonly property bool matchThumbnails: matches("picture thumbnails preview image photo svg gallery")
     readonly property bool matchThumbShape: matches("thumbnail shape square crop original aspect ratio preview image photo")
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
-    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
+    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom density compact comfortable spacious")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
     readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
@@ -198,7 +198,27 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchHighContrast && root.matchTooltips }
+        SettingDivider { visible: root.matchHighContrast && (root.matchFontSize || root.matchTooltips) }
+
+        SettingRow {
+            visible: root.matchFontSize
+            icon: "rows"
+            title: qsTr("Layout density")
+            subtitle: qsTr("Adjust vertical spacing and row height in file lists and grids")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 360
+                options: [
+                    { value: "compact", label: qsTr("Compact"), shortLabel: qsTr("Compact") },
+                    { value: "comfortable", label: qsTr("Comfortable"), shortLabel: qsTr("Normal") },
+                    { value: "spacious", label: qsTr("Spacious"), shortLabel: qsTr("Spacious") }
+                ]
+                value: theme.density
+                onSelected: function(v) { theme.density = v; }
+            }
+        }
+
+        SettingDivider { visible: (root.matchFontSize || root.matchHighContrast) && root.matchTooltips }
 
         SettingRow {
             visible: root.matchTooltips
