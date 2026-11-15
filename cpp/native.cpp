@@ -35,6 +35,8 @@
 #include <QQuickItem>
 #include <QFont>
 #include <QWheelEvent>
+#include <QPointingDevice>
+#include <QInputDevice>
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QStyleHints>
@@ -509,7 +511,15 @@ protected:
             m_accumulatedZoomDelta = 0;
 
             const bool hasPixelDelta = (we->pixelDelta().x() != 0 || we->pixelDelta().y() != 0);
-            const bool isContinuous = hasPixelDelta || (we->phase() != Qt::NoScrollPhase);
+            const bool hasAngleDelta = (we->angleDelta().x() != 0 || we->angleDelta().y() != 0);
+            const auto *dev = we->pointingDevice();
+            const bool isExplicitTouchPad = (dev && dev->type() == QInputDevice::DeviceType::TouchPad);
+            const bool isNotSynthesized = (we->source() == Qt::MouseEventNotSynthesized);
+            const bool isDiscreteMouseWheel = (we->phase() == Qt::NoScrollPhase)
+                                              && hasAngleDelta
+                                              && !isExplicitTouchPad
+                                              && isNotSynthesized;
+            const bool isContinuous = !isDiscreteMouseWheel && (hasPixelDelta || (we->phase() != Qt::NoScrollPhase));
 
             if (isContinuous) {
                 cancelAnimation();
