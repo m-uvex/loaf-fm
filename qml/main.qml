@@ -86,7 +86,7 @@ ApplicationWindow {
             if (eng && eng.location_kind !== "dir")
                 return universal;
             var e = dirs[path];
-            return e ? e.prefs : universal;
+            return (e && e.mode === "dir") ? e.prefs : universal;
         }
 
         function applyTo(eng, p, withZoom) {
@@ -110,6 +110,8 @@ ApplicationWindow {
             if (!eng)
                 return;
             applyTo(eng, scopeFor(eng.current_path, eng), eng === window.engine);
+            if (eng === window.engine)
+                refreshMode();
         }
 
         function syncAll() {
@@ -121,7 +123,8 @@ ApplicationWindow {
 
         function refreshMode() {
             var eng = window.engine;
-            mode = (eng && eng.location_kind === "dir" && dirs[eng.current_path]) ? "dir" : "universal";
+            var e = eng && eng.location_kind === "dir" ? dirs[eng.current_path] : null;
+            mode = e ? e.mode : "universal";
         }
 
         function saveUniversal() {
@@ -142,7 +145,7 @@ ApplicationWindow {
             if (!eng)
                 return;
             var path = eng.current_path;
-            if (mode === "dir" && eng.location_kind === "dir" && dirs[path]) {
+            if (mode === "dir" && dirs[path]) {
                 dirs[path].prefs[key] = value;
                 saveDirs();
             } else {
@@ -153,19 +156,22 @@ ApplicationWindow {
         }
 
         // Switch between universal and per-folder for the active folder.
-        // Switching to dir keeps a previously saved set for it, or clones
-        // the universal one; switching back to universal drops the folder's
-        // set and re-applies universal.
+        // The folder's set is kept either way: switching to dir restores it,
+        // switching to universal keeps it stored so flipping back brings it
+        // back.
         function setMode(m) {
             var eng = window.engine;
             if (!eng || eng.location_kind !== "dir")
                 return;
             var path = eng.current_path;
+            var e = dirs[path];
             if (m === "dir") {
-                if (!dirs[path])
-                    dirs[path] = { prefs: liveSnapshot(eng) };
-            } else {
-                delete dirs[path];
+                if (!e)
+                    dirs[path] = { mode: "dir", prefs: liveSnapshot(eng) };
+                else
+                    e.mode = "dir";
+            } else if (e) {
+                e.mode = "universal";
             }
             saveDirs();
             syncAll();
