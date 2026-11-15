@@ -27,14 +27,13 @@ ColumnLayout {
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
     readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
-    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
     readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
             + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
-            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
+            + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
         : 0
 
     Layout.fillWidth: true
@@ -182,9 +181,9 @@ ColumnLayout {
 
     // Category 3: Readability & Vision
     SettingCard {
-        visible: root.matchHighContrast || root.matchFontChoice || root.matchTooltips
+        visible: root.matchHighContrast || root.matchTooltips
         title: qsTr("Readability & Vision")
-        subtitle: qsTr("Typography and contrast adjustments for improved accessibility")
+        subtitle: qsTr("Contrast and tooltip adjustments for improved accessibility")
         icon: "eye"
 
         SettingRow {
@@ -199,47 +198,7 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchHighContrast && root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-t"
-            title: qsTr("Font chooser")
-            subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
-
-            LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
-                options: [
-                    { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
-                    { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },
-                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") }
-                ]
-                value: theme.fontChoice
-                onSelected: function(v) { theme.fontChoice = v; }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-bolder"
-            title: qsTr("Font weight")
-            subtitle: qsTr("Adjust text stroke weight from light to bold across the interface")
-
-            LoafSlider {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
-                from: 200
-                to: 800
-                stepSize: 100
-                value: theme.fontWeight
-                customValueText: theme.weightName(theme.fontWeight)
-                accessibleName: qsTr("Font weight")
-                onMoved: function(v) { theme.fontWeight = Math.round(v); }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice && root.matchTooltips }
+        SettingDivider { visible: root.matchHighContrast && root.matchTooltips }
 
         SettingRow {
             visible: root.matchTooltips

@@ -504,12 +504,13 @@ Rectangle {
         readonly property bool containsMouse: mouse.containsMouse
         readonly property bool showBroom: btn.emptyTrashAction && mouse.containsMouse
             && typeof core !== "undefined" && core && !core.trash_empty
+        readonly property bool overBroom: mouse.mouseX >= iconBox.x && mouse.mouseX <= iconBox.x + iconBox.width
 
         signal clicked()
         signal middleClicked()
         signal menuRequested(real x, real y)
         signal filesDropped(var paths, bool asCopy, var dropEvent)
-        // Raised instead of clicked() when the broom is showing (hovering the trash tab).
+        // Raised when the broom button is clicked while hovering the trash tab.
         signal emptyTrashRequested()
 
         implicitHeight: 44
@@ -527,8 +528,8 @@ Rectangle {
         Keys.onEnterPressed: btn.clicked()
         Keys.onSpacePressed: btn.clicked()
         Accessible.role: Accessible.Button
-        Accessible.name: btn.showBroom ? qsTr("Empty Trash") : accessibleName
-        Accessible.onPressAction: if (btn.showBroom) btn.emptyTrashRequested(); else btn.clicked()
+        Accessible.name: accessibleName
+        Accessible.onPressAction: btn.clicked()
 
         readonly property bool dropHover: drop.containsDrag
 
@@ -554,8 +555,9 @@ Rectangle {
             scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.10 : 1.0)
             Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
 
-            // Trash hold-to-empty: the row's own icon becomes the button,
-            // wrapped in a rotating M3 cookie shape that only appears on hover.
+            // Trash empty-on-hover: the row's own icon becomes a button on
+            // hover, wrapped in a rotating M3 cookie shape. Only the icon
+            // empties the trash, the rest of the row keeps opening it.
             LoafShape {
                 anchors.centerIn: parent
                 width: 38
@@ -564,7 +566,7 @@ Rectangle {
                 visible: btn.showBroom
                 opacity: btn.showBroom ? 1.0 : 0.0
                 rotation: btn.showBroom ? 135 : 0
-                color: theme.dangerContainer
+                color: theme.backdropSurface(theme.surfaceContainer)
                 Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 3.2; damping: 0.32 } }
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             }
@@ -582,7 +584,8 @@ Rectangle {
                 anchors.centerIn: parent
                 name: "broom"
                 size: 18
-                color: theme.danger
+                color: btn.overBroom ? theme.danger : theme.textMuted
+                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
             }
             Image {
                 visible: theme.iconSource !== "phosphor" && btn.systemIcon.length > 0 && !btn.showBroom
@@ -645,18 +648,25 @@ Rectangle {
             onEntered: {
                 if (btn.showLabel)
                     return;
-                var label = btn.showBroom ? qsTr("Empty Trash") : btn.label;
+                var label = (btn.showBroom && btn.overBroom) ? qsTr("Empty Trash") : btn.label;
                 if (label.length > 0)
                     tooltip.show(btn, label);
             }
             onExited: tooltip.hide(btn)
+            onPositionChanged: {
+                if (!btn.showBroom)
+                    return;
+                var label = btn.overBroom ? qsTr("Empty Trash") : btn.label;
+                if (tooltip.target === btn && tooltip.tipText !== label)
+                    tooltip.show(btn, label);
+            }
             onClicked: function(m) {
                 if (m.button === Qt.RightButton) {
                     var p = mapToItem(window.contentItem, m.x, m.y);
                     btn.menuRequested(p.x, p.y);
                 } else if (m.button === Qt.MiddleButton) {
                     btn.middleClicked();
-                } else if (btn.showBroom) {
+                } else if (btn.showBroom && m.x >= iconBox.x && m.x <= iconBox.x + iconBox.width) {
                     btn.emptyTrashRequested();
                 } else {
                     btn.clicked();

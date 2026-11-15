@@ -31,11 +31,12 @@ ColumnLayout {
     readonly property bool matchThisPc: matches(qsTr("this pc computer hostname name label device system"))
     readonly property bool matchMenus: matches(qsTr("menus context menu right click sidebar customize places navigation layout minimal"))
     readonly property bool matchLanguage: matches(qsTr("language locale translation bahasa indonesia"))
+    readonly property bool matchFontChoice: matches(qsTr("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility"))
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchOutlines ? 1 : 0) + (matchPalette ? 1 : 0)
             + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchIconColor ? 1 : 0) + (matchTopBar ? 1 : 0)
-            + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0))
+            + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0) + (matchFontChoice ? 1 : 0))
         : 0
     readonly property var languageOptions: [{ value: "", label: qsTr("System default") }].concat(JSON.parse(core.available_languages() || "[]"))
 
@@ -44,9 +45,9 @@ ColumnLayout {
 
     // Category 1: Appearance
     SettingCard {
-        visible: root.matchTheme || root.matchOpacity || root.matchOutlines
+        visible: root.matchTheme || root.matchOpacity || root.matchOutlines || root.matchFontChoice
         title: qsTr("Appearance")
-        subtitle: qsTr("Window colors, translucency and chrome outlines")
+        subtitle: qsTr("Window colors, translucency, chrome outlines and typography")
         icon: "palette"
 
         SettingRow {
@@ -146,6 +147,46 @@ ColumnLayout {
                 enabled: theme.showOutlines
                 accessibleName: qsTr("Outline intensity")
                 onMoved: function(v) { theme.outlineIntensity = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchOutlines && root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontChoice
+            icon: "text-t"
+            title: qsTr("Font chooser")
+            subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
+
+            LoafSegmented {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
+                options: [
+                    { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
+                    { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },
+                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") }
+                ]
+                value: theme.fontChoice
+                onSelected: function(v) { theme.fontChoice = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchFontChoice }
+
+        SettingRow {
+            visible: root.matchFontChoice
+            icon: "text-b"
+            title: qsTr("Font weight")
+            subtitle: qsTr("Adjust text stroke weight from light to bold across the interface")
+
+            LoafSlider {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                from: 200
+                to: 800
+                stepSize: 100
+                value: theme.fontWeight
+                customValueText: theme.weightName(theme.fontWeight)
+                accessibleName: qsTr("Font weight")
+                onMoved: function(v) { theme.fontWeight = Math.round(v); }
             }
         }
     }
