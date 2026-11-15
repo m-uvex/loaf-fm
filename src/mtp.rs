@@ -329,7 +329,7 @@ mod tests {
         let loc = Location::parse(&root_url).expect("parse root");
         assert_eq!(loc.url(), root_url);
         assert_eq!(loc.title(), "Phone");
-        assert_eq!(loc.is_root(), true);
+        assert!(loc.is_root());
         assert_eq!(loc.parent(), None);
         assert_eq!(
             loc.breadcrumbs(),
@@ -339,7 +339,7 @@ mod tests {
         let st_name = "Internal Storage #1 (SD card & 100%)";
         let loc_storage = loc.child(st_name).expect("child storage");
         assert_eq!(loc_storage.title(), st_name);
-        assert_eq!(loc_storage.is_root(), false);
+        assert!(!loc_storage.is_root());
         assert_eq!(loc_storage.parent(), Some(loc.clone()));
         let st_url = loc_storage.url();
 
@@ -455,10 +455,10 @@ mod tests {
         let dcim = &entries[0];
         assert_eq!(dcim.name, "DCIM");
         assert_eq!(dcim.display_name, "DCIM");
-        assert_eq!(dcim.is_dir, true);
-        assert_eq!(dcim.is_symlink, false);
-        assert_eq!(dcim.is_hidden, false);
-        assert_eq!(dcim.thumbable, false);
+        assert!(dcim.is_dir);
+        assert!(!dcim.is_symlink);
+        assert!(!dcim.is_hidden);
+        assert!(!dcim.thumbable);
         assert_eq!(dcim.category, "folder");
         assert_eq!(dcim.icon, "folder");
         assert_eq!(dcim.detail, "MTP");
@@ -467,10 +467,10 @@ mod tests {
         let photo = &entries[1];
         assert_eq!(photo.name, "photo.jpg");
         assert_eq!(photo.display_name, "photo.jpg");
-        assert_eq!(photo.is_dir, false);
-        assert_eq!(photo.is_symlink, false);
-        assert_eq!(photo.is_hidden, false);
-        assert_eq!(photo.thumbable, false); // thumbable must be false for MTP
+        assert!(!photo.is_dir);
+        assert!(!photo.is_symlink);
+        assert!(!photo.is_hidden);
+        assert!(!photo.thumbable); // thumbable must be false for MTP
         assert_eq!(photo.category, "image");
         assert_eq!(photo.icon, "file-image");
         assert_eq!(photo.detail, "MTP");
@@ -479,8 +479,8 @@ mod tests {
 
         let hidden = &entries[2];
         assert_eq!(hidden.name, ".hidden_folder");
-        assert_eq!(hidden.is_hidden, true);
-        assert_eq!(hidden.is_dir, true);
+        assert!(hidden.is_hidden);
+        assert!(hidden.is_dir);
     }
 
     #[test]
