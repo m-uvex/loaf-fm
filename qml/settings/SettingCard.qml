@@ -21,7 +21,7 @@ Rectangle {
     Layout.fillWidth: true
     Layout.minimumWidth: 0
     radius: theme.radiusL
-    color: theme.surfaceContainer
+    color: theme.backdropSurface(theme.surfaceContainer)
     border.width: 1
     border.color: theme.outlineAlpha(theme.borderSubtle)
     implicitHeight: cardLayout.implicitHeight + 2 * padding

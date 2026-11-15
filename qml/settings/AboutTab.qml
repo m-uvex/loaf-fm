@@ -196,7 +196,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.minimumWidth: 0
         radius: theme.radiusXl
-        color: theme.surfaceContainer
+        color: theme.backdropSurface(theme.surfaceContainer)
         border.width: 1
         border.color: theme.outlineAlpha(theme.borderSubtle)
         implicitHeight: heroCol.implicitHeight + (root.isCompact ? 36 : 56)

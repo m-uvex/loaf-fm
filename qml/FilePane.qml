@@ -774,20 +774,30 @@ Item {
                     if (pane.isList()) {
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
                         var pitch = rowH + listView.spacing;
-                        var itemTop = idx * pitch;
-                        if (paneEngine.sort_by === "modified") {
+                        var it = listView.itemAtIndex(idx);
+                        var ly = 0;
+                        var inSameGroupWithPrev = idx > 0;
+                        var inSameGroupWithNext = idx + 1 < paneEngine.item_count;
+                        if (paneEngine.group_by !== "none") {
                             var groups = [];
                             try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                            var itemTop = idx * pitch;
                             for (var g = 0; g < groups.length; ++g) {
                                 if (idx >= groups[g].start && idx < groups[g].start + groups[g].count) {
                                     itemTop = idx * pitch + (g + 1) * 28;
+                                    if (idx === groups[g].start) inSameGroupWithPrev = false;
+                                    if (idx === groups[g].start + groups[g].count - 1) inSameGroupWithNext = false;
                                     break;
                                 }
                             }
+                            ly = it ? Math.round(it.mapToItem(selectionCanvas, 0, 0).y)
+                                    : Math.round(listHeader.height + 6 + itemTop - listView.contentY);
+                        } else {
+                            ly = it ? Math.round(it.mapToItem(selectionCanvas, 0, 0).y)
+                                    : Math.round(listHeader.height + 6 + (idx * pitch) - listView.contentY);
                         }
-                        var ly = Math.round(listHeader.height + 6 + itemTop - listView.contentY);
-                        var up = idx > 0 && on(idx - 1);
-                        var down = on(idx + 1);
+                        var up = inSameGroupWithPrev && on(idx - 1);
+                        var down = inSameGroupWithNext && on(idx + 1);
                         return {
                             x0: 2, x1: listView.width - 2,
                             // Rows are 3px apart: a selected neighbour pulls
@@ -845,7 +855,7 @@ Item {
                         return out;
                     if (pane.isList()) {
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom))) + 3;
-                        if (paneEngine.sort_by === "modified") {
+                        if (paneEngine.group_by !== "none") {
                             var groups = [];
                             try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
                             for (var g = 0; g < groups.length; ++g) {
@@ -1635,7 +1645,7 @@ Item {
                         var sel = Object.assign({}, base);
                         var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
                         var pitch = rowH + listView.spacing;
-                        if (paneEngine.sort_by === "modified") {
+                        if (paneEngine.group_by !== "none") {
                             var groups = [];
                             try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
                             for (var g = 0; g < groups.length; ++g) {

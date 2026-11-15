@@ -6,7 +6,7 @@ import app.loaf
 Rectangle {
     id: root
 
-    property color cardColor: theme.surfaceContainerLow
+    property color cardColor: theme.backdropSurface(theme.surfaceContainerLow)
     property bool outline: true
     property bool interactive: false
     property real padding: 14
