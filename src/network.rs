@@ -1,7 +1,7 @@
 use crate::message::{Message, MessageKey};
 use crate::{state, util};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -584,6 +584,48 @@ pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
     None
 }
 
+/// Extracts a concise display label from a raw GVFS mount directory name
+/// (e.g. `smb-share:server=192.168.1.50,share=share3,user=haris` -> `share3`).
+pub(crate) fn friendly_gvfs_mount_name(mount_dir: &str) -> Option<String> {
+    if let Some(smb) = parse_smb_mount_entry(mount_dir) {
+        if !smb.share.trim().is_empty() {
+            return Some(smb.share);
+        }
+        if !smb.server.trim().is_empty() {
+            return Some(smb.server);
+        }
+    }
+    if let Some(dav) = parse_dav_mount_entry(mount_dir) {
+        if !dav.host.trim().is_empty() {
+            return Some(dav.host);
+        }
+    }
+    None
+}
+
+/// If `path` is inside a GVFS mount, returns `(mount_root, friendly_label)`
+/// preferring the saved network profile name when available.
+pub fn gvfs_mount_for_path(path: &Path) -> Option<(PathBuf, String)> {
+    let gvfs = gvfs_dir();
+    let rel = path.strip_prefix(&gvfs).ok()?;
+    let first = rel.components().next()?;
+    let std::path::Component::Normal(mount_os) = first else {
+        return None;
+    };
+    let mount_dir = mount_os.to_string_lossy();
+    let mount_root = gvfs.join(first);
+    for profile in profiles() {
+        if connected_path(&profile).as_ref() == Some(&mount_root) {
+            let name = profile.name.trim();
+            if !name.is_empty() {
+                return Some((mount_root, name.to_string()));
+            }
+        }
+    }
+    let label = friendly_gvfs_mount_name(&mount_dir)?;
+    Some((mount_root, label))
+}
+
 fn run_gio(args: &[String]) -> Result<String, String> {
     let bin = util::which("gio")
         .ok_or_else(|| Message::key(MessageKey::NetworkErrorGioMissing).to_string())?;
@@ -757,5 +799,19 @@ mod tests {
         assert!(dav_entry.ssl);
         assert_eq!(dav_entry.prefix, "/remote.php/webdav");
         assert_eq!(dav_entry.user, "alice");
+    }
+
+    #[test]
+    fn friendly_gvfs_mount_name_extracts_share_or_server() {
+        assert_eq!(
+            friendly_gvfs_mount_name("smb-share:server=192.168.1.50,share=share3,user=haris")
+                .as_deref(),
+            Some("share3")
+        );
+        assert_eq!(
+            friendly_gvfs_mount_name("smb-share:server=nas.local,share=,user=alice").as_deref(),
+            Some("nas.local")
+        );
+        assert_eq!(friendly_gvfs_mount_name("unrelated-dir"), None);
     }
 }
