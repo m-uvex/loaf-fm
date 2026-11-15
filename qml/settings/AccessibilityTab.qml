@@ -155,7 +155,7 @@ ColumnLayout {
                 value: theme.zoomIndex
                 customValueText: Math.round(theme.zoom * 100) + "%"
                 accessibleName: qsTr("Icon zoom size")
-                onMoved: function(v) { theme.zoomIndex = Math.round(v); }
+                onMoved: function(v) { window.viewPrefs.setZoom(v); }
             }
         }
 

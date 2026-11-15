@@ -38,11 +38,151 @@ ApplicationWindow {
     readonly property bool showHidden: activePane ? activePane.engine.show_hidden : false
 
     function toggleShowHidden() {
-        var v = !pane0.engine.show_hidden;
-        if (pane0.engine.show_hidden !== v)
-            pane0.engine.toggle_show_hidden();
-        if (pane1Loader.item && pane1Loader.item.engine.show_hidden !== v)
-            pane1Loader.item.engine.toggle_show_hidden();
+        viewPrefs.setHidden(!pane0.engine.show_hidden);
+    }
+
+    // View preferences live in two scopes: one universal set shared by every
+    // folder, plus optional per-folder sets. The scope pill at the top of the
+    // View menu picks which scope the active folder edits; folders default to
+    // universal and keep their own set once the pill is flipped to This folder.
+    // Exposed as a property so other components (FilePane, settings tabs)
+    // can reach the manager; ids alone are file-scoped.
+    readonly property alias viewPrefs: viewPrefsManager
+
+    QtObject {
+        id: viewPrefsManager
+
+        readonly property string universalKey: "viewPrefsUniversal"
+        readonly property string dirsKey: "viewPrefsDirs"
+        readonly property int maxDirs: 500
+
+        property var universal: null
+        property var dirs: ({})
+        // Scope the active folder's edits land in right now.
+        property string mode: "universal"
+
+        function load() {
+            var u = theme.readSetting(universalKey);
+            universal = (u && u.length > 0) ? JSON.parse(u) : null;
+            if (!universal) {
+                universal = liveSnapshot(pane0.engine);
+                saveUniversal();
+            }
+            var d = theme.readSetting(dirsKey);
+            dirs = (d && d.length > 0) ? JSON.parse(d) : {};
+            refreshMode();
+        }
+
+        function liveSnapshot(eng) {
+            return {
+                view: eng.view_mode, zoom: theme.zoomIndex,
+                sort: eng.sort_by, sortAsc: eng.sort_ascending,
+                group: eng.group_by, groupAsc: eng.group_ascending,
+                folders: eng.folder_position, hidden: eng.show_hidden
+            };
+        }
+
+        function scopeFor(path, eng) {
+            if (eng && eng.location_kind !== "dir")
+                return universal;
+            var e = dirs[path];
+            return e ? e.prefs : universal;
+        }
+
+        function applyTo(eng, p, withZoom) {
+            if (!eng || !p)
+                return;
+            if (eng.view_mode !== p.view)
+                eng.set_view(p.view);
+            if (eng.sort_by !== p.sort || eng.sort_ascending !== p.sortAsc)
+                eng.set_sort(p.sort, p.sortAsc);
+            if (eng.group_by !== p.group || eng.group_ascending !== p.groupAsc)
+                eng.set_group(p.group, p.groupAsc);
+            if (eng.folder_position !== p.folders)
+                eng.change_folder_position(p.folders);
+            if (withZoom && theme.zoomIndex !== p.zoom)
+                theme.zoomIndex = p.zoom;
+            if (eng.show_hidden !== p.hidden)
+                eng.toggle_show_hidden();
+        }
+
+        function syncPane(eng) {
+            if (!eng)
+                return;
+            applyTo(eng, scopeFor(eng.current_path, eng), eng === window.engine);
+        }
+
+        function syncAll() {
+            syncPane(pane0.engine);
+            if (pane1Loader.item)
+                syncPane(pane1Loader.item.engine);
+            refreshMode();
+        }
+
+        function refreshMode() {
+            var eng = window.engine;
+            mode = (eng && eng.location_kind === "dir" && dirs[eng.current_path]) ? "dir" : "universal";
+        }
+
+        function saveUniversal() {
+            theme.writeSetting(universalKey, JSON.stringify(universal));
+        }
+
+        function saveDirs() {
+            var keys = Object.keys(dirs);
+            if (keys.length > maxDirs) {
+                for (var i = 0; i < keys.length - maxDirs; ++i)
+                    delete dirs[keys[i]];
+            }
+            theme.writeSetting(dirsKey, JSON.stringify(dirs));
+        }
+
+        function set(key, value) {
+            var eng = window.engine;
+            if (!eng)
+                return;
+            var path = eng.current_path;
+            if (mode === "dir" && eng.location_kind === "dir" && dirs[path]) {
+                dirs[path].prefs[key] = value;
+                saveDirs();
+            } else {
+                universal[key] = value;
+                saveUniversal();
+            }
+            syncAll();
+        }
+
+        // Switch between universal and per-folder for the active folder.
+        // Switching to dir keeps a previously saved set for it, or clones
+        // the universal one; switching back to universal drops the folder's
+        // set and re-applies universal.
+        function setMode(m) {
+            var eng = window.engine;
+            if (!eng || eng.location_kind !== "dir")
+                return;
+            var path = eng.current_path;
+            if (m === "dir") {
+                if (!dirs[path])
+                    dirs[path] = { prefs: liveSnapshot(eng) };
+            } else {
+                delete dirs[path];
+            }
+            saveDirs();
+            syncAll();
+        }
+
+        function setView(v) { set("view", v); }
+        function setZoom(i) { set("zoom", Math.max(0, Math.min(theme.zoomLevels.length - 1, Math.round(i)))); }
+        function zoom(dir) { setZoom(theme.zoomIndex + dir); }
+        function toggleView() { set("view", window.engine.view_mode === "grid" ? "list" : "grid"); }
+        function setHidden(v) { set("hidden", v); }
+
+        function sortBy(key, defaultAsc) {
+            var eng = window.engine;
+            var asc = (eng.sort_by === key) ? !eng.sort_ascending : defaultAsc;
+            set("sort", key);
+            set("sortAsc", asc);
+        }
     }
     property var activePane: pane0
     // The engine (model) of the pane the user is working in.
@@ -76,7 +216,7 @@ ApplicationWindow {
     }
 
     onCurrentTabChanged: cancelDriveOpen()
-    onActivePaneChanged: cancelDriveOpen()
+    onActivePaneChanged: { viewPrefs.refreshMode(); if (window.engine) viewPrefs.syncPane(window.engine); cancelDriveOpen(); }
 
     Connections {
         target: window.engine
@@ -260,7 +400,7 @@ ApplicationWindow {
         function onPickerDismissed(handle) { window.closePicker(handle); }
         function onCtrlScroll(delta) {
             if (window.activeView === "files")
-                theme.stepZoom(delta);
+                viewPrefs.zoom(delta);
         }
         function onSpacePressed() {
             if (searchInput.activeFocus || window.isEditingPath)
@@ -780,13 +920,23 @@ ApplicationWindow {
 
     onClosing: saveSession()
 
+    Connections {
+        target: pane0.engine
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane0.engine); }
+    }
+    Connections {
+        target: pane1Loader.item ? pane1Loader.item.engine : null
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane1Loader.item.engine); }
+    }
+
     Component.onCompleted: {
+        viewPrefs.load();
         refreshCutSet();
         var pending = nativeBridge.takePendingOpen();
         var restored = restoreSession(pending.length > 0);
         if (nativeBridge.startupMode === "mini") {
             sidebar.expanded = false;
-            theme.zoomIndex = 1;
+            viewPrefs.setZoom(1);
         }
         var first = !restored;
         for (var i = 0; i < pending.length; ++i) {
@@ -866,11 +1016,11 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("newFolder"); enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
     Shortcut { sequence: theme.shortcutFor("toggleSplit"); onActivated: window.toggleSplit() }
     Shortcut { sequence: theme.shortcutFor("toggleSidebar"); onActivated: sidebar.expanded = !sidebar.expanded }
-    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
-    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
-    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: theme.zoomIndex = 2 }
-    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: engine.set_view("grid") }
-    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: engine.set_view("list") }
+    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: viewPrefs.zoom(1) }
+    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: viewPrefs.zoom(-1) }
+    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: viewPrefs.setZoom(2) }
+    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: viewPrefs.setView("grid") }
+    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: viewPrefs.setView("list") }
     Shortcut { sequence: theme.shortcutFor("bookmark"); enabled: engine.location_kind === "dir"; onActivated: core.add_bookmark(engine.current_path) }
     Shortcut { sequence: theme.shortcutFor("copyPath"); enabled: window.gridKeyboardReady; onActivated: window.copyPathOfSelection() }
     Shortcut {
@@ -1732,7 +1882,7 @@ ApplicationWindow {
                         Keys.onSpacePressed: function(event) { viewIconBtn.toggleView(); event.accepted = true; }
 
                         function toggleView() {
-                            engine.set_view(engine.view_mode === "grid" ? "list" : "grid");
+                            viewPrefs.toggleView();
                         }
 
                         Rectangle {
@@ -3149,6 +3299,19 @@ ApplicationWindow {
         menuMaxWidth: 320
         model: []
 
+        // Scope pill: which set of view options the active folder edits.
+        headerBar: LoafSegmented {
+            id: viewScopeToggle
+            visible: true
+            Accessible.name: qsTr("View options scope")
+            options: [
+                { value: "universal", label: qsTr("Universal") },
+                { value: "dir", label: qsTr("This folder") }
+            ]
+            value: viewPrefs.mode
+            onSelected: function(v) { viewPrefs.setMode(v); }
+        }
+
         // Rebuilt on every open so checkmarks track engine state exactly.
         // Same LoafMenu the RMB context menu uses; the button drops it
         // below itself, right-aligned.
@@ -3159,24 +3322,24 @@ ApplicationWindow {
             var groupLabels = [qsTr("None"), qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
 
             var m = [];
-            m.push({ text: qsTr("Grid"), icon: "squares-four", checkable: true, checked: engine.view_mode === "grid", action: function() { engine.set_view("grid"); } });
-            m.push({ text: qsTr("List"), icon: "list", checkable: true, checked: engine.view_mode === "list", action: function() { engine.set_view("list"); } });
+            m.push({ text: qsTr("Grid"), icon: "squares-four", checkable: true, checked: engine.view_mode === "grid", action: function() { viewPrefs.setView("grid"); } });
+            m.push({ text: qsTr("List"), icon: "list", checkable: true, checked: engine.view_mode === "list", action: function() { viewPrefs.setView("list"); } });
             m.push({ text: qsTr("Icon Size"), icon: "magnifying-glass", separatorBefore: true, submenu: theme.zoomLevels.map(function(z, i) {
-                return { text: Math.round(z * 100) + "%", checkable: true, checked: theme.zoomIndex === i, action: function() { theme.zoomIndex = i; } };
+                return { text: Math.round(z * 100) + "%", checkable: true, checked: theme.zoomIndex === i, action: function() { viewPrefs.setZoom(i); } };
             }) });
             m.push({ text: qsTr("Folders"), icon: "folder", separatorBefore: true, submenu: ["first", "last", "mixed"].map(function(v) {
                 var label = v === "first" ? qsTr("Folders First") : (v === "last" ? qsTr("Folders Last") : qsTr("Mixed"));
-                return { text: label, checkable: true, checked: engine.folder_position === v, action: function() { engine.change_folder_position(v); } };
+                return { text: label, checkable: true, checked: engine.folder_position === v, action: function() { viewPrefs.set("folders", v); } };
             }) });
             m.push({ text: qsTr("Sort By"), icon: "arrow-down", separatorBefore: true, submenu: sortKeys.map(function(k, i) {
-                return { text: sortLabels[i], checkable: true, checked: engine.sort_by === k, action: function() { engine.set_sort(k, engine.sort_ascending); } };
+                return { text: sortLabels[i], checkable: true, checked: engine.sort_by === k, action: function() { viewPrefs.set("sort", k); } };
             }) });
-            m.push({ text: qsTr("Reverse Order"), icon: "arrows-down-up", checkable: true, checked: !engine.sort_ascending, action: function() { engine.set_sort(engine.sort_by, !engine.sort_ascending); } });
+            m.push({ text: qsTr("Reverse Order"), icon: "arrows-down-up", checkable: true, checked: !engine.sort_ascending, action: function() { viewPrefs.set("sortAsc", !engine.sort_ascending); } });
             m.push({ text: qsTr("Group By"), icon: "rows", separatorBefore: true, submenu: groupKeys.map(function(k, i) {
-                return { text: groupLabels[i], checkable: true, checked: engine.group_by === k, action: function() { engine.set_group(k, engine.group_ascending); } };
+                return { text: groupLabels[i], checkable: true, checked: engine.group_by === k, action: function() { viewPrefs.set("group", k); } };
             }) });
-            m.push({ text: qsTr("Reverse Group Order"), icon: "arrows-down-up", checkable: true, enabled: engine.group_by !== "none", checked: !engine.group_ascending, action: function() { engine.set_group(engine.group_by, !engine.group_ascending); } });
-            m.push({ text: qsTr("Show Hidden Files"), icon: "eye", separatorBefore: true, checkable: true, checked: window.showHidden, shortcut: theme.shortcutFor("toggleHidden"), action: function() { window.toggleShowHidden(); } });
+            m.push({ text: qsTr("Reverse Group Order"), icon: "arrows-down-up", checkable: true, enabled: engine.group_by !== "none", checked: !engine.group_ascending, action: function() { viewPrefs.set("groupAsc", !engine.group_ascending); } });
+            m.push({ text: qsTr("Show Hidden Files"), icon: "eye", separatorBefore: true, checkable: true, checked: window.showHidden, shortcut: theme.shortcutFor("toggleHidden"), action: function() { viewPrefs.setHidden(!window.showHidden); } });
             m.push({ text: qsTr("Split View"), icon: "columns", checkable: true, checked: window.splitView, shortcut: theme.shortcutFor("toggleSplit"), action: function() { window.toggleSplit(); } });
             model = m;
             openBelowRight(viewTextView);

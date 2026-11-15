@@ -1087,7 +1087,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 // Rubber band selection.
@@ -1277,7 +1277,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 Rectangle {
@@ -1511,12 +1511,7 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 Accessible.role: Accessible.ColumnHeader
                                 Accessible.name: modelData.label
-                                onClicked: {
-                                    if (paneEngine.sort_by === modelData.key)
-                                        paneEngine.toggle_sort_order();
-                                    else
-                                        paneEngine.set_sort(modelData.key, modelData.defaultAsc);
-                                }
+                                onClicked: window.viewPrefs.sortBy(modelData.key, modelData.defaultAsc)
                             }
                         }
                     }
@@ -1597,7 +1592,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 // Rubber band selection.
