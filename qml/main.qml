@@ -145,9 +145,19 @@ ApplicationWindow {
     // Paths currently cut to the clipboard (dimmed in the views).
     property var cutSet: ({})
 
+    readonly property var quickLook: quickLookLoader.item
+    readonly property var propsDialog: propsDialogLoader.item
+    readonly property var batchRename: batchRenameLoader.item
+    readonly property var conflictDialog: conflictDialogLoader.item
+
+    function openQuickLook(path) { quickLookLoader.active = true; quickLookLoader.item.showFor(path); }
+    function openPropsDialog(paths) { propsDialogLoader.active = true; propsDialogLoader.item.showFor(paths); }
+    function openBatchRename(items) { batchRenameLoader.active = true; batchRenameLoader.item.showFor(items); }
+    function openConflictDialog(conflicts, paths, dest, mode, fromCut) { conflictDialogLoader.active = true; conflictDialogLoader.item.showFor(conflicts, paths, dest, mode, fromCut); }
+
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
-    readonly property bool anyModalOpen: inputModal.visible || propsDialog.visible || conflictDialog.visible
-        || passwordModal.visible || quickLook.visible || commandModal.visible || batchRename.visible
+    readonly property bool anyModalOpen: inputModal.visible || (propsDialog && propsDialog.visible) || (conflictDialog && conflictDialog.visible)
+        || passwordModal.visible || (quickLook && quickLook.visible) || commandModal.visible || (batchRename && batchRename.visible)
         || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
         || networkDialog.visible
         || window.isEditingPath
@@ -265,10 +275,10 @@ ApplicationWindow {
         function onSpacePressed() {
             if (searchInput.activeFocus || window.isEditingPath)
                 return;
-            if (!quickLook.visible && window.gridKeyboardReady) {
+            if (!(quickLook && quickLook.visible) && window.gridKeyboardReady) {
                 window.spaceHeldForQuickLook = true;
                 window.toggleQuickLook();
-            } else if (quickLook.visible) {
+            } else if (quickLook && quickLook.visible) {
                 window.spaceHeldForQuickLook = false;
                 quickLook.close();
             }
@@ -276,7 +286,7 @@ ApplicationWindow {
         // Tap (short press): opens and stays. Hold: closes on release.
         // A press shorter than the hold threshold is a toggle, not a hold.
         function onSpaceReleased(heldDuration) {
-            if (!quickLook.visible || !window.spaceHeldForQuickLook)
+            if (!(quickLook && quickLook.visible) || !window.spaceHeldForQuickLook)
                 return;
             if (heldDuration >= 400) {
                 window.spaceHeldForQuickLook = false;
@@ -338,7 +348,7 @@ ApplicationWindow {
         } else if (pane.engine.location_kind === "mtp") {
             core.open_item(item.path);
         } else if (pane.engine.location_kind === "trash") {
-            quickLook.showFor(item.path);
+            openQuickLook(item.path);
         } else if (core.is_archive_file(item.path) && theme.archiveOpenAction === "extract") {
             core.extract(item.path, true, "");
         } else if (theme.browseArchives && theme.archiveOpenAction === "browse" && core.is_archive_file(item.path)) {
@@ -403,7 +413,7 @@ ApplicationWindow {
         }
         var conflicts = JSON.parse(core.check_conflicts(JSON.stringify(paths), dest) || "[]");
         if (conflicts.length > 0) {
-            conflictDialog.showFor(conflicts, paths, dest, mode, !!fromCut);
+            openConflictDialog(conflicts, paths, dest, mode, !!fromCut);
             return;
         }
         core.transfer(JSON.stringify(paths), dest, mode, "rename");
@@ -480,7 +490,7 @@ ApplicationWindow {
         if (paths.some(function(path) { return path.indexOf("mtp:") === 0; }))
             return;
         if (paths.length > 0)
-            propsDialog.showFor(paths);
+            openPropsDialog(paths);
     }
 
     function startNewFolder() {
@@ -491,13 +501,13 @@ ApplicationWindow {
 
     function previewItem(path) {
         if (path.indexOf("mtp:") === 0) core.preview_mtp(path);
-        else quickLook.showFor(path);
+        else openQuickLook(path);
     }
 
     property bool spaceHeldForQuickLook: false
 
     function toggleQuickLook() {
-        if (quickLook.visible) {
+        if (quickLook && quickLook.visible) {
             quickLook.close();
             return;
         }
@@ -923,12 +933,12 @@ ApplicationWindow {
         enabled: window.gridKeyboardReady && (engine.location_kind !== "mtp" || (!engine.read_only && window.selectedPaths().length === 1))
         onActivated: {
             if (window.selectedPaths().length > 1)
-                batchRename.showFor(window.activePane.selectedItems());
+                openBatchRename(window.activePane.selectedItems());
             else
                 window.activePane.startRename();
         }
     }
-    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: quickLook.visible || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
+    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: (quickLook && quickLook.visible) || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
     Shortcut { sequence: theme.shortcutFor("trash"); enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
     Shortcut { sequence: theme.shortcutFor("deletePermanent"); enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
     Shortcut {
@@ -1072,7 +1082,7 @@ ApplicationWindow {
             }
         }
         onNotify: function(kind, text) { window.toast(kind, text); }
-        onMtp_preview_ready: function(path) { quickLook.showFor(path); }
+        onMtp_preview_ready: function(path) { openQuickLook(path); }
         onOperation_finished: function(kind, ok, resultJson) {
             var r = null;
             try { r = JSON.parse(resultJson); } catch (e) { r = null; }
@@ -1413,7 +1423,7 @@ ApplicationWindow {
                         visible: window.isEditingPath
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         selectByMouse: true
                         verticalAlignment: TextInput.AlignVCenter
                         clip: true
@@ -1453,7 +1463,7 @@ ApplicationWindow {
                                     ? engine.current_path : engine.location_kind + "://"))
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         elide: Text.ElideMiddle
                         verticalAlignment: Text.AlignVCenter
                         Accessible.role: Accessible.StaticText
@@ -1872,7 +1882,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
+                border.color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1884,16 +1894,16 @@ ApplicationWindow {
                     spacing: 8
 
                     LoafIcon {
-                        name: "trash"
+                        name: "broom"
                         size: 16
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMuted
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     }
 
                     Text {
                         visible: window.width >= 900
-                        text: qsTr("Empty Trash")
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMain
+                        text: window.emptyTrashArmed ? qsTr("Click again to confirm") : qsTr("Empty Trash")
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMain
                         font.pixelSize: theme.fs(13)
                         font.bold: true
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1905,7 +1915,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: window.confirmEmptyTrash()
+                    onClicked: window.confirmEmptyTrash(true)
                 }
             }
         }
@@ -2453,9 +2463,41 @@ ApplicationWindow {
             }
         }
     }
-    function confirmEmptyTrash() {
-        confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
-            qsTr("Empty Trash"), function() { core.empty_trash(); });
+    // Two-step empty trash: first click arms, a hint toast follows half a
+    // second later if no second click comes, second click empties. The
+    // blocking "Empty the trash?" dialog is gone.
+    property bool emptyTrashArmed: false
+    Timer {
+        id: emptyTrashHintTimer
+        interval: 500
+        onTriggered: if (window.emptyTrashArmed)
+            window.toast("info", qsTr("Click again to confirm"))
+    }
+    Timer {
+        id: emptyTrashDisarmTimer
+        interval: 4000
+        onTriggered: window.emptyTrashArmed = false
+    }
+    // Two-step empty trash: first click arms, second click empties. Full-size
+    // header chip shows the hint on its own label; the mini (icon-only) chip
+    // falls back to the confirm dialog; the rail broom gets a toast hint.
+    function confirmEmptyTrash(inButtonLabel) {
+        if (window.emptyTrashArmed) {
+            window.emptyTrashArmed = false;
+            emptyTrashHintTimer.stop();
+            emptyTrashDisarmTimer.stop();
+            core.empty_trash();
+            return;
+        }
+        if (inButtonLabel && window.width < 900) {
+            confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
+                qsTr("Empty Trash"), function() { core.empty_trash(); });
+            return;
+        }
+        window.emptyTrashArmed = true;
+        emptyTrashDisarmTimer.restart();
+        if (!inButtonLabel)
+            emptyTrashHintTimer.restart();
     }
 
     function menuFromTree(tree, onPick) {
@@ -2625,7 +2667,7 @@ ApplicationWindow {
         }
         if (kind === "trash") {
             m.push({ text: qsTr("Restore"), icon: "arrow-counter-clockwise", action: function() { core.restore_items(JSON.stringify(paths)); pane.clearSelection(); } });
-            m.push({ text: qsTr("Preview"), icon: "eye", shortcut: "Space", action: function() { quickLook.showFor(item.path); } });
+            m.push({ text: qsTr("Preview"), icon: "eye", shortcut: "Space", action: function() { openQuickLook(item.path); } });
             m.push({ text: qsTr("Delete Permanently"), icon: "trash", danger: true, separatorBefore: true, shortcut: "Del", action: function() { window.deleteSelection(); } });
             m.push({ text: qsTr("Properties"), icon: "info", separatorBefore: true, action: function() { window.showProperties(paths); } });
             if (m.length === 0)
@@ -2677,7 +2719,7 @@ ApplicationWindow {
                 m.push({ text: qsTr("Extract to Folder"), icon: "folder-plus", itemKey: "extract", action: function() { core.extract(item.path, true, ""); } });
             }
         }
-        m.push({ text: qsTr("Quick Look"), icon: "eye", shortcut: "Space", itemKey: "quick_look", action: function() { quickLook.showFor(item.path); } });
+        m.push({ text: qsTr("Quick Look"), icon: "eye", shortcut: "Space", itemKey: "quick_look", action: function() { openQuickLook(item.path); } });
         if (!inArchive) {
             var termDir = item.is_dir ? item.path : (item.parent_path || pane.engine.current_path);
             m.push({ text: qsTr("Open in Terminal"), icon: "terminal", itemKey: "terminal", action: function() { core.open_terminal(termDir); } });
@@ -2688,11 +2730,11 @@ ApplicationWindow {
             m.push({ text: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C", itemKey: "copy", action: function() { window.copySelection(false); } });
             if (item.is_dir && single && nativeBridge.clipboardHasFiles())
                 m.push({ text: qsTr("Paste Into Folder"), icon: "clipboard", itemKey: "paste", action: function() { window.pasteInto(item.path); } });
-            m.push({ text: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C", itemKey: "copy_path", action: function() { window.copyPathOfSelection(); } });
+            m.push({ text: qsTr("Copy Path"), icon: "copy-simple", shortcut: theme.shortcutFor("copyPath"), itemKey: "copy_path", action: function() { window.copyPathOfSelection(); } });
             if (single)
                 m.push({ text: qsTr("Rename…"), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { pane.startRename(); } });
             else
-                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
+                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { openBatchRename(pane.selectedItems()); } });
             if (kind === "dir") {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });
@@ -2762,7 +2804,7 @@ ApplicationWindow {
         var m = [];
         if (kind === "trash") {
             if (e.item_count > 0) {
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { core.empty_trash(); } });
                 m.push({ text: qsTr("Select All"), icon: "selection-all", shortcut: "Ctrl+A", itemKey: "select_all", separatorBefore: true, action: function() { pane.selectAll(); } });
             }
             if (m.length === 0)
@@ -3130,7 +3172,7 @@ ApplicationWindow {
                     if (window.pcView) window.pcView.requestPcRename();
                 } });
             if (place.kind === "trash")
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { core.empty_trash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
@@ -3266,10 +3308,10 @@ ApplicationWindow {
     }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
     LoafTooltip { id: tooltip }
-    QuickLook { id: quickLook }
-    PropertiesDialog { id: propsDialog }
-    BatchRenameDialog { id: batchRename }
-    ConflictDialog { id: conflictDialog }
+    Loader { id: quickLookLoader; active: false; sourceComponent: QuickLook {} }
+    Loader { id: propsDialogLoader; active: false; sourceComponent: PropertiesDialog {} }
+    Loader { id: batchRenameLoader; active: false; sourceComponent: BatchRenameDialog {} }
+    Loader { id: conflictDialogLoader; active: false; sourceComponent: ConflictDialog {} }
 
     LoafTextPrompt {
         id: inputModal
@@ -3638,7 +3680,7 @@ ApplicationWindow {
             id: pathField
             Layout.fillWidth: true
             color: theme.textMain
-            font.family: "monospace"
+            font.family: theme.monoFont
             Keys.onTabPressed: function(e) { text = core.complete_path(text, true); e.accepted = true; }
         }
         RowLayout {
@@ -3815,7 +3857,7 @@ ApplicationWindow {
             { id: "run", name: qsTr("Run Executable"), icon: "play", shortcut: "" },
             { id: "cut", name: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X" },
             { id: "copy", name: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C" },
-            { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C" },
+            { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: theme.shortcutFor("copyPath") },
             { id: "paste", name: qsTr("Paste"), icon: "clipboard", shortcut: "Ctrl+V" },
             { id: "rename", name: qsTr("Rename"), icon: "pencil-simple", shortcut: "F2" },
             { id: "duplicate", name: qsTr("Duplicate"), icon: "copy-simple", shortcut: "" },

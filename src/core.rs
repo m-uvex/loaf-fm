@@ -381,6 +381,52 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+#[derive(Default)]
+struct SpeedTracker {
+    last_ms: u64,
+    last_bytes: u64,
+    ema_bps: f64,
+}
+
+fn format_speed(bps: f64) -> String {
+    if !bps.is_finite() || bps < 1.0 {
+        return String::new();
+    }
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    if bps >= GB {
+        format!("{:.1} GB/s", bps / GB)
+    } else if bps >= MB {
+        format!("{:.1} MB/s", bps / MB)
+    } else if bps >= KB {
+        format!("{:.0} KB/s", bps / KB)
+    } else {
+        format!("{:.0} B/s", bps)
+    }
+}
+
+fn format_eta(secs: u64) -> String {
+    if secs == 0 {
+        return String::new();
+    }
+    if secs < 60 {
+        format!("{}s left", secs)
+    } else if secs < 3600 {
+        let m = secs / 60;
+        let s = secs % 60;
+        if s == 0 {
+            format!("{}m left", m)
+        } else {
+            format!("{}m {}s left", m, s)
+        }
+    } else {
+        let h = secs / 3600;
+        let m = (secs % 3600) / 60;
+        format!("{}h {}m left", h, m)
+    }
+}
+
 struct Op {
     id: u64,
     title: String,
@@ -390,6 +436,7 @@ struct Op {
     cancel: AtomicBool,
     current: Mutex<String>,
     last_publish: AtomicU64,
+    speed: Mutex<SpeedTracker>,
     started: Instant,
     thread: CxxQtThread<qobject::LoafCore>,
 }
@@ -839,7 +886,34 @@ impl qobject::LoafCore {
                 } else {
                     -1.0
                 };
-                let detail = if total > 0 && op.kind != "delete" && op.kind != "trash" {
+                let is_byte_op = total > 0 && op.kind != "delete" && op.kind != "trash";
+                let (speed_text, eta_text) = if is_byte_op {
+                    let now_ms = op.started.elapsed().as_millis() as u64;
+                    let mut st = util::lock(&op.speed);
+                    let dt_ms = now_ms.saturating_sub(st.last_ms);
+                    if dt_ms >= 150 && done >= st.last_bytes {
+                        let inst_bps = (done - st.last_bytes) as f64 / (dt_ms as f64 / 1000.0);
+                        st.ema_bps = if st.ema_bps <= 0.0 {
+                            inst_bps
+                        } else {
+                            st.ema_bps * 0.65 + inst_bps * 0.35
+                        };
+                        st.last_ms = now_ms;
+                        st.last_bytes = done;
+                    } else if st.ema_bps <= 0.0 && now_ms >= 200 && done > 0 {
+                        st.ema_bps = done as f64 / (now_ms as f64 / 1000.0);
+                    }
+                    let bps = st.ema_bps;
+                    let eta_secs = if bps >= 1.0 && total > done {
+                        ((total - done) as f64 / bps).ceil() as u64
+                    } else {
+                        0
+                    };
+                    (format_speed(bps), format_eta(eta_secs))
+                } else {
+                    (String::new(), String::new())
+                };
+                let detail = if is_byte_op {
                     Message::key(MessageKey::OpDetailProgress)
                         .text(util::format_size(done))
                         .text(util::format_size(total))
@@ -858,6 +932,8 @@ impl qobject::LoafCore {
                     "kind": op.kind,
                     "progress": progress,
                     "detail": detail,
+                    "speed": speed_text,
+                    "eta": eta_text,
                     "current": util::lock(&op.current).clone(),
                     "seconds": op.started.elapsed().as_secs(),
                 })
@@ -887,6 +963,7 @@ impl qobject::LoafCore {
             cancel: AtomicBool::new(false),
             current: Mutex::new(String::new()),
             last_publish: AtomicU64::new(0),
+            speed: Mutex::new(SpeedTracker::default()),
             started: Instant::now(),
             thread: self.qt_thread(),
         });
@@ -4162,5 +4239,17 @@ mod tests {
         let dup = batch_rename_pairs(&[(d.join("a"), d.join("y")), (d.join("b"), d.join("y"))]);
         assert!(dup.is_err());
         std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn format_speed_and_eta_readable() {
+        assert_eq!(format_speed(0.0), "");
+        assert_eq!(format_speed(512.0), "512 B/s");
+        assert_eq!(format_speed(2048.0), "2 KB/s");
+        assert_eq!(format_speed(15.5 * 1024.0 * 1024.0), "15.5 MB/s");
+        assert_eq!(format_eta(0), "");
+        assert_eq!(format_eta(42), "42s left");
+        assert_eq!(format_eta(125), "2m 5s left");
+        assert_eq!(format_eta(3660), "1h 1m left");
     }
 }

@@ -257,8 +257,32 @@ install_native_package() {
     esac
 }
 
+install_gvfs_smb() {
+    echo -e "${CYAN}[*] Installing GVfs SMB support...${RESET}"
+    case "$PKG_FAMILY" in
+        deb)
+            as_root apt-get update -qq || true
+            as_root apt-get install -y gvfs gvfs-backends
+            ;;
+        pacman)
+            as_root pacman -S --needed --noconfirm gvfs gvfs-smb
+            ;;
+        rpm)
+            if [ "$RPM_FRONTEND" = "zypper" ]; then
+                as_root zypper --non-interactive install gvfs gvfs-backend-samba
+            else
+                as_root dnf install -y gvfs gvfs-smb
+            fi
+            ;;
+        *)
+            echo -e "${AMBER}[!] Install GVfs and its SMB backend manually to browse SMB shares.${RESET}"
+            ;;
+    esac
+}
+
 install_from_tree() {
     local tree="$1"
+    install_gvfs_smb
     echo -e "${CYAN}[*] Installing files into $PREFIX...${RESET}"
     mkdir -p "$PREFIX/bin" "$PREFIX/share/applications" "$PREFIX/share/icons/hicolor"
 
@@ -362,6 +386,7 @@ do_install() {
     # Try AppImage first if explicitly requested
     if [ "${FORCE_APPIMAGE:-0}" -eq 1 ]; then
         if download_asset "$WORKDIR" appimage; then
+            install_gvfs_smb
             mkdir -p "$PREFIX/bin"
             install -m 755 "$ASSET_FILE" "$PREFIX/bin/loaf"
             installed=1
