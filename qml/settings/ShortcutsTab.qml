@@ -52,6 +52,8 @@ ColumnLayout {
             items: [
                 { id: "newFolder", label: qsTr("New folder"), desc: qsTr("Create a new folder here") },
                 { id: "quickLook", label: qsTr("Quick Look"), desc: qsTr("Preview the selected file") },
+                { id: "cloneQuickLook", label: qsTr("Clone Quick Look"), desc: qsTr("Open another preview of the current Quick Look item") },
+                { id: "closeQuickLook", label: qsTr("Close Quick Look"), desc: qsTr("Close the most recently opened Quick Look preview") },
                 { id: "toggleHidden", label: qsTr("Show hidden files"), desc: qsTr("Toggle dotfile visibility") },
                 { id: "newTab", label: qsTr("New tab"), desc: qsTr("Open a new tab") },
                 { id: "closeTab", label: qsTr("Close tab"), desc: qsTr("Close the active tab") },
