@@ -714,13 +714,18 @@ pub fn unmount(profile: &NetworkProfile) -> Result<(), String> {
 }
 
 fn compute_usage(total: u64, free: u64) -> (u64, u64, u64, f64) {
-    let used = total.saturating_sub(free);
+    let (used, free) = space_metrics(total, free);
     let pct = if total > 0 {
         ((used as f64 / total as f64) * 1000.0).round() / 10.0
     } else {
         0.0
     };
     (total, used, free, pct)
+}
+
+fn space_metrics(total_bytes: u64, available_bytes: u64) -> (u64, u64) {
+    let free_bytes = available_bytes.min(total_bytes);
+    (total_bytes.saturating_sub(free_bytes), free_bytes)
 }
 
 fn build_state(profile: &NetworkProfile, with_usage: bool) -> NetworkProfileState {
@@ -788,6 +793,12 @@ pub fn list_json() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn smb_space_metrics_report_used_and_available_bytes() {
+        assert_eq!(space_metrics(100, 25), (75, 25));
+        assert_eq!(space_metrics(100, 150), (0, 100));
+    }
 
     #[test]
     fn smb_uri_building() {

@@ -180,7 +180,10 @@ Item {
                     total_bytes: Number(p.total_bytes) || 0,
                     used_bytes: Number(p.used_bytes) || 0,
                     free_bytes: Number(p.free_bytes) || 0,
-                    percent: Number(p.percent) || 0
+                    percent: Number(p.percent) || 0,
+                    total_str: p.total_str || "",
+                    used_str: p.used_str || "",
+                    free_str: p.free_str || ""
                 });
             }
         } catch (e) {}
