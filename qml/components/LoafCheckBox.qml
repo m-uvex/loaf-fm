@@ -13,7 +13,7 @@ CheckBox {
         implicitHeight: 18
         x: control.leftPadding
         y: (control.height - height) / 2
-        radius: 5
+        radius: theme.scaledRadius(5)
         color: control.checked ? theme.primary : "transparent"
         border.color: control.checked ? theme.primary : theme.outlineAlpha(theme.outline)
         border.width: 2

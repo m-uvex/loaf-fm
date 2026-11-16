@@ -530,6 +530,29 @@ fn dir_crumbs(target: &Path) -> Vec<Crumb> {
                 }
             }
         }
+    } else if let Some((mount_root, label)) = crate::network::gvfs_mount_for_path(target) {
+        out.push(crumb(
+            &label,
+            &mount_root.to_string_lossy(),
+            "globe",
+            "folder-remote",
+            true,
+        ));
+        let mut cur = mount_root.clone();
+        if let Ok(rel) = target.strip_prefix(&mount_root) {
+            for comp in rel.components() {
+                if let std::path::Component::Normal(c) = comp {
+                    cur.push(c);
+                    out.push(crumb(
+                        &c.to_string_lossy(),
+                        &cur.to_string_lossy(),
+                        "folder",
+                        "folder",
+                        false,
+                    ));
+                }
+            }
+        }
     } else {
         out.push(crumb(
             "root",
@@ -726,6 +749,14 @@ impl qobject::LoafEngine {
             Loc::Dir(p) => {
                 let name = if *p == util::home() {
                     "Home".to_string()
+                } else if let Some((mount_root, label)) = crate::network::gvfs_mount_for_path(p) {
+                    if *p == mount_root {
+                        label
+                    } else {
+                        p.file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or(label)
+                    }
                 } else {
                     p.file_name()
                         .map(|n| n.to_string_lossy().to_string())

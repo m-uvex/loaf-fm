@@ -70,7 +70,7 @@ Item {
         anchors.topMargin: 3
         anchors.leftMargin: 1
         anchors.rightMargin: 1
-        radius: theme.radiusFull
+        radius: theme.pillRadius(width, height)
         color: theme.outlineAlpha(theme.outlineVariant)
         opacity: 0.55
     }
@@ -78,7 +78,7 @@ Item {
     Rectangle {
         id: bg
         anchors.fill: parent
-        radius: theme.radiusFull
+        radius: theme.pillRadius(width, height)
         color: mouse.containsMouse ? root.hoverBg : root.bgColor
         border.width: root.variant === "outlined" ? 1 : 0
         border.color: theme.outlineAlpha(theme.outline)

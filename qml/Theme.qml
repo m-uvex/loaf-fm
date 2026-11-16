@@ -2307,12 +2307,21 @@ Item {
     readonly property color borderSubtle: outlineVariant
     readonly property color separator: outlineVariant
 
-    // Radii & Motion
-    readonly property real radiusFull: 9999.0
-    readonly property real radiusXl: 28.0
-    readonly property real radiusL: 18.0
-    readonly property real radiusM: 12.0
-    readonly property real radiusS: 8.0
+    // Radii & Motion (12 px preserves the original card and surface radii)
+    property int cornerRadius: 12
+    function scaledRadius(base: real): real {
+        return base * cornerRadius / 12;
+    }
+
+    // 0 = square, 12 = full pill (default), >12 = full pill.
+    function pillRadius(width: real, height: real): real {
+        return Math.min(width, height) / 2 * Math.min(cornerRadius / 12, 1);
+    }
+
+    readonly property real radiusXl: scaledRadius(28)
+    readonly property real radiusL: scaledRadius(18)
+    readonly property real radiusM: cornerRadius
+    readonly property real radiusS: scaledRadius(8)
 
     readonly property int durationFast: animate ? 150 : 0
     readonly property int durationNormal: animate ? 250 : 0
@@ -2460,6 +2469,9 @@ Item {
         value = readSetting("outlineIntensity");
         if (value.length > 0 && isFinite(parseInt(value)))
             outlineIntensity = Math.max(0, Math.min(100, parseInt(value)));
+        value = readSetting("cornerRadius");
+        if (value.length > 0 && isFinite(parseInt(value)))
+            cornerRadius = Math.max(0, Math.min(24, parseInt(value)));
         value = readSetting("showTooltips");
         if (value.length > 0) showTooltips = (value !== "false");
         value = readSetting("showBackgroundShapes");
@@ -2542,6 +2554,7 @@ Item {
     onIconColorChanged: writeSetting("iconColor", iconColor)
     onShowOutlinesChanged: writeSetting("showOutlines", showOutlines ? "true" : "false")
     onOutlineIntensityChanged: writeSetting("outlineIntensity", String(outlineIntensity))
+    onCornerRadiusChanged: writeSetting("cornerRadius", String(cornerRadius))
     onShowTooltipsChanged: writeSetting("showTooltips", showTooltips ? "true" : "false")
     onShowBackgroundShapesChanged: writeSetting("showBackgroundShapes", showBackgroundShapes ? "true" : "false")
     onFontChoiceChanged: { writeSetting("fontChoice", fontChoice); syncAppFont(); }

@@ -28,7 +28,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: width / 2
+        radius: theme.pillRadius(width, height)
         color: mouseArea.containsMouse ? theme.hoverOverlay : "transparent"
         border.width: button.activeFocus ? 2 : 0
         border.color: theme.primary

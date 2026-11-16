@@ -1090,12 +1090,12 @@ ApplicationWindow {
         anchors.fill: parent
         visible: !theme.lowPower && theme.showBackgroundShapes && theme.effectiveBackgroundOpacity >= 0.98
         Rectangle {
-            width: 420; height: 220; radius: 200; x: -40; y: -50
+            width: 420; height: 220; radius: theme.pillRadius(width, height); x: -40; y: -50
             color: theme.primaryContainer
             opacity: theme.isDark ? 0.22 : 0.35
         }
         Rectangle {
-            width: 380; height: 380; radius: 190
+            width: 380; height: 380; radius: theme.scaledRadius(190)
             x: parent.width - 280; y: parent.height - 300
             color: theme.secondaryContainer
             opacity: theme.isDark ? 0.18 : 0.28
@@ -1166,7 +1166,7 @@ ApplicationWindow {
                 visible: nativeBridge.isAdmin
                 Layout.preferredWidth: adminRow.implicitWidth + 24
                 Layout.preferredHeight: 42
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.dangerContainer
                 RowLayout {
                     id: adminRow
@@ -1179,7 +1179,7 @@ ApplicationWindow {
             Rectangle {
                 id: navChip
                 Layout.preferredHeight: 42
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(theme.surfaceContainer)
                 // Ruleset: every floating pill carries a 1px outlineVariant
                 // border at rest; focus/active upgrades to 2px primary.
@@ -1233,7 +1233,7 @@ ApplicationWindow {
                 Layout.preferredHeight: 42
                 Layout.preferredWidth: (theme.showNewTabButton && theme.showNewWindowButton) ? 82 : 44
                 Layout.minimumWidth: Layout.preferredWidth
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
                 border.color: theme.outlineAlpha(theme.outlineVariant)
@@ -1275,7 +1275,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 140
                 Layout.preferredHeight: 42
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(window.isEditingPath ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: window.isEditingPath ? 2 : 1
                 border.color: window.isEditingPath ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
@@ -1426,7 +1426,7 @@ ApplicationWindow {
 
                             Rectangle {
                                 anchors.fill: parent
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: chip.dropHover ? theme.primaryContainer
                                     : (crumbDelegate.modelData.is_forward ? "transparent" : (chip.isCurrent ? theme.secondaryContainer : theme.hoverOverlay))
                                 border.color: chip.dropHover ? theme.primary : (crumbDelegate.modelData.is_forward ? theme.outlineAlpha(theme.outline) : "transparent")
@@ -1540,7 +1540,7 @@ ApplicationWindow {
                     Rectangle {
                         Layout.preferredHeight: 30
                         Layout.preferredWidth: curCrumb.implicitWidth + 20
-                        radius: theme.radiusFull
+                        radius: theme.pillRadius(width, height)
                         color: theme.secondaryContainer
                         RowLayout {
                             id: curCrumb
@@ -1576,7 +1576,7 @@ ApplicationWindow {
                     ? (window.width < 900 ? 280 : 380) : (window.width < 900 ? 180 : 220)
                 Layout.minimumWidth: window.width < 760 ? 80 : 120
                 Layout.maximumWidth: searchBar.Layout.preferredWidth
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(searchInput.activeFocus ? theme.surfaceContainerHighest : theme.surfaceContainer)
                 border.width: searchInput.activeFocus ? 2 : 1
                 border.color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
@@ -1710,7 +1710,7 @@ ApplicationWindow {
                 Layout.preferredHeight: 42
                 Layout.preferredWidth: viewRow.implicitWidth + 20
                 Layout.minimumWidth: viewRow.implicitWidth + 20
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
                 border.color: theme.outlineAlpha(theme.outlineVariant)
@@ -1723,7 +1723,7 @@ ApplicationWindow {
                     Rectangle {
                         width: 32
                         height: 32
-                        radius: 16
+                        radius: theme.scaledRadius(16)
                         color: cycleMouse.containsMouse ? theme.hoverOverlay : "transparent"
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         LoafIcon {
@@ -1746,7 +1746,7 @@ ApplicationWindow {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 16
+                            radius: theme.scaledRadius(16)
                             color: dropMouse.containsMouse ? theme.hoverOverlay : "transparent"
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         }
@@ -1783,7 +1783,7 @@ ApplicationWindow {
                 Layout.preferredHeight: 42
                 Layout.preferredWidth: emptyTrashRow.implicitWidth + 24
                 Layout.minimumWidth: Layout.preferredWidth
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
                 border.color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
@@ -1977,7 +1977,7 @@ ApplicationWindow {
                             ? Math.min(380, Math.max(220, tabLeftLabel.implicitWidth + tabRightLabel.implicitWidth + 88))
                             : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
                         height: 34
-                        radius: theme.radiusFull
+                        radius: theme.pillRadius(width, height)
                         border.width: 1
                         border.color: current ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                         Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }

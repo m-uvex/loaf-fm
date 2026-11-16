@@ -87,7 +87,7 @@ Item {
             id: track
             Layout.fillWidth: true
             Layout.preferredHeight: root.height
-            radius: theme.radiusFull
+            radius: theme.pillRadius(width, height)
             color: theme.surfaceContainerHighest
 
             readonly property real segW: track.width / Math.max(1, (root.options ? root.options.length : 1))
@@ -96,7 +96,7 @@ Item {
                 id: highlight
                 height: track.height - 6
                 y: 3
-                radius: theme.radiusFull
+                radius: theme.pillRadius(width, height)
                 color: theme.secondaryContainer
                 width: Math.max(0, track.segW - 6)
                 x: 3 + root.currentIndex * track.segW
@@ -136,7 +136,7 @@ Item {
                             Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 3
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: theme.secondaryContainer
                                 opacity: segItem.isCurrent ? 0.0 : (segMouse.pressed ? 0.35 : (segMouse.containsMouse ? 0.18 : 0.0))
 

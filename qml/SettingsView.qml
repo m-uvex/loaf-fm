@@ -113,7 +113,7 @@ Item {
                 x: 12
                 width: settingsView.isCompact ? 44 : (navRail.width - 24)
                 height: 44
-                radius: 22
+                radius: theme.scaledRadius(22)
                 color: theme.primaryContainer
                 visible: opacity > 0.01
                 opacity: targetY >= 0 ? 1.0 : 0.0
@@ -217,7 +217,7 @@ Item {
                             x: 12
                             width: settingsView.isCompact ? 44 : (tabItem.width - 24)
                             height: 44
-                            radius: 22
+                            radius: theme.scaledRadius(22)
                             color: (tabItem.isHovered && !tabItem.isCurrent) ? theme.hoverOverlay : "transparent"
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
@@ -248,7 +248,7 @@ Item {
                                 anchors.rightMargin: 4
                                 width: 8
                                 height: 8
-                                radius: 4
+                                radius: theme.scaledRadius(4)
                                 color: tabItem.isCurrent ? theme.textMain : theme.primary
                             }
                         }
@@ -275,7 +275,7 @@ Item {
                             anchors.right: parent.right
                             anchors.rightMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
-                            radius: theme.radiusFull
+                            radius: theme.pillRadius(width, height)
                             color: isCurrent ? theme.surfaceContainerHighest : theme.primaryContainer
                             implicitHeight: 20
                             implicitWidth: badgeTxt.implicitWidth + 10
@@ -335,7 +335,7 @@ Item {
                         x: 12
                         width: settingsView.isCompact ? 44 : (aboutNavBtn.width - 24)
                         height: 44
-                        radius: 22
+                        radius: theme.scaledRadius(22)
                         color: (aboutNavBtn.isHovered && !aboutNavBtn.isCurrent) ? theme.hoverOverlay : "transparent"
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
@@ -366,7 +366,7 @@ Item {
                             anchors.rightMargin: 4
                             width: 8
                             height: 8
-                            radius: 4
+                            radius: theme.scaledRadius(4)
                             color: aboutNavBtn.isCurrent ? theme.textMain : theme.primary
                         }
                     }
@@ -459,7 +459,7 @@ Item {
                             Rectangle {
                                 visible: settingsView.searchQuery.length > 0 && settingsView.totalMatches > 0
                                 height: 26
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: theme.primaryContainer
                                 implicitWidth: summaryCountTxt.implicitWidth + 16
 

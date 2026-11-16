@@ -56,7 +56,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: theme.radiusFull
+        radius: theme.pillRadius(width, height)
         color: mouse.containsMouse || root.open ? Qt.lighter(theme.surfaceContainerHigh, 1.08) : theme.surfaceContainerHigh
         border.width: root.open ? 2 : 1
         border.color: root.open ? theme.primary : theme.outlineAlpha(theme.outlineVariant)

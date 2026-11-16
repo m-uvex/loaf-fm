@@ -27,6 +27,7 @@ ColumnLayout {
     readonly property bool matchIconWeight: matches(qsTr("phosphor weight variant thin light regular bold fill duotone stroke thickness"))
     readonly property bool matchIconColor: matches(qsTr("icon color colour tint colorize colorise accent monochrome folders files all none hue saturation"))
     readonly property bool matchOutlines: matches(qsTr("outline outlines border borders edge edges chrome intensity thickness stroke strength"))
+    readonly property bool matchCorners: matches(qsTr("corner corners radius round square sharp pixel"))
     readonly property bool matchTopBar: matches(qsTr("top bar toolbar operations undo redo new tab new window path bar chips text breadcrumb"))
     readonly property bool matchThisPc: matches(qsTr("this pc computer hostname name label device system"))
     readonly property bool matchMenus: matches(qsTr("menus context menu right click sidebar customize places navigation layout minimal"))
@@ -34,7 +35,7 @@ ColumnLayout {
     readonly property bool matchFontChoice: matches(qsTr("font chooser typography typeface opendyslexic dyslexic google flex sans system custom family monospace weight accessibility"))
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
-        ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchOutlines ? 1 : 0) + (matchPalette ? 1 : 0)
+        ? ((matchTheme ? 1 : 0) + (matchOpacity ? 1 : 0) + (matchOutlines ? 1 : 0) + (matchCorners ? 1 : 0) + (matchPalette ? 1 : 0)
             + (matchIconStyle ? 1 : 0) + (matchIconWeight ? 1 : 0) + (matchIconColor ? 1 : 0) + (matchTopBar ? 1 : 0)
             + (matchThisPc ? 1 : 0) + (matchMenus ? 1 : 0) + (matchLanguage ? 1 : 0) + (matchFontChoice ? 1 : 0))
         : 0
@@ -45,7 +46,7 @@ ColumnLayout {
 
     // Category 1: Appearance
     SettingCard {
-        visible: root.matchTheme || root.matchOpacity || root.matchOutlines || root.matchFontChoice
+        visible: root.matchTheme || root.matchOpacity || root.matchOutlines || root.matchCorners || root.matchFontChoice
         title: qsTr("Appearance")
         subtitle: qsTr("Window colors, translucency, chrome outlines and typography")
         icon: "palette"
@@ -150,7 +151,27 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchOutlines && root.matchFontChoice }
+        SettingDivider { visible: root.matchOutlines && root.matchCorners }
+
+        SettingRow {
+            visible: root.matchCorners
+            icon: "corners-out"
+            title: qsTr("Corner radius")
+            subtitle: qsTr("Fine-tune surface roundness from sharp square (0 px) to extra round")
+
+            LoafSlider {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                from: 0
+                to: 24
+                stepSize: 1
+                value: theme.cornerRadius
+                customValueText: theme.cornerRadius + " px"
+                accessibleName: qsTr("Corner radius")
+                onMoved: function(v) { theme.cornerRadius = Math.round(v); }
+            }
+        }
+
+        SettingDivider { visible: (root.matchOutlines || root.matchCorners) && root.matchFontChoice }
 
         SettingRow {
             visible: root.matchFontChoice
@@ -314,7 +335,7 @@ ColumnLayout {
                             Rectangle {
                                 implicitWidth: 14
                                 implicitHeight: 14
-                                radius: 7
+                                radius: theme.scaledRadius(7)
                                 color: swatch ? swatch.darkPrimary : theme.primary
                                 border.width: 1
                                 border.color: theme.outlineAlpha(theme.outlineVariant)
@@ -499,7 +520,7 @@ ColumnLayout {
                         id: swatchDot
                         Layout.preferredWidth: 26
                         Layout.preferredHeight: 26
-                        radius: 13
+                        radius: theme.scaledRadius(13)
                         color: modelData.color
                         border.width: theme.iconColor === modelData.value ? 2 : 1
                         border.color: theme.iconColor === modelData.value ? theme.primary : theme.outlineAlpha(theme.outlineVariant)

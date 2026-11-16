@@ -508,7 +508,7 @@ Item {
                         Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.0; damping: 0.25 } }
                     }
                     Rectangle {
-                        width: 14; height: 14; radius: 7
+                        width: 14; height: 14; radius: theme.scaledRadius(7)
                         x: 2; y: parent.height - 16
                         color: theme.secondaryContainer
                     }
@@ -589,7 +589,7 @@ Item {
                         rotation: 45
                     }
                     Rectangle {
-                        width: 18; height: 18; radius: 9
+                        width: 18; height: 18; radius: theme.scaledRadius(9)
                         x: 100; y: 66
                         color: theme.primary
                     }
@@ -796,7 +796,7 @@ Item {
                             delegate: Rectangle {
                                 width: 156
                                 height: 60
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: cPlaceMouse.containsMouse ? theme.surfaceContainerHigh : theme.surfaceContainer
                                 scale: cPlaceMouse.pressed ? 0.95 : 1.0
                                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -866,7 +866,7 @@ Item {
                             delegate: Rectangle {
                                 width: freqCardRow.implicitWidth + 24
                                 height: 46
-                                radius: theme.radiusFull
+                                radius: theme.pillRadius(width, height)
                                 color: theme.surfaceContainer
                                 opacity: freqCMouse.containsMouse ? 1.0 : 0.85
                                 scale: freqCMouse.pressed ? 0.95 : 1.0
@@ -907,7 +907,7 @@ Item {
                                 delegate: Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 46
-                                    radius: theme.radiusFull
+                                    radius: theme.pillRadius(width, height)
                                     color: theme.surfaceContainer
                                     opacity: freqGMouse.containsMouse ? 1.0 : 0.85
                                     scale: freqGMouse.pressed ? 0.95 : 1.0

@@ -138,7 +138,7 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: Math.min(width, height) / 6
+                    radius: theme.scaledRadius(Math.min(width, height) / 6)
                     color: "transparent"
                     border.color: card.isSelected ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                     border.width: 1
@@ -147,7 +147,7 @@ Item {
             }
             Rectangle {
                 visible: card.itemIsSymlink
-                width: 14; height: 14; radius: 7
+                width: 14; height: 14; radius: theme.scaledRadius(7)
                 color: theme.surfaceContainer
                 border.color: theme.outlineAlpha(theme.outlineVariant)
                 border.width: 1

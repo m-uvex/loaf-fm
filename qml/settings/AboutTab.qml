@@ -219,7 +219,7 @@ ColumnLayout {
                     Layout.alignment: Qt.AlignVCenter
                     Layout.preferredWidth: heroText.implicitHeight + 4
                     Layout.preferredHeight: heroText.implicitHeight + 4
-                    radius: width * 0.28
+                    radius: theme.scaledRadius(width * 0.28)
                     color: theme.primaryContainer
                     border.width: 2
                     border.color: theme.primary
@@ -248,7 +248,7 @@ ColumnLayout {
 
                     Rectangle {
                         Layout.alignment: Qt.AlignLeft
-                        radius: theme.radiusFull
+                        radius: theme.pillRadius(width, height)
                         color: theme.secondaryContainer
                         implicitHeight: 25
                         implicitWidth: verTxt.implicitWidth + 18
@@ -366,7 +366,7 @@ ColumnLayout {
                             // Letter avatar: always available, even offline.
                             Rectangle {
                                 anchors.fill: parent
-                                radius: width / 2
+                                radius: theme.pillRadius(width, height)
                                 color: theme.surfaceContainerHighest
 
                                 Text {
