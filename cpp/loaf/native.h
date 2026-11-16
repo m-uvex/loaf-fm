@@ -79,6 +79,8 @@ public:
     bool isAdmin() const;
     bool alphaBuffer() const;
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE int dropButtons() const { return m_dropButtons; }
+    Q_INVOKABLE int dropModifiers() const { return m_dropModifiers; }
     Q_INVOKABLE QString systemFontFamily() const;
     Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
     Q_INVOKABLE QStringList systemFontFamilies() const;
@@ -100,6 +102,9 @@ Q_SIGNALS:
     // The request was closed from the D-Bus side (Request.Close()).
     void pickerDismissed(const QString &handle);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private Q_SLOTS:
     void notifyMtpDevicesChanged() { Q_EMIT mtpDevicesChanged(); }
 
@@ -111,6 +116,8 @@ private:
     bool m_portalOnly = false;
     QVariantMap m_clipboard;
     class PortalService *m_portal = nullptr;
+    int m_dropButtons = 0;
+    int m_dropModifiers = 0;
 };
 
 // org.freedesktop.FileManager1 (used by browsers' "Show in folder").

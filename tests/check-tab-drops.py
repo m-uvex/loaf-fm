@@ -146,12 +146,29 @@ function runTabDropTests() {
     check(drop1 !== null, "Tab 1 DropArea found");
     check(drop2 !== null, "Tab 2 DropArea found");
 
+    // Plain left-drop owns the move; Control preserves copy behavior.
+    var directSource = sDir + "/file_direct_move.txt";
+    var directResult = DropEventInjector.deliverDrop(drop0, ["file://" + directSource], drop0.width/2, drop0.height/2);
+    check(directResult === Qt.CopyAction, "Receiver owns transfer and safely acknowledges Copy");
+    check(!rmbDropMenu.visible, "Plain left-drop must not open a chooser");
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_direct_move.txt"); }, "Left-drop moves into the active tab");
+    check(!nativeBridge.fileExists(directSource), "Left-drop removes source after successful move");
+    console.log("TAB_LEFT_DROP_MOVE_PASS");
+
+    var controlSource = sDir + "/file_control_copy.txt";
+    var controlResult = DropEventInjector.deliverDrop(drop0, ["file://" + controlSource], drop0.width/2, drop0.height/2,
+        Qt.CopyAction | Qt.MoveAction, Qt.MoveAction, Qt.LeftButton, Qt.ControlModifier);
+    check(controlResult === Qt.CopyAction && !rmbDropMenu.visible, "Control+left-drop copies without a chooser");
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_control_copy.txt"); }, "Control-drop copies into tab");
+    check(nativeBridge.fileExists(controlSource), "Control-drop retains source");
+    console.log("TAB_CONTROL_DROP_COPY_PASS");
+
     // -------------------------------------------------------------
     // Test 1: Native Qt Drag/Drop event delivery onto Tab 0 DropArea
     // followed by Real QtTest mouse click on "Copy Here" row
     // -------------------------------------------------------------
     var file1 = sDir + "/file_active_copy.txt";
-    var dropRes1 = DropEventInjector.deliverDrop(drop0, ["file://" + file1], drop0.width / 2, drop0.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction);
+    var dropRes1 = DropEventInjector.deliverDrop(drop0, ["file://" + file1], drop0.width / 2, drop0.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction, Qt.RightButton);
     check(dropRes1 === Qt.CopyAction, "Tab 0 DropArea.onDropped accepted native Qt drop with CopyAction (actual res=" + dropRes1 + ")");
     check(rmbDropMenu.visible, "Drop menu displayed for native tab drop");
     waitMs(50);
@@ -171,7 +188,7 @@ function runTabDropTests() {
     // followed by Real QtTest mouse click on "Move Here" row
     // -------------------------------------------------------------
     var file2 = sDir + "/file_inactive_move.txt";
-    var dropRes2 = DropEventInjector.deliverDrop(drop1, ["file://" + file2], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction);
+    var dropRes2 = DropEventInjector.deliverDrop(drop1, ["file://" + file2], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction, Qt.RightButton);
     check(dropRes2 === Qt.CopyAction, "Inactive Tab 1 DropArea.onDropped accepted native Qt drop with CopyAction (actual res=" + dropRes2 + ")");
     check(rmbDropMenu.visible, "Drop menu displayed for inactive native tab drop");
     waitMs(50);
@@ -188,7 +205,7 @@ function runTabDropTests() {
     // Test 3: Dismissal via Escape leaves files untouched
     // -------------------------------------------------------------
     var file3 = sDir + "/file_esc.txt";
-    var dropRes3 = DropEventInjector.deliverDrop(drop1, ["file://" + file3], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction);
+    var dropRes3 = DropEventInjector.deliverDrop(drop1, ["file://" + file3], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction, Qt.RightButton);
     check(dropRes3 === Qt.CopyAction, "Tab 1 accepted drop for Escape test");
     waitMs(50);
     check(rmbDropMenu.visible, "Menu opened before Escape");
@@ -201,7 +218,7 @@ function runTabDropTests() {
     // Test 4: Dismissal via outside click leaves files untouched
     // -------------------------------------------------------------
     var file4 = sDir + "/file_outside.txt";
-    var dropRes4 = DropEventInjector.deliverDrop(drop1, ["file://" + file4], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction);
+    var dropRes4 = DropEventInjector.deliverDrop(drop1, ["file://" + file4], drop1.width / 2, drop1.height / 2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction, Qt.RightButton);
     check(dropRes4 === Qt.CopyAction, "Tab 1 accepted drop for outside click test");
     waitMs(50);
     check(rmbDropMenu.visible, "Menu opened before outside click");
@@ -239,6 +256,7 @@ function runTabDropTests() {
 
     var file5L = sDir + "/file_split_l.txt";
     var dropEv5L = makeDropEvent(["file://" + file5L]);
+    dropEv5L.source = dragProxy; dragManager.isRmb = true;
     var ok5L = drop2.dropUrls(["file://" + file5L], 20, tab2.height / 2, dropEv5L);
     check(ok5L, "Split tab left drop accepted");
     waitMs(50);
@@ -249,6 +267,7 @@ function runTabDropTests() {
 
     var file5R = sDir + "/file_split_r.txt";
     var dropEv5R = makeDropEvent(["file://" + file5R]);
+    dropEv5R.source = dragProxy; dragManager.isRmb = true;
     var ok5R = drop2.dropUrls(["file://" + file5R], tab2.width - 20, tab2.height / 2, dropEv5R);
     check(ok5R, "Split tab right drop accepted");
     waitMs(50);
@@ -257,6 +276,23 @@ function runTabDropTests() {
     uiTest.mouseClick(copyRowWrap.rowItem, copyRowWrap.rowItem.width / 2, copyRowWrap.rowItem.height / 2, Qt.LeftButton, Qt.NoModifier, 30);
     waitMs(200);
     console.log("TAB_SPLIT_TARGETING_PASS");
+    // Real native left-button drops also target inactive and split tabs directly.
+    var directTargets = [
+        [drop1, drop1.width/2, "file_left_inactive.txt", destInactive],
+        [drop2, 20, "file_left_split_l.txt", destSplitL],
+        [drop2, tab2.width-20, "file_left_split_r.txt", destSplitR]
+    ];
+    for (var target of directTargets) {
+        var sourcePath = sDir + "/" + target[2];
+        var result = DropEventInjector.deliverDrop(target[0], ["file://" + sourcePath],
+            target[1], target[0].height/2);
+        check(result === Qt.CopyAction && !rmbDropMenu.visible, "Native left drop targets inactive/split tab without menu");
+        var expectedPath = target[3] + "/" + target[2];
+        waitUntil(function() { return nativeBridge.fileExists(expectedPath); }, "Inactive/split native drop reaches correct destination");
+        check(!nativeBridge.fileExists(sourcePath), "Inactive/split move removes original");
+    }
+    console.log("TAB_NATIVE_LEFT_INACTIVE_SPLIT_PASS");
+
 
     // -------------------------------------------------------------
     // Test 6: Virtual & Non-Folder Tab Rejection
@@ -307,15 +343,52 @@ function runTabDropTests() {
     // -------------------------------------------------------------
     var tab0Current = findTabDelegate(tabStripItem, 0);
     var drop0Current = getTabDrop(tab0Current);
-    var dropCopyOnly = makeDropEvent(["file://" + file1], Qt.CopyAction);
-    drop0Current.dropUrls(["file://" + file1], tab0Current.width / 2, tab0Current.height / 2, dropCopyOnly);
+    var linkSource = sDir + "/file_copy_offer_link.txt";
+    var copyOnlyResult = DropEventInjector.deliverDrop(drop0Current, ["file://" + linkSource],
+        drop0Current.width/2, drop0Current.height/2, Qt.CopyAction, Qt.CopyAction, Qt.RightButton,
+        Qt.NoModifier, true);
+    check(copyOnlyResult === Qt.CopyAction && rmbDropMenu.visible, "Released right-button copy-only offer opens chooser");
+    check(rmbDropMenu.model.length === 3, "Copy-only offers Copy, Link and Cancel on writable local destinations");
+    check(rmbDropMenu.model[1].text === qsTr("Link Here"), "Link does not depend on source advertising LinkAction");
     waitMs(50);
-    check(rmbDropMenu.visible, "Menu opened for copy-only tab drop");
-    check(rmbDropMenu.model.length === 2, "Menu offers only Copy Here and Cancel for copy-only");
-    check(rmbDropMenu.model[0].text === qsTr("Copy Here"), "First option is Copy Here");
-    check(rmbDropMenu.model[1].text === qsTr("Cancel"), "Second option is Cancel");
-    rmbDropMenu.close();
-    waitMs(200);
+    var linkRow = listView.itemAtIndex(1);
+    uiTest.mouseClick(linkRow.rowItem, linkRow.rowItem.width/2, linkRow.rowItem.height/2, Qt.LeftButton);
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_copy_offer_link.txt"); }, "Copy-only source can be linked");
+    check(nativeBridge.fileExists(linkSource), "Link retains original file");
+    console.log("TAB_COPY_ONLY_LINK_PASS");
+
+    var linkBothSource = sDir + "/file_move_offer_link.txt";
+    var linkBothResult = DropEventInjector.deliverDrop(drop0Current, ["file://" + linkBothSource],
+        drop0Current.width/2, drop0Current.height/2, Qt.CopyAction | Qt.MoveAction, Qt.CopyAction, Qt.RightButton);
+    check(linkBothResult === Qt.CopyAction && rmbDropMenu.model[2].text === qsTr("Link Here"),
+        "Copy/move offers also retain Link Here");
+    waitMs(50);
+    var linkBothRow = listView.itemAtIndex(2);
+    uiTest.mouseClick(linkBothRow.rowItem, linkBothRow.rowItem.width/2, linkBothRow.rowItem.height/2, Qt.LeftButton);
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_move_offer_link.txt"); }, "Copy/move source can be linked");
+    console.log("TAB_COPY_MOVE_LINK_PASS");
+    var linkOnlySource = sDir + "/file_link_only.txt";
+    var linkOnlyResult = DropEventInjector.deliverDrop(drop0Current, ["file://" + linkOnlySource],
+        drop0Current.width/2, drop0Current.height/2, Qt.LinkAction, Qt.LinkAction, Qt.RightButton);
+    check(linkOnlyResult === Qt.LinkAction && rmbDropMenu.visible, "Link-only source is safely acknowledged without Move");
+    check(rmbDropMenu.model.length === 2 && rmbDropMenu.model[0].text === qsTr("Link Here"), "Link-only chooser offers Link and Cancel");
+    waitMs(50);
+    var linkOnlyRow = listView.itemAtIndex(0);
+    uiTest.mouseClick(linkOnlyRow.rowItem, linkOnlyRow.rowItem.width/2, linkOnlyRow.rowItem.height/2, Qt.LeftButton);
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_link_only.txt"); }, "Link-only source creates a symlink");
+    console.log("TAB_LINK_ONLY_SOURCE_PASS");
+
+    var copyFallback = sDir + "/file_copy_only_left.txt";
+    var fallbackResult = DropEventInjector.deliverDrop(drop0Current, ["file://" + copyFallback],
+        drop0Current.width/2, drop0Current.height/2, Qt.CopyAction, Qt.CopyAction);
+    check(fallbackResult === Qt.CopyAction && !rmbDropMenu.visible, "Copy-only left drop uses safe direct-copy fallback");
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_copy_only_left.txt"); }, "Copy-only fallback reaches destination");
+    check(nativeBridge.fileExists(copyFallback), "Copy-only fallback retains source");
+    console.log("TAB_COPY_ONLY_LEFT_FALLBACK_PASS");
+
+
+    check(!window.canLinkDrop(["mtp://loaf/device/storage/file.txt"], destActive), "MTP source cannot be symlinked");
+    check(!window.canLinkDrop([linkSource], "mtp://loaf/device/storage"), "MTP destination cannot create symlinks");
 
     var dropMoveOnlyExt = makeDropEvent(["file://" + file1], Qt.MoveAction);
     dropMoveOnlyExt.source = null; // external
@@ -324,6 +397,15 @@ function runTabDropTests() {
     check(dropMoveOnlyExt.acceptedAction === Qt.IgnoreAction, "External move-only offer rejected with IgnoreAction");
     check(!rmbDropMenu.visible, "Menu never shown for external move-only tab drop");
     console.log("TAB_CAPABILITIES_FILTER_PASS");
+
+    var leftAfterRight = sDir + "/file_after_right.txt";
+    dragManager.isRmb = true; // Stale internal state must not turn an external left-drop into a menu.
+    var leftAfterResult = DropEventInjector.deliverDrop(drop0Current, ["file://" + leftAfterRight],
+        drop0Current.width/2, drop0Current.height/2);
+    check(leftAfterResult === Qt.CopyAction && !rmbDropMenu.visible, "External left drag ignores stale internal right-drag state");
+    waitUntil(function() { return nativeBridge.fileExists(destActive + "/file_after_right.txt"); }, "Left-drop still moves after a right-drop");
+    check(!nativeBridge.fileExists(leftAfterRight), "Subsequent left-drop removes source");
+    console.log("TAB_LEFT_AFTER_RIGHT_PASS");
 
     console.log("ALL_TAB_DROP_TESTS_PASS");
     Qt.quit();
@@ -357,6 +439,14 @@ def main():
         dest_readonly.chmod(0o555)
 
         # Files to drop
+        (scratch_dir / "file_copy_offer_link.txt").write_text("copy-only link payload")
+        (scratch_dir / "file_move_offer_link.txt").write_text("copy/move link payload")
+        (scratch_dir / "file_after_right.txt").write_text("after right payload")
+        for name in ["file_left_inactive.txt", "file_left_split_l.txt", "file_left_split_r.txt",
+                     "file_link_only.txt", "file_copy_only_left.txt"]:
+            (scratch_dir / name).write_text(name + " payload")
+        (scratch_dir / "file_direct_move.txt").write_text("direct move payload")
+        (scratch_dir / "file_control_copy.txt").write_text("control copy payload")
         (scratch_dir / "file_active_copy.txt").write_text("content active copy")
         (scratch_dir / "file_inactive_move.txt").write_text("content inactive move")
         (scratch_dir / "file_esc.txt").write_text("content esc")
@@ -477,10 +567,23 @@ def main():
         output = result.stdout + result.stderr
         rc = result.returncode
 
-        if rc != 0 or "ALL_TAB_DROP_TESTS_PASS" not in output or "TEST_ABORTED" in output:
+        if rc != 0 or "ALL_TAB_DROP_TESTS_PASS" not in output or "TEST_ABORTED" in output or "Binding loop detected" in output:
             print("STDERR/STDOUT TAIL:")
             print(output)
             sys.exit(1)
+
+        for name, content in [("file_copy_offer_link.txt", "copy-only link payload"),
+                              ("file_move_offer_link.txt", "copy/move link payload"),
+                              ("file_link_only.txt", "file_link_only.txt payload")]:
+            link = dest_active / name
+            assert link.is_symlink(), f"{name} must be an actual symbolic link"
+            assert link.resolve() == (scratch_dir / name).resolve(), "Symlink must point to original source"
+            assert link.read_text() == content
+        assert not (scratch_dir / "file_direct_move.txt").exists()
+        assert (dest_active / "file_direct_move.txt").read_text() == "direct move payload"
+        assert (scratch_dir / "file_control_copy.txt").exists()
+        assert (dest_active / "file_control_copy.txt").read_text() == "control copy payload"
+        assert not (scratch_dir / "file_after_right.txt").exists()
 
         # Assert real filesystem side effects
         # 1. Copy Here copied file and retained source

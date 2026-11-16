@@ -427,6 +427,12 @@ ApplicationWindow {
         transfer(paths, destDir, asCopy ? "copy" : "move");
     }
 
+    function canLinkDrop(paths, destDir) {
+        return paths && paths.length > 0 && destDir && destDir.indexOf("/") === 0
+            && nativeBridge.isDirectory(destDir) && nativeBridge.isWritable(destDir)
+            && paths.every(function(path) { return path.indexOf("/") === 0; });
+    }
+
     function handleTabDrop(drop, paths, destDir, px, py) {
         if (!destDir || !paths || paths.length === 0) {
             if (drop) drop.accept(Qt.IgnoreAction);
@@ -439,19 +445,33 @@ ApplicationWindow {
             }
         }
         var isInternal = drop && drop.source === dragProxy;
-        var rawSupported = (drop && drop.supportedActions !== undefined) ? drop.supportedActions : (Qt.CopyAction | Qt.MoveAction);
-        var sourceSupported = rawSupported & (Qt.CopyAction | Qt.MoveAction);
-
-        // Native DnD protocol safety:
-        // Move-only external offers cannot safely defer confirmation because
-        // acknowledging MoveAction immediately could trigger source deletion,
-        // while acknowledging CopyAction is rejected by move-only sources.
-        if (!isInternal && !(sourceSupported & Qt.CopyAction)) {
+        var supported = ((drop && drop.supportedActions !== undefined) ? drop.supportedActions
+            : (Qt.CopyAction | Qt.MoveAction)) & (Qt.CopyAction | Qt.MoveAction | Qt.LinkAction);
+        var canLink = window.canLinkDrop(paths, destDir);
+        // Loaf owns the asynchronous transfer; external Move acknowledgements can delete the source prematurely.
+        var acknowledgement = (supported & Qt.CopyAction) ? Qt.CopyAction
+            : ((supported & Qt.LinkAction) && canLink ? Qt.LinkAction
+                : (isInternal && (supported & Qt.MoveAction) ? Qt.MoveAction : Qt.IgnoreAction));
+        if (acknowledgement === Qt.IgnoreAction) {
             if (drop) drop.accept(Qt.IgnoreAction);
             return false;
         }
-        if (drop) drop.accept(Qt.CopyAction);
-        rmbDropMenu.showAt(px, py, paths, destDir, sourceSupported);
+        var rightButton = isInternal ? dragManager.isRmb : !!(nativeBridge.dropButtons() & Qt.RightButton);
+        if (rightButton) {
+            if (drop) drop.accept(acknowledgement);
+            rmbDropMenu.showAt(px, py, paths, destDir, supported);
+            return true;
+        }
+        var asCopy = isInternal ? dragManager.asCopy : !!(nativeBridge.dropModifiers() & Qt.ControlModifier);
+        var mode = asCopy ? ((supported & Qt.CopyAction) ? "copy" : "")
+            : ((supported & Qt.MoveAction) ? "move"
+                : ((supported & Qt.CopyAction) ? "copy" : (canLink ? "link" : "")));
+        if (!mode) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        if (drop) drop.accept(acknowledgement);
+        window.transfer(paths, destDir, mode);
         return true;
     }
 
@@ -2069,9 +2089,19 @@ ApplicationWindow {
                         readonly property string rightName: current ? (pane1Loader.item ? pane1Loader.item.engine.current_dir_name : (window.tabs[index] ? window.tabs[index].rightTitle || qsTr("Split") : qsTr("Split")))
                             : (window.tabs[index] ? (window.tabs[index].rightTitle || qsTr("Split")) : qsTr("Split"))
 
+                        TextMetrics {
+                            id: tabLeftMetrics
+                            text: tabDelegate.leftName
+                            font: tabLeftLabel.font
+                        }
+                        TextMetrics {
+                            id: tabRightMetrics
+                            text: tabDelegate.rightName
+                            font: tabRightLabel.font
+                        }
                         width: isSplit
-                            ? Math.min(380, Math.max(220, tabLeftLabel.implicitWidth + tabRightLabel.implicitWidth + 88))
-                            : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
+                            ? Math.min(380, Math.max(220, tabLeftMetrics.advanceWidth + tabRightMetrics.advanceWidth + 88))
+                            : Math.min(240, Math.max(120, tabLeftMetrics.advanceWidth + 84))
                         height: 34
                         radius: theme.radiusFull
                         border.width: 1
@@ -3210,7 +3240,7 @@ ApplicationWindow {
                     { text: qsTr("Cancel"), icon: "x", separatorBefore: true, action: function() {} }
                 ];
             } else {
-                var canLink = !!(dropSupported & Qt.LinkAction) && dest.indexOf("mtp:") !== 0 && !rmbDropMenu.dropPaths.some(function(p) { return p.indexOf("mtp:") === 0; });
+                var canLink = window.canLinkDrop(rmbDropMenu.dropPaths, dest);
                 var items = [];
                 if (dropSupported & Qt.CopyAction) {
                     items.push({ text: qsTr("Copy Here"), icon: "copy", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "copy"); } });

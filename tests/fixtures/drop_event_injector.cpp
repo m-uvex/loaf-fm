@@ -14,7 +14,7 @@ public:
     explicit DropEventInjector(QObject *parent = nullptr) : QObject(parent) {}
 
     // Injects native Qt drag/drop events into the window containing target item
-    Q_INVOKABLE int deliverDrop(QQuickItem *item, const QStringList &urls, qreal x, qreal y, int supportedActions = 3, int proposedAction = 1) {
+    Q_INVOKABLE int deliverDrop(QQuickItem *item, const QStringList &urls, qreal x, qreal y, int supportedActions = 3, int proposedAction = 1, int buttons = Qt::LeftButton, int modifiers = Qt::NoModifier, bool releaseBeforeDrop = false) {
         if (!item) return -1;
         QQuickWindow *win = item->window();
         if (!win) return -2;
@@ -30,15 +30,15 @@ public:
         }
         mimeData.setUrls(qurls);
 
-        QDragEnterEvent enterEvent(scenePosInt, static_cast<Qt::DropActions>(supportedActions), &mimeData, Qt::LeftButton, Qt::NoModifier);
+        QDragEnterEvent enterEvent(scenePosInt, static_cast<Qt::DropActions>(supportedActions), &mimeData, static_cast<Qt::MouseButtons>(buttons), static_cast<Qt::KeyboardModifiers>(modifiers));
         enterEvent.setDropAction(static_cast<Qt::DropAction>(proposedAction));
         QCoreApplication::sendEvent(win, &enterEvent);
 
-        QDragMoveEvent moveEvent(scenePosInt, static_cast<Qt::DropActions>(supportedActions), &mimeData, Qt::LeftButton, Qt::NoModifier);
+        QDragMoveEvent moveEvent(scenePosInt, static_cast<Qt::DropActions>(supportedActions), &mimeData, static_cast<Qt::MouseButtons>(buttons), static_cast<Qt::KeyboardModifiers>(modifiers));
         moveEvent.setDropAction(static_cast<Qt::DropAction>(proposedAction));
         QCoreApplication::sendEvent(win, &moveEvent);
 
-        QDropEvent dropEvent(scenePos, static_cast<Qt::DropActions>(supportedActions), &mimeData, Qt::LeftButton, Qt::NoModifier);
+        QDropEvent dropEvent(scenePos, static_cast<Qt::DropActions>(supportedActions), &mimeData, releaseBeforeDrop ? Qt::NoButton : static_cast<Qt::MouseButtons>(buttons), static_cast<Qt::KeyboardModifiers>(modifiers));
         dropEvent.setDropAction(static_cast<Qt::DropAction>(proposedAction));
 
         QCoreApplication::sendEvent(win, &dropEvent);
