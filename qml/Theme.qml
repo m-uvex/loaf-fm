@@ -2313,9 +2313,9 @@ Item {
         return base * cornerRadius / 12;
     }
 
-    // A capsule reaches a semicircle at the maximum setting.
+    // 0 = square, 12 = full pill (default), >12 = full pill.
     function pillRadius(width: real, height: real): real {
-        return Math.min(width, height) / 2 * cornerRadius / 24;
+        return Math.min(width, height) / 2 * Math.min(cornerRadius / 12, 1);
     }
 
     readonly property real radiusXl: scaledRadius(28)
