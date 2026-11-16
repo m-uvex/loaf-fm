@@ -78,6 +78,12 @@ pub struct NetworkProfileState {
     pub path: String,
     pub label: String,
     pub icon: String,
+    pub total_bytes: u64,
+    pub used_bytes: u64,
+    pub free_bytes: u64,
+    pub total_str: String,
+    pub used_str: String,
+    pub free_str: String,
 }
 
 #[derive(Debug)]
@@ -656,8 +662,21 @@ pub fn unmount(profile: &NetworkProfile) -> Result<(), String> {
     }
 }
 
+fn space_metrics(total_bytes: u64, available_bytes: u64) -> (u64, u64) {
+    let free_bytes = available_bytes.min(total_bytes);
+    (total_bytes.saturating_sub(free_bytes), free_bytes)
+}
+
 pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
     let path = connected_path(profile);
+    let (total_bytes, available_bytes) = if profile.protocol == Protocol::Smb {
+        path.as_ref()
+            .and_then(|p| crate::drives::statvfs(&p.to_string_lossy()))
+            .unwrap_or_default()
+    } else {
+        (0, 0)
+    };
+    let (used_bytes, free_bytes) = space_metrics(total_bytes, available_bytes);
     NetworkProfileState {
         id: profile.id.clone(),
         protocol: profile.protocol.as_str().to_string(),
@@ -670,10 +689,29 @@ pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
         ssl: profile.ssl,
         connected: path.is_some(),
         path: path
+            .as_ref()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default(),
         label: profile.label(),
         icon: profile.protocol.icon().to_string(),
+        total_bytes,
+        used_bytes,
+        free_bytes,
+        total_str: if total_bytes > 0 {
+            util::format_size(total_bytes)
+        } else {
+            String::new()
+        },
+        used_str: if total_bytes > 0 {
+            util::format_size(used_bytes)
+        } else {
+            String::new()
+        },
+        free_str: if total_bytes > 0 {
+            util::format_size(free_bytes)
+        } else {
+            String::new()
+        },
     }
 }
 
@@ -685,6 +723,12 @@ pub fn list_json() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn smb_space_metrics_report_used_and_available_bytes() {
+        assert_eq!(space_metrics(100, 25), (75, 25));
+        assert_eq!(space_metrics(100, 150), (0, 100));
+    }
 
     #[test]
     fn smb_uri_building() {

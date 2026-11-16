@@ -205,6 +205,7 @@ Item {
             visible: root.isMounted
             Layout.fillWidth: true
             value: root.usage
+            wavy: true
             barColor: root.almostFull ? theme.danger : theme.primary
         }
 

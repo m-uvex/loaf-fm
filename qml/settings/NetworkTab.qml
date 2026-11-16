@@ -187,6 +187,38 @@ ColumnLayout {
                             elide: Text.ElideMiddle
                             Layout.fillWidth: true
                         }
+
+                        UsageBar {
+                            visible: modelData.connected
+                                && modelData.protocol === "smb"
+                                && Number(modelData.total_bytes) > 0
+                            Layout.fillWidth: true
+                            value: Number(modelData.used_bytes) / Number(modelData.total_bytes)
+                            barColor: value >= 0.9 ? theme.danger : theme.primary
+                        }
+
+                        RowLayout {
+                            visible: modelData.connected
+                                && modelData.protocol === "smb"
+                                && Number(modelData.total_bytes) > 0
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Text {
+                                text: qsTr("%1 used").arg(modelData.used_str || "")
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(10)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: qsTr("%1 free of %2").arg(modelData.free_str || "").arg(modelData.total_str || "")
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(10)
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
                     }
 
                     LoafButton {

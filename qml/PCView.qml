@@ -176,7 +176,13 @@ Item {
                     ssl: p.ssl !== false,
                     connected: p.connected === true,
                     path: p.path || "",
-                    icon: p.icon || (p.protocol === "webdav" ? "globe" : "network")
+                    icon: p.icon || (p.protocol === "webdav" ? "globe" : "network"),
+                    total_bytes: p.total_bytes || 0,
+                    used_bytes: p.used_bytes || 0,
+                    free_bytes: p.free_bytes || 0,
+                    total_str: p.total_str || "",
+                    used_str: p.used_str || "",
+                    free_str: p.free_str || ""
                 });
             }
         } catch (e) {}
