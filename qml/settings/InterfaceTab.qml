@@ -21,7 +21,7 @@ ColumnLayout {
     }
 
     readonly property bool matchTheme: matches(qsTr("theme appearance light dark auto mode color scheme"))
-    readonly property bool matchOpacity: matches(qsTr("background opacity panel backing transparency translucent translucency frosted blur appearance"))
+    readonly property bool matchOpacity: matches(qsTr("background opacity panel backing transparency translucent translucency frosted blur appearance submenu submenus menus"))
     readonly property bool matchPalette: matches(qsTr("theme palette accent colors wallpaper catppuccin nord tokyonight gruvbox rosepine amber lavender violet ricing"))
     readonly property bool matchIconStyle: matches(qsTr("icon style vector phosphor system adwaita desktop theme custom installed papirus breeze"))
     readonly property bool matchIconWeight: matches(qsTr("phosphor weight variant thin light regular bold fill duotone stroke thickness"))
@@ -113,6 +113,24 @@ ColumnLayout {
                 formatPercent: true
                 accessibleName: qsTr("Panel backing opacity")
                 onMoved: function(v) { theme.panelOpacity = v; }
+            }
+        }
+
+        SettingDivider { visible: root.matchOpacity }
+
+        SettingRow {
+            visible: root.matchOpacity
+            icon: "stack"
+            title: qsTr("Submenu translucency and blur")
+            subtitle: theme.lowPower
+                ? qsTr("Disabled in low-power mode")
+                : qsTr("Extends panel backing opacity and background blur to menus and submenus")
+
+            LoafSwitch {
+                checked: theme.submenuEffects
+                enabled: !theme.lowPower
+                Accessible.name: qsTr("Submenu translucency and blur")
+                onToggled: function(c) { theme.submenuEffects = c; }
             }
         }
 

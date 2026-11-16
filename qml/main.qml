@@ -1149,7 +1149,9 @@ ApplicationWindow {
         }
         globalKeyHandler.forceActiveFocus();
     }
+    readonly property alias workspaceArea: workspaceArea
     ColumnLayout {
+        id: workspaceArea
         anchors.fill: parent
         spacing: 10
         z: 1
