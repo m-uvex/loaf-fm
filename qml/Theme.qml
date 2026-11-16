@@ -224,7 +224,8 @@ Item {
 
     // Text size multiplier (also follows the desktop font size).
     property real fontScaleSetting: 1.0
-    readonly property real systemFontFactor: Math.max(0.8, Math.min(1.6, (Qt.application.font.pointSize > 0 ? Qt.application.font.pointSize : 10) / 10))
+    FontMetrics { id: systemFontMetrics }
+    readonly property real systemFontFactor: Math.max(0.8, Math.min(1.6, (systemFontMetrics.font.pointSize > 0 ? systemFontMetrics.font.pointSize : 10) / 10))
     readonly property real fontScale: fontScaleSetting * systemFontFactor
     function fs(px) {
         return Math.round(px * fontScale);
@@ -330,7 +331,7 @@ Item {
     // Only the weight in use is loaded (each file is ~0.5 MB; there are six).
     readonly property string iconFontFile: ({ bold: "Phosphor-Bold", fill: "Phosphor-Fill", duotone: "Phosphor-Duotone",
                                               light: "Phosphor-Light", thin: "Phosphor-Thin" })[phosphorWeight] || "Phosphor"
-    FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + iconFontFile + ".ttf" }
+    FontLoader { id: iconFont; source: "qrc:/loaf/fonts/" + theme.iconFontFile + ".ttf" }
 
     property string fontChoice: "system" // "system", "google_flex", "opendyslexic", "custom"
     property string customFontFamily: ""
@@ -379,7 +380,7 @@ Item {
     property bool highContrast: false
 
     function getFontFamily() {
-        return iconFont.status === FontLoader.Ready ? iconFont.name : iconFontFile;
+        return iconFont.status === FontLoader.Ready ? iconFont.name : theme.iconFontFile;
     }
 
     readonly property bool isDark: themeMode === "dark" ? true

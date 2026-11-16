@@ -111,13 +111,13 @@ pub fn new_id() -> String {
 
 pub fn profiles() -> Vec<NetworkProfile> {
     // 1. Try reading unified networkProfiles
-    if let Some(s) = state::get("networkProfiles") {
-        if let Ok(list) = serde_json::from_str::<Vec<NetworkProfile>>(&s) {
-            return list
-                .into_iter()
-                .filter(|p| !p.id.is_empty() && !p.server.trim().is_empty())
-                .collect();
-        }
+    if let Some(s) = state::get("networkProfiles")
+        && let Ok(list) = serde_json::from_str::<Vec<NetworkProfile>>(&s)
+    {
+        return list
+            .into_iter()
+            .filter(|p| !p.id.is_empty() && !p.server.trim().is_empty())
+            .collect();
     }
 
     // 2. Migration: Check legacy smbProfiles
@@ -176,11 +176,11 @@ pub fn save(list: &[NetworkProfile]) {
 
 pub fn set_remember(id: &str, remember: bool) {
     let mut list = profiles();
-    if let Some(profile) = list.iter_mut().find(|p| p.id == id) {
-        if profile.remember != remember {
-            profile.remember = remember;
-            save(&list);
-        }
+    if let Some(profile) = list.iter_mut().find(|p| p.id == id)
+        && profile.remember != remember
+    {
+        profile.remember = remember;
+        save(&list);
     }
 }
 
@@ -192,18 +192,17 @@ fn secret_tool() -> Option<PathBuf> {
 
 pub fn split_server(value: &str) -> (&str, Option<u16>) {
     let value = value.trim();
-    if let Some(rest) = value.strip_prefix('[') {
-        if let Some((host, tail)) = rest.split_once(']') {
-            let port = tail.strip_prefix(':').and_then(|p| p.parse::<u16>().ok());
-            return (host, port);
-        }
+    if let Some(rest) = value.strip_prefix('[')
+        && let Some((host, tail)) = rest.split_once(']')
+    {
+        let port = tail.strip_prefix(':').and_then(|p| p.parse::<u16>().ok());
+        return (host, port);
     }
-    if let Some((host, port)) = value.rsplit_once(':') {
-        if !host.contains(':') {
-            if let Ok(port) = port.parse::<u16>() {
-                return (host, Some(port));
-            }
-        }
+    if let Some((host, port)) = value.rsplit_once(':')
+        && !host.contains(':')
+        && let Ok(port) = port.parse::<u16>()
+    {
+        return (host, Some(port));
     }
     (value, None)
 }
@@ -617,13 +616,13 @@ fn needs_password(message: &str) -> bool {
 
 pub fn mount(profile: &NetworkProfile) -> Result<String, MountError> {
     let target = uri(profile);
-    if let Err(message) = run_gio(&["mount".to_string(), target.clone()]) {
-        if !message.to_lowercase().contains("already mounted") {
-            return Err(MountError {
-                needs_password: needs_password(&message),
-                message,
-            });
-        }
+    if let Err(message) = run_gio(&["mount".to_string(), target.clone()])
+        && !message.to_lowercase().contains("already mounted")
+    {
+        return Err(MountError {
+            needs_password: needs_password(&message),
+            message,
+        });
     }
     for _ in 0..25 {
         if let Some(path) = connected_path(profile) {

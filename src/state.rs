@@ -19,17 +19,16 @@ fn settings_file() -> PathBuf {
 
 fn load_settings() -> HashMap<String, String> {
     let mut map = HashMap::new();
-    if let Ok(content) = std::fs::read_to_string(settings_file()) {
-        if let Ok(serde_json::Value::Object(obj)) =
+    if let Ok(content) = std::fs::read_to_string(settings_file())
+        && let Ok(serde_json::Value::Object(obj)) =
             serde_json::from_str::<serde_json::Value>(&content)
-        {
-            for (k, v) in obj {
-                let s = match v {
-                    serde_json::Value::String(s) => s,
-                    other => other.to_string(),
-                };
-                map.insert(k, s);
-            }
+    {
+        for (k, v) in obj {
+            let s = match v {
+                serde_json::Value::String(s) => s,
+                other => other.to_string(),
+            };
+            map.insert(k, s);
         }
     }
     map
@@ -103,7 +102,7 @@ pub fn record_visit(path: &str) {
         // Keep the file small: forget the least visited folders.
         if map.len() > 200 {
             let mut v: Vec<(String, u32)> = map.iter().map(|(k, c)| (k.clone(), *c)).collect();
-            v.sort_by(|a, b| b.1.cmp(&a.1));
+            v.sort_by_key(|a| std::cmp::Reverse(a.1));
             v.truncate(150);
             *map = v.into_iter().collect();
         }

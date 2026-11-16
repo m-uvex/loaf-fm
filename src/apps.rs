@@ -72,11 +72,9 @@ pub fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopApp> {
             in_group = line == "[Desktop Entry]";
             continue;
         }
-        if in_group {
-            if let Some((k, v)) = line.split_once('=') {
-                kv.entry(k.trim().to_string())
-                    .or_insert_with(|| v.trim().to_string());
-            }
+        if in_group && let Some((k, v)) = line.split_once('=') {
+            kv.entry(k.trim().to_string())
+                .or_insert_with(|| v.trim().to_string());
         }
     }
     let is_true = |k: &str| {
@@ -257,14 +255,14 @@ fn group_values(content: &str, group: &str, mime: &str) -> Vec<String> {
         if !in_group {
             continue;
         }
-        if let Some((k, v)) = line.split_once('=') {
-            if k.trim().eq_ignore_ascii_case(mime) {
-                out.extend(
-                    v.split(';')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty()),
-                );
-            }
+        if let Some((k, v)) = line.split_once('=')
+            && k.trim().eq_ignore_ascii_case(mime)
+        {
+            out.extend(
+                v.split(';')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty()),
+            );
         }
     }
     out
@@ -323,11 +321,11 @@ pub fn for_mime(mime: &str) -> Vec<DesktopApp> {
         .filter(|a| a.mimes.iter().any(|m| mime_covers(m, mime)))
         .cloned()
         .collect();
-    if let Some(def) = default_for_in(&apps, mime) {
-        if let Some(pos) = list.iter().position(|a| a.id == def.id) {
-            let d = list.remove(pos);
-            list.insert(0, d);
-        }
+    if let Some(def) = default_for_in(&apps, mime)
+        && let Some(pos) = list.iter().position(|a| a.id == def.id)
+    {
+        let d = list.remove(pos);
+        list.insert(0, d);
     }
     list
 }
@@ -366,17 +364,16 @@ pub fn set_default_in(existing: &str, mime: &str, desktop: &str) -> String {
             i += 1;
             continue;
         }
-        if in_group {
-            if let Some((k, _)) = t.split_once('=') {
-                if k.trim().eq_ignore_ascii_case(mime) {
-                    if replaced {
-                        lines.remove(i);
-                        continue;
-                    }
-                    lines[i] = entry.clone();
-                    replaced = true;
-                }
+        if in_group
+            && let Some((k, _)) = t.split_once('=')
+            && k.trim().eq_ignore_ascii_case(mime)
+        {
+            if replaced {
+                lines.remove(i);
+                continue;
             }
+            lines[i] = entry.clone();
+            replaced = true;
         }
         i += 1;
     }
@@ -798,20 +795,20 @@ pub fn launch(app: &DesktopApp, files: &[PathBuf]) -> std::io::Result<()> {
             Message::key(MessageKey::NotifyEmptyExec).to_string(),
         ));
     }
-    if app.terminal {
-        if let Some((term, prefix)) = terminal_command() {
-            let mut full = vec![term.to_string_lossy().to_string()];
-            full.extend(prefix.iter().map(|s| s.to_string()));
-            full.append(&mut argv);
-            argv = full;
-        }
+    if app.terminal
+        && let Some((term, prefix)) = terminal_command()
+    {
+        let mut full = vec![term.to_string_lossy().to_string()];
+        full.extend(prefix.iter().map(|s| s.to_string()));
+        full.append(&mut argv);
+        argv = full;
     }
     let mut cmd = Command::new(&argv[0]);
     cmd.args(&argv[1..]);
-    if let Some(parent) = files.first().and_then(|f| f.parent()) {
-        if parent.is_dir() {
-            cmd.current_dir(parent);
-        }
+    if let Some(parent) = files.first().and_then(|f| f.parent())
+        && parent.is_dir()
+    {
+        cmd.current_dir(parent);
     }
     util::spawn_detached(cmd)
 }
@@ -869,12 +866,20 @@ mod tests {
     #[test]
     fn parses_entries_and_respects_tryexec() {
         let d = sandbox("parse");
-        let p = write_desktop(&d, "viewer.desktop", "[Desktop Entry]\nType=Application\nName=Viewer\nExec=viewer %U\nMimeType=image/png;image/*;\nNoDisplay=true\nIcon=viewer\n[Desktop Action x]\nName=Other\n");
+        let p = write_desktop(
+            &d,
+            "viewer.desktop",
+            "[Desktop Entry]\nType=Application\nName=Viewer\nExec=viewer %U\nMimeType=image/png;image/*;\nNoDisplay=true\nIcon=viewer\n[Desktop Action x]\nName=Other\n",
+        );
         let app = parse_desktop_file(&p, "viewer").unwrap();
         assert_eq!(app.name, "Viewer");
         assert!(app.no_display, "NoDisplay entries stay usable as handlers");
         assert_eq!(app.mimes, vec!["image/png", "image/*"]);
-        let gone = write_desktop(&d, "gone.desktop", "[Desktop Entry]\nType=Application\nName=Gone\nExec=gone\nTryExec=/definitely/not/here\n");
+        let gone = write_desktop(
+            &d,
+            "gone.desktop",
+            "[Desktop Entry]\nType=Application\nName=Gone\nExec=gone\nTryExec=/definitely/not/here\n",
+        );
         assert!(parse_desktop_file(&gone, "gone").is_none());
         let hidden = write_desktop(
             &d,

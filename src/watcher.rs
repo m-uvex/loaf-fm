@@ -11,8 +11,8 @@
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -78,11 +78,7 @@ fn wake(efd: i32) {
 
 /// poll() timeout: sleep until an event arrives, but tick while a change is pending.
 fn timeout_ms(pending: bool) -> i32 {
-    if pending {
-        50
-    } else {
-        -1
-    }
+    if pending { 50 } else { -1 }
 }
 
 pub struct DirWatcher {
@@ -218,22 +214,24 @@ impl DeviceWatcher {
         if ino < 0 {
             return None;
         }
-        for dir in ["/dev/disk/by-uuid", "/dev/disk/by-id", "/dev"] {
-            if let Ok(c) = CString::new(dir) {
-                let wd = unsafe {
-                    libc::inotify_add_watch(
-                        ino,
-                        c.as_ptr(),
-                        libc::IN_CREATE | libc::IN_DELETE | libc::IN_ONLYDIR,
-                    )
-                };
-                if wd >= 0 {
-                    break;
-                }
+        for dir in [c"/dev/disk/by-uuid", c"/dev/disk/by-id", c"/dev"] {
+            let wd = unsafe {
+                libc::inotify_add_watch(
+                    ino,
+                    dir.as_ptr(),
+                    libc::IN_CREATE | libc::IN_DELETE | libc::IN_ONLYDIR,
+                )
+            };
+            if wd >= 0 {
+                break;
             }
         }
-        let mounts = CString::new("/proc/self/mountinfo").ok()?;
-        let mfd = unsafe { libc::open(mounts.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
+        let mfd = unsafe {
+            libc::open(
+                c"/proc/self/mountinfo".as_ptr(),
+                libc::O_RDONLY | libc::O_CLOEXEC,
+            )
+        };
         let efd = new_waker();
         if efd < 0 {
             unsafe {

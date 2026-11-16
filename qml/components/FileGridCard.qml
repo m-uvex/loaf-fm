@@ -45,11 +45,11 @@ Item {
     DropArea {
         id: folderDrop
         anchors.fill: parent
-        enabled: card.itemIsDir && engineModel && !engineModel.read_only
+        enabled: card.itemIsDir && card.engineModel && !card.engineModel.read_only
         keys: ["text/uri-list"]
-        onEntered: if (fileDragManager) fileDragManager.hover(card.itemPath, engineModel)
-        onExited: if (fileDragManager && fileDragManager.hoverTarget === card.itemPath) fileDragManager.hoverTarget = ""
-        onDropped: function(drop) { if (viewPane) viewPane.handleDropOn(drop, card.itemPath, card); }
+        onEntered: if (card.fileDragManager) card.fileDragManager.hover(card.itemPath, card.engineModel)
+        onExited: if (card.fileDragManager && card.fileDragManager.hoverTarget === card.itemPath) card.fileDragManager.hoverTarget = ""
+        onDropped: function(drop) { if (card.viewPane) card.viewPane.handleDropOn(drop, card.itemPath, card); }
     }
 
     Rectangle {
@@ -81,15 +81,15 @@ Item {
         opacity: card.isCut ? 0.52 : 1.0
         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
         anchors.fill: parent
-        anchors.margins: 12 * (viewPane ? viewPane.chromeScale : 1)
+        anchors.margins: 12 * (card.viewPane ? card.viewPane.chromeScale : 1)
         spacing: 6
 
         Item { Layout.fillHeight: true }
 
         Item {
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: viewPane ? viewPane.iconBox : 48
-            Layout.preferredHeight: viewPane ? viewPane.iconBox : 48
+            Layout.preferredWidth: card.viewPane ? card.viewPane.iconBox : 48
+            Layout.preferredHeight: card.viewPane ? card.viewPane.iconBox : 48
 
             LoafIcon {
                 visible: !card.hasThumb && theme.iconSource === "phosphor"
@@ -103,11 +103,11 @@ Item {
             Image {
                 visible: !card.hasThumb && theme.iconSource !== "phosphor"
                 anchors.centerIn: parent
-                source: (theme.iconSource !== "phosphor" && hostWindow) ? hostWindow.systemIcon(card.itemSystemIcon) : ""
-                width: (viewPane ? viewPane.iconSize : 24) + 2
-                height: (viewPane ? viewPane.iconSize : 24) + 2
-                sourceSize.width: 64 * (viewPane ? viewPane.zoom : 1)
-                sourceSize.height: 64 * (viewPane ? viewPane.zoom : 1)
+                source: (theme.iconSource !== "phosphor" && card.hostWindow) ? card.hostWindow.systemIcon(card.itemSystemIcon) : ""
+                width: (card.viewPane ? card.viewPane.iconSize : 24) + 2
+                height: (card.viewPane ? card.viewPane.iconSize : 24) + 2
+                sourceSize.width: 64 * (card.viewPane ? card.viewPane.zoom : 1)
+                sourceSize.height: 64 * (card.viewPane ? card.viewPane.zoom : 1)
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
             }
@@ -128,8 +128,8 @@ Item {
                     source: theme.showThumbnails && card.itemThumbable && card.itemThumbId.length > 0
                         ? ("image://thumb/" + card.itemThumbId + (thumbFrame.square ? "/cover" : "") + "/round") : ""
                     fillMode: thumbFrame.square ? Image.PreserveAspectCrop : Image.Stretch
-                    sourceSize.width: viewPane ? viewPane.thumbBox : 64
-                    sourceSize.height: viewPane ? viewPane.thumbBox : 64
+                    sourceSize.width: card.viewPane ? card.viewPane.thumbBox : 64
+                    sourceSize.height: card.viewPane ? card.viewPane.thumbBox : 64
                     asynchronous: true
                     cache: true
                     smooth: true
@@ -170,12 +170,12 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 30
             active: true
-            sourceComponent: (viewPane && viewPane.renamingPath === card.itemPath) ? renameEditor : nameLabel
+            sourceComponent: (card.viewPane && card.viewPane.renamingPath === card.itemPath) ? renameEditor : nameLabel
 
             Component {
                 id: nameLabel
                 Text {
-                    text: (engineModel && engineModel.is_searching_everywhere) ? (card.itemDisplayName || card.itemName) : card.itemName
+                    text: (card.engineModel && card.engineModel.is_searching_everywhere) ? (card.itemDisplayName || card.itemName) : card.itemName
                     color: card.isSelected ? theme.secondaryContainerFg : theme.textMain
                     font.pixelSize: theme.fs(11)
                     font.bold: card.itemIsDir || card.isSelected
@@ -193,8 +193,8 @@ Item {
                 InlineRename {
                     originalName: card.itemName
                     isDir: card.itemIsDir
-                    onCommit: function(text) { if (viewPane) viewPane.commitRename(card.itemPath, text); }
-                    onCancel: if (viewPane) viewPane.cancelRename()
+                    onCommit: function(text) { if (card.viewPane) card.viewPane.commitRename(card.itemPath, text); }
+                    onCancel: if (card.viewPane) card.viewPane.cancelRename()
                 }
             }
         }
@@ -216,45 +216,45 @@ Item {
         property bool dragging: false
 
         onPressed: function(mouse) {
-            if (viewPane) viewPane.activated();
-            if (hostWindow) hostWindow.defocusInputs();
+            if (card.viewPane) card.viewPane.activated();
+            if (card.hostWindow) card.hostWindow.defocusInputs();
             pressPt = Qt.point(mouse.x, mouse.y);
             dragging = false;
             if (mouse.button === Qt.LeftButton && !card.isSelected
                     && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) {
-                if (viewPane) viewPane.selectRow(card.itemIndex, false, false);
+                if (card.viewPane) card.viewPane.selectRow(card.itemIndex, false, false);
             }
         }
         onPositionChanged: function(mouse) {
-            if (dragging || !(mouse.buttons & (Qt.LeftButton | Qt.RightButton)) || (viewPane && viewPane.renamingPath === card.itemPath))
+            if (dragging || !(mouse.buttons & (Qt.LeftButton | Qt.RightButton)) || (card.viewPane && card.viewPane.renamingPath === card.itemPath))
                 return;
-            if (engineModel && (engineModel.location_kind === "archive" || engineModel.location_kind === "trash" || (engineModel.location_kind === "mtp" && engineModel.read_only)))
+            if (card.engineModel && (card.engineModel.location_kind === "archive" || card.engineModel.location_kind === "trash" || (card.engineModel.location_kind === "mtp" && card.engineModel.read_only)))
                 return;
             var dx = mouse.x - pressPt.x, dy = mouse.y - pressPt.y;
             if (dx * dx + dy * dy >= 36) {
                 dragging = true;
-                if (!card.isSelected && viewPane)
-                    viewPane.selectRow(card.itemIndex, false, false);
-                if (fileDragManager) {
-                    fileDragManager.isRmb = !!(mouse.buttons & Qt.RightButton);
-                    fileDragManager.cursorPos = hostWindow ? mapToItem(hostWindow.contentItem, mouse.x, mouse.y) : Qt.point(mouse.x, mouse.y);
-                    fileDragManager.begin(viewPane ? viewPane.selectedPaths() : [], mouse);
+                if (!card.isSelected && card.viewPane)
+                    card.viewPane.selectRow(card.itemIndex, false, false);
+                if (card.fileDragManager) {
+                    card.fileDragManager.isRmb = !!(mouse.buttons & Qt.RightButton);
+                    card.fileDragManager.cursorPos = card.hostWindow ? mapToItem(card.hostWindow.contentItem, mouse.x, mouse.y) : Qt.point(mouse.x, mouse.y);
+                    card.fileDragManager.begin(card.viewPane ? card.viewPane.selectedPaths() : [], mouse);
                 }
             }
         }
-        onReleased: if (dragging) { if (fileDragManager) fileDragManager.end(); dragging = false; }
-        onCanceled: if (dragging) { if (fileDragManager) fileDragManager.end(); dragging = false; }
+        onReleased: if (dragging) { if (card.fileDragManager) card.fileDragManager.end(); dragging = false; }
+        onCanceled: if (dragging) { if (card.fileDragManager) card.fileDragManager.end(); dragging = false; }
         onClicked: function(mouse) {
             if (mouse.button === Qt.MiddleButton) {
-                if (hostWindow) hostWindow.newTab(card.itemPath);
+                if (card.hostWindow) card.hostWindow.newTab(card.itemPath);
                 return;
             }
             if (mouse.button === Qt.RightButton) {
-                if (!card.isSelected && viewPane)
-                    viewPane.selectRow(card.itemIndex, false, false);
-                if (hostWindow) {
-                    var pt = mapToItem(hostWindow.contentItem, mouse.x, mouse.y);
-                    hostWindow.openItemMenu(viewPane, card.itemIndex, pt.x, pt.y);
+                if (!card.isSelected && card.viewPane)
+                    card.viewPane.selectRow(card.itemIndex, false, false);
+                if (card.hostWindow) {
+                    let pt = mapToItem(card.hostWindow.contentItem, mouse.x, mouse.y);
+                    card.hostWindow.openItemMenu(card.viewPane, card.itemIndex, pt.x, pt.y);
                 }
             } else {
                 if (typeof contextMenu !== "undefined" && contextMenu) contextMenu.close();
@@ -272,9 +272,9 @@ Item {
         }
         onDoubleClicked: function(mouse) {
             renameDelay.stop();
-            if (mouse.button === Qt.LeftButton && viewPane)
-                viewPane.openRow(card.itemIndex);
+            if (mouse.button === Qt.LeftButton && card.viewPane)
+                card.viewPane.openRow(card.itemIndex);
         }
-        Timer { id: renameDelay; interval: 500; onTriggered: if (viewPane) viewPane.startRename() }
+        Timer { id: renameDelay; interval: 500; onTriggered: if (card.viewPane) card.viewPane.startRename() }
     }
 }

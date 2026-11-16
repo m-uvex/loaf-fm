@@ -206,12 +206,13 @@ use crate::{archive, state, trash, util, watcher, xdg};
 use core::pin::Pin;
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{
-    QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString, QVariant,
+    ItemDataRole, QByteArray, QHash, QHashPair_i32_QByteArray, QList, QModelIndex, QString,
+    QVariant,
 };
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Clone, Debug, PartialEq)]
 enum Loc {
@@ -412,7 +413,7 @@ impl Default for PaneRust {
 }
 
 // Model roles (Qt::UserRole + n).
-const ROLE_BASE: i32 = 0x0100;
+const ROLE_BASE: i32 = ItemDataRole::UserRole.repr;
 const ROLES: [&str; 19] = [
     "name",
     "path",
@@ -572,11 +573,11 @@ impl qobject::LoafEngine {
     }
 
     pub fn role_names(&self) -> QHash<QHashPair_i32_QByteArray> {
-        let mut h = QHash::<QHashPair_i32_QByteArray>::default();
-        for (i, name) in ROLES.iter().enumerate() {
-            h.insert(ROLE_BASE + i as i32, QByteArray::from(*name));
-        }
-        h
+        ROLES
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (ROLE_BASE + i as i32, QByteArray::from(*name)))
+            .collect()
     }
 
     pub fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
@@ -733,22 +734,23 @@ impl qobject::LoafEngine {
                 };
                 let mut c = dir_crumbs(p);
                 // Show where "forward" would go as faded crumbs.
-                if let Some(Loc::Dir(f)) = self.forward.last().and_then(|f| Loc::parse(f)) {
-                    if f != *p && f.starts_with(p) {
-                        let mut cur = p.clone();
-                        for comp in f.strip_prefix(p).unwrap_or(Path::new("")).components() {
-                            if let std::path::Component::Normal(x) = comp {
-                                cur.push(x);
-                                let mut cb = crumb(
-                                    &x.to_string_lossy(),
-                                    &cur.to_string_lossy(),
-                                    "folder",
-                                    "folder",
-                                    false,
-                                );
-                                cb.is_forward = true;
-                                c.push(cb);
-                            }
+                if let Some(Loc::Dir(f)) = self.forward.last().and_then(|f| Loc::parse(f))
+                    && f != *p
+                    && f.starts_with(p)
+                {
+                    let mut cur = p.clone();
+                    for comp in f.strip_prefix(p).unwrap_or(Path::new("")).components() {
+                        if let std::path::Component::Normal(x) = comp {
+                            cur.push(x);
+                            let mut cb = crumb(
+                                &x.to_string_lossy(),
+                                &cur.to_string_lossy(),
+                                "folder",
+                                "folder",
+                                false,
+                            );
+                            cb.is_forward = true;
+                            c.push(cb);
                         }
                     }
                 }
@@ -923,7 +925,7 @@ impl qobject::LoafEngine {
 
     /// Lists the current location on a worker thread.
     fn start_scan(mut self: Pin<&mut Self>, reset: bool) {
-        let gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         let gen_ref = self.generation.clone();
         let loc = self.loc.clone();
         let spec = self.sort_spec();
@@ -942,7 +944,7 @@ impl qobject::LoafEngine {
         self.as_mut().set_loading(true);
         let started = std::time::Instant::now();
         std::thread::spawn(move || {
-            let cancelled = || gen_ref.load(Ordering::SeqCst) != gen;
+            let cancelled = || gen_ref.load(Ordering::SeqCst) != generation;
             let mut new_cache = None;
             let result: Result<Vec<Entry>, String> = match &loc {
                 Loc::Dir(p) => listing::scan(p, &cancelled).map_err(|e| match e.kind() {
@@ -997,7 +999,7 @@ impl qobject::LoafEngine {
                 v.into_iter().map(Arc::new).collect::<Vec<_>>()
             });
             let _ = thread.queue(move |mut pane| {
-                if pane.generation.load(Ordering::SeqCst) != gen {
+                if pane.generation.load(Ordering::SeqCst) != generation {
                     return;
                 }
                 if new_cache.is_some() {
@@ -1182,7 +1184,7 @@ impl qobject::LoafEngine {
     }
 
     fn run_search(mut self: Pin<&mut Self>, root: PathBuf, query: String, contents: bool) {
-        let gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         let gen_ref = self.generation.clone();
         let show_hidden = *self.show_hidden();
         let thread = self.qt_thread();
@@ -1191,7 +1193,7 @@ impl qobject::LoafEngine {
         self.as_mut().set_searching(true);
         self.as_mut().set_loading(true);
         std::thread::spawn(move || {
-            let cancelled = || gen_ref.load(Ordering::SeqCst) != gen;
+            let cancelled = || gen_ref.load(Ordering::SeqCst) != generation;
             let q = crate::search::Query {
                 text: query,
                 root,
@@ -1202,7 +1204,7 @@ impl qobject::LoafEngine {
             let t = thread.clone();
             crate::search::run(&q, &cancelled, &mut |mut batch: Vec<Entry>| {
                 let _ = t.queue(move |mut pane| {
-                    if pane.generation.load(Ordering::SeqCst) != gen {
+                    if pane.generation.load(Ordering::SeqCst) != generation {
                         return;
                     }
                     let mut all = std::mem::take(&mut pane.as_mut().rust_mut().all);
@@ -1219,7 +1221,7 @@ impl qobject::LoafEngine {
                 });
             });
             let _ = thread.queue(move |mut pane| {
-                if pane.generation.load(Ordering::SeqCst) != gen {
+                if pane.generation.load(Ordering::SeqCst) != generation {
                     return;
                 }
                 pane.as_mut().set_searching(false);
@@ -1470,11 +1472,11 @@ impl qobject::LoafEngine {
         let group_by = self.group_by().to_string();
         for (i, entry) in self.rows.iter().enumerate() {
             let label = listing::group_label(entry, &group_by, &self.date_ctx);
-            if let Some(last) = groups.last_mut() {
-                if last.title == label {
-                    last.count += 1;
-                    continue;
-                }
+            if let Some(last) = groups.last_mut()
+                && last.title == label
+            {
+                last.count += 1;
+                continue;
             }
             groups.push(GroupInfo {
                 title: label,
@@ -1593,11 +1595,7 @@ fn match_class(p: &[char], pi: usize, c: char) -> Option<usize> {
     if i >= p.len() {
         return None; // never closed
     }
-    if negated != hit {
-        Some(i + 1)
-    } else {
-        None
-    }
+    if negated != hit { Some(i + 1) } else { None }
 }
 
 /// Entries directly inside `inner` of an archive listing.

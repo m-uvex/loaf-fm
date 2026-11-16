@@ -11,7 +11,6 @@
 #include <QDBusArgument>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
-#include <QJsonObject>
 #include <optional>
 #include <QMap>
 #include <QObject>

@@ -9,7 +9,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -46,14 +46,14 @@ struct ActiveShareHandle {
     temp_file: Option<PathBuf>,
 }
 
-static MANAGER: OnceLock<ShareManager> = OnceLock::new();
+static MANAGER: LazyLock<ShareManager> = LazyLock::new(|| ShareManager {
+    shares: Mutex::new(HashMap::new()),
+    handles: Mutex::new(HashMap::new()),
+    cloudflared_installing: AtomicBool::new(false),
+});
 
 pub fn get_manager() -> &'static ShareManager {
-    MANAGER.get_or_init(|| ShareManager {
-        shares: Mutex::new(HashMap::new()),
-        handles: Mutex::new(HashMap::new()),
-        cloudflared_installing: AtomicBool::new(false),
-    })
+    &MANAGER
 }
 
 /// Find cloudflared binary, checking system PATH, then ~/.local/share/loaf/bin/cloudflared
@@ -117,7 +117,7 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
         other => {
             return Err(Message::key(MessageKey::ShareErrorUnsupportedArch)
                 .text(other.to_string())
-                .to_string())
+                .to_string());
         }
     };
 
@@ -140,7 +140,8 @@ fn install_cloudflared_sync() -> Result<PathBuf, String> {
     } else if let Some(py) = util::which("python3") {
         let py_script = format!(
             "import urllib.request\nreq = urllib.request.Request('{}', headers={{'User-Agent': 'loaf/0.2'}})\nwith urllib.request.urlopen(req) as r, open('{}', 'wb') as f:\n    f.write(r.read())",
-            url, tmp_bin.to_str().unwrap()
+            url,
+            tmp_bin.to_str().unwrap()
         );
         let status = Command::new(py).args(["-c", &py_script]).status();
         matches!(status, Ok(s) if s.success())
@@ -186,7 +187,7 @@ impl ShareManager {
         }
 
         // Sort newest first
-        shares.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        shares.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         serde_json::to_string(&shares).unwrap_or_else(|_| "[]".into())
     }
 

@@ -268,10 +268,10 @@ pub fn decode_entries(location: &Location, json: &str) -> Result<Vec<listing::En
             .to_string()
     })?;
 
-    if let Some(err) = resp.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = resp.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
 
     let raw_entries = resp

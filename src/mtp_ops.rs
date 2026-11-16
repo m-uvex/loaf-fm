@@ -42,10 +42,10 @@ pub fn metadata(url: &str) -> Result<Option<Metadata>, String> {
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.exists == Some(true) {
         let name = reply.name.unwrap_or_default();
@@ -81,10 +81,10 @@ pub fn mkdir(parent_url: &str, name: &str) -> Result<String, String> {
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.ok == Some(true) {
         Ok(child_loc.url())
@@ -117,10 +117,10 @@ pub fn rename(url: &str, name: &str) -> Result<String, String> {
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.ok == Some(true) {
         Ok(new_loc.url())
@@ -145,10 +145,10 @@ pub fn remove(paths: &[String], mon: &dyn Monitor) -> Result<(), String> {
                 .text(e.to_string())
                 .to_string()
         })?;
-        if let Some(err) = reply.error {
-            if !err.is_empty() {
-                return Err(err);
-            }
+        if let Some(err) = reply.error
+            && !err.is_empty()
+        {
+            return Err(err);
         }
         if reply.ok != Some(true) {
             return Err(Message::key(MessageKey::MtpErrorDeleteFailed)
@@ -187,10 +187,10 @@ pub fn local_copy(url: &str, mon: &dyn Monitor) -> Result<PathBuf, String> {
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.ok != Some(true) {
         return Err(Message::key(MessageKey::MtpErrorDownloadFailed).to_string());
@@ -288,10 +288,10 @@ fn check_move_source(
     before: &Option<Vec<(String, bool, u64, i128)>>,
     mon: &dyn Monitor,
 ) -> Result<(), String> {
-    if let Some(before) = before {
-        if &source_snapshot(path, mon)? != before {
-            return Err(Message::key(MessageKey::MtpErrorSourceChanged).to_string());
-        }
+    if let Some(before) = before
+        && &source_snapshot(path, mon)? != before
+    {
+        return Err(Message::key(MessageKey::MtpErrorSourceChanged).to_string());
     }
     Ok(())
 }
@@ -505,10 +505,10 @@ fn upload_file(
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.ok != Some(true) {
         return Err(Message::key(MessageKey::MtpErrorUploadFailed)
@@ -588,10 +588,10 @@ fn download_file(
             .text(e.to_string())
             .to_string()
     })?;
-    if let Some(err) = reply.error {
-        if !err.is_empty() {
-            return Err(err);
-        }
+    if let Some(err) = reply.error
+        && !err.is_empty()
+    {
+        return Err(err);
     }
     if reply.ok != Some(true) {
         return Err(Message::key(MessageKey::MtpErrorDownloadFailed)
@@ -709,10 +709,10 @@ fn sanitize_filename(name: &str) -> String {
 }
 
 fn dirs_next_cache_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("XDG_CACHE_HOME") {
-        if !p.is_empty() {
-            return PathBuf::from(p);
-        }
+    if let Ok(p) = std::env::var("XDG_CACHE_HOME")
+        && !p.is_empty()
+    {
+        return PathBuf::from(p);
     }
     if let Ok(home) = std::env::var("HOME") {
         return PathBuf::from(home).join(".cache");

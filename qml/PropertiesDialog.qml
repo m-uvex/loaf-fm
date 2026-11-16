@@ -160,7 +160,7 @@ LoafDialog {
 
             RowLayout {
                 spacing: 0
-                Item { Layout.preferredWidth: 70; height: 1 }
+                Item { Layout.preferredWidth: 70; Layout.preferredHeight: 1 }
                 Repeater {
                     model: [qsTr("Read"), qsTr("Write"), dlg.info.is_dir ? qsTr("Open") : qsTr("Run")]
                     delegate: Text {
@@ -193,8 +193,9 @@ LoafDialog {
                     Repeater {
                         model: [4, 2, 1]
                         delegate: Item {
+                            id: permBit
                             required property int modelData
-                            readonly property int bit: modelData << permRow.modelData.shift
+                            readonly property int bit: permBit.modelData << permRow.modelData.shift
                             Layout.preferredWidth: 64
                             implicitHeight: 30
                             LoafCheckBox {
@@ -258,13 +259,14 @@ LoafDialog {
             model: dlg.apps
             ScrollBar.vertical: ScrollBar {}
             delegate: LoafRadio {
+                id: appRadio
                 required property var modelData
                 width: ListView.view.width
-                text: modelData.name
-                checked: modelData.id === dlg.defaultApp
+                text: appRadio.modelData.name
+                checked: appRadio.modelData.id === dlg.defaultApp
                 onClicked: {
-                    core.set_default_app(dlg.paths[0], modelData.id);
-                    dlg.defaultApp = modelData.id;
+                    core.set_default_app(dlg.paths[0], appRadio.modelData.id);
+                    dlg.defaultApp = appRadio.modelData.id;
                 }
             }
         }

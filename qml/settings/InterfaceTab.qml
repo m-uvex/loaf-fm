@@ -284,13 +284,15 @@ ColumnLayout {
                 ]
 
                 delegate: Item {
+                    id: palCard
+                    required property var modelData
                     width: (typeof settingsView !== "undefined" && settingsView.isCompact)
                         ? Math.max(120, Math.floor((palFlow.width - 10) / 2))
                         : 142
                     height: 42
 
-                    readonly property var swatch: theme.palettes[modelData.id] ? theme.palettes[modelData.id] : theme.palettes["lavender"]
-                    readonly property bool isSelected: theme.accentName === modelData.id
+                    readonly property var swatch: theme.palettes[palCard.modelData.id] ? theme.palettes[palCard.modelData.id] : theme.palettes["lavender"]
+                    readonly property bool isSelected: theme.accentName === palCard.modelData.id
 
                     Rectangle {
                         anchors.fill: parent
@@ -315,23 +317,23 @@ ColumnLayout {
                                 implicitWidth: 14
                                 implicitHeight: 14
                                 radius: 7
-                                color: swatch ? swatch.darkPrimary : theme.primary
+                                color: palCard.swatch ? palCard.swatch.darkPrimary : theme.primary
                                 border.width: 1
                                 border.color: theme.outlineAlpha(theme.outlineVariant)
                             }
 
                             Text {
-                                text: modelData.label
-                                color: isSelected ? theme.primaryContainerFg : theme.textMain
+                                text: palCard.modelData.label
+                                color: palCard.isSelected ? theme.primaryContainerFg : theme.textMain
                                 font.pixelSize: theme.fs(11)
-                                font.bold: isSelected
+                                font.bold: palCard.isSelected
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             }
 
                             LoafIcon {
-                                visible: isSelected
+                                visible: palCard.isSelected
                                 name: "check"
                                 size: 14
                                 color: theme.primaryContainerFg
@@ -344,7 +346,7 @@ ColumnLayout {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: theme.accentName = modelData.id
+                        onClicked: theme.accentName = palCard.modelData.id
                     }
                 }
             }

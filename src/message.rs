@@ -796,10 +796,10 @@ mod tests {
         let mut qml_keys = BTreeSet::new();
         for line in qml_source.lines() {
             let line = line.trim();
-            if let Some(rest) = line.strip_prefix("case \"") {
-                if let Some(key) = rest.split('"').next() {
-                    qml_keys.insert(key.to_string());
-                }
+            if let Some(rest) = line.strip_prefix("case \"")
+                && let Some(key) = rest.split('"').next()
+            {
+                qml_keys.insert(key.to_string());
             }
         }
 

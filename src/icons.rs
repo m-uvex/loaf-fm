@@ -110,13 +110,11 @@ fn load_theme(name: &str) -> Option<Theme> {
             continue;
         }
         theme.roots.push(root.clone());
-        if !parsed {
-            if let Ok(c) = fs::read_to_string(root.join("index.theme")) {
-                let (dirs, inherits) = parse_index(&c);
-                theme.dirs = dirs;
-                theme.inherits = inherits;
-                parsed = true;
-            }
+        if !parsed && let Ok(c) = fs::read_to_string(root.join("index.theme")) {
+            let (dirs, inherits) = parse_index(&c);
+            theme.dirs = dirs;
+            theme.inherits = inherits;
+            parsed = true;
         }
     }
     let result = if parsed { Some(theme) } else { None };
@@ -292,12 +290,12 @@ fn ini_value(path: &Path, group: &str, key: &str) -> Option<String> {
             in_group = line == group;
             continue;
         }
-        if in_group {
-            if let Some((k, v)) = line.split_once('=') {
-                if k.trim() == key && !v.trim().is_empty() {
-                    return Some(v.trim().trim_matches('"').to_string());
-                }
-            }
+        if in_group
+            && let Some((k, v)) = line.split_once('=')
+            && k.trim() == key
+            && !v.trim().is_empty()
+        {
+            return Some(v.trim().trim_matches('"').to_string());
         }
     }
     None
@@ -348,10 +346,10 @@ pub fn system_theme() -> String {
 }
 
 fn detect_system_theme() -> String {
-    if let Ok(t) = std::env::var("LOAF_ICON_THEME") {
-        if !t.is_empty() {
-            return t;
-        }
+    if let Ok(t) = std::env::var("LOAF_ICON_THEME")
+        && !t.is_empty()
+    {
+        return t;
     }
     let cfg = util::config_home();
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")

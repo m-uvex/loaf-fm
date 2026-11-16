@@ -317,11 +317,7 @@ fn compare_name_group(la: &str, lb: &str, ascending: bool) -> Ordering {
         }
     };
     let ord = rank(la).cmp(&rank(lb)).then_with(|| natural_cmp(la, lb));
-    if ascending {
-        ord
-    } else {
-        ord.reverse()
-    }
+    if ascending { ord } else { ord.reverse() }
 }
 
 pub fn size_group_label(entry: &Entry) -> String {
@@ -421,11 +417,7 @@ pub fn type_group_label(category: &str, is_dir: bool) -> String {
 
 fn compare_type_group(la: &str, lb: &str, ascending: bool) -> Ordering {
     let ord = natural_cmp(la, lb);
-    if ascending {
-        ord
-    } else {
-        ord.reverse()
-    }
+    if ascending { ord } else { ord.reverse() }
 }
 
 pub fn group_label(entry: &Entry, group_by: &str, ctx: &DateGroupContext) -> String {
@@ -491,21 +483,13 @@ fn compare_intra_bucket(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
                 (false, true) => Ordering::Less,
                 (false, false) => {
                     let m = b.modified.cmp(&a.modified);
-                    if spec.ascending {
-                        m
-                    } else {
-                        m.reverse()
-                    }
+                    if spec.ascending { m } else { m.reverse() }
                 }
             }
         }
         "size" => {
             let s = a.size.cmp(&b.size).then_with(by_name);
-            if spec.ascending {
-                s
-            } else {
-                s.reverse()
-            }
+            if spec.ascending { s } else { s.reverse() }
         }
         "type" => {
             let t = a
@@ -513,21 +497,13 @@ fn compare_intra_bucket(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
                 .cmp(b.category)
                 .then_with(|| extension(&a.name).cmp(&extension(&b.name)))
                 .then_with(by_name);
-            if spec.ascending {
-                t
-            } else {
-                t.reverse()
-            }
+            if spec.ascending { t } else { t.reverse() }
         }
         _ => by_name(),
     };
 
     let ord = if spec.key == "name" {
-        if spec.ascending {
-            ord
-        } else {
-            ord.reverse()
-        }
+        if spec.ascending { ord } else { ord.reverse() }
     } else {
         ord
     };
@@ -642,11 +618,7 @@ fn checked_localtime(ts: i64) -> Option<libc::tm> {
     let t = ts as libc::time_t;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::localtime_r(&t, &mut tm) };
-    if ret.is_null() {
-        None
-    } else {
-        Some(tm)
-    }
+    if ret.is_null() { None } else { Some(tm) }
 }
 
 pub fn date_bucket_key(ts: i64, ctx: &DateGroupContext) -> DateBucketKey {
@@ -698,29 +670,20 @@ pub fn date_bucket_key(ts: i64, ctx: &DateGroupContext) -> DateBucketKey {
     }
 }
 
-// Compile-time verified NUL-terminated CStr for strftime, compatible with Rust 1.75+.
-// ASCII for "%B %Y\0"
-const MONTH_YEAR_FMT_BYTES: &[u8; 6] = &[b'%', b'B', b' ', b'%', b'Y', 0];
-const MONTH_YEAR_FMT_CSTR: &std::ffi::CStr =
-    match std::ffi::CStr::from_bytes_with_nul(MONTH_YEAR_FMT_BYTES) {
-        Ok(c) => c,
-        Err(_) => panic!("static date format must be NUL-terminated"),
-    };
-
 fn format_month_year(tm: &libc::tm) -> String {
     let mut buf = [0u8; 64];
     let len = unsafe {
         libc::strftime(
             buf.as_mut_ptr() as *mut libc::c_char,
             buf.len(),
-            MONTH_YEAR_FMT_CSTR.as_ptr(),
+            c"%B %Y".as_ptr(),
             tm,
         )
     };
-    if len > 0 {
-        if let Ok(s) = std::str::from_utf8(&buf[..len]) {
-            return s.to_string();
-        }
+    if len > 0
+        && let Ok(s) = std::str::from_utf8(&buf[..len])
+    {
+        return s.to_string();
     }
     const MONTHS: [&str; 12] = [
         "January",
@@ -792,11 +755,7 @@ pub fn compare_date_group_keys(ka: DateBucketKey, kb: DateBucketKey, ascending: 
         (false, true) => Ordering::Less,    // Unknown LAST in both directions
         (false, false) => {
             let cmp = ka.order.cmp(&kb.order);
-            if ascending {
-                cmp
-            } else {
-                cmp.reverse()
-            }
+            if ascending { cmp } else { cmp.reverse() }
         }
     }
 }
@@ -934,11 +893,11 @@ pub fn diff<T: EntryLike + Clone + PartialEq>(old: &[T], new: &[T]) -> Vec<Chang
     let mut changes: Vec<Change<T>> = Vec::new();
     let (mut i, mut j, mut k) = (0usize, 0usize, 0usize);
     let push_remove = |changes: &mut Vec<Change<T>>, at: usize| {
-        if let Some(Change::Remove { at: a, count }) = changes.last_mut() {
-            if *a == at {
-                *count += 1;
-                return;
-            }
+        if let Some(Change::Remove { at: a, count }) = changes.last_mut()
+            && *a == at
+        {
+            *count += 1;
+            return;
         }
         changes.push(Change::Remove { at, count: 1 });
     };
@@ -967,13 +926,13 @@ pub fn diff<T: EntryLike + Clone + PartialEq>(old: &[T], new: &[T]) -> Vec<Chang
         } else {
             let at = k;
             let item = new[j].clone();
-            if let Some(Change::Insert { at: a, items }) = changes.last_mut() {
-                if *a + items.len() == at {
-                    items.push(item);
-                    j += 1;
-                    k += 1;
-                    continue;
-                }
+            if let Some(Change::Insert { at: a, items }) = changes.last_mut()
+                && *a + items.len() == at
+            {
+                items.push(item);
+                j += 1;
+                k += 1;
+                continue;
             }
             changes.push(Change::Insert {
                 at,
@@ -1506,7 +1465,11 @@ mod tests {
                                     assert!(
                                         cmp != Ordering::Greater,
                                         "Order violation between index {} ({}) and {} ({}) under {:?}",
-                                        i, items[i].name, j, items[j].name, spec
+                                        i,
+                                        items[i].name,
+                                        j,
+                                        items[j].name,
+                                        spec
                                     );
                                 }
                             }
@@ -1521,7 +1484,8 @@ mod tests {
                                         assert!(
                                             !seen_labels.contains(&lbl),
                                             "Group bucket '{}' is fragmented (not contiguous) under {:?}",
-                                            lbl, spec
+                                            lbl,
+                                            spec
                                         );
                                         seen_labels.push(lbl.clone());
                                         current_label = lbl;
@@ -1537,7 +1501,11 @@ mod tests {
                                         if !item.is_dir {
                                             seen_file = true;
                                         } else {
-                                            assert!(!seen_file, "Folder appeared after file with folders=first: {:?}", spec);
+                                            assert!(
+                                                !seen_file,
+                                                "Folder appeared after file with folders=first: {:?}",
+                                                spec
+                                            );
                                         }
                                     }
                                 }
@@ -1548,7 +1516,11 @@ mod tests {
                                         if item.is_dir {
                                             seen_dir = true;
                                         } else {
-                                            assert!(!seen_dir, "File appeared after folder with folders=last: {:?}", spec);
+                                            assert!(
+                                                !seen_dir,
+                                                "File appeared after folder with folders=last: {:?}",
+                                                spec
+                                            );
                                         }
                                     }
                                 }
@@ -1660,9 +1632,13 @@ mod tests {
         let pool: Vec<Entry> = (0..12).map(|i| e(&format!("f{}", i), false, i)).collect();
         for _ in 0..500 {
             let pick = |r: &mut dyn FnMut() -> u64| -> Vec<Entry> {
-                let mut v: Vec<Entry> = pool.iter().filter(|_| (r() & 1) == 0).cloned().collect();
+                let mut v: Vec<Entry> = pool
+                    .iter()
+                    .filter(|_| r().is_multiple_of(2))
+                    .cloned()
+                    .collect();
                 for x in v.iter_mut() {
-                    if (r() & 3) == 0 {
+                    if r().is_multiple_of(4) {
                         x.size += 100;
                     }
                 }

@@ -119,6 +119,7 @@ ColumnLayout {
             model: activeSharesCard.sharesList
 
             delegate: Rectangle {
+                id: shareCard
                 required property var modelData
                 Layout.fillWidth: true
                 implicitHeight: shareItemRow.implicitHeight + 20
@@ -134,7 +135,7 @@ ColumnLayout {
                     spacing: 12
 
                     LoafIcon {
-                        name: modelData.is_archive ? "file-archive" : "file"
+                        name: shareCard.modelData.is_archive ? "file-archive" : "file"
                         size: 24
                         color: theme.primary
                     }
@@ -146,7 +147,7 @@ ColumnLayout {
                         RowLayout {
                             spacing: 8
                             Text {
-                                text: modelData.name
+                                text: shareCard.modelData.name
                                 color: theme.textMain
                                 font.pixelSize: theme.fs(13)
                                 font.bold: true
@@ -156,16 +157,16 @@ ColumnLayout {
                                 radius: 4
                                 implicitWidth: stText.implicitWidth + 8
                                 implicitHeight: stText.implicitHeight + 4
-                                color: modelData.status === "ready" ? theme.primaryContainer : theme.surfaceContainerHighest
+                                color: shareCard.modelData.status === "ready" ? theme.primaryContainer : theme.surfaceContainerHighest
                                 Text {
                                     id: stText
                                     anchors.centerIn: parent
-                                    text: modelData.status === "ready" ? qsTr("READY")
-                                        : (modelData.status === "starting" ? qsTr("STARTING")
-                                        : (modelData.status === "error" ? qsTr("ERROR")
-                                        : (modelData.status === "expired" ? qsTr("EXPIRED")
-                                        : (modelData.status ? modelData.status.toUpperCase() : ""))))
-                                    color: modelData.status === "ready" ? theme.primaryContainerFg : theme.textMuted
+                                    text: shareCard.modelData.status === "ready" ? qsTr("READY")
+                                        : (shareCard.modelData.status === "starting" ? qsTr("STARTING")
+                                        : (shareCard.modelData.status === "error" ? qsTr("ERROR")
+                                        : (shareCard.modelData.status === "expired" ? qsTr("EXPIRED")
+                                        : (shareCard.modelData.status ? shareCard.modelData.status.toUpperCase() : ""))))
+                                    color: shareCard.modelData.status === "ready" ? theme.primaryContainerFg : theme.textMuted
                                     font.pixelSize: theme.fs(9)
                                     font.bold: true
                                 }
@@ -173,8 +174,8 @@ ColumnLayout {
                         }
 
                         Text {
-                            visible: modelData.url && modelData.url.length > 0
-                            text: modelData.url || ""
+                            visible: shareCard.modelData.url && shareCard.modelData.url.length > 0
+                            text: shareCard.modelData.url || ""
                             color: theme.primary
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideMiddle
@@ -183,11 +184,11 @@ ColumnLayout {
                     }
 
                     LoafButton {
-                        visible: modelData.url && modelData.url.length > 0
+                        visible: shareCard.modelData.url && shareCard.modelData.url.length > 0
                         icon: "copy"
                         variant: "ghost"
                         Accessible.name: qsTr("Copy URL")
-                        onClicked: if (typeof core !== "undefined" && core) core.copy_text(modelData.url)
+                        onClicked: if (typeof core !== "undefined" && core) core.copy_text(shareCard.modelData.url)
                     }
 
                     LoafButton {
@@ -196,7 +197,7 @@ ColumnLayout {
                         variant: "tonal"
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
-                                core.cancel_share(modelData.id);
+                                core.cancel_share(shareCard.modelData.id);
                                 activeSharesCard.refreshShares();
                             }
                         }

@@ -165,8 +165,8 @@ nix develop --command cargo build --release
 
 #### 1. Dependencies
 
-* **Build tools:** Rust (1.75+), C++17 compiler, CMake, Ninja, `pkg-config`
-* **Qt6 libraries:** `qtbase` (including private headers and QtDBus), `qtdeclarative`, `qtsvg`, `qtwayland`
+* **Build tools:** Rust (1.99+), C++23 compiler, CMake, Ninja, `pkg-config`
+* **Qt6 libraries (Qt 6.12 or newer):** `qtbase` (including private headers and QtDBus), `qtdeclarative`, `qtsvg`, `qtwayland`
 * *Fedora:* `sudo dnf install qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel qt6-qtsvg-devel qt6-qtwayland-devel`
 * *Debian/Ubuntu:* `sudo apt install qt6-base-dev qt6-base-private-dev qt6-declarative-dev libqt6svg6-dev qt6-wayland-dev`
 * *Arch:* `sudo pacman -S qt6-base qt6-declarative qt6-svg qt6-wayland`

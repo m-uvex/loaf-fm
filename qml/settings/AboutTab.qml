@@ -331,26 +331,27 @@ ColumnLayout {
                 model: root.contributors
 
                 delegate: Rectangle {
+                    id: contribCard
                     required property var modelData
 
                     readonly property bool hovered: chipMouse.containsMouse
-                    readonly property string displayName: (modelData.name && modelData.name.length > 0)
-                        ? modelData.name : modelData.login
+                    readonly property string displayName: (contribCard.modelData.name && contribCard.modelData.name.length > 0)
+                        ? contribCard.modelData.name : contribCard.modelData.login
 
                     width: chipRow.implicitWidth + 24
                     height: 46
                     radius: theme.radiusM
-                    color: hovered ? theme.primaryContainer : theme.surfaceContainerHigh
+                    color: contribCard.hovered ? theme.primaryContainer : theme.surfaceContainerHigh
                     border.width: 1
-                    border.color: hovered ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
-                    scale: chipMouse.pressed ? 0.97 : (hovered ? 1.03 : 1.0)
+                    border.color: contribCard.hovered ? theme.primary : theme.outlineVariant
+                    scale: chipMouse.pressed ? 0.97 : (contribCard.hovered ? 1.03 : 1.0)
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
 
                     Accessible.role: Accessible.Link
-                    Accessible.name: displayName
+                    Accessible.name: contribCard.displayName
 
                     Row {
                         id: chipRow
@@ -371,7 +372,7 @@ ColumnLayout {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: modelData.login ? modelData.login.charAt(0).toUpperCase() : "?"
+                                    text: contribCard.modelData.login ? contribCard.modelData.login.charAt(0).toUpperCase() : "?"
                                     color: theme.textMuted
                                     font.pixelSize: theme.fs(11)
                                     font.bold: true
@@ -381,7 +382,7 @@ ColumnLayout {
                             // Circular GitHub avatar, clipped by the canvas.
                             Canvas {
                                 anchors.fill: parent
-                                property string src: modelData.avatar || ""
+                                property string src: contribCard.modelData.avatar || ""
 
                                 onSrcChanged: requestPaint()
                                 onImageLoaded: requestPaint()
@@ -404,15 +405,16 @@ ColumnLayout {
                         }
 
                         Text {
-                            text: displayName
+                            text: contribCard.displayName
                             anchors.verticalCenter: parent.verticalCenter
-                            color: hovered ? theme.primaryContainerFg : theme.textMain
+                            color: contribCard.hovered ? theme.primaryContainerFg : theme.textMain
                             font.pixelSize: theme.fs(12)
-                            font.bold: hovered
+                            font.bold: contribCard.hovered
 
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         }
                     }
+
 
                     MouseArea {
                         id: chipMouse

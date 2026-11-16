@@ -94,7 +94,7 @@ ColumnLayout {
             LoafSwitch {
                 id: thumbSwitch
                 checked: theme.showThumbnails
-                onToggled: theme.showThumbnails = checked
+                onToggled: function(checked) { theme.showThumbnails = checked; }
             }
         }
 

@@ -12,7 +12,7 @@ pkgdesc="Material 3 Expressive File Manager built with Qt6 Quick and Rust (night
 arch=('x86_64')
 url="https://github.com/m-uvex/loaf-fm"
 license=('MIT')
-depends=('glibc' 'libgcc' 'libstdc++' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'hicolor-icon-theme' 'gvfs' 'gvfs-smb')
+depends=('glibc' 'libgcc' 'libstdc++' 'qt6-base>=6.12' 'qt6-declarative>=6.12' 'qt6-svg>=6.12' 'qt6-wayland>=6.12' 'hicolor-icon-theme' 'gvfs' 'gvfs-smb')
 optdepends=('7zip: zip/7z/rar/iso and encrypted archives'
             'udisks2: mount, eject and unlock drives'
             'ffmpegthumbnailer: video thumbnails'

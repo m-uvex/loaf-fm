@@ -54,6 +54,7 @@ LoafDialog {
                 { title: qsTr("Incoming"), size: dlg.conflicts[0].src_size, date: dlg.conflicts[0].src_modified, dir: dlg.conflicts[0].src_is_dir }
             ] : []
             delegate: Rectangle {
+                id: conflictCard
                 required property var modelData
                 Layout.fillWidth: true
                 implicitHeight: 70
@@ -63,12 +64,12 @@ LoafDialog {
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 10
-                    LoafIcon { name: modelData.dir ? "folder" : "file"; size: 22; color: theme.primary }
+                    LoafIcon { name: conflictCard.modelData.dir ? "folder" : "file"; size: 22; color: theme.primary }
                     ColumnLayout {
                         spacing: 2
-                        Text { text: modelData.title; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                        Text { text: modelData.size || "-"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                        Text { text: theme.relativeTime(modelData.date || 0); color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: conflictCard.modelData.title; color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
+                        Text { text: conflictCard.modelData.size || "-"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
+                        Text { text: theme.relativeTime(conflictCard.modelData.date || 0); color: theme.textMuted; font.pixelSize: theme.fs(11) }
                     }
                 }
             }

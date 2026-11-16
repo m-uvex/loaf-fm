@@ -97,7 +97,10 @@ fn parse_args() -> Result<Args, String> {
                 println!("loaf {}", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
-            "-v" | "--verbose" => std::env::set_var("LOAF_VERBOSE", "1"),
+            "-v" | "--verbose" => {
+                // SAFETY: parse_args runs on the main thread before Qt or worker threads spawn.
+                unsafe { std::env::set_var("LOAF_VERBOSE", "1") };
+            }
             "-m" | "--mini" => out.mini = true,
             "--new-window" => out.new_window = true,
             "--portal" => out.portal = true,
@@ -111,7 +114,7 @@ fn parse_args() -> Result<Args, String> {
             "-p" | "--path" => out.paths.push(it.next().ok_or("--path needs a folder")?),
             "--" => out.paths.extend(it.by_ref()),
             s if s.starts_with('-') && s.len() > 1 => {
-                return Err(format!("unknown option '{}' (see --help)", s))
+                return Err(format!("unknown option '{}' (see --help)", s));
             }
             s => out.paths.push(s.to_string()),
         }

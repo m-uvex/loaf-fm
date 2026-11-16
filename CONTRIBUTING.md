@@ -48,9 +48,9 @@ nix develop --command cargo build --release
 
 If you prefer building directly on your host distribution:
 
-1. **Rust Toolchain**: Rust 1.75+ (`rustc`, `cargo`).
-2. **C++ Compiler**: A modern C++17 compiler (`g++` or `clang++`).
-3. **Qt6 Libraries**:
+1. **Rust Toolchain**: Rust 1.99+ (`rustc`, `cargo`).
+2. **C++ Compiler**: A modern C++23 compiler (`g++` or `clang++`).
+3. **Qt6 Libraries (Qt 6.12 or newer)**:
    - `qtbase` (including private headers and `QtDBus`)
    - `qtdeclarative` (QML and Quick engine)
    - `qtsvg`

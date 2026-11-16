@@ -1,6 +1,6 @@
 //! Validation and normalization of portal file chooser requests.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::filters::Filter;
 
@@ -312,10 +312,10 @@ mod tests {
             error(json!({"kind": "save", "handle": "/h", "current_name": ".."}))
                 .contains("'.' or '..'")
         );
-        assert!(error(
-            json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", "../escape"]})
-        )
-        .contains("plain file name"));
+        assert!(
+            error(json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", "../escape"]}))
+                .contains("plain file name")
+        );
         assert!(
             error(json!({"kind": "save-files", "handle": "/h", "files": ["ok.txt", 3]}))
                 .contains("file names")
@@ -351,8 +351,7 @@ mod tests {
             "B"
         );
         assert_eq!(
-            spec(json!({"kind": "open", "handle": "/h", "current_filter": "junk"}))
-                ["current_filter"],
+            spec(json!({"kind": "open", "handle": "/h", "current_filter": "junk"}))["current_filter"],
             Value::Null
         );
     }
@@ -385,10 +384,12 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(bad["ok"], false);
-        assert!(bad["error"]
-            .as_str()
-            .unwrap()
-            .contains("unknown request kind"));
+        assert!(
+            bad["error"]
+                .as_str()
+                .unwrap()
+                .contains("unknown request kind")
+        );
         let malformed: Value = serde_json::from_str(&normalize_request_json("not json")).unwrap();
         assert_eq!(malformed["ok"], false);
     }
