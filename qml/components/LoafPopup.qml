@@ -101,7 +101,7 @@ Popup {
                     source: backdropCapture
                     autoPaddingEnabled: false
                     blurEnabled: true
-                    blur: 0.8
+                    blur: 0.9
                     blurMax: 32
                     opacity: 0.88
                     maskEnabled: true
