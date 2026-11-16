@@ -69,10 +69,10 @@ pub fn read_head(path: &Path) -> (String, bool, bool) {
     }
     // Don't cut a multi-byte character in half at the end.
     let mut end = buf.len();
-    if let Err(e) = std::str::from_utf8(&buf) {
-        if e.error_len().is_none() {
-            end = e.valid_up_to(); // only an incomplete character at the end
-        }
+    if let Err(e) = std::str::from_utf8(&buf)
+        && e.error_len().is_none()
+    {
+        end = e.valid_up_to(); // only an incomplete character at the end
     }
     (
         String::from_utf8_lossy(&buf[..end]).to_string(),

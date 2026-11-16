@@ -30,7 +30,7 @@ LoafDialog {
         field.text = prompt.initialText;
         field.forceActiveFocus();
         if (prompt.selectBasename) {
-            var slash = prompt.initialText.lastIndexOf("/");
+            let slash = prompt.initialText.lastIndexOf("/");
             if (slash >= 0)
                 field.select(slash + 1, field.text.length);
             else
@@ -73,7 +73,7 @@ LoafDialog {
 
         onAccepted: prompt.accept()
 
-        Keys.onEscapePressed: {
+        Keys.onEscapePressed: function(event) {
             prompt.cancel();
             event.accepted = true;
         }

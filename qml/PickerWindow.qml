@@ -722,15 +722,15 @@ Window {
                 Layout.fillHeight: true
                 showHeader: false
                 pickerMode: true
-                pickerMultiple: multiple
+                pickerMultiple: picker.multiple
                 onFilePicked: function(path) {
-                    if (isSaveFiles)
+                    if (picker.isSaveFiles)
                         return;
-                    if (isSave) {
+                    if (picker.isSave) {
                         nameField.text = path.split("/").pop();
                         return;
                     }
-                    respond(0, [path]);
+                    picker.respond(0, [path]);
                 }
             }
         }
@@ -748,40 +748,41 @@ Window {
 
             RowLayout {
                 Layout.fillWidth: true
-                visible: (request.choices || []).length > 0
+                visible: (picker.request.choices || []).length > 0
                 spacing: 18
 
                 Repeater {
-                    model: request.choices || []
+                    model: picker.request.choices || []
 
                     delegate: RowLayout {
+                        id: choiceRow
                         required property var modelData
                         spacing: 8
 
                         // No options: a boolean choice.
                         LoafSwitch {
-                            visible: (modelData.values || []).length === 0
-                            label: modelData.label
-                            checked: picker.choiceValues[modelData.id] === true
-                            onToggled: function(checked) { picker.choiceValues[modelData.id] = checked; }
+                            visible: (choiceRow.modelData.values || []).length === 0
+                            label: choiceRow.modelData.label
+                            checked: picker.choiceValues[choiceRow.modelData.id] === true
+                            onToggled: function(checked) { picker.choiceValues[choiceRow.modelData.id] = checked; }
                         }
 
                         RowLayout {
-                            visible: (modelData.values || []).length > 0
+                            visible: (choiceRow.modelData.values || []).length > 0
                             spacing: 8
                             Text {
-                                text: modelData.label
+                                text: choiceRow.modelData.label
                                 color: theme.textMuted
                                 font.pixelSize: theme.fs(13)
                             }
                             LoafSelect {
                                 Layout.preferredWidth: 180
-                                options: (modelData.values || []).map(function(value) {
+                                options: (choiceRow.modelData.values || []).map(function(value) {
                                     return { "value": value.id, "label": value.label };
                                 })
-                                value: typeof picker.choiceValues[modelData.id] === "string" ? picker.choiceValues[modelData.id] : ""
-                                accessibleName: modelData.label
-                                onSelected: function(value) { picker.choiceValues[modelData.id] = value; }
+                                value: typeof picker.choiceValues[choiceRow.modelData.id] === "string" ? picker.choiceValues[choiceRow.modelData.id] : ""
+                                accessibleName: choiceRow.modelData.label
+                                onSelected: function(value) { picker.choiceValues[choiceRow.modelData.id] = value; }
                             }
                         }
                     }
@@ -790,7 +791,7 @@ Window {
 
             RowLayout {
                 Layout.fillWidth: true
-                visible: isSave
+                visible: picker.isSave
                 spacing: 10
 
                 Text {
@@ -801,10 +802,10 @@ Window {
                 LoafTextField {
                     id: nameField
                     Layout.fillWidth: true
-                    text: request.current_name || ""
+                    text: picker.request.current_name || ""
                     placeholderText: qsTr("File name")
                     Accessible.name: qsTr("File name")
-                    onAccepted: acceptRequest()
+                    onAccepted: picker.acceptRequest()
                     Keys.onEscapePressed: function(event) { event.accepted = false; }
                 }
             }
@@ -817,12 +818,12 @@ Window {
                 LoafButton {
                     text: qsTr("Cancel")
                     variant: "text"
-                    onClicked: respond(1, [])
+                    onClicked: picker.respond(1, [])
                 }
                 LoafButton {
-                    text: acceptLabel
+                    text: picker.acceptLabel
                     variant: "filled"
-                    onClicked: acceptRequest()
+                    onClicked: picker.acceptRequest()
                 }
             }
         }
@@ -859,7 +860,7 @@ Window {
                 variant: "danger"
                 onClicked: {
                     overwriteDialog.close();
-                    respond(0, overwriteDialog.targets);
+                    picker.respond(0, overwriteDialog.targets);
                 }
             }
         }

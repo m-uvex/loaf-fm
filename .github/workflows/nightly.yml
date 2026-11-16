@@ -31,6 +31,12 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install Qt 6.12
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.12.*'
+          modules: 'qtwayland'
+
       - name: Install Qt6 and packaging dependencies
         run: |
           sudo apt-get update

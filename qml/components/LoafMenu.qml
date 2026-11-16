@@ -367,13 +367,14 @@ LoafPopup {
 
         delegate: ColumnLayout {
             id: rowWrap
+            required property var modelData
+            required property int index
             width: rowsView.width
             spacing: 0
 
-            property var entry: modelData
-            property int rowIndex: index
+            property var entry: rowWrap.modelData
+            property int rowIndex: rowWrap.index
             property var rowItem: row
-
             function playPop(delayMs) { sep.popIn(delayMs); row.popIn(delayMs); }
             function playOut(delayMs) { sep.popOut(delayMs); row.popOut(delayMs); }
             function reset() { sep.reset(); row.reset(); }

@@ -1,10 +1,10 @@
 #include "loaf/thumbnails.h"
 
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QHash>
 #include <QImage>
 #include <QImageReader>
 #include <QMimeDatabase>
@@ -12,19 +12,18 @@
 #include <QPainter>
 #include <QProcess>
 #include <QQuickImageResponse>
-#include <QRunnable>
 #include <QSaveFile>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTemporaryDir>
-#include <QUrl>
-
 #include <QThread>
 #include <QWaitCondition>
 
-#include <cstring>
-
+#include <algorithm>
 #include <atomic>
+#include <string_view>
 
+using namespace Qt::StringLiterals;
 namespace loaf {
 namespace {
 
@@ -32,24 +31,24 @@ QString cacheRoot()
 {
     QString base = qEnvironmentVariable("XDG_CACHE_HOME");
     if (base.isEmpty())
-        base = QDir::homePath() + QStringLiteral("/.cache");
-    return base + QStringLiteral("/thumbnails");
+        base = QDir::homePath() + u"/.cache"_s;
+    return base + u"/thumbnails"_s;
 }
 
 struct Flavor {
-    const char *dir;
+    QLatin1StringView dir;
     int size;
 };
 
 Flavor flavorFor(int wanted)
 {
     if (wanted <= 128)
-        return {"normal", 128};
+        return {"normal"_L1, 128};
     if (wanted <= 256)
-        return {"large", 256};
+        return {"large"_L1, 256};
     if (wanted <= 512)
-        return {"x-large", 512};
-    return {"xx-large", 1024};
+        return {"x-large"_L1, 512};
+    return {"xx-large"_L1, 1024};
 }
 
 // One parsed $XDG_DATA_DIRS/thumbnailers/*.thumbnailer entry.
@@ -61,11 +60,11 @@ struct Thumbnailer {
 QList<Thumbnailer> loadThumbnailers()
 {
     QList<Thumbnailer> out;
-    QStringList dirs = QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, QStringLiteral("thumbnailers"),
+    QStringList dirs = QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, u"thumbnailers"_s,
                                                  QStandardPaths::LocateDirectory);
     QSet<QString> seen;
     for (const QString &dir : dirs) {
-        const QFileInfoList files = QDir(dir).entryInfoList({QStringLiteral("*.thumbnailer")}, QDir::Files);
+        const QFileInfoList files = QDir(dir).entryInfoList({u"*.thumbnailer"_s}, QDir::Files);
         for (const QFileInfo &fi : files) {
             if (seen.contains(fi.fileName()))
                 continue;
@@ -78,23 +77,24 @@ QList<Thumbnailer> loadThumbnailers()
             bool inGroup = false;
             while (!f.atEnd()) {
                 const QString line = QString::fromUtf8(f.readLine()).trimmed();
-                if (line.startsWith(QLatin1Char('['))) {
-                    inGroup = line == QLatin1String("[Thumbnailer Entry]");
+                if (line.startsWith('['_L1)) {
+                    inGroup = line == "[Thumbnailer Entry]"_L1;
                     continue;
                 }
                 if (!inGroup)
                     continue;
-                const int eq = line.indexOf(QLatin1Char('='));
+                const int eq = line.indexOf('='_L1);
                 if (eq < 0)
                     continue;
-                const QString key = line.left(eq).trimmed();
-                const QString value = line.mid(eq + 1).trimmed();
-                if (key == QLatin1String("Exec"))
+                const QStringView view(line);
+                const QStringView key = view.first(eq).trimmed();
+                const QString value = view.sliced(eq + 1).trimmed().toString();
+                if (key == "Exec"_L1)
                     t.exec = value;
-                else if (key == QLatin1String("TryExec"))
+                else if (key == "TryExec"_L1)
                     tryExec = value;
-                else if (key == QLatin1String("MimeType"))
-                    t.mimes = value.split(QLatin1Char(';'), Qt::SkipEmptyParts);
+                else if (key == "MimeType"_L1)
+                    t.mimes = value.split(';'_L1, Qt::SkipEmptyParts);
             }
             if (!tryExec.isEmpty() && QStandardPaths::findExecutable(tryExec).isEmpty() && !QFileInfo(tryExec).isExecutable())
                 continue;
@@ -113,13 +113,11 @@ const QList<Thumbnailer> &thumbnailers()
 
 const Thumbnailer *thumbnailerFor(const QMimeType &mime)
 {
-    for (const Thumbnailer &t : thumbnailers()) {
-        for (const QString &m : t.mimes) {
-            if (mime.inherits(m))
-                return &t;
-        }
-    }
-    return nullptr;
+    const auto &list = thumbnailers();
+    const auto it = std::ranges::find_if(list, [&mime](const Thumbnailer &t) {
+        return std::ranges::any_of(t.mimes, [&mime](const QString &m) { return mime.inherits(m); });
+    });
+    return it != list.end() ? &*it : nullptr;
 }
 
 // Splits an Exec line, honouring quotes, and substitutes %i %u %o %s.
@@ -131,7 +129,7 @@ QStringList expandExec(const QString &exec, const QString &input, const QString 
     bool has = false;
     for (int i = 0; i < exec.size(); ++i) {
         const QChar c = exec.at(i);
-        if (c == QLatin1Char('"')) {
+        if (c == '"'_L1) {
             inQuote = !inQuote;
             has = true;
         } else if (c.isSpace() && !inQuote) {
@@ -139,14 +137,14 @@ QStringList expandExec(const QString &exec, const QString &input, const QString 
                 args << cur;
             cur.clear();
             has = false;
-        } else if (c == QLatin1Char('%') && i + 1 < exec.size()) {
+        } else if (c == '%'_L1 && i + 1 < exec.size()) {
             const QChar code = exec.at(++i);
             switch (code.toLatin1()) {
             case 'i': cur += input; break;
             case 'u': cur += uri; break;
             case 'o': cur += output; break;
             case 's': cur += QString::number(size); break;
-            case '%': cur += QLatin1Char('%'); break;
+            case '%': cur += '%'_L1; break;
             default: break;
             }
             has = true;
@@ -172,10 +170,10 @@ std::atomic<bool> g_shutdown{false};
 // raw file name bytes (non-UTF-8 names included).
 QByteArray glibFileUri(const QByteArray &rawPath)
 {
-    static const char *safe = "-_.!~*'()/&=:@+$,";
+    constexpr std::string_view safe = "-_.!~*'()/&=:@+$,";
     QByteArray out("file://");
     for (unsigned char c : rawPath) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c && std::strchr(safe, c))) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c && safe.contains(static_cast<char>(c)))) {
             out.append(char(c));
         } else {
             out.append('%');
@@ -212,8 +210,8 @@ public:
     void handleDone(const QImage &image, const QString &error)
     {
         m_image = image;
-        m_error = image.isNull() && error.isEmpty() ? QStringLiteral("no thumbnail") : error;
-        emit finished();
+        m_error = image.isNull() && error.isEmpty() ? u"no thumbnail"_s : error;
+        Q_EMIT finished();
     }
 
 private:
@@ -240,29 +238,29 @@ public:
     {
         const QFileInfo fi(m_path);
         if (!fi.isFile() || !fi.isReadable()) {
-            m_error = QStringLiteral("not a readable file");
+            m_error = u"not a readable file"_s;
             return;
         }
         const QString root = cacheRoot();
         // Never thumbnail the thumbnail cache itself (spec).
-        if (fi.absoluteFilePath().startsWith(root + QLatin1Char('/')))
+        if (fi.absoluteFilePath().startsWith(root + '/'_L1))
             return loadPlain(fi);
 
-        const int wanted = qMax(m_requested.width(), m_requested.height()) > 0
-            ? qMax(m_requested.width(), m_requested.height()) : 128;
+        const int maxDim = std::max(m_requested.width(), m_requested.height());
+        const int wanted = maxDim > 0 ? maxDim : 128;
         // A cropped thumbnail needs its short side to fill the box: one flavor
         // up still covers it for images up to 2:1.
         const Flavor flavor = flavorFor(m_cover ? wanted * 2 : wanted);
         const QByteArray uri = glibFileUri(m_raw);
         const QString md5 = QString::fromLatin1(QCryptographicHash::hash(uri, QCryptographicHash::Md5).toHex());
         const QString mtime = QString::number(fi.lastModified().toSecsSinceEpoch());
-        const QString cached = root + QLatin1Char('/') + QLatin1String(flavor.dir) + QLatin1Char('/') + md5 + QStringLiteral(".png");
-        const QString failMarker = root + QStringLiteral("/fail/loaf-1.0/") + md5 + QStringLiteral(".png");
+        const QString cached = root + '/'_L1 + flavor.dir + '/'_L1 + md5 + u".png"_s;
+        const QString failMarker = root + u"/fail/loaf-1.0/"_s + md5 + u".png"_s;
 
         // 1. Valid cached thumbnail?
         {
             QImageReader r(cached);
-            if (r.canRead() && r.text(QStringLiteral("Thumb::MTime")) == mtime) {
+            if (r.canRead() && r.text(u"Thumb::MTime"_s) == mtime) {
                 QImage img = r.read();
                 if (!img.isNull())
                     return finish(img);
@@ -271,8 +269,8 @@ public:
         // 2. Known failure for this version of the file?
         {
             QImageReader r(failMarker);
-            if (r.canRead() && r.text(QStringLiteral("Thumb::MTime")) == mtime) {
-                m_error = QStringLiteral("thumbnailing failed before");
+            if (r.canRead() && r.text(u"Thumb::MTime"_s) == mtime) {
+                m_error = u"thumbnailing failed before"_s;
                 return;
             }
         }
@@ -290,9 +288,9 @@ public:
             if (waited) {
                 lock.unlock();
                 QImageReader r(cached);
-                if (r.canRead() && r.text(QStringLiteral("Thumb::MTime")) == mtime)
+                if (r.canRead() && r.text(u"Thumb::MTime"_s) == mtime)
                     return finish(r.read());
-                m_error = QStringLiteral("no thumbnail");
+                m_error = u"no thumbnail"_s;
                 return;
             }
             g_inflight.insert(cached);
@@ -314,7 +312,7 @@ public:
                 marker.fill(Qt::transparent);
                 store(marker, failMarker, uri, mtime);
             }
-            m_error = QStringLiteral("no thumbnailer could handle this file");
+            m_error = u"no thumbnailer could handle this file"_s;
             return;
         }
         if (img.width() > flavor.size || img.height() > flavor.size)
@@ -350,7 +348,7 @@ public:
         QTemporaryDir tmp;
         if (!tmp.isValid())
             return GenResult::Transient;
-        const QString out = tmp.filePath(QStringLiteral("thumb.png"));
+        const QString out = tmp.filePath(u"thumb.png"_s);
         QStringList args = expandExec(t->exec, fi.absoluteFilePath(), QString::fromLatin1(uri), out, size);
         if (args.isEmpty())
             return GenResult::Failed;
@@ -386,9 +384,9 @@ public:
     static void store(const QImage &src, const QString &file, const QByteArray &uri, const QString &mtime)
     {
         QImage img = src;
-        img.setText(QStringLiteral("Thumb::URI"), QString::fromLatin1(uri));
-        img.setText(QStringLiteral("Thumb::MTime"), mtime);
-        img.setText(QStringLiteral("Software"), QStringLiteral("Loaf"));
+        img.setText(u"Thumb::URI"_s, QString::fromLatin1(uri));
+        img.setText(u"Thumb::MTime"_s, mtime);
+        img.setText(u"Software"_s, u"Loaf"_s);
         makePrivateDir(QFileInfo(file).absolutePath());
         QSaveFile out(file);
         if (!out.open(QIODevice::WriteOnly))
@@ -442,7 +440,7 @@ public:
         p.setRenderHint(QPainter::Antialiasing);
         p.setPen(Qt::NoPen);
         p.setBrush(QBrush(img));
-        const qreal r = qMin(img.width(), img.height()) / 6.0;
+        const qreal r = static_cast<qreal>(std::min(img.width(), img.height())) / 6.0;
         p.drawRoundedRect(QRectF(0, 0, img.width(), img.height()), r, r);
         return out;
     }
@@ -455,13 +453,25 @@ public:
     const std::atomic<bool> &m_cancelled;
 };
 
+// id = hex(UTF-8/raw path bytes) "-" mtime ["/cover"]["/round"]; hex keeps any
+// byte sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
+// "/cover" asks for an image that fills the requested size (cropped tiles)
+// instead of fitting inside it. "/round" rounds the corners here, once, so
+// QML needs no offscreen mask layer per thumbnail.
+QByteArray pathFromId(const QString &id)
+{
+    const int dash = id.indexOf('-'_L1);
+    const QByteArray hex = (dash >= 0 ? QStringView(id).first(dash) : QStringView(id)).toLatin1();
+    return QByteArray::fromHex(hex);
+}
+
 } // namespace
 
 ThumbnailProvider::ThumbnailProvider()
 {
     // Thumbnailing is I/O and CPU heavy: two workers keep scrolling smooth
     // on low-end machines without starving the UI.
-    m_pool.setMaxThreadCount(qBound(1, QThread::idealThreadCount() / 2, 2));
+    m_pool.setMaxThreadCount(std::clamp(QThread::idealThreadCount() / 2, 1, 2));
     m_pool.setExpiryTimeout(30000);
 }
 
@@ -488,24 +498,13 @@ void ThumbRunnable::run()
     Q_EMIT done(work.m_image, work.m_error);
 }
 
-// id = hex(UTF-8/raw path bytes) "-" mtime ["/cover"]["/round"]; hex keeps any
-// byte sequence (spaces, '%', '#', non-UTF-8) unambiguous inside an image URL.
-// "/cover" asks for an image that fills the requested size (cropped tiles)
-// instead of fitting inside it. "/round" rounds the corners here, once, so
-// QML needs no offscreen mask layer per thumbnail.
-static QByteArray pathFromId(const QString &id)
-{
-    const int dash = id.indexOf(QLatin1Char('-'));
-    const QByteArray hex = (dash >= 0 ? id.left(dash) : id).toLatin1();
-    return QByteArray::fromHex(hex);
-}
 
 QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, const QSize &requestedSize)
 {
     auto cancelled = std::make_shared<std::atomic<bool>>(false);
     auto *response = new ThumbResponse(cancelled);
-    const bool cover = id.contains(QLatin1String("/cover"));
-    const bool round = id.endsWith(QLatin1String("/round"));
+    const bool cover = id.contains("/cover"_L1);
+    const bool round = id.endsWith("/round"_L1);
     auto *runnable = new ThumbRunnable(pathFromId(id), requestedSize, cover, round, cancelled);
     QObject::connect(runnable, &ThumbRunnable::done, response, &ThumbResponse::handleDone, Qt::QueuedConnection);
     m_pool.start(runnable);

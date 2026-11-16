@@ -406,6 +406,7 @@ Rectangle {
                 width: placeList.width
                 height: 48
                 DropArea {
+                    id: footerDrop
                     anchors.fill: parent
                     keys: ["text/uri-list"]
                     onDropped: function(drop) {
@@ -419,10 +420,10 @@ Rectangle {
                         anchors.margins: 8
                         radius: theme.radiusL
                         color: "transparent"
-                        border.width: parent.containsDrag ? 2 : 0
+                        border.width: footerDrop.containsDrag ? 2 : 0
                         border.color: theme.primary
                         Text {
-                            visible: parent.parent.containsDrag && rail.expanded
+                            visible: footerDrop.containsDrag && rail.expanded
                             anchors.centerIn: parent
                             text: qsTr("Add to sidebar")
                             color: theme.primary

@@ -52,10 +52,10 @@ pub fn statvfs(mount: &str) -> Option<(u64, u64)> {
 
 fn sysfs_removable(name: &str) -> bool {
     let block = Path::new("/sys/class/block").join(name);
-    if let Ok(real) = std::fs::canonicalize(&block) {
-        if real.to_string_lossy().contains("/usb") {
-            return true;
-        }
+    if let Ok(real) = std::fs::canonicalize(&block)
+        && real.to_string_lossy().contains("/usb")
+    {
+        return true;
     }
     std::fs::read_to_string(Path::new("/sys/block").join(name).join("removable"))
         .map(|s| s.trim() == "1")

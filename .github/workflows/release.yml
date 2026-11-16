@@ -29,6 +29,12 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install Qt 6.12
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.12.*'
+          modules: 'qtwayland'
+
       - name: Install Qt6 and packaging dependencies
         run: |
           sudo apt-get update
@@ -37,15 +43,6 @@ jobs:
             cmake \
             ninja-build \
             pkg-config \
-            qt6-base-dev \
-            qt6-declarative-dev \
-            libqt6quick6 \
-            qml6-module-qtquick \
-            qml6-module-qtquick-controls \
-            qml6-module-qtquick-layouts \
-            qml6-module-qtquick-templates \
-            qml6-module-qtquick-shapes \
-            qml6-module-qtquick-window \
             libgl1-mesa-dev \
             libxkbcommon-dev \
             libvulkan-dev \

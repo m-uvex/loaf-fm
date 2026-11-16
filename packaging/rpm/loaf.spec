@@ -26,15 +26,15 @@ BuildRequires:  rust
 BuildRequires:  gcc-c++
 BuildRequires:  cmake
 BuildRequires:  pkgconfig
-BuildRequires:  qt6-qtbase-devel
-BuildRequires:  qt6-qtbase-private-devel
-BuildRequires:  qt6-qtdeclarative-devel
+BuildRequires:  qt6-qtbase-devel >= 6.12
+BuildRequires:  qt6-qtbase-private-devel >= 6.12
+BuildRequires:  qt6-qtdeclarative-devel >= 6.12
 %endif
 BuildRequires:  desktop-file-utils
 
-Requires:       qt6-qtbase-gui
-Requires:       qt6-qtdeclarative
-Requires:       qt6-qtsvg
+Requires:       qt6-qtbase-gui >= 6.12
+Requires:       qt6-qtdeclarative >= 6.12
+Requires:       qt6-qtsvg >= 6.12
 Requires:       hicolor-icon-theme
 Requires:       gvfs
 %if 0%{?suse_version}

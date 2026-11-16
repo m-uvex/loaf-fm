@@ -2,8 +2,8 @@ use crate::{state, util};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 // Re-export from unified network module for backwards compatibility
@@ -101,11 +101,11 @@ pub fn load_cached_discovery() {
     if !cache.is_empty() {
         return;
     }
-    if let Some(raw) = state::get(DISCOVERY_CACHE) {
-        if let Ok(mut list) = serde_json::from_str::<Vec<Discovered>>(&raw) {
-            list.retain(|d| !d.server.trim().is_empty());
-            *cache = list;
-        }
+    if let Some(raw) = state::get(DISCOVERY_CACHE)
+        && let Ok(mut list) = serde_json::from_str::<Vec<Discovered>>(&raw)
+    {
+        list.retain(|d| !d.server.trim().is_empty());
+        *cache = list;
     }
 }
 
@@ -182,11 +182,7 @@ fn run_timed(program: &str, args: &[&str], timeout_secs: u64) -> Option<String> 
     };
     cmd.env("LC_ALL", "C").env("LC_MESSAGES", "C");
     let (ok, out, _) = util::run_capture(cmd, None);
-    if ok {
-        Some(out)
-    } else {
-        None
-    }
+    if ok { Some(out) } else { None }
 }
 
 fn add_found(
@@ -697,9 +693,11 @@ mod tests {
             &mut found,
         );
         assert_eq!(found.len(), 2);
-        assert!(found
-            .values()
-            .any(|d| d.server == "NAS" && d.address == "192.168.1.5"));
+        assert!(
+            found
+                .values()
+                .any(|d| d.server == "NAS" && d.address == "192.168.1.5")
+        );
         assert!(found.values().any(|d| d.server == "DESKTOP"));
     }
 

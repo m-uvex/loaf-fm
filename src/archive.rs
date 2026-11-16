@@ -135,10 +135,10 @@ fn run(
     let mut child = cmd
         .spawn()
         .map_err(|e| ArchiveError::Failed(e.to_string()))?;
-    if let Some(data) = stdin {
-        if let Some(mut s) = child.stdin.take() {
-            let _ = s.write_all(data.as_bytes());
-        }
+    if let Some(data) = stdin
+        && let Some(mut s) = child.stdin.take()
+    {
+        let _ = s.write_all(data.as_bytes());
     }
     // Drain output on threads so a chatty tool can't block on a full pipe.
     let mut out = child.stdout.take();
@@ -370,7 +370,7 @@ pub fn compress(
                 Message::key(MessageKey::ArchiveErrorUnsupportedFormat)
                     .text(other.to_string())
                     .to_string(),
-            ))
+            ));
         }
     };
 
@@ -817,9 +817,11 @@ mod tests {
                 "{:?}",
                 entries
             );
-            assert!(entries
-                .iter()
-                .any(|e| e.path == "proj/src/main.rs" && !e.is_dir && e.size == 11));
+            assert!(
+                entries
+                    .iter()
+                    .any(|e| e.path == "proj/src/main.rs" && !e.is_dir && e.size == 11)
+            );
             if fmt == "zip" && seven_zip().is_none() {
                 continue;
             }

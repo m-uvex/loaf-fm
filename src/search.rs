@@ -136,12 +136,12 @@ pub fn run(q: &Query, cancelled: &dyn Fn() -> bool, emit: &mut dyn FnMut(Vec<Ent
                 && e.metadata()
                     .map(|m| file_contains(&path, &needle, m.len()))
                     .unwrap_or(false);
-            if name_hit || content_hit {
-                if let Some(mut entry) = listing::entry_for(&path, &name, &empty) {
-                    entry.detail = dir.to_string_lossy().to_string();
-                    batch.push(entry);
-                    total += 1;
-                }
+            if (name_hit || content_hit)
+                && let Some(mut entry) = listing::entry_for(&path, &name, &empty)
+            {
+                entry.detail = dir.to_string_lossy().to_string();
+                batch.push(entry);
+                total += 1;
             }
             if !batch.is_empty() && last_emit.elapsed() >= Duration::from_millis(150) {
                 emit(std::mem::take(&mut batch));

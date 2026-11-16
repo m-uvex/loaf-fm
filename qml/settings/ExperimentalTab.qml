@@ -47,7 +47,7 @@ ColumnLayout {
             LoafSwitch {
                 id: expIconSwitch
                 checked: theme.showExperimentalIcons
-                onToggled: theme.showExperimentalIcons = checked
+                onToggled: function(checked) { theme.showExperimentalIcons = checked; }
             }
         }
 
@@ -62,7 +62,7 @@ ColumnLayout {
             LoafSwitch {
                 id: expArchSwitch
                 checked: theme.showAdvancedArchives
-                onToggled: theme.showAdvancedArchives = checked
+                onToggled: function(checked) { theme.showAdvancedArchives = checked; }
             }
         }
 
@@ -77,7 +77,7 @@ ColumnLayout {
             LoafSwitch {
                 id: pcCustomSwitch
                 checked: theme.experimentalPcCustomization
-                onToggled: theme.experimentalPcCustomization = checked
+                onToggled: function(checked) { theme.experimentalPcCustomization = checked; }
             }
         }
 
@@ -92,7 +92,7 @@ ColumnLayout {
             LoafSwitch {
                 id: shareViaLinkSwitch
                 checked: theme.shareViaLinkEnabled
-                onToggled: {
+                onToggled: function(checked) {
                     theme.shareViaLinkEnabled = checked;
                     if (checked && typeof core !== "undefined" && core) {
                         if (!core.is_cloudflared_installed()) {

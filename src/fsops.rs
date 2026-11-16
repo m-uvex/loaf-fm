@@ -370,13 +370,13 @@ pub fn replace(src: &Path, dst: &Path, is_move: bool, mon: &dyn Monitor) -> io::
 /// `src` (e.g. reached through a linked folder), which would otherwise
 /// delete the source and leave a link pointing at itself.
 pub fn replace_with_link(src: &Path, dst: &Path) -> io::Result<()> {
-    if let (Ok(a), Ok(b)) = (fs::canonicalize(src), fs::canonicalize(dst)) {
-        if a == b {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                Message::key(MessageKey::FsopsErrorSameItem).to_string(),
-            ));
-        }
+    if let (Ok(a), Ok(b)) = (fs::canonicalize(src), fs::canonicalize(dst))
+        && a == b
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            Message::key(MessageKey::FsopsErrorSameItem).to_string(),
+        ));
     }
     let staged = staging_name(dst, "new");
     std::os::unix::fs::symlink(src, &staged)?;

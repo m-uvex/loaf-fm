@@ -46,8 +46,11 @@
 #include <QTimer>
 #include <QTranslator>
 #include <QUrl>
+#include <QStandardPaths>
 #include <algorithm>
 
+using namespace Qt::StringLiterals;
+using namespace std::chrono_literals;
 namespace loaf {
 
 static const char *kService = "io.github.m_uvex.Loaf";
@@ -111,6 +114,15 @@ static rust::String toRust(const QString &s)
 {
     const QByteArray utf8 = s.toUtf8();
     return rust::String(utf8.constData(), static_cast<size_t>(utf8.size()));
+}
+static rust::String jsonToRust(const QJsonObject &object)
+{
+    return toRust(QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact)));
+}
+
+static rust::String jsonToRust(const QJsonArray &array)
+{
+    return toRust(QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact)));
 }
 
 // Accepts local paths and Loaf MTP locations. MTP validation happens in Rust.
@@ -600,10 +612,10 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         raw << QString::fromUtf8(p.data(), static_cast<qsizetype>(p.size()));
     // mode: "tab" or "mini", optionally with ",new-window" or ",portal".
     const QString modeStr = toQString(mode);
-    const bool newWindow = modeStr.contains(QLatin1String("new-window"));
-    const bool portalMode = modeStr.contains(QLatin1String("portal"));
+    const bool newWindow = modeStr.contains("new-window"_L1);
+    const bool portalMode = modeStr.contains("portal"_L1);
     native->setPortalMode(portalMode);
-    native->queueOpen(toLocalPaths(raw), modeStr.section(QLatin1Char(','), 0, 0));
+    native->queueOpen(toLocalPaths(raw), modeStr.section(','_L1, 0, 0));
 
     QDBusConnection bus = QDBusConnection::sessionBus();
     // A separate window or an admin (root) instance must not take over the
@@ -614,13 +626,13 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
         new LoafAppAdaptor(appObj, native);
         auto *fmObj = new QObject(native);
         new FileManager1Adaptor(fmObj, native);
-        if (bus.registerService(QString::fromLatin1(kService)))
-            bus.registerObject(QString::fromLatin1(kPath), appObj, QDBusConnection::ExportAdaptors);
+        if (bus.registerService(QString::fromUtf8(kService)))
+            bus.registerObject(QString::fromUtf8(kPath), appObj, QDBusConnection::ExportAdaptors);
         else
-            qWarning("loaf: another instance already owns %s", kService);
+            qWarning("loaf: another instance already owns %ls", qUtf16Printable(QString::fromUtf8(kService)));
         // FileManager1 stays with whichever file manager claimed it first.
-        if (bus.registerService(QStringLiteral("org.freedesktop.FileManager1")))
-            bus.registerObject(QStringLiteral("/org/freedesktop/FileManager1"), fmObj, QDBusConnection::ExportAdaptors);
+        if (bus.registerService("org.freedesktop.FileManager1"_L1))
+            bus.registerObject("/org/freedesktop/FileManager1"_L1, fmObj, QDBusConnection::ExportAdaptors);
 
         // The portal backend serves file chooser requests on demand; in
         // portal mode (D-Bus activation) it is the reason we are running,
@@ -643,13 +655,12 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
     // strings render unchanged.
     installTranslatorFor(resolvedLocale());
 
-    engine.rootContext()->setContextProperty(QStringLiteral("nativeBridge"), native);
-    engine.addImageProvider(QStringLiteral("thumb"), new ThumbnailProvider);
+    engine.rootContext()->setContextProperty("nativeBridge"_L1, native);
+    engine.addImageProvider("thumb"_L1, new ThumbnailProvider);
 
     auto *wheelFilter = new WheelEventFilter(native, &engine);
     QCoreApplication::instance()->installEventFilter(wheelFilter);
 }
-
 void set_application_language(rust::Str localeName)
 {
     storeRequestedLocale(localeName);
@@ -665,22 +676,22 @@ void apply_language(rust::Str localeName)
 
 rust::String languages_json()
 {
-    QFile file(QStringLiteral(":/loaf/settings/languages.json"));
+    QFile file(u":/loaf/settings/languages.json"_s);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-        return toRust(QStringLiteral("[]"));
+        return toRust(u"[]"_s);
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
     if (!document.isArray())
-        return toRust(QStringLiteral("[]"));
+        return toRust(u"[]"_s);
     QJsonArray available;
     for (const QJsonValue &entry : document.array()) {
-        const QString code = entry.toObject().value(QStringLiteral("value")).toString();
+        const QString code = entry.toObject().value(u"value"_s).toString();
         if (code.isEmpty())
             continue;
-        if (!QFile::exists(QStringLiteral(":/i18n/loaf_%1.qm").arg(code)))
+        if (!QFile::exists(u":/i18n/loaf_%1.qm"_s.arg(code)))
             continue;
         available.append(entry);
     }
-    return toRust(QString::fromUtf8(QJsonDocument(available).toJson(QJsonDocument::Compact)));
+    return jsonToRust(available);
 }
 
 rust::String mime_type_for(rust::Str path, bool sniff)

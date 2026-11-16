@@ -134,9 +134,9 @@ ColumnLayout {
                     spacing: 12
 
                     LoafIcon {
-                        name: modelData.icon || "hard-drives"
+                        name: savedDriveCard.modelData.icon || "hard-drives"
                         size: 20
-                        color: modelData.connected ? theme.primary : theme.textMuted
+                        color: savedDriveCard.modelData.connected ? theme.primary : theme.textMuted
                     }
 
                     ColumnLayout {
@@ -147,7 +147,7 @@ ColumnLayout {
                         RowLayout {
                             spacing: 8
                             Text {
-                                text: modelData.label || qsTr("Network Drive")
+                                text: savedDriveCard.modelData.label || qsTr("Network Drive")
                                 color: theme.textMain
                                 font.pixelSize: theme.fs(13)
                                 font.bold: true
@@ -156,15 +156,15 @@ ColumnLayout {
 
                             Rectangle {
                                 radius: theme.radiusFull
-                                color: modelData.connected ? theme.primaryContainer : theme.surfaceContainerHighest
+                                color: savedDriveCard.modelData.connected ? theme.primaryContainer : theme.surfaceContainerHighest
                                 implicitWidth: statusTxt.implicitWidth + 10
                                 implicitHeight: 18
 
                                 Text {
                                     id: statusTxt
                                     anchors.centerIn: parent
-                                    text: modelData.connected ? qsTr("Connected") : qsTr("Offline")
-                                    color: modelData.connected ? theme.primaryContainerFg : theme.textMuted
+                                    text: savedDriveCard.modelData.connected ? qsTr("Connected") : qsTr("Offline")
+                                    color: savedDriveCard.modelData.connected ? theme.primaryContainerFg : theme.textMuted
                                     font.pixelSize: theme.fs(9)
                                     font.bold: true
                                 }
@@ -173,13 +173,13 @@ ColumnLayout {
 
                         Text {
                             text: {
-                                var srv = modelData.server || "";
-                                if (modelData.port && modelData.port > 0)
-                                    srv += ":" + modelData.port;
-                                var sh = modelData.share || "";
+                                var srv = savedDriveCard.modelData.server || "";
+                                if (savedDriveCard.modelData.port && savedDriveCard.modelData.port > 0)
+                                    srv += ":" + savedDriveCard.modelData.port;
+                                var sh = savedDriveCard.modelData.share || "";
                                 if (sh && sh.indexOf("/") !== 0)
                                     sh = "/" + sh;
-                                var user = modelData.username ? (modelData.username + "@") : "";
+                                var user = savedDriveCard.modelData.username ? (savedDriveCard.modelData.username + "@") : "";
                                 return "//" + user + srv + sh;
                             }
                             color: theme.textMuted
@@ -190,15 +190,15 @@ ColumnLayout {
                     }
 
                     LoafButton {
-                        text: modelData.connected ? qsTr("Disconnect") : qsTr("Connect")
-                        icon: modelData.connected ? "plug-slash" : "plug"
-                        variant: modelData.connected ? "tonal" : "filled"
+                        text: savedDriveCard.modelData.connected ? qsTr("Disconnect") : qsTr("Connect")
+                        icon: savedDriveCard.modelData.connected ? "plug-slash" : "plug"
+                        variant: savedDriveCard.modelData.connected ? "tonal" : "filled"
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
-                                if (modelData.connected)
-                                    core.disconnect_network(modelData.id);
+                                if (savedDriveCard.modelData.connected)
+                                    core.disconnect_network(savedDriveCard.modelData.id);
                                 else
-                                    core.connect_network(modelData.id, "", false);
+                                    core.connect_network(savedDriveCard.modelData.id, "", false);
                             }
                         }
                     }
@@ -209,7 +209,7 @@ ColumnLayout {
                         variant: "ghost"
                         Accessible.name: qsTr("Rename drive")
                         tooltipText: qsTr("Rename")
-                        onClicked: root.openRename(modelData)
+                        onClicked: root.openRename(savedDriveCard.modelData)
                     }
 
                     LoafButton {
@@ -218,7 +218,7 @@ ColumnLayout {
                         variant: "ghost"
                         Accessible.name: qsTr("Edit drive")
                         tooltipText: qsTr("Edit")
-                        onClicked: root.openNetworkEditorRequested(modelData)
+                        onClicked: root.openNetworkEditorRequested(savedDriveCard.modelData)
                     }
 
                     LoafButton {
@@ -227,7 +227,7 @@ ColumnLayout {
                         variant: "ghost"
                         Accessible.name: qsTr("Remove drive")
                         tooltipText: qsTr("Remove")
-                        onClicked: root.removeNetworkDriveRequested(modelData.id, modelData.label)
+                        onClicked: root.removeNetworkDriveRequested(savedDriveCard.modelData.id, savedDriveCard.modelData.label)
                     }
                 }
             }
@@ -298,9 +298,9 @@ ColumnLayout {
             model: root.discovered
 
             delegate: Rectangle {
+                id: discCard
                 required property var modelData
-                readonly property var entry: modelData
-
+                readonly property var entry: discCard.modelData
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 implicitHeight: discRow.implicitHeight + 20
@@ -317,9 +317,9 @@ ColumnLayout {
                     spacing: 12
 
                     LoafIcon {
-                        name: entry.ignored ? "eye-slash" : "network"
+                        name: discCard.entry.ignored ? "eye-slash" : "network"
                         size: 20
-                        color: entry.ignored ? theme.textMuted : theme.primary
+                        color: discCard.entry.ignored ? theme.textMuted : theme.primary
                     }
 
                     ColumnLayout {
@@ -328,7 +328,7 @@ ColumnLayout {
                         spacing: 4
 
                         Text {
-                            text: entry.name || entry.server || qsTr("Network Device")
+                            text: discCard.entry.name || discCard.entry.server || qsTr("Network Device")
                             color: theme.textMain
                             font.pixelSize: theme.fs(13)
                             font.bold: true
@@ -337,8 +337,8 @@ ColumnLayout {
                         }
 
                         Text {
-                            visible: root.serverSubtitle(entry).length > 0
-                            text: root.serverSubtitle(entry)
+                            visible: root.serverSubtitle(discCard.entry).length > 0
+                            text: root.serverSubtitle(discCard.entry)
                             color: theme.textMuted
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideMiddle
@@ -348,17 +348,18 @@ ColumnLayout {
                         Flow {
                             Layout.fillWidth: true
                             spacing: 6
-                            visible: !entry.ignored && entry.shares && entry.shares.length > 0
+                            visible: !discCard.entry.ignored && discCard.entry.shares && discCard.entry.shares.length > 0
 
                             Repeater {
-                                model: entry.shares || []
+                                model: discCard.entry.shares || []
 
                                 delegate: LoafButton {
+                                    id: discShareBtn
                                     required property string modelData
-                                    text: modelData
+                                    text: discShareBtn.modelData
                                     icon: "plus"
                                     variant: "tonal"
-                                    onClicked: root.addShare(entry.server, modelData)
+                                    onClicked: root.addShare(discCard.entry.server, discShareBtn.modelData)
                                 }
                             }
                         }
@@ -368,22 +369,22 @@ ColumnLayout {
                         text: qsTr("Connect")
                         icon: "plug"
                         variant: "filled"
-                        visible: !entry.ignored && (!entry.shares || entry.shares.length === 0)
-                        onClicked: root.connectDiscovered(entry)
+                        visible: !discCard.entry.ignored && (!discCard.entry.shares || discCard.entry.shares.length === 0)
+                        onClicked: root.connectDiscovered(discCard.entry)
                     }
 
                     LoafButton {
                         id: ignoreBtn
-                        icon: entry.ignored ? "eye" : "eye-slash"
+                        icon: discCard.entry.ignored ? "eye" : "eye-slash"
                         variant: "ghost"
-                        Accessible.name: entry.ignored ? qsTr("Show drive") : qsTr("Ignore drive")
-                        tooltipText: entry.ignored ? qsTr("Restore") : qsTr("Ignore")
+                        Accessible.name: discCard.entry.ignored ? qsTr("Show drive") : qsTr("Ignore drive")
+                        tooltipText: discCard.entry.ignored ? qsTr("Restore") : qsTr("Ignore")
                         onClicked: {
                             if (typeof core !== "undefined" && core) {
-                                if (entry.ignored)
-                                    core.unignore_smb_server(entry.server);
+                                if (discCard.entry.ignored)
+                                    core.unignore_smb_server(discCard.entry.server);
                                 else
-                                    core.ignore_smb_server(entry.server);
+                                    core.ignore_smb_server(discCard.entry.server);
                             }
                         }
                     }

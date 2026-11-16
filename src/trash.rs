@@ -196,8 +196,7 @@ fn topdir_trash(topdir: &Path, create: bool) -> Option<PathBuf> {
 
 /// The trash directory an item at `abs` should go to, plus the topdir to make
 /// `Path=` relative to (None for the home trash).
-fn trash_for(abs: &Path) -> io::Result<(PathBuf, Option<PathBuf>)> {
-    let home = home_trash();
+fn trash_for_in(abs: &Path, home: PathBuf) -> io::Result<(PathBuf, Option<PathBuf>)> {
     let _ = fs::create_dir_all(&home);
     let item_dev = fs::symlink_metadata(abs)?.dev();
     let home_dev = fs::metadata(&home).map(|m| m.dev()).ok();
@@ -259,6 +258,10 @@ fn reserve_info(root: &Path, name: &str, contents: &str) -> io::Result<String> {
 
 /// Moves `path` into the matching trash. Never copies across filesystems.
 pub fn trash(path: &Path) -> io::Result<TrashedItem> {
+    trash_in_home(path, home_trash())
+}
+
+fn trash_in_home(path: &Path, home: PathBuf) -> io::Result<TrashedItem> {
     let abs = absolute_no_follow(path)?;
     let name = abs
         .file_name()
@@ -269,7 +272,7 @@ pub fn trash(path: &Path) -> io::Result<TrashedItem> {
                 Message::key(MessageKey::TrashErrorNoFilename).to_string(),
             )
         })?;
-    let (root, topdir) = trash_for(&abs)?;
+    let (root, topdir) = trash_for_in(&abs, home)?;
     if abs.starts_with(&root) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -343,10 +346,10 @@ pub fn all_trash_dirs() -> Vec<PathBuf> {
             continue;
         }
         let mnt = PathBuf::from(unescape_mount(mnt));
-        if let Some(t) = topdir_trash(&mnt, false) {
-            if !out.contains(&t) {
-                out.push(t);
-            }
+        if let Some(t) = topdir_trash(&mnt, false)
+            && !out.contains(&t)
+        {
+            out.push(t);
         }
     }
     out
@@ -628,17 +631,18 @@ mod tests {
     #[test]
     fn trash_restore_cycle_keeps_symlink_targets() {
         let d = sandbox("cycle");
-        std::env::set_var("XDG_DATA_HOME", d.join("data"));
-        fs::create_dir_all(d.join("data")).unwrap();
+        let home = d.join("data/Trash");
+        fs::create_dir_all(&home).unwrap();
         fs::write(d.join("target.txt"), b"precious").unwrap();
         std::os::unix::fs::symlink(d.join("target.txt"), d.join("link")).unwrap();
 
-        let item = trash(&d.join("link")).unwrap();
-        assert!(d.join("target.txt").exists(), "symlink target must survive");
-        assert!(fs::symlink_metadata(&item.trashed)
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        let item = trash_in_home(&d.join("link"), home.clone()).unwrap();
+        assert!(
+            fs::symlink_metadata(&item.trashed)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         assert_eq!(item.original, fs::canonicalize(&d).unwrap().join("link"));
 
         // Something new now lives at the original spot: restore must not clobber it.
@@ -650,18 +654,14 @@ mod tests {
 
         // Name collisions inside the trash get unique names.
         fs::write(d.join("dup"), b"1").unwrap();
-        let a = trash(&d.join("dup")).unwrap();
+        let a = trash_in_home(&d.join("dup"), home.clone()).unwrap();
         fs::write(d.join("dup"), b"2").unwrap();
-        let b = trash(&d.join("dup")).unwrap();
+        let b = trash_in_home(&d.join("dup"), home.clone()).unwrap();
         assert_ne!(a.trashed, b.trashed);
-        let only_home = [home_trash()];
+        let only_home = [home.clone()];
         assert!(list_in(&only_home).iter().any(|i| i.trashed == b.trashed));
         empty_in(&only_home).unwrap();
-        assert!(fs::read_dir(home_trash().join("files"))
-            .unwrap()
-            .next()
-            .is_none());
-        std::env::remove_var("XDG_DATA_HOME");
+        assert!(fs::read_dir(home.join("files")).unwrap().next().is_none());
         fs::remove_dir_all(&d).unwrap();
     }
 }

@@ -145,12 +145,13 @@ LoafDialog {
         model: dlg.preview
         ScrollBar.vertical: ScrollBar {}
         delegate: RowLayout {
+            id: renameRow
             required property var modelData
             width: ListView.view.width
             spacing: 8
             Text {
                 Layout.preferredWidth: parent.width * 0.45
-                text: modelData.old
+                text: renameRow.modelData.old
                 color: theme.textMuted
                 font.pixelSize: theme.fs(12)
                 elide: Text.ElideMiddle
@@ -158,10 +159,10 @@ LoafDialog {
             LoafIcon { name: "arrow-right"; size: 12; color: theme.outlineAlpha(theme.outline) }
             Text {
                 Layout.fillWidth: true
-                text: modelData.name
-                color: modelData.bad ? theme.danger : (modelData.changed ? theme.primary : theme.textMain)
+                text: renameRow.modelData.name
+                color: renameRow.modelData.bad ? theme.danger : (renameRow.modelData.changed ? theme.primary : theme.textMain)
                 font.pixelSize: theme.fs(12)
-                font.bold: modelData.changed
+                font.bold: renameRow.modelData.changed
                 elide: Text.ElideMiddle
             }
         }

@@ -11,10 +11,10 @@ pkgbase = loaf-fm
 	makedepends = ninja
 	makedepends = pkgconf
 	makedepends = clang
-	depends = qt6-base
-	depends = qt6-declarative
-	depends = qt6-svg
-	depends = qt6-wayland
+	depends = qt6-base>=6.12
+	depends = qt6-declarative>=6.12
+	depends = qt6-svg>=6.12
+	depends = qt6-wayland>=6.12
 	depends = glibc
 	depends = gcc-libs
 	depends = hicolor-icon-theme

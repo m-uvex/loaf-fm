@@ -7,7 +7,7 @@ pkgdesc="Material 3 Expressive File Manager built with Qt6 Quick and Rust"
 arch=('x86_64')
 url="https://github.com/m-uvex/loaf-fm"
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'glibc' 'gcc-libs' 'hicolor-icon-theme' 'gvfs' 'gvfs-smb')
+depends=('qt6-base>=6.12' 'qt6-declarative>=6.12' 'qt6-svg>=6.12' 'qt6-wayland>=6.12' 'glibc' 'gcc-libs' 'hicolor-icon-theme' 'gvfs' 'gvfs-smb')
 makedepends=('cargo' 'rust' 'cmake' 'ninja' 'pkgconf' 'clang')
 # GCC LTO objects from the cxx-qt C++ side can't be linked by rustc
 options=('!lto')

@@ -203,12 +203,13 @@ Item {
 
                     delegate: Item {
                         id: tabItem
+                        required property var modelData
                         width: tabNavList.width
                         height: 44
 
-                        readonly property bool isCurrent: modelData.index === settingsView.activeTab
+                        readonly property bool isCurrent: tabItem.modelData.index === settingsView.activeTab
                         readonly property bool isHovered: tabMouse.containsMouse
-                        readonly property int tabMatches: settingsView.getTabMatchCount(modelData.id)
+                        readonly property int tabMatches: settingsView.getTabMatchCount(tabItem.modelData.id)
 
                         scale: tabMouse.pressed ? 0.95 : (tabMouse.containsMouse ? 1.02 : 1.0)
                         Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
@@ -233,7 +234,7 @@ Item {
 
                             LoafIcon {
                                 anchors.centerIn: parent
-                                name: modelData.iconName
+                                name: tabItem.modelData.iconName
                                 size: 20
                                 color: tabItem.isCurrent ? theme.primaryContainerFg : (tabItem.isHovered ? theme.textMain : theme.textMuted)
                                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -241,7 +242,7 @@ Item {
 
                             // Compact search match indicator
                             Rectangle {
-                                visible: settingsView.isCompact && settingsView.searchQuery.length > 0 && tabMatches > 0
+                                visible: settingsView.isCompact && settingsView.searchQuery.length > 0 && tabItem.tabMatches > 0
                                 anchors.top: parent.top
                                 anchors.right: parent.right
                                 anchors.topMargin: 4
@@ -260,7 +261,7 @@ Item {
                             anchors.rightMargin: 12
                             anchors.verticalCenter: parent.verticalCenter
                             visible: !settingsView.isCompact
-                            text: modelData.name
+                            text: tabItem.modelData.name
                             color: tabItem.isCurrent ? theme.primaryContainerFg : (tabItem.isHovered ? theme.textMain : theme.textMuted)
                             font.pixelSize: theme.fs(13)
                             font.bold: tabItem.isCurrent
@@ -271,20 +272,20 @@ Item {
 
                         Rectangle {
                             id: badgeContainer
-                            visible: !settingsView.isCompact && settingsView.searchQuery.length > 0 && tabMatches > 0
+                            visible: !settingsView.isCompact && settingsView.searchQuery.length > 0 && tabItem.tabMatches > 0
                             anchors.right: parent.right
                             anchors.rightMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
                             radius: theme.radiusFull
-                            color: isCurrent ? theme.surfaceContainerHighest : theme.primaryContainer
+                            color: tabItem.isCurrent ? theme.surfaceContainerHighest : theme.primaryContainer
                             implicitHeight: 20
                             implicitWidth: badgeTxt.implicitWidth + 10
 
                             Text {
                                 id: badgeTxt
                                 anchors.centerIn: parent
-                                text: tabMatches.toString()
-                                color: isCurrent ? theme.textMain : theme.primaryContainerFg
+                                text: tabItem.tabMatches.toString()
+                                color: tabItem.isCurrent ? theme.textMain : theme.primaryContainerFg
                                 font.pixelSize: theme.fs(10)
                                 font.bold: true
                             }
@@ -302,7 +303,7 @@ Item {
                                     settingsView.searchCleared();
                                     settingsView.searchQuery = "";
                                 }
-                                settingsView.activeTab = modelData.index;
+                                settingsView.activeTab = tabItem.modelData.index;
                             }
                         }
                     }
@@ -438,8 +439,8 @@ Item {
                             spacing: 12
 
                             LoafIcon {
-                                visible: settingsView.searchQuery.length === 0 && currentTabInfo.iconName.length > 0
-                                name: currentTabInfo.iconName
+                                visible: settingsView.searchQuery.length === 0 && settingsView.currentTabInfo.iconName.length > 0
+                                name: settingsView.currentTabInfo.iconName
                                 size: settingsView.isCompact ? 22 : 26
                                 color: theme.primary
                             }
@@ -447,7 +448,7 @@ Item {
                             Text {
                                 text: settingsView.searchQuery.length > 0
                                     ? qsTr("Settings search results")
-                                    : currentTabInfo.name
+                                    : settingsView.currentTabInfo.name
                                 color: theme.textMain
                                 font.pixelSize: settingsView.isCompact ? theme.fs(20) : theme.fs(24)
                                 font.bold: true
@@ -475,8 +476,8 @@ Item {
                         }
 
                         Text {
-                            visible: !settingsView.isCompact && settingsView.searchQuery.length === 0 && currentTabInfo.subtitle.length > 0
-                            text: currentTabInfo.subtitle
+                            visible: !settingsView.isCompact && settingsView.searchQuery.length === 0 && settingsView.currentTabInfo.subtitle.length > 0
+                            text: settingsView.currentTabInfo.subtitle
                             color: theme.textMuted
                             font.pixelSize: theme.fs(12)
                             wrapMode: Text.Wrap

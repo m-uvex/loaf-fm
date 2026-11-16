@@ -197,7 +197,7 @@ ColumnLayout {
             LoafSwitch {
                 id: disambigSwitch
                 checked: typeof core !== "undefined" && core ? core.get_setting("disambiguate_duplicates") !== "false" : true
-                onToggled: if (typeof core !== "undefined" && core) core.set_setting("disambiguate_duplicates", checked ? "true" : "false")
+                onToggled: function(checked) { if (typeof core !== "undefined" && core) core.set_setting("disambiguate_duplicates", checked ? "true" : "false"); }
             }
         }
     }
@@ -250,7 +250,7 @@ ColumnLayout {
 
             LoafSwitch {
                 checked: typeof core !== "undefined" && core ? core.get_setting("restoreSession") !== "false" : true
-                onToggled: if (typeof core !== "undefined" && core) core.set_setting("restoreSession", checked ? "true" : "false")
+                onToggled: function(checked) { if (typeof core !== "undefined" && core) core.set_setting("restoreSession", checked ? "true" : "false"); }
             }
         }
     }

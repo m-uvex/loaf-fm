@@ -51,7 +51,7 @@ Item {
         spacing: 12
 
         Item {
-            width: 24; height: 24
+            Layout.preferredWidth: 26; Layout.preferredHeight: 26
             Canvas {
                 id: ring
                 anchors.fill: parent
@@ -101,6 +101,7 @@ Item {
             size: 14
             color: theme.textMuted
         }
+        Item { Layout.preferredWidth: 4; Layout.preferredHeight: 1 }
     }
 
     MouseArea {
@@ -128,13 +129,14 @@ Item {
         Repeater {
             model: panel.ops
             delegate: ColumnLayout {
+                id: opItem
                 required property var modelData
                 Layout.fillWidth: true
                 spacing: 4
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: theme.resolveRustMessage(modelData.title)
+                        text: theme.resolveRustMessage(opItem.modelData.title)
                         color: theme.textMain
                         font.pixelSize: theme.fs(12)
                         elide: Text.ElideMiddle
@@ -144,7 +146,7 @@ Item {
                         icon: "x"
                         variant: "text"
                         Accessible.name: qsTr("Cancel")
-                        onClicked: core.cancel_operation(modelData.id)
+                        onClicked: core.cancel_operation(opItem.modelData.id)
                     }
                 }
                 Basic.ProgressBar {
@@ -153,8 +155,8 @@ Item {
                     palette.midlight: theme.outlineVariant
                     from: 0
                     to: 1
-                    value: modelData.progress < 0 ? 0 : modelData.progress
-                    indeterminate: modelData.progress < 0
+                    value: opItem.modelData.progress < 0 ? 0 : opItem.modelData.progress
+                    indeterminate: opItem.modelData.progress < 0
                 }
                 RowLayout {
                     Layout.fillWidth: true

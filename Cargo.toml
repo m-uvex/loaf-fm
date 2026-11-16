@@ -1,7 +1,8 @@
 [package]
 name = "loaf"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.99"
 license = "MIT"
 description = "Material 3 Expressive file manager built with Rust and Qt 6"
 repository = "https://github.com/m-uvex/loaf-fm"

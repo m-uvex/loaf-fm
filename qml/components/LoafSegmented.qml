@@ -115,12 +115,14 @@ Item {
 
                     delegate: Item {
                         id: segItem
+                        required property var modelData
+                        required property int index
                         Layout.fillWidth: true
                         Layout.fillHeight: true
 
-                        readonly property bool isCurrent: index === root.currentIndex
-                        readonly property bool hasIcon: !!(modelData && modelData.icon && String(modelData.icon).length > 0)
-                        readonly property bool isDisabled: !!(modelData && modelData.disabled)
+                        readonly property bool isCurrent: segItem.index === root.currentIndex
+                        readonly property bool hasIcon: !!(segItem.modelData && segItem.modelData.icon && String(segItem.modelData.icon).length > 0)
+                        readonly property bool isDisabled: !!(segItem.modelData && segItem.modelData.disabled)
 
                         opacity: isDisabled ? 0.4 : 1.0
 
@@ -149,7 +151,7 @@ Item {
 
                                 LoafIcon {
                                     visible: segItem.hasIcon
-                                    name: segItem.hasIcon ? modelData.icon : ""
+                                    name: segItem.hasIcon ? segItem.modelData.icon : ""
                                     size: root.effectiveIconOnly ? 16 : 14
                                     color: segItem.isCurrent ? theme.secondaryContainerFg : (segMouse.containsMouse ? theme.textMain : theme.textMuted)
 
@@ -157,11 +159,11 @@ Item {
                                 }
 
                                 Text {
-                                    visible: !root.effectiveIconOnly && (modelData && modelData.label)
+                                    visible: !root.effectiveIconOnly && (segItem.modelData && segItem.modelData.label)
                                     text: {
-                                        if (!modelData) return "";
-                                        if (root.isCompact && modelData.shortLabel) return modelData.shortLabel;
-                                        return modelData.label || "";
+                                        if (!segItem.modelData) return "";
+                                        if (root.isCompact && segItem.modelData.shortLabel) return segItem.modelData.shortLabel;
+                                        return segItem.modelData.label || "";
                                     }
                                     color: segItem.isCurrent ? theme.secondaryContainerFg : (segMouse.containsMouse ? theme.textMain : theme.textMuted)
                                     font.pixelSize: theme.fs(12)
@@ -179,14 +181,14 @@ Item {
                             enabled: !segItem.isDisabled
                             hoverEnabled: !segItem.isDisabled
                             cursorShape: segItem.isDisabled ? Qt.ArrowCursor : Qt.PointingHandCursor
-                            onEntered: if (root.effectiveIconOnly && !!(modelData && modelData.label) && typeof tooltip !== "undefined")
-                                tooltip.show(segMouse, modelData.label)
-                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(segMouse)
+                            ToolTip.visible: segMouse.containsMouse && root.effectiveIconOnly && !!(segItem.modelData && segItem.modelData.label)
+                            ToolTip.text: (segItem.modelData && segItem.modelData.label) ? segItem.modelData.label : ""
+                            ToolTip.delay: 350
 
                             onClicked: {
                                 if (!segItem.isDisabled) {
-                                    root.value = modelData.value;
-                                    root.selected(modelData.value);
+                                    root.value = segItem.modelData.value;
+                                    root.selected(segItem.modelData.value);
                                 }
                             }
                         }

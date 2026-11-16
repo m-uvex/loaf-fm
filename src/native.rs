@@ -96,29 +96,35 @@ mod tests {
     fn mime_matcher_uses_mime_inheritance() {
         let filter_mimes = vec!["text/plain".to_string()];
         let matcher = ffi::new_mime_filter_matcher(&filter_mimes);
-        assert!(matcher
-            .as_ref()
-            .expect("matcher is constructed")
-            .matches("notes.md"));
+        assert!(
+            matcher
+                .as_ref()
+                .expect("matcher is constructed")
+                .matches("notes.md")
+        );
     }
 
     #[test]
     fn mime_matcher_handles_extensionless_names() {
         let filter_mimes = vec![mime_type(Path::new("Makefile"), false)];
         let matcher = ffi::new_mime_filter_matcher(&filter_mimes);
-        assert!(matcher
-            .as_ref()
-            .expect("matcher is constructed")
-            .matches("Makefile"));
+        assert!(
+            matcher
+                .as_ref()
+                .expect("matcher is constructed")
+                .matches("Makefile")
+        );
     }
 
     #[test]
     fn mime_matcher_rejects_unknown_filter_types() {
         let filter_mimes = vec!["application/x-loaf-unknown-filter".to_string()];
         let matcher = ffi::new_mime_filter_matcher(&filter_mimes);
-        assert!(!matcher
-            .as_ref()
-            .expect("matcher is constructed")
-            .matches("file.png"));
+        assert!(
+            !matcher
+                .as_ref()
+                .expect("matcher is constructed")
+                .matches("file.png")
+        );
     }
 }

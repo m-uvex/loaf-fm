@@ -411,7 +411,11 @@ pub fn add_recent_in(content: &str, path: &Path, mime: &str, now: &str) -> Strin
         "  <bookmark href=\"{href}\" added=\"{now}\" modified=\"{now}\" visited=\"{now}\">\n    <info>\n      <metadata owner=\"http://freedesktop.org\">\n        <mime:mime-type type=\"{mime}\"/>\n        <bookmark:applications>\n          <bookmark:application name=\"Loaf\" exec=\"&apos;loaf %u&apos;\" modified=\"{now}\" count=\"1\"/>\n        </bookmark:applications>\n      </metadata>\n    </info>\n  </bookmark>\n",
         href = href,
         now = now,
-        mime = xml_escape(if mime.is_empty() { "application/octet-stream" } else { mime })
+        mime = xml_escape(if mime.is_empty() {
+            "application/octet-stream"
+        } else {
+            mime
+        })
     );
     if let Some(close) = content.rfind("</xbel>") {
         format!("{}{}{}", &content[..close], entry, &content[close..])
