@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
+import M3Shapes
 import app.loaf
 
 Item {
@@ -125,10 +126,13 @@ Item {
                 Layout.preferredWidth: 52
                 Layout.preferredHeight: 52
 
-                LoafShape {
+                MaterialShape {
                     anchors.fill: parent
-                    shape: root.bookmark ? "flower" : "cookie9"
+                    readonly property int restingShape: root.bookmark ? MaterialShape.Flower : MaterialShape.Cookie9Sided
+                    readonly property int hoveredShape: root.bookmark ? MaterialShape.Sunny : MaterialShape.Cookie12Sided
+                    shape: cardMouse.containsMouse ? hoveredShape : restingShape
                     color: root.active ? theme.primaryContainer : theme.surfaceContainerHighest
+                    animationDuration: theme.animate ? 350 : 0
                     rotation: cardMouse.containsMouse ? 30 : 0
                     Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.28 } }
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }

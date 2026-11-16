@@ -218,4 +218,6 @@ rust::String mime_comment_for(rust::Str mime);
 // class) from `window_class`.
 void set_application_identity(rust::Str version, rust::Str window_class);
 
+bool verify_m3shapes();
+
 } // namespace loaf

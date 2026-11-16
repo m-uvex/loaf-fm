@@ -1,13 +1,14 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import M3Shapes
 import app.loaf
 
 // PC Dashboard: hostname header with device type icon, plus reorderable /
 // customizable sections (places, frequent, internal storage summary + drives,
 // external drives). Drive rows are rendered with the shared DriveCard; all
 // controls come from the shared component library (SectionHeader, LoafButton,
-// LoafShape, UsageBar, LoafMenu, LoafTextPrompt).
+// MaterialShape, UsageBar, LoafMenu, LoafTextPrompt).
 Item {
     id: pcView
 
@@ -248,9 +249,33 @@ Item {
         return "0 B";
     }
     // Places cycle through expressive shapes and the three tonal containers.
-    readonly property var placeShapes: ["cookie9", "clover4", "sunny", "cookie6", "flower", "burst", "clover8", "cookie4", "cookie12"]
+    readonly property var placeShapes: [
+        MaterialShape.Cookie9Sided,
+        MaterialShape.Clover4Leaf,
+        MaterialShape.Sunny,
+        MaterialShape.Cookie6Sided,
+        MaterialShape.Flower,
+        MaterialShape.Burst,
+        MaterialShape.Clover8Leaf,
+        MaterialShape.Cookie4Sided,
+        MaterialShape.Cookie12Sided
+    ]
+    readonly property var placeHoverShapes: [
+        MaterialShape.Cookie12Sided,
+        MaterialShape.Clover8Leaf,
+        MaterialShape.VerySunny,
+        MaterialShape.Cookie9Sided,
+        MaterialShape.SoftBurst,
+        MaterialShape.Sunny,
+        MaterialShape.Cookie12Sided,
+        MaterialShape.Clover4Leaf,
+        MaterialShape.Flower
+    ]
     function placeShape(i) {
         return pcView.placeShapes[i % pcView.placeShapes.length];
+    }
+    function placeHoverShape(i) {
+        return pcView.placeHoverShapes[i % pcView.placeHoverShapes.length];
     }
     function placeContainer(i) {
         return [theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer][i % 3];
@@ -492,18 +517,20 @@ Item {
                     Layout.preferredWidth: 104
                     Layout.preferredHeight: 104
 
-                    LoafShape {
+                    MaterialShape {
                         anchors.fill: parent
-                        shape: "cookie12"
+                        shape: heroMouse.containsMouse ? MaterialShape.Cookie9Sided : MaterialShape.Cookie12Sided
                         color: theme.primaryContainer
+                        animationDuration: theme.animate ? 350 : 0
                         rotation: heroMouse.containsMouse ? 30 : 0
                         Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.0; damping: 0.25 } }
                     }
-                    LoafShape {
+                    MaterialShape {
                         width: 30; height: 30
                         x: parent.width - 22; y: -4
-                        shape: "sunny"
+                        shape: heroMouse.containsMouse ? MaterialShape.VerySunny : MaterialShape.Sunny
                         color: theme.tertiaryContainer
+                        animationDuration: theme.animate ? 350 : 0
                         rotation: heroMouse.containsMouse ? -45 : 0
                         Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.0; damping: 0.25 } }
                     }
@@ -574,18 +601,20 @@ Item {
                     Layout.preferredWidth: 132
                     Layout.preferredHeight: 96
 
-                    LoafShape {
+                    MaterialShape {
                         width: 72; height: 72
                         x: 0; y: 14
-                        shape: "flower"
+                        shape: MaterialShape.Flower
                         color: theme.tertiaryContainer
+                        animationDuration: theme.animate ? 350 : 0
                         rotation: 12
                     }
-                    LoafShape {
+                    MaterialShape {
                         width: 48; height: 48
                         x: 64; y: 0
-                        shape: "clover4"
+                        shape: MaterialShape.Clover4Leaf
                         color: theme.primaryContainer
+                        animationDuration: theme.animate ? 350 : 0
                         rotation: 45
                     }
                     Rectangle {
@@ -745,10 +774,11 @@ Item {
                                             Layout.preferredWidth: 56
                                             Layout.preferredHeight: 56
 
-                                            LoafShape {
+                                            MaterialShape {
                                                 anchors.fill: parent
-                                                shape: pcView.placeShape(index)
+                                                shape: placeMouse.containsMouse ? pcView.placeHoverShape(index) : pcView.placeShape(index)
                                                 color: pcView.placeContainer(index)
+                                                animationDuration: theme.animate ? 350 : 0
                                                 rotation: placeMouse.containsMouse ? 45 : 0
                                                 Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.26 } }
                                             }
@@ -812,10 +842,11 @@ Item {
                                         Layout.preferredWidth: 40
                                         Layout.preferredHeight: 40
 
-                                        LoafShape {
+                                        MaterialShape {
                                             anchors.fill: parent
-                                            shape: pcView.placeShape(index)
+                                            shape: cPlaceMouse.containsMouse ? pcView.placeHoverShape(index) : pcView.placeShape(index)
                                             color: pcView.placeContainer(index)
+                                            animationDuration: theme.animate ? 350 : 0
                                             rotation: cPlaceMouse.containsMouse ? 45 : 0
                                             Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.26 } }
                                         }
@@ -962,10 +993,11 @@ Item {
                                         Layout.preferredWidth: 56
                                         Layout.preferredHeight: 56
 
-                                        LoafShape {
+                                        MaterialShape {
                                             anchors.fill: parent
-                                            shape: "burst"
+                                            shape: MaterialShape.Burst
                                             color: theme.primaryContainer
+                                            animationDuration: theme.animate ? 350 : 0
                                         }
                                         LoafIcon {
                                             anchors.centerIn: parent
@@ -1095,11 +1127,12 @@ Item {
                                     anchors.margins: 14
                                     spacing: 14
 
-                                    LoafShape {
+                                    MaterialShape {
                                         Layout.preferredWidth: 44
                                         Layout.preferredHeight: 44
-                                        shape: "cookie6"
+                                        shape: MaterialShape.Cookie6Sided
                                         color: theme.secondaryContainer
+                                        animationDuration: theme.animate ? 350 : 0
 
                                         LoafIcon {
                                             anchors.centerIn: parent
