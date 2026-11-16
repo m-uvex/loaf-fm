@@ -164,6 +164,7 @@ ApplicationWindow {
     readonly property bool gridKeyboardReady: activeView === "files" && !searchInput.activeFocus
         && !sidebar.keyboardHasFocus
         && !newTabToolbarButton.activeFocus && !newWindowToolbarButton.activeFocus
+        && !refreshToolbarButton.activeFocus
         && !pathInput.activeFocus && !anyModalOpen && !!activePane && activePane.renamingPath === ""
     // helpers used by the panes and dialogs
 
@@ -251,6 +252,23 @@ ApplicationWindow {
                 s[c.paths[i]] = true;
         }
         cutSet = s;
+    }
+
+    function refreshCurrentView() {
+        if (window.activeView === "pc") {
+            core.load_places();
+            core.load_drives();
+            core.refresh_frequent_dirs();
+            core.refresh_smb_discovery();
+            return;
+        }
+        if (window.activeView !== "files") {
+            engine.refresh();
+            return;
+        }
+        pane0.engine.refresh_with_reset();
+        if (window.splitView && pane1Loader.item)
+            pane1Loader.item.engine.refresh_with_reset();
     }
 
     Connections {
@@ -867,7 +885,7 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("up"); onActivated: engine.navigate_up() }
     Shortcut { sequence: theme.shortcutFor("home"); onActivated: { window.showFiles(); engine.set_path(core.user_dir("HOME")); } }
     Shortcut { sequence: theme.shortcutFor("backAlt"); enabled: window.gridKeyboardReady && engine.can_go_back; onActivated: engine.go_back() }
-    Shortcut { sequences: [theme.shortcutFor("refresh"), "Ctrl+R"]; onActivated: engine.refresh() }
+    Shortcut { sequences: [theme.shortcutFor("refresh"), "Ctrl+R"]; onActivated: window.refreshCurrentView() }
     Shortcut { sequence: theme.shortcutFor("newTab"); onActivated: window.newTab((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
     Shortcut { sequence: theme.shortcutFor("closeTab"); onActivated: window.closeTab(window.currentTab) }
     Shortcut { sequences: [theme.shortcutFor("nextTab"), "Ctrl+PgDown"]; onActivated: window.switchTab((window.currentTab + 1) % window.tabs.length) }
@@ -1191,10 +1209,12 @@ ApplicationWindow {
                 readonly property bool showBack: theme.toolbarOperations !== "hidden"
                 readonly property bool showForward: theme.toolbarOperations === "always"
                     || (theme.toolbarOperations === "auto" && canForward)
-                visible: showBack || showForward
-                Layout.preferredWidth: (showBack && showForward) ? 82 : 44
-                Layout.minimumWidth: (showBack && showForward) ? 82 : 44
-                opacity: (canBack || canForward) ? 1.0 : 0.45
+                readonly property bool showRefresh: window.activeView === "files" || window.activeView === "pc"
+                readonly property int actionCount: (showBack ? 1 : 0) + (showForward ? 1 : 0) + (showRefresh ? 1 : 0)
+                visible: actionCount > 0
+                Layout.preferredWidth: actionCount === 1 ? 44 : (36 * actionCount + 10)
+                Layout.minimumWidth: Layout.preferredWidth
+                opacity: (canBack || canForward || showRefresh) ? 1.0 : 0.45
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -1223,6 +1243,18 @@ ApplicationWindow {
                         systemIcon: "go-next-symbolic"
                         accessibleName: qsTr("Forward")
                         onClicked: engine.go_forward()
+                    }
+                    TopIconButton {
+                        id: refreshToolbarButton
+                        visible: navChip.showRefresh
+                        iconName: "arrow-clockwise"
+                        systemIcon: "view-refresh-symbolic"
+                        accessibleName: qsTr("Refresh")
+                        activeFocusOnTab: true
+                        Keys.onSpacePressed: clicked()
+                        Keys.onReturnPressed: clicked()
+                        Keys.onEnterPressed: clicked()
+                        onClicked: window.refreshCurrentView()
                     }
                 }
             }
@@ -2681,6 +2713,13 @@ ApplicationWindow {
         var e = pane.engine;
         var kind = e.location_kind;
         var m = [];
+        m.push({
+            text: qsTr("Refresh"),
+            icon: "arrow-clockwise",
+            shortcut: "Ctrl+R",
+            itemKey: "refresh",
+            action: function() { window.refreshCurrentView(); }
+        });
         if (kind === "trash") {
             if (e.item_count > 0) {
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { core.empty_trash(); } });

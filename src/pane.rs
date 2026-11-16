@@ -127,6 +127,8 @@ pub mod qobject {
         #[qinvokable]
         fn refresh(self: Pin<&mut LoafEngine>);
         #[qinvokable]
+        fn refresh_with_reset(self: Pin<&mut LoafEngine>);
+        #[qinvokable]
         fn open_trash(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn open_recent(self: Pin<&mut LoafEngine>);
@@ -1117,6 +1119,14 @@ impl qobject::LoafEngine {
     }
 
     pub fn refresh(self: Pin<&mut Self>) {
+        self.refresh_impl(false);
+    }
+
+    pub fn refresh_with_reset(self: Pin<&mut Self>) {
+        self.refresh_impl(true);
+    }
+
+    fn refresh_impl(self: Pin<&mut Self>, reset: bool) {
         match self.loc.clone() {
             Loc::Search {
                 root,
@@ -1136,7 +1146,7 @@ impl qobject::LoafEngine {
                 }
                 self.go_to(Loc::Dir(up), false);
             }
-            _ => self.start_scan(false),
+            _ => self.start_scan(reset),
         }
     }
 
