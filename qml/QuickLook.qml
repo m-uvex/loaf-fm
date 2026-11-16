@@ -8,8 +8,9 @@ import app.loaf
 LoafPopup {
     id: quickLook
     parent: Overlay.overlay
-    modal: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    modal: false
+    closePolicy: Popup.NoAutoClose
+    onClosed: window.removeQuickLook(quickLook)
 
     transformOrigin: Item.Center
     scale: 0.15
@@ -32,7 +33,14 @@ LoafPopup {
     }
 
     property var info: ({})
+    property string sourcePath: ""
     property bool imageFailed: false
+    property real moveStartX: 0
+    property real moveStartY: 0
+    property real resizeStartX: 0
+    property real resizeStartY: 0
+    property real resizeStartWidth: 0
+    property real resizeStartHeight: 0
     // Rendered once per open so scrolling never re-runs the highlighter.
     property string previewHtml: ""
 
@@ -57,7 +65,153 @@ LoafPopup {
     width: Math.min(window.width - 160, 900)
     height: Math.min(window.height - 160, 640)
 
-    function showFor(path) {
+    background: Item {
+        Rectangle {
+            anchors.fill: parent
+            anchors.topMargin: 3
+            anchors.bottomMargin: -3
+            radius: theme.radiusL
+            color: theme.shadow
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: theme.radiusL
+            color: theme.menuSurface
+            border.color: theme.outlineAlpha(theme.borderSubtle)
+            border.width: 1
+        }
+
+        Loader {
+            x: 12
+            y: 0
+            width: parent.width - 24
+            height: 12
+            sourceComponent: resizeHandleComponent
+            onLoaded: item.fromTop = true
+        }
+        Loader {
+            x: 12
+            y: parent.height - height
+            width: parent.width - 24
+            height: 12
+            sourceComponent: resizeHandleComponent
+            onLoaded: item.fromBottom = true
+        }
+        Loader {
+            x: 0
+            y: 12
+            width: 12
+            height: parent.height - 24
+            sourceComponent: resizeHandleComponent
+            onLoaded: item.fromLeft = true
+        }
+        Loader {
+            x: parent.width - width
+            y: 12
+            width: 12
+            height: parent.height - 24
+            sourceComponent: resizeHandleComponent
+            onLoaded: item.fromRight = true
+        }
+        Loader {
+            x: 0
+            y: 0
+            width: 14
+            height: 14
+            sourceComponent: resizeHandleComponent
+            onLoaded: { item.fromLeft = true; item.fromTop = true; }
+        }
+        Loader {
+            x: parent.width - width
+            y: 0
+            width: 14
+            height: 14
+            sourceComponent: resizeHandleComponent
+            onLoaded: { item.fromRight = true; item.fromTop = true; }
+        }
+        Loader {
+            x: 0
+            y: parent.height - height
+            width: 14
+            height: 14
+            sourceComponent: resizeHandleComponent
+            onLoaded: { item.fromLeft = true; item.fromBottom = true; }
+        }
+        Loader {
+            x: parent.width - width
+            y: parent.height - height
+            width: 14
+            height: 14
+            sourceComponent: resizeHandleComponent
+            onLoaded: { item.fromRight = true; item.fromBottom = true; }
+        }
+    }
+
+    Component {
+        id: resizeHandleComponent
+        Item {
+            property bool fromLeft: false
+            property bool fromRight: false
+            property bool fromTop: false
+            property bool fromBottom: false
+            readonly property int resizeCursor: (fromLeft || fromRight) && (fromTop || fromBottom)
+                ? (((fromLeft && fromTop) || (fromRight && fromBottom)) ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor)
+                : ((fromLeft || fromRight) ? Qt.SizeHorCursor : Qt.SizeVerCursor)
+
+            DragHandler {
+                target: null
+                acceptedButtons: Qt.LeftButton
+                onActiveChanged: {
+                    if (active) {
+                        quickLook.raiseToFront();
+                        quickLook.beginResize(parent.fromLeft, parent.fromRight, parent.fromTop, parent.fromBottom, translation.x, translation.y);
+                    }
+                }
+                onTranslationChanged: {
+                    if (active)
+                        quickLook.resizeFromEdges(parent.fromLeft, parent.fromRight, parent.fromTop, parent.fromBottom, translation.x, translation.y);
+                }
+            }
+            HoverHandler { cursorShape: parent.resizeCursor }
+        }
+    }
+
+    function moveTo(px, py) {
+        var margin = 10;
+        x = Math.max(margin, Math.min(px, window.width - width - margin));
+        y = Math.max(margin, Math.min(py, window.height - height - margin));
+        requestedX = x;
+        requestedY = y;
+    }
+
+    function beginResize(fromLeft, fromRight, fromTop, fromBottom, dx, dy) {
+        resizeStartWidth = width - (fromLeft ? -dx : (fromRight ? dx : 0));
+        resizeStartHeight = height - (fromTop ? -dy : (fromBottom ? dy : 0));
+        resizeStartX = x - (fromLeft ? dx : 0);
+        resizeStartY = y - (fromTop ? dy : 0);
+    }
+
+    function resizeFromEdges(fromLeft, fromRight, fromTop, fromBottom, dx, dy) {
+        var maxWidth = Math.max(1, window.width - 20);
+        var maxHeight = Math.max(1, window.height - 20);
+        var minWidth = Math.min(360, maxWidth);
+        var minHeight = Math.min(240, maxHeight);
+        var newWidth = Math.max(minWidth, Math.min(maxWidth,
+            resizeStartWidth + (fromLeft ? -dx : (fromRight ? dx : 0))));
+        var newHeight = Math.max(minHeight, Math.min(maxHeight,
+            resizeStartHeight + (fromTop ? -dy : (fromBottom ? dy : 0))));
+        var newX = resizeStartX + (fromLeft ? resizeStartWidth - newWidth : 0);
+        var newY = resizeStartY + (fromTop ? resizeStartHeight - newHeight : 0);
+
+        requestedX = newX;
+        requestedY = newY;
+        width = newWidth;
+        height = newHeight;
+        moveTo(newX, newY);
+    }
+
+    function showFor(path, instanceIndex) {
+        sourcePath = path;
         var raw = "{}";
         try {
             raw = core.quick_look(path) || "{}";
@@ -67,7 +221,12 @@ LoafPopup {
         info = JSON.parse(raw);
         imageFailed = false;
         previewHtml = buildPreviewHtml();
-        openAt((window.width - width) / 2, (window.height - height) / 2);
+        var offset = (instanceIndex % 8) * 28;
+        openAt((window.width - width) / 2 + offset, (window.height - height) / 2 + offset);
+    }
+
+    function raiseToFront() {
+        window.activateQuickLook(quickLook);
     }
 
     function escapeHtml(s) {
@@ -236,6 +395,11 @@ LoafPopup {
         width: quickLook.width - 2 * quickLook.contentPadding
         spacing: 10
 
+        TapHandler {
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onPressedChanged: if (pressed) quickLook.raiseToFront()
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
@@ -266,6 +430,46 @@ LoafPopup {
                     color: theme.textMuted
                     font.pixelSize: theme.fs(11)
                     elide: Text.ElideMiddle
+                }
+
+                DragHandler {
+                    target: null
+                    acceptedButtons: Qt.LeftButton
+                    onActiveChanged: {
+                        if (active) {
+                            quickLook.raiseToFront();
+                            quickLook.moveStartX = quickLook.x - translation.x;
+                            quickLook.moveStartY = quickLook.y - translation.y;
+                        }
+                    }
+                    onTranslationChanged: {
+                        if (active)
+                            quickLook.moveTo(quickLook.moveStartX + translation.x, quickLook.moveStartY + translation.y);
+                    }
+                }
+                HoverHandler { cursorShape: Qt.SizeAllCursor }
+            }
+
+            Item {
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: closeMouse.containsMouse ? theme.hoverOverlay : "transparent"
+                }
+                LoafIcon {
+                    anchors.centerIn: parent
+                    name: "x"
+                    size: 14
+                    color: theme.textMuted
+                }
+                MouseArea {
+                    id: closeMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: quickLook.close()
                 }
             }
         }
@@ -369,5 +573,6 @@ LoafPopup {
             color: theme.textMuted
             font.pixelSize: theme.fs(11)
         }
+
     }
 }

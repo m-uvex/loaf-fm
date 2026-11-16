@@ -98,6 +98,8 @@ Item {
         "search": "Ctrl+F",
         "rename": "F2",
         "quickLook": "Space",
+        "cloneQuickLook": "Ctrl+Shift+Space",
+        "closeQuickLook": "Escape",
         "trash": "Delete",
         "deletePermanent": "Shift+Delete",
         "back": "Alt+Left",

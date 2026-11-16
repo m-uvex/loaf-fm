@@ -145,19 +145,62 @@ ApplicationWindow {
     // Paths currently cut to the clipboard (dimmed in the views).
     property var cutSet: ({})
 
-    readonly property var quickLook: quickLookLoader.item
+    property var quickLooks: []
+    property real quickLookZCounter: 0
+    readonly property var quickLook: quickLooks.length > 0 ? quickLooks[quickLooks.length - 1] : null
     readonly property var propsDialog: propsDialogLoader.item
     readonly property var batchRename: batchRenameLoader.item
     readonly property var conflictDialog: conflictDialogLoader.item
 
-    function openQuickLook(path) { quickLookLoader.active = true; quickLookLoader.item.showFor(path); }
+    function openQuickLook(path) {
+        var preview = quickLookComponent.createObject(window.contentItem);
+        if (!preview) {
+            console.error("Could not create Quick Look preview");
+            return;
+        }
+        var previews = quickLooks.slice();
+        previews.push(preview);
+        quickLooks = previews;
+        window.activateQuickLook(preview);
+        preview.showFor(path, previews.length - 1);
+    }
+    function activateQuickLook(preview) {
+        var previews = quickLooks.slice();
+        var index = previews.indexOf(preview);
+        if (index < 0)
+            return;
+        previews.splice(index, 1);
+        previews.push(preview);
+        quickLooks = previews;
+        quickLookZCounter += 1;
+        preview.z = quickLookZCounter;
+    }
+    function removeQuickLook(preview) {
+        var previews = quickLooks.slice();
+        var index = previews.indexOf(preview);
+        if (index < 0)
+            return;
+        previews.splice(index, 1);
+        quickLooks = previews;
+        if (previews.length === 0)
+            quickLookZCounter = 0;
+        preview.destroy();
+    }
+    function cloneQuickLook() {
+        if (quickLook && quickLook.visible)
+            window.previewItem(quickLook.sourcePath);
+    }
+    function closeQuickLook() {
+        if (quickLook && quickLook.visible)
+            quickLook.close();
+    }
     function openPropsDialog(paths) { propsDialogLoader.active = true; propsDialogLoader.item.showFor(paths); }
     function openBatchRename(items) { batchRenameLoader.active = true; batchRenameLoader.item.showFor(items); }
     function openConflictDialog(conflicts, paths, dest, mode, fromCut) { conflictDialogLoader.active = true; conflictDialogLoader.item.showFor(conflicts, paths, dest, mode, fromCut); }
 
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
     readonly property bool anyModalOpen: inputModal.visible || (propsDialog && propsDialog.visible) || (conflictDialog && conflictDialog.visible)
-        || passwordModal.visible || (quickLook && quickLook.visible) || commandModal.visible || (batchRename && batchRename.visible)
+        || passwordModal.visible || commandModal.visible || (batchRename && batchRename.visible)
         || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
         || networkDialog.visible
         || window.isEditingPath
@@ -273,9 +316,11 @@ ApplicationWindow {
                 theme.stepZoom(delta);
         }
         function onSpacePressed() {
+            if (theme.shortcutFor("quickLook") !== "Space")
+                return;
             if (searchInput.activeFocus || window.isEditingPath)
                 return;
-            if (!(quickLook && quickLook.visible) && window.gridKeyboardReady) {
+            if (window.gridKeyboardReady) {
                 window.spaceHeldForQuickLook = true;
                 window.toggleQuickLook();
             } else if (quickLook && quickLook.visible) {
@@ -286,6 +331,8 @@ ApplicationWindow {
         // Tap (short press): opens and stays. Hold: closes on release.
         // A press shorter than the hold threshold is a toggle, not a hold.
         function onSpaceReleased(heldDuration) {
+            if (theme.shortcutFor("quickLook") !== "Space")
+                return;
             if (!(quickLook && quickLook.visible) || !window.spaceHeldForQuickLook)
                 return;
             if (heldDuration >= 400) {
@@ -479,13 +526,17 @@ ApplicationWindow {
     property bool spaceHeldForQuickLook: false
 
     function toggleQuickLook() {
-        if (quickLook && quickLook.visible) {
-            quickLook.close();
+        var paths = selectedPaths();
+        if (paths.length === 0) {
+            if (quickLook && quickLook.visible)
+                quickLook.close();
             return;
         }
-        var paths = selectedPaths();
-        if (paths.length > 0)
-            window.previewItem(activePane.cursorPath || paths[paths.length - 1]);
+        var path = activePane.cursorPath || paths[paths.length - 1];
+        if (quickLook && quickLook.visible && quickLook.sourcePath === path)
+            quickLook.close();
+        else
+            window.previewItem(path);
     }
     function saveCurrentTab() {
         var t = tabs[currentTab];
@@ -842,7 +893,21 @@ ApplicationWindow {
                 window.activePane.startRename();
         }
     }
-    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: (quickLook && quickLook.visible) || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
+    Shortcut {
+        sequence: theme.shortcutFor("quickLook")
+        enabled: theme.shortcutFor("quickLook") !== "Space" && ((quickLook && quickLook.visible) || window.gridKeyboardReady)
+        onActivated: window.toggleQuickLook()
+    }
+    Shortcut {
+        sequence: theme.shortcutFor("cloneQuickLook")
+        enabled: quickLooks.length > 0 && !window.anyModalOpen
+        onActivated: window.cloneQuickLook()
+    }
+    Shortcut {
+        sequence: theme.shortcutFor("closeQuickLook")
+        enabled: quickLooks.length > 0 && !window.anyModalOpen
+        onActivated: window.closeQuickLook()
+    }
     Shortcut { sequence: theme.shortcutFor("trash"); enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
     Shortcut { sequence: theme.shortcutFor("deletePermanent"); enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
     Shortcut {
@@ -3178,7 +3243,7 @@ ApplicationWindow {
     }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
     LoafTooltip { id: tooltip }
-    Loader { id: quickLookLoader; active: false; sourceComponent: QuickLook {} }
+    Component { id: quickLookComponent; QuickLook {} }
     Loader { id: propsDialogLoader; active: false; sourceComponent: PropertiesDialog {} }
     Loader { id: batchRenameLoader; active: false; sourceComponent: BatchRenameDialog {} }
     Loader { id: conflictDialogLoader; active: false; sourceComponent: ConflictDialog {} }
