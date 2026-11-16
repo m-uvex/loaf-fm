@@ -125,7 +125,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Integrations & Context Actions
-- [ ] **Custom Terminal Emulator Selection**: User setting in Behavior to configure preferred terminal executable (`kitty`, `ghostty`, `foot`, `alacritty`, `wezterm`, etc.) for "Open in Terminal".
+- [x] **Custom Terminal Emulator Selection**: User setting in Behavior → Default Applications to configure the preferred installed terminal emulator for "Open in Terminal".
 - [ ] **Integrated Terminal**: Embedded terminal panel that opens directly inside Loaf, styled to match the active theme.
 - [ ] **Direct File Viewer & Editor**: In-app viewing and lightweight editing support for documents and markup (e.g. `.md`).
 - [ ] **Syncthing Integration**: Native integration with Syncthing to show folder sync status, manage shared folders, and control sync settings directly inside Loaf.

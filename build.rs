@@ -67,10 +67,7 @@ fn compile_translations() -> Option<PathBuf> {
             }
         }
         match found {
-            Some(binary) => {
-                println!("cargo:warning=translations: using lrelease candidate '{binary}'");
-                binary
-            }
+            Some(binary) => binary,
             None => {
                 return fail("find lrelease", "executable not found or not runnable (tried lrelease, lrelease-qt6, lrelease6)");
             }

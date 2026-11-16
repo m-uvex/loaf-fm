@@ -29,7 +29,7 @@ ColumnLayout {
     readonly property bool matchRename: matches("click rename inline single click")
     readonly property bool matchSearch: matches("search file contents text inside")
     readonly property bool matchSession: matches("session restore tabs remember last folder window startup launch")
-    readonly property bool matchDefaultApps: matches("default apps applications folders directories text txt plain text png images image file type mime formats")
+    readonly property bool matchDefaultApps: matches("default apps applications folders directories text txt plain text png images image file type mime formats terminal emulator kitty ghostty foot alacritty wezterm konsole")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchClickToOpen ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
@@ -41,6 +41,8 @@ ColumnLayout {
     property var mimeAppOptions: []
     property string selectedMimeType: ""
     property string selectedMimeApp: ""
+    property var terminalEmulatorOptions: []
+    property string selectedTerminalEmulator: ""
 
     function loadAppOptions(mime) {
         var apps = [];
@@ -63,6 +65,7 @@ ColumnLayout {
     function loadDefaultAppSettings() {
         if (typeof core === "undefined" || !core)
             return;
+        loadTerminalEmulatorSettings();
         try {
             var types = JSON.parse(core.used_mime_types() || "[]");
             mimeTypeOptions = types.map(function(type) {
@@ -74,6 +77,30 @@ ColumnLayout {
         }
         if (mimeTypeOptions.length > 0)
             selectMimeType(mimeTypeOptions[0].value);
+    }
+
+    function loadTerminalEmulatorSettings() {
+        var options = [{ value: "", label: qsTr("System default") }];
+        try {
+            var installed = JSON.parse(core.available_terminal_options_json() || "[]");
+            options = options.concat(installed);
+        } catch (e) {
+            console.warn("Could not load installed terminal emulators: " + e);
+        }
+        selectedTerminalEmulator = core.get_setting("preferredTerminal");
+        if (selectedTerminalEmulator.length > 0
+                && !options.some(function(option) { return option.value === selectedTerminalEmulator; })) {
+            options.push({
+                value: selectedTerminalEmulator,
+                label: qsTr("%1 (not installed)").arg(selectedTerminalEmulator)
+            });
+        }
+        terminalEmulatorOptions = options;
+    }
+
+    function saveTerminalEmulator(name) {
+        core.set_setting("preferredTerminal", name);
+        selectedTerminalEmulator = name;
     }
 
     function saveDefaultApp(appId) {
@@ -258,8 +285,22 @@ ColumnLayout {
     SettingCard {
         visible: root.matchDefaultApps
         title: qsTr("Default Applications")
-        subtitle: qsTr("Choose a file type and the installed app that should open it")
+        subtitle: qsTr("Choose a terminal emulator and file type applications")
         icon: "app-window"
+
+        SettingRow {
+            icon: "terminal"
+            title: qsTr("Terminal emulator")
+            subtitle: qsTr("Used by Open in Terminal; System default follows your desktop settings")
+
+            LoafSelect {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
+                options: root.terminalEmulatorOptions
+                value: root.selectedTerminalEmulator
+                placeholder: qsTr("System default")
+                onSelected: function(name) { root.saveTerminalEmulator(name); }
+            }
+        }
 
         SettingRow {
             visible: root.mimeTypeOptions.length > 0

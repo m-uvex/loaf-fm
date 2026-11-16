@@ -239,6 +239,8 @@ pub mod qobject {
         #[qinvokable]
         fn used_mime_types(self: &LoafCore) -> QString;
         #[qinvokable]
+        fn available_terminal_options_json(self: &LoafCore) -> QString;
+        #[qinvokable]
         fn apps_for_mime(self: &LoafCore, mime: &QString) -> QString;
         #[qinvokable]
         fn set_default_mime_app(self: Pin<&mut LoafCore>, mime: &QString, app_id: &QString)
@@ -2256,6 +2258,12 @@ impl qobject::LoafCore {
             })
             .collect();
         q(&serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn available_terminal_options_json(&self) -> QString {
+        q(&apps::available_terminal_options_json(
+            &self.icon_theme().to_string(),
+        ))
     }
 
     pub fn apps_for_mime(&self, mime: &QString) -> QString {
