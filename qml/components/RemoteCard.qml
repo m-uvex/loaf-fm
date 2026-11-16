@@ -7,8 +7,8 @@ Item {
     id: root
 
     Layout.fillWidth: true
-    Layout.preferredHeight: 128
-    implicitHeight: 128
+    Layout.preferredHeight: root.hasStorage ? 164 : 128
+    implicitHeight: root.hasStorage ? 164 : 128
     implicitWidth: 320
 
     property var remote: ({})
@@ -20,6 +20,12 @@ Item {
     readonly property bool connected: root.remote && root.remote.connected === true
     readonly property bool bookmark: root.remote && root.remote.kind === "bookmark"
     readonly property bool active: root.connected || root.bookmark
+    readonly property bool hasStorage: root.connected
+        && root.remote.protocol === "smb"
+        && Number(root.remote.total_bytes) > 0
+    readonly property real storageUsage: root.hasStorage
+        ? Number(root.remote.used_bytes) / Number(root.remote.total_bytes)
+        : 0
 
     function remoteIcon() {
         var r = root.remote || {};
@@ -196,6 +202,34 @@ Item {
             color: theme.textMuted
             font.pixelSize: theme.fs(11)
             font.bold: true
+        }
+
+        UsageBar {
+            visible: root.hasStorage
+            Layout.fillWidth: true
+            value: root.storageUsage
+            barColor: root.storageUsage >= 0.9 ? theme.danger : theme.primary
+        }
+
+        RowLayout {
+            visible: root.hasStorage
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                text: qsTr("%1 used").arg(root.remote.used_str || "")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(11)
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+
+            Text {
+                text: qsTr("%1 free of %2").arg(root.remote.free_str || "").arg(root.remote.total_str || "")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(11)
+                horizontalAlignment: Text.AlignRight
+            }
         }
     }
 
