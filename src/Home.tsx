@@ -124,7 +124,9 @@ function FeatureCard({
         </div>
         <p>{body}</p>
       </div>
-      <Icon className="feature-ambient" size={176} strokeWidth={1.1} aria-hidden="true" />
+      <span className="feature-ambient-clip" aria-hidden="true">
+        <Icon className="feature-ambient" size={176} strokeWidth={1.1} />
+      </span>
     </article>
   );
 }
