@@ -186,7 +186,7 @@ impl ShareManager {
         }
 
         // Sort newest first
-        shares.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        shares.sort_by_key(|share| std::cmp::Reverse(share.created_at));
         serde_json::to_string(&shares).unwrap_or_else(|_| "[]".into())
     }
 
