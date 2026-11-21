@@ -24,6 +24,7 @@ ColumnLayout {
     readonly property bool matchArchives: matches("open archives zip tar 7z enter extract browse default app")
     readonly property bool matchClickToOpen: matches("click to open single click double click behavior folder file")
     readonly property bool matchDrag: matches("left click drag action selection box pan scroll view rubberband marquee mouse")
+    readonly property bool matchScrollStrength: matches("scroll scrolling speed strength wheel touchpad mouse sensitivity")
     readonly property bool matchHidden: matches("show hidden files dot dotfiles folders")
     readonly property bool matchDisambig: matches("disambiguate duplicate names parent folder prefix search")
     readonly property bool matchRename: matches("click rename inline single click")
@@ -32,7 +33,7 @@ ColumnLayout {
     readonly property bool matchDefaultApps: matches("default apps applications folders directories text txt plain text png images image file type mime formats")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
-        ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchClickToOpen ? 1 : 0) + (matchDrag ? 1 : 0) + (matchHidden ? 1 : 0)
+        ? ((matchOpenDirs ? 1 : 0) + (matchArchives ? 1 : 0) + (matchClickToOpen ? 1 : 0) + (matchDrag ? 1 : 0) + (matchScrollStrength ? 1 : 0) + (matchHidden ? 1 : 0)
             + (matchDisambig ? 1 : 0) + (matchRename ? 1 : 0) + (matchSearch ? 1 : 0) + (matchSession ? 1 : 0)
             + (matchDefaultApps ? 1 : 0))
         : 0
@@ -89,7 +90,7 @@ ColumnLayout {
 
     // Category 1: Browsing & Navigation
     SettingCard {
-        visible: root.matchOpenDirs || root.matchArchives || root.matchClickToOpen || root.matchDrag || root.matchHidden || root.matchDisambig
+        visible: root.matchOpenDirs || root.matchArchives || root.matchClickToOpen || root.matchDrag || root.matchScrollStrength || root.matchHidden || root.matchDisambig
         title: qsTr("Browsing & Navigation")
         subtitle: qsTr("Folder opening mode, drag actions, and file visibility")
         icon: "folder-notch-open"
@@ -152,7 +153,7 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: (root.matchOpenDirs || root.matchClickToOpen || root.matchArchives) && (root.matchDrag || root.matchHidden || root.matchDisambig) }
+        SettingDivider { visible: (root.matchOpenDirs || root.matchClickToOpen || root.matchArchives) && (root.matchDrag || root.matchScrollStrength || root.matchHidden || root.matchDisambig) }
 
         SettingRow {
             visible: root.matchDrag
@@ -171,7 +172,28 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchDrag && (root.matchHidden || root.matchDisambig) }
+        SettingDivider { visible: root.matchDrag && (root.matchScrollStrength || root.matchHidden || root.matchDisambig) }
+
+        SettingRow {
+            visible: root.matchScrollStrength
+            icon: "sliders-horizontal"
+            title: qsTr("Scroll strength")
+            subtitle: qsTr("Adjust wheel and touchpad scrolling sensitivity (33% is original speed)")
+
+            LoafSlider {
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
+                from: 1
+                to: 100
+                stepSize: 1
+                value: theme.scrollStrength
+                formatPercent: false
+                unit: "%"
+                accessibleName: qsTr("Scroll strength")
+                onMoved: function(v) { theme.scrollStrength = Math.round(v); }
+            }
+        }
+
+        SettingDivider { visible: (root.matchDrag || root.matchScrollStrength) && (root.matchHidden || root.matchDisambig) }
 
         SettingRow {
             visible: root.matchHidden
