@@ -44,7 +44,17 @@ The vector icon fonts bundled in `assets/fonts/` (`Phosphor.ttf`, `Phosphor-Fill
 
 ---
 
-## 3. Rust Dependencies (Compiled into Binary)
+## 3. M3Shapes / AndroidX Graphics Shapes
+
+The Material 3 Expressive shape and morphing C++ engine in `cpp/m3shapes/` is adapted from `soramanew/m3shapes` and the Android Open Source Project (`androidx.graphics.shapes` / `androidx.compose.material3.MaterialShapes`).
+
+- Copyright (c) soramanew (https://github.com/soramanew/m3shapes)
+- Copyright (c) The Android Open Source Project
+- License: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+---
+
+## 4. Rust Dependencies (Compiled into Binary)
 
 The Loaf binary compiles Rust crates statically from crates.io. All direct and transitive dependencies are licensed under permissive open-source licenses (MIT, Apache-2.0, Zlib, or Unlicense):
 

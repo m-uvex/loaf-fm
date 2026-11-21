@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
+import M3Shapes
 import app.loaf
 
 // DriveCard -- storage drive card used by the PC dashboard.
@@ -149,11 +150,14 @@ Item {
                 Layout.preferredWidth: 52
                 Layout.preferredHeight: 52
 
-                LoafShape {
+                MaterialShape {
                     anchors.fill: parent
-                    shape: root.drive && root.drive.is_external ? "clover4" : "cookie9"
+                    readonly property int restingShape: root.drive && root.drive.is_external ? MaterialShape.Clover4Leaf : MaterialShape.Cookie9Sided
+                    readonly property int hoveredShape: root.drive && root.drive.is_external ? MaterialShape.Clover8Leaf : MaterialShape.Cookie12Sided
+                    shape: cardMouse.containsMouse ? hoveredShape : restingShape
                     color: !root.isMounted ? theme.surfaceContainerHighest
                            : (root.almostFull ? theme.dangerContainer : theme.primaryContainer)
+                    animationDuration: theme.animate ? 350 : 0
                     rotation: cardMouse.containsMouse ? 30 : 0
                     Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.28 } }
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
