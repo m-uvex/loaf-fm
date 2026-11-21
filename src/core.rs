@@ -73,6 +73,8 @@ pub mod qobject {
         fn share_link_error(self: Pin<&mut LoafCore>, message: QString);
         #[qsignal]
         fn cloudflared_status_changed(self: Pin<&mut LoafCore>, installed: bool);
+        #[qsignal]
+        fn rclone_link_ready(self: Pin<&mut LoafCore>, url: QString);
     }
 
     unsafe extern "RustQt" {
@@ -224,6 +226,15 @@ pub mod qobject {
         ) -> QString;
         #[qinvokable]
         fn open_item(self: Pin<&mut LoafCore>, path: &QString);
+        #[qinvokable]
+        fn rclone_context(self: &LoafCore, path: &QString) -> QString;
+        #[qinvokable]
+        fn rclone_action(
+            self: Pin<&mut LoafCore>,
+            action: &QString,
+            path: &QString,
+            extra: &QString,
+        );
         #[qinvokable]
         fn open_with_apps(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
@@ -1603,6 +1614,112 @@ impl qobject::LoafCore {
         if self.smb_profiles_json().to_string() != json {
             self.as_mut().set_smb_profiles_json(q(&json));
         }
+    }
+
+    pub fn rclone_context(&self, path: &QString) -> QString {
+        let ctx = crate::rclone::context_for(Path::new(&path.to_string()));
+        q(&serde_json::to_string(&ctx).unwrap_or_else(|_| "{}".into()))
+    }
+
+    pub fn rclone_action(self: Pin<&mut Self>, action: &QString, path: &QString, extra: &QString) {
+        let act = action.to_string();
+        let target = PathBuf::from(path.to_string());
+        let extra_s = extra.to_string();
+        let thread = self.qt_thread();
+
+        if act == "copy_to_remote" || act == "move_to_remote" {
+            let is_move = act == "move_to_remote";
+            let title = format!(
+                "{} {}",
+                if is_move { "Moving" } else { "Uploading" },
+                target
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| target.to_string_lossy().to_string())
+            );
+            self.spawn_op(
+                "rclone",
+                title,
+                move |_op| match crate::rclone::transfer_to_remote(&target, &extra_s, is_move) {
+                    Ok(msg) => Outcome::ok(msg),
+                    Err(e) => Outcome::err(e),
+                },
+            );
+            return;
+        }
+
+        std::thread::spawn(move || match act.as_str() {
+            "copy_link" => match crate::rclone::public_link(&target) {
+                Ok(url) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().rclone_link_ready(q(&url));
+                    });
+                }
+                Err(e) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("error"), q(&format!("rclone link failed: {}", e)));
+                    });
+                }
+            },
+            "open_link" => match crate::rclone::public_link(&target) {
+                Ok(url) => {
+                    if let Some(open) = util::which("xdg-open") {
+                        let _ = std::process::Command::new(open).arg(&url).spawn();
+                    }
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("info"), q(&format!("Opening {}", url)));
+                    });
+                }
+                Err(e) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("error"), q(&format!("rclone link failed: {}", e)));
+                    });
+                }
+            },
+            "refresh_vfs" => match crate::rclone::refresh_vfs(&target) {
+                Ok(msg) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().notify(q("info"), q(&msg));
+                    });
+                }
+                Err(e) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("error"), q(&format!("VFS refresh failed: {}", e)));
+                    });
+                }
+            },
+            "about" => match crate::rclone::remote_about(&target) {
+                Ok(msg) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().notify(q("info"), q(&msg));
+                    });
+                }
+                Err(e) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("error"), q(&format!("rclone about failed: {}", e)));
+                    });
+                }
+            },
+            "size" => match crate::rclone::remote_size(&target) {
+                Ok(msg) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut().notify(q("info"), q(&msg));
+                    });
+                }
+                Err(e) => {
+                    let _ = thread.queue(move |mut core| {
+                        core.as_mut()
+                            .notify(q("error"), q(&format!("rclone size failed: {}", e)));
+                    });
+                }
+            },
+            _ => {}
+        });
     }
 
     pub fn save_network_profile(
