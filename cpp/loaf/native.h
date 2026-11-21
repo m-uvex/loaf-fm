@@ -70,6 +70,7 @@ public:
     Q_INVOKABLE void cancelPicker(const QString &handle);
     Q_INVOKABLE bool fileExists(const QString &path) const;
     Q_INVOKABLE bool isDirectory(const QString &path) const;
+    Q_INVOKABLE bool isWritable(const QString &path) const;
     // Makes a picker window transient for the caller's window on X11
     // ("x11:0x..." handles); Wayland needs xdg-foreign, which Qt Quick does
     // not expose, so there we degrade gracefully.
@@ -87,6 +88,8 @@ public:
     void setAnimate(bool value);
     Q_INVOKABLE void cancelScrollAnimation();
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE int dropButtons() const { return m_dropButtons; }
+    Q_INVOKABLE int dropModifiers() const { return m_dropModifiers; }
     Q_INVOKABLE QString systemFontFamily() const;
     Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
     Q_INVOKABLE QStringList systemFontFamilies() const;
@@ -111,6 +114,9 @@ Q_SIGNALS:
     // The request was closed from the D-Bus side (Request.Close()).
     void pickerDismissed(const QString &handle);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private Q_SLOTS:
     void notifyMtpDevicesChanged() { Q_EMIT mtpDevicesChanged(); }
 
@@ -124,6 +130,8 @@ private:
     bool m_animate = true;
     QVariantMap m_clipboard;
     class PortalService *m_portal = nullptr;
+    int m_dropButtons = 0;
+    int m_dropModifiers = 0;
 };
 
 // org.freedesktop.FileManager1 (used by browsers' "Show in folder").

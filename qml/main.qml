@@ -630,6 +630,54 @@ ApplicationWindow {
         transfer(paths, destDir, asCopy ? "copy" : "move");
     }
 
+    function canLinkDrop(paths, destDir) {
+        return paths && paths.length > 0 && destDir && destDir.indexOf("/") === 0
+            && nativeBridge.isDirectory(destDir) && nativeBridge.isWritable(destDir)
+            && paths.every(function(path) { return path.indexOf("/") === 0; });
+    }
+
+    function handleTabDrop(drop, paths, destDir, px, py) {
+        if (!destDir || !paths || paths.length === 0) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        if (destDir.indexOf("/") === 0) {
+            if (!nativeBridge.isWritable(destDir) || !nativeBridge.isDirectory(destDir)) {
+                if (drop) drop.accept(Qt.IgnoreAction);
+                return false;
+            }
+        }
+        var isInternal = drop && drop.source === dragProxy;
+        var supported = ((drop && drop.supportedActions !== undefined) ? drop.supportedActions
+            : (Qt.CopyAction | Qt.MoveAction)) & (Qt.CopyAction | Qt.MoveAction | Qt.LinkAction);
+        var canLink = window.canLinkDrop(paths, destDir);
+        // Loaf owns the asynchronous transfer; external Move acknowledgements can delete the source prematurely.
+        var acknowledgement = (supported & Qt.CopyAction) ? Qt.CopyAction
+            : ((supported & Qt.LinkAction) && canLink ? Qt.LinkAction
+                : (isInternal && (supported & Qt.MoveAction) ? Qt.MoveAction : Qt.IgnoreAction));
+        if (acknowledgement === Qt.IgnoreAction) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        var rightButton = isInternal ? dragManager.isRmb : !!(nativeBridge.dropButtons() & Qt.RightButton);
+        if (rightButton) {
+            if (drop) drop.accept(acknowledgement);
+            rmbDropMenu.showAt(px, py, paths, destDir, supported);
+            return true;
+        }
+        var asCopy = isInternal ? dragManager.asCopy : !!(nativeBridge.dropModifiers() & Qt.ControlModifier);
+        var mode = asCopy ? ((supported & Qt.CopyAction) ? "copy" : "")
+            : ((supported & Qt.MoveAction) ? "move"
+                : ((supported & Qt.CopyAction) ? "copy" : (canLink ? "link" : "")));
+        if (!mode) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        if (drop) drop.accept(acknowledgement);
+        window.transfer(paths, destDir, mode);
+        return true;
+    }
+
     function trashSelection() {
         var paths = selectedPaths();
         if (paths.length === 0)
@@ -759,6 +807,74 @@ ApplicationWindow {
                 loc = loc.substring(10).split("#")[0];
             var parts = loc.split("/").filter(function(p) { return p.length > 0; });
             return parts.length > 0 ? parts[parts.length - 1] : "/";
+        } catch (e) {
+            return "";
+        }
+    }
+
+    // Resolves current folder destination for active or inactive tab, targeting
+    // left or right pane if split. Virtual non-folder targets return empty string.
+    function resolveTabDestination(tabIndex, splitRight) {
+        if (tabIndex < 0 || tabIndex >= tabs.length)
+            return "";
+        if (tabIndex === currentTab) {
+            if (activeView === "settings" || activeView === "pc")
+                return "";
+            if (splitRight && splitView && pane1Loader.item) {
+                var rEngine = pane1Loader.item.engine;
+                var rk = rEngine.location_kind;
+                if (rEngine.read_only)
+                    return "";
+                return (rk === "dir" || rk === "mtp") ? rEngine.current_path : "";
+            }
+            var lEngine = pane0.engine;
+            var lk = lEngine.location_kind;
+            if (lEngine.read_only)
+                return "";
+            return (lk === "dir" || lk === "mtp") ? lEngine.current_path : "";
+        }
+        var t = tabs[tabIndex];
+        if (!t || t.view === "settings" || t.view === "pc")
+            return "";
+        var paneIdx = (splitRight && t.split) ? 1 : 0;
+        var stateStr = (t.states && t.states.length > paneIdx) ? t.states[paneIdx] : "";
+        if (!stateStr)
+            return "";
+        try {
+            var loc = JSON.parse(stateStr).location || "";
+            if (!loc || typeof loc !== "string")
+                return "";
+            if (loc.indexOf("mtp:") === 0) {
+                var rest = loc.substring(4);
+                if (rest.indexOf("//loaf/") === 0)
+                    rest = rest.substring(7);
+                else if (rest.indexOf("//") === 0) {
+                    rest = rest.substring(2);
+                    if (rest.indexOf("loaf/") === 0)
+                        rest = rest.substring(5);
+                } else if (rest.indexOf("/") === 0) {
+                    rest = rest.substring(1);
+                }
+                var mtpParts = rest.split("/").filter(function(p) { return p.length > 0; });
+                return mtpParts.length >= 2 ? loc : "";
+            }
+            if (loc.indexOf("file://") === 0) {
+                var rawFile = loc.substring(7);
+                try {
+                    loc = decodeURIComponent(rawFile);
+                } catch (e) {
+                    loc = rawFile;
+                }
+            } else if (loc === "~")
+                loc = core.user_dir("HOME");
+            else if (loc.indexOf("~/") === 0)
+                loc = core.user_dir("HOME") + loc.substring(1);
+            if (loc.indexOf("/") === 0 && loc.indexOf("trash:") !== 0 && loc.indexOf("recent:") !== 0 && loc.indexOf("starred:") !== 0 && loc.indexOf("archive://") !== 0) {
+                if (!nativeBridge.isDirectory(loc))
+                    return "";
+                return loc;
+            }
+            return "";
         } catch (e) {
             return "";
         }
@@ -2288,9 +2404,19 @@ ApplicationWindow {
                         readonly property string rightName: current ? (pane1Loader.item ? pane1Loader.item.engine.current_dir_name : (window.tabs[index] ? window.tabs[index].rightTitle || qsTr("Split") : qsTr("Split")))
                             : (window.tabs[index] ? (window.tabs[index].rightTitle || qsTr("Split")) : qsTr("Split"))
 
+                        TextMetrics {
+                            id: tabLeftMetrics
+                            text: tabDelegate.leftName
+                            font: tabLeftLabel.font
+                        }
+                        TextMetrics {
+                            id: tabRightMetrics
+                            text: tabDelegate.rightName
+                            font: tabRightLabel.font
+                        }
                         width: isSplit
-                            ? Math.min(380, Math.max(220, tabLeftLabel.implicitWidth + tabRightLabel.implicitWidth + 88))
-                            : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
+                            ? Math.min(380, Math.max(220, tabLeftMetrics.advanceWidth + tabRightMetrics.advanceWidth + 88))
+                            : Math.min(240, Math.max(120, tabLeftMetrics.advanceWidth + 84))
                         height: 34
                         radius: theme.radiusFull
                         border.width: 1
@@ -2317,6 +2443,31 @@ ApplicationWindow {
                                     window.setActivePane(pane1Loader.item);
                                 else
                                     window.setActivePane(pane0);
+                            }
+                        }
+
+                        DropArea {
+                            id: tabDrop
+                            anchors.fill: parent
+                            keys: ["text/uri-list"]
+                            function dropUrls(urls, dropX, dropY, dropEvent) {
+                                var isRight = tabDelegate.isSplit
+                                    && mapToItem(tabDelegate, dropX, dropY).x > tabRightLabel.mapToItem(tabDelegate, 0, 0).x;
+                                var dest = window.resolveTabDestination(tabDelegate.index, isRight);
+                                if (!dest) {
+                                    if (dropEvent) dropEvent.accept(Qt.IgnoreAction);
+                                    return false;
+                                }
+                                var paths = window.urlsToPaths(urls).filter(function(p) { return p !== dest; });
+                                if (paths.length === 0) {
+                                    if (dropEvent) dropEvent.accept(Qt.IgnoreAction);
+                                    return false;
+                                }
+                                var pt = tabDrop.mapToItem(window.contentItem, dropX, dropY);
+                                return window.handleTabDrop(dropEvent, paths, dest, pt.x, pt.y);
+                            }
+                            onDropped: function(drop) {
+                                dropUrls(drop.urls, drop.x, drop.y, drop);
                             }
                         }
 
@@ -3400,21 +3551,30 @@ ApplicationWindow {
         menuMinWidth: 200
         property var dropPaths: []
         property string dropDest: ""
-        function showAt(px, py, paths, dest) {
-            dropPaths = paths;
+        property int dropSupported: Qt.CopyAction | Qt.MoveAction | Qt.LinkAction
+        function showAt(px, py, paths, dest, supported) {
+            dropPaths = paths.slice ? paths.slice() : paths;
             dropDest = dest;
+            dropSupported = (supported !== undefined) ? supported : (Qt.CopyAction | Qt.MoveAction | Qt.LinkAction);
             if (dest === "trash") {
                 model = [
                     { text: qsTr("Move to Trash"), icon: "trash", danger: true, action: function() { core.trash_items(JSON.stringify(rmbDropMenu.dropPaths)); } },
                     { text: qsTr("Cancel"), icon: "x", separatorBefore: true, action: function() {} }
                 ];
             } else {
-                model = [
-                    { text: qsTr("Copy Here"), icon: "copy", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "copy"); } },
-                    { text: qsTr("Move Here"), icon: "arrows-out-cardinal", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "move"); } },
-                    { text: qsTr("Link Here"), icon: "link", action: function() { core.transfer(JSON.stringify(rmbDropMenu.dropPaths), rmbDropMenu.dropDest, "link", "rename"); } },
-                    { text: qsTr("Cancel"), icon: "x", danger: true, separatorBefore: true, action: function() {} }
-                ];
+                var canLink = window.canLinkDrop(rmbDropMenu.dropPaths, dest);
+                var items = [];
+                if (dropSupported & Qt.CopyAction) {
+                    items.push({ text: qsTr("Copy Here"), icon: "copy", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "copy"); } });
+                }
+                if (dropSupported & Qt.MoveAction) {
+                    items.push({ text: qsTr("Move Here"), icon: "arrows-out-cardinal", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "move"); } });
+                }
+                if (canLink) {
+                    items.push({ text: qsTr("Link Here"), icon: "link", action: function() { core.transfer(JSON.stringify(rmbDropMenu.dropPaths), rmbDropMenu.dropDest, "link", "rename"); } });
+                }
+                items.push({ text: qsTr("Cancel"), icon: "x", danger: true, separatorBefore: true, action: function() {} });
+                model = items;
             }
             openAt(px, py);
         }

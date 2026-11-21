@@ -19,6 +19,7 @@
 #include <QDBusReply>
 #include <QDBusUnixFileDescriptor>
 #include <QDir>
+#include <QDropEvent>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
@@ -148,6 +149,37 @@ static void captureInitialAppFont()
         return;
     g_initialAppFont = QGuiApplication::font();
     g_initialAppFontCaptured = true;
+}
+
+bool LoafNative::eventFilter(QObject *watched, QEvent *event)
+{
+    if (!qobject_cast<QQuickWindow *>(watched))
+        return false;
+    switch (event->type()) {
+    case QEvent::DragEnter:
+    case QEvent::DragMove:
+    case QEvent::Drop: {
+        auto *drop = static_cast<QDropEvent *>(event);
+        // The release event may have no buttons; retain the drag's initiating button.
+        if (event->type() == QEvent::DragEnter || drop->buttons() != Qt::NoButton)
+            m_dropButtons = int(drop->buttons());
+        m_dropModifiers = int(drop->modifiers());
+        if (event->type() == QEvent::Drop) {
+            QTimer::singleShot(0, this, [this]() {
+                m_dropButtons = 0;
+                m_dropModifiers = 0;
+            });
+        }
+        break;
+    }
+    case QEvent::DragLeave:
+        m_dropButtons = 0;
+        m_dropModifiers = 0;
+        break;
+    default:
+        break;
+    }
+    return false;
 }
 
 LoafNative::LoafNative(QObject *parent)
@@ -305,6 +337,11 @@ bool LoafNative::fileExists(const QString &path) const
 bool LoafNative::isDirectory(const QString &path) const
 {
     return QFileInfo(path).isDir();
+}
+
+bool LoafNative::isWritable(const QString &path) const
+{
+    return QFileInfo(path).isWritable();
 }
 
 void LoafNative::setPickerTransient(QWindow *window, const QString &parentWindow, bool modal) const
@@ -849,6 +886,7 @@ void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &
     }
 
     auto *native = new LoafNative(&engine);
+    QCoreApplication::instance()->installEventFilter(native);
     QStringList raw;
     for (const rust::String &p : paths)
         raw << QString::fromUtf8(p.data(), static_cast<qsizetype>(p.size()));
