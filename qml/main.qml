@@ -1062,6 +1062,10 @@ ApplicationWindow {
         onShare_link_error: function(message) {
             window.toast("error", qsTr("Could not share via link: %1").arg(theme.resolveRustMessage(message)));
         }
+        onRclone_link_ready: function(url) {
+            nativeBridge.setClipboardText(url);
+            window.toast("info", qsTr("rclone link copied to clipboard"));
+        }
         onStarred_changed: {
             pane0.engine.reload_starred();
             if (pane1Loader.item)
@@ -2636,6 +2640,98 @@ ApplicationWindow {
                 m.push({ text: qsTr("Share…"), icon: "share-network", itemKey: "share", submenu: shareSub });
             }
             m.push({ text: qsTr("Compress"), icon: "file-archive", itemKey: "compress", submenu: compressSubmenu(paths) });
+
+            if (single) {
+                var rcCtx = null;
+                try { rcCtx = JSON.parse(core.rclone_context(item.path) || "{}"); } catch (e) {}
+                if (rcCtx && rcCtx.available) {
+                    var rcItems = [];
+                    if (rcCtx.in_mount) {
+                        rcItems.push({
+                            text: qsTr("Copy Public Link"),
+                            icon: "link",
+                            action: function() {
+                                window.toast("info", qsTr("Fetching rclone public link…"));
+                                core.rclone_action("copy_link", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Open Link in Browser"),
+                            icon: "globe",
+                            action: function() {
+                                window.toast("info", qsTr("Opening rclone link…"));
+                                core.rclone_action("open_link", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Copy Remote Path (%1)").arg(rcCtx.remote),
+                            icon: "copy-simple",
+                            action: function() {
+                                nativeBridge.setClipboardText(rcCtx.remote_path);
+                                window.toast("info", qsTr("Remote path copied"));
+                            }
+                        });
+                        if (rcCtx.has_rc) {
+                            rcItems.push({
+                                text: qsTr("Refresh Folder Cache"),
+                                icon: "arrow-clockwise",
+                                separatorBefore: true,
+                                action: function() {
+                                    core.rclone_action("refresh_vfs", item.path, "");
+                                }
+                            });
+                        }
+                        rcItems.push({
+                            text: qsTr("Remote Size"),
+                            icon: "hard-drive",
+                            separatorBefore: !rcCtx.has_rc,
+                            action: function() {
+                                window.toast("info", qsTr("Checking remote size…"));
+                                core.rclone_action("size", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Remote Quota / Info"),
+                            icon: "info",
+                            action: function() {
+                                window.toast("info", qsTr("Checking remote quota…"));
+                                core.rclone_action("about", item.path, "");
+                            }
+                        });
+                    }
+                    if (rcCtx.remotes && rcCtx.remotes.length > 0) {
+                        var copyTargets = [];
+                        var moveTargets = [];
+                        for (var ri = 0; ri < rcCtx.remotes.length; ++ri) {
+                            (function(rem) {
+                                copyTargets.push({
+                                    text: rem,
+                                    icon: "cloud",
+                                    action: function() { core.rclone_action("copy_to_remote", item.path, rem); }
+                                });
+                                moveTargets.push({
+                                    text: rem,
+                                    icon: "cloud",
+                                    action: function() { core.rclone_action("move_to_remote", item.path, rem); }
+                                });
+                            })(rcCtx.remotes[ri]);
+                        }
+                        rcItems.push({
+                            text: qsTr("Copy to Remote"),
+                            icon: "upload-simple",
+                            separatorBefore: rcItems.length > 0,
+                            submenu: copyTargets
+                        });
+                        rcItems.push({
+                            text: qsTr("Move to Remote"),
+                            icon: "arrow-right",
+                            submenu: moveTargets
+                        });
+                    }
+                    if (rcItems.length > 0)
+                        m.push({ text: qsTr("rclone"), icon: "cloud", itemKey: "rclone", submenu: rcItems });
+                }
+            }
 
             var starred = item.starred === true;
             m.push({ text: starred ? qsTr("Unstar") : qsTr("Star"), icon: "star", itemKey: "star", separatorBefore: true, action: function() { core.set_starred(JSON.stringify(paths), !starred); } });
