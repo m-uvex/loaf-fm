@@ -77,6 +77,56 @@ Item {
     property var groupedGroupTops: []
     property var groupedFileToVisual: []
 
+    property var columnWidths: pane.loadColumnWidths()
+
+    function defaultColumnWidth(key) {
+        if (key === "modified")
+            return 150;
+        if (key === "type")
+            return 100;
+        if (key === "size")
+            return 80;
+        return 120;
+    }
+
+    function loadColumnWidths() {
+        var base = { "modified": 150, "type": 100, "size": 80 };
+        if (typeof core === "undefined" || !core)
+            return base;
+        try {
+            var raw = core.get_setting("listColumnWidths");
+            if (raw && raw.length > 0) {
+                var parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                    for (var k in parsed) {
+                        var n = Number(parsed[k]);
+                        if (n >= 56 && n <= 480)
+                            base[k] = Math.round(n);
+                    }
+                }
+            }
+        } catch (e) {}
+        return base;
+    }
+
+    function colWidth(key) {
+        var v = pane.columnWidths && Number(pane.columnWidths[key]);
+        return (v && v >= 56) ? v : pane.defaultColumnWidth(key);
+    }
+
+    function setColWidth(key, w, persist) {
+        var clamped = Math.max(56, Math.min(480, Math.round(w)));
+        var copy = Object.assign({}, pane.columnWidths);
+        copy[key] = clamped;
+        pane.columnWidths = copy;
+        if (persist && typeof core !== "undefined" && core)
+            core.set_setting("listColumnWidths", JSON.stringify(copy));
+    }
+
+    function resetColWidth(key) {
+        pane.setColWidth(key, pane.defaultColumnWidth(key), true);
+    }
+
     function isGroupedGrid() {
         return !isList() && paneEngine.group_by !== "none";
     }
@@ -1481,26 +1531,75 @@ Item {
 
                     Repeater {
                         model: [
-                            { key: "name", label: qsTr("Name"), fill: true, width: 100, show: true, defaultAsc: true },
-                            { key: "modified", label: qsTr("Date Modified"), fill: false, width: 150, show: pane.width >= 560, defaultAsc: true },
-                            { key: "type", label: qsTr("Type"), fill: false, width: 100, show: pane.width >= 720, defaultAsc: true },
-                            { key: "size", label: qsTr("Size"), fill: false, width: 80, show: pane.width >= 640, defaultAsc: false }
+                            { key: "name", label: qsTr("Name"), fill: true, show: true, defaultAsc: true },
+                            { key: "modified", label: qsTr("Date Modified"), fill: false, show: pane.width >= 560, defaultAsc: true },
+                            { key: "type", label: qsTr("Type"), fill: false, show: pane.width >= 720, defaultAsc: true },
+                            { key: "size", label: qsTr("Size"), fill: false, show: pane.width >= 640, defaultAsc: false }
                         ]
                         delegate: Item {
+                            id: headerCell
                             visible: modelData.show
                             Layout.fillWidth: modelData.fill
-                            Layout.preferredWidth: modelData.width
-                            Layout.minimumWidth: modelData.fill ? 100 : 60
+                            Layout.preferredWidth: modelData.fill ? 100 : pane.colWidth(modelData.key)
+                            Layout.minimumWidth: modelData.fill ? 100 : 56
                             Layout.fillHeight: true
+
+                            // Left-edge drag handle on every resizable column (dragging left widens this column and shrinks Name).
+                            Item {
+                                visible: !modelData.fill
+                                width: 10
+                                anchors.left: parent.left
+                                anchors.leftMargin: -11
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                z: 4
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: resizeMouse.containsMouse || resizeMouse.pressed ? 2 : 1
+                                    height: resizeMouse.containsMouse || resizeMouse.pressed ? 18 : 12
+                                    radius: 1
+                                    color: resizeMouse.containsMouse || resizeMouse.pressed
+                                           ? theme.primary
+                                           : theme.outlineAlpha(theme.outlineVariant)
+                                    Behavior on color { enabled: theme.animate; ColorAnimation { duration: 100 } }
+                                }
+
+                                MouseArea {
+                                    id: resizeMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.SplitHCursor
+                                    preventStealing: true
+                                    property real startGlobalX: 0
+                                    property real startWidth: 0
+                                    onPressed: function(mouse) {
+                                        startGlobalX = mapToGlobal(mouse.x, 0).x;
+                                        startWidth = pane.colWidth(modelData.key);
+                                    }
+                                    onPositionChanged: function(mouse) {
+                                        if (!pressed)
+                                            return;
+                                        var delta = startGlobalX - mapToGlobal(mouse.x, 0).x;
+                                        pane.setColWidth(modelData.key, startWidth + delta, false);
+                                    }
+                                    onReleased: pane.setColWidth(modelData.key, pane.colWidth(modelData.key), true)
+                                    onDoubleClicked: pane.resetColWidth(modelData.key)
+                                }
+                            }
 
                             RowLayout {
                                 anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
                                 spacing: 6
                                 Text {
                                     text: modelData.label
                                     color: paneEngine.sort_by === modelData.key ? theme.primary : theme.textMuted
                                     font.pixelSize: theme.fs(11)
                                     font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
                                 }
                                 LoafIcon {
                                     visible: paneEngine.sort_by === modelData.key
@@ -1899,8 +1998,8 @@ Item {
 
                         Text {
                             visible: pane.width >= 560
-                            Layout.preferredWidth: 150
-                            Layout.minimumWidth: 96
+                            Layout.preferredWidth: pane.colWidth("modified")
+                            Layout.minimumWidth: 56
                             text: theme.relativeTime(row.modified)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
@@ -1908,8 +2007,8 @@ Item {
                         }
                         Text {
                             visible: pane.width >= 720
-                            Layout.preferredWidth: 100
-                            Layout.minimumWidth: 70
+                            Layout.preferredWidth: pane.colWidth("type")
+                            Layout.minimumWidth: 56
                             text: theme.categoryName(row.category)
                             color: row.isSelected ? theme.secondaryContainerFg : theme.outline
                             font.pixelSize: theme.fs(11)
@@ -1917,8 +2016,8 @@ Item {
                         }
                         Text {
                             visible: pane.width >= 640
-                            Layout.preferredWidth: 80
-                            Layout.minimumWidth: 60
+                            Layout.preferredWidth: pane.colWidth("size")
+                            Layout.minimumWidth: 56
                             text: row.size_str
                             color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
                             font.pixelSize: theme.fs(11)
