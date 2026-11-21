@@ -7,8 +7,8 @@ Item {
     id: root
 
     Layout.fillWidth: true
-    Layout.preferredHeight: 128
-    implicitHeight: 128
+    Layout.preferredHeight: root.hasUsage ? 164 : 128
+    implicitHeight: root.hasUsage ? 164 : 128
     implicitWidth: 320
 
     property var remote: ({})
@@ -22,7 +22,7 @@ Item {
     readonly property bool active: root.connected || root.bookmark
     readonly property real totalBytes: (root.remote && Number(root.remote.total_bytes)) || 0
     readonly property real usedBytes: (root.remote && Number(root.remote.used_bytes)) || 0
-    readonly property bool hasUsage: root.connected && root.totalBytes > 0
+    readonly property bool hasUsage: root.connected && root.remote.protocol === "smb" && root.totalBytes > 0
     readonly property real usage: Math.max(0, Math.min(1, ((root.remote && root.remote.percent) || 0) / 100))
     readonly property bool almostFull: root.hasUsage && root.usage >= 0.9
 
@@ -258,6 +258,7 @@ Item {
             font.pixelSize: theme.fs(11)
             font.bold: true
         }
+
     }
 
     MouseArea {

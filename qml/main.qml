@@ -3366,6 +3366,17 @@ ApplicationWindow {
                     icon: "arrows-clockwise",
                     enabled: theme.smbAutoDiscovery,
                     action: function() { core.refresh_smb_discovery(); }
+                },
+                {
+                    text: qsTr("New Custom Tab…"),
+                    icon: "plus",
+                    separatorBefore: true,
+                    action: function() { newCustomTabPrompt.open(); }
+                },
+                {
+                    text: qsTr("Expand All Sections"),
+                    icon: "arrows-out-line-vertical",
+                    action: function() { theme.sidebarCollapsedSections = {}; }
                 }
             ];
             openAt(px, py);
@@ -3625,7 +3636,11 @@ ApplicationWindow {
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
             m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
-            if (place.kind === "bookmark")
+            if (place.kind === "custom_place") {
+                m.push({ text: qsTr("Remove from Tab"), icon: "trash", danger: true, separatorBefore: true, action: function() {
+                    theme.removeCustomTabItem(place.customTabId, place.customItemId);
+                } });
+            } else if (place.kind === "bookmark")
                 m.push({ text: qsTr("Remove from Sidebar"), icon: "x", danger: true, separatorBefore: true, action: function() { core.remove_bookmark(place.path); } });
             else
                 m.push({ text: qsTr("Hide from Sidebar"), icon: "eye-slash", separatorBefore: true, action: function() { core.set_place_hidden(place.id, true); } });
@@ -3639,8 +3654,14 @@ ApplicationWindow {
             return;
         if (!window.pcOpened)
             window.pcOpened = true;
-        if (window.pcView)
+        if (window.pcView) {
             window.pcView.openDriveMenu(d, x, y);
+        } else {
+            Qt.callLater(function() {
+                if (window.pcView)
+                    window.pcView.openDriveMenu(d, x, y);
+            });
+        }
     }
     LoafMenu {
         id: rmbDropMenu
@@ -4118,33 +4139,63 @@ ApplicationWindow {
     LoafDialog {
         id: customizePlaces
         title: qsTr("Customize Sidebar")
-        dialogWidth: 440
+        dialogWidth: Math.max(280, Math.min(560, window.width - 32))
         property var all: []
-        onOpened: all = JSON.parse(core.all_places_json() || "[]")
+        property var allDrives: []
+        property string activeTab: "places"
+        onOpened: {
+            all = JSON.parse(core.all_places_json() || "[]");
+            try { allDrives = JSON.parse(core.drives_json || "[]"); } catch (e) { allDrives = []; }
+            activeTab = "places";
+        }
         Connections {
             target: core
             function onPlaces_jsonChanged() {
                 if (customizePlaces.visible)
                     customizePlaces.all = JSON.parse(core.all_places_json() || "[]");
             }
+            function onDrives_jsonChanged() {
+                if (customizePlaces.visible) {
+                    try { customizePlaces.allDrives = JSON.parse(core.drives_json || "[]"); } catch (e) { customizePlaces.allDrives = []; }
+                }
+            }
         }
-        ListView {
-            id: customizePlacesList
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(380, contentHeight)
-            clip: true
-            model: customizePlaces.all
-            ScrollBar.vertical: ScrollBar {}
-            spacing: 4
 
-            delegate: Rectangle {
-                id: placeRow
-                required property var modelData
-                required property int index
-                width: ListView.view.width
-                height: 40
-                radius: theme.radiusM
-                color: dragHandleArea.containsMouse ? theme.hoverOverlay : "transparent"
+        LoafSegmented {
+            Layout.fillWidth: true
+            options: [
+                { value: "places", label: qsTr("Places"), shortLabel: qsTr("Places"), icon: "folder" },
+                { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Custom"), icon: "tag" },
+                { value: "drives", label: qsTr("Drives"), shortLabel: qsTr("Drives"), icon: "hard-drives" },
+                { value: "network", label: qsTr("Network"), shortLabel: qsTr("Network"), icon: "network" }
+            ]
+            value: customizePlaces.activeTab
+            onSelected: function(v) { customizePlaces.activeTab = v; }
+        }
+
+        // 1. PLACES & BOOKMARKS
+        ColumnLayout {
+            visible: customizePlaces.activeTab === "places"
+            Layout.fillWidth: true
+            spacing: 8
+
+            ListView {
+                id: customizePlacesList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(380, window.height * 0.42, contentHeight)
+                clip: true
+                model: customizePlaces.all
+                ScrollBar.vertical: ScrollBar {}
+                spacing: 4
+
+                delegate: Rectangle {
+                    id: placeRow
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width
+                    height: 40
+                    radius: theme.radiusM
+                    color: dragHandleArea.containsMouse ? theme.hoverOverlay : "transparent"
 
                 RowLayout {
                     anchors.fill: parent
@@ -4159,28 +4210,28 @@ ApplicationWindow {
                             size: 16
                             color: dragHandleArea.containsMouse ? theme.primary : theme.outline
                         }
-                        MouseArea {
-                            id: dragHandleArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.SizeVerCursor
-                            property int startY: 0
-                            property int startIdx: -1
-                            onPressed: function(mouse) {
-                                startY = mouse.y;
-                                startIdx = placeRow.index;
-                            }
-                            onPositionChanged: function(mouse) {
-                                if (pressed) {
-                                    var pt = mapToItem(customizePlacesList.contentItem, mouse.x, mouse.y);
-                                    var targetIdx = Math.max(0, Math.min(customizePlaces.all.length - 1, Math.floor(pt.y / 44)));
-                                    if (targetIdx !== placeRow.index) {
-                                        core.move_place(placeRow.modelData.id, targetIdx);
+                            MouseArea {
+                                id: dragHandleArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.SizeVerCursor
+                                property int startY: 0
+                                property int startIdx: -1
+                                onPressed: function(mouse) {
+                                    startY = mouse.y;
+                                    startIdx = placeRow.index;
+                                }
+                                onPositionChanged: function(mouse) {
+                                    if (pressed) {
+                                        var pt = mapToItem(customizePlacesList.contentItem, mouse.x, mouse.y);
+                                        var targetIdx = Math.max(0, Math.min(customizePlaces.all.length - 1, Math.floor(pt.y / 44)));
+                                        if (targetIdx !== placeRow.index) {
+                                            core.move_place(placeRow.modelData.id, targetIdx);
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
@@ -4200,6 +4251,7 @@ ApplicationWindow {
                         icon: placeRow.modelData.hidden ? "eye-slash" : "eye"
                         variant: "text"
                         Accessible.name: placeRow.modelData.hidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                        tooltipText: Accessible.name
                         onClicked: core.set_place_hidden(placeRow.modelData.id, !placeRow.modelData.hidden)
                     }
                     LoafButton {
@@ -4207,6 +4259,7 @@ ApplicationWindow {
                         variant: "text"
                         enabled: placeRow.modelData.kind === "bookmark" || (placeRow.modelData.id && placeRow.modelData.id.indexOf("bookmark:") === 0)
                         Accessible.name: qsTr("Remove bookmark")
+                        tooltipText: Accessible.name
                         onClicked: {
                             if (placeRow.modelData.path)
                                 core.remove_bookmark(placeRow.modelData.path);
@@ -4216,32 +4269,577 @@ ApplicationWindow {
                     }
                 }
             }
+            }
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+            LoafSwitch {
+                label: qsTr("Hide Trash when empty (shows when dragging)")
+                checked: theme.hideTrashWhenEmpty
+                onToggled: function(c) { theme.hideTrashWhenEmpty = c; }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                LoafButton {
+                    text: qsTr("Add Place…")
+                    icon: "plus"
+                    variant: "tonal"
+                    onClicked: addPlacePrompt.open()
+                }
+                LoafButton {
+                    text: qsTr("Reset")
+                    variant: "text"
+                    onClicked: core.reset_places()
+                }
+                Item { Layout.fillWidth: true }
+                LoafButton {
+                    text: qsTr("Done")
+                    variant: "filled"
+                    onClicked: customizePlaces.close()
+                }
+            }
         }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.outlineAlpha(theme.separator) }
-        LoafSwitch {
-            label: qsTr("Hide Trash when empty (shows when dragging)")
-            checked: theme.hideTrashWhenEmpty
-            onToggled: function(c) { theme.hideTrashWhenEmpty = c; }
-        }
-        RowLayout {
+        // 2. CUSTOM TABS
+        ColumnLayout {
+            visible: customizePlaces.activeTab === "custom"
             Layout.fillWidth: true
             spacing: 8
-            LoafButton {
-                text: qsTr("Add Place…")
-                icon: "plus"
-                variant: "tonal"
-                onClicked: addPlacePrompt.open()
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Text {
+                    text: qsTr("Create your own sidebar tabs to group folders")
+                    color: theme.textMuted
+                    font.pixelSize: theme.fs(12)
+                    Layout.fillWidth: true
+                }
+
+                LoafButton {
+                    text: qsTr("New Tab…")
+                    icon: "plus"
+                    variant: "tonal"
+                    onClicked: newCustomTabPrompt.open()
+                }
             }
-            LoafButton {
-                text: qsTr("Reset")
-                variant: "text"
-                onClicked: core.reset_places()
+
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+
+            Item {
+                visible: !theme.sidebarCustomTabs || theme.sidebarCustomTabs.length === 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: 160
+
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    LoafIcon {
+                        Layout.alignment: Qt.AlignHCenter
+                        name: "folder-plus"
+                        size: 34
+                        color: theme.outline
+                    }
+
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("No custom tabs created yet")
+                        color: theme.textMuted
+                        font.pixelSize: theme.fs(13)
+                    }
+
+                    LoafButton {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Create New Tab…")
+                        icon: "plus"
+                        variant: "filled"
+                        onClicked: newCustomTabPrompt.open()
+                    }
+                }
             }
-            Item { Layout.fillWidth: true }
-            LoafButton {
-                text: qsTr("Done")
-                variant: "filled"
-                onClicked: customizePlaces.close()
+
+            ListView {
+                id: customTabsList
+                visible: theme.sidebarCustomTabs && theme.sidebarCustomTabs.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
+                clip: true
+                model: theme.sidebarCustomTabs
+                ScrollBar.vertical: ScrollBar {}
+                spacing: 8
+
+                delegate: Rectangle {
+                    id: tabCard
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width
+                    height: tabCol.implicitHeight
+                    color: "transparent"
+
+                    ColumnLayout {
+                        id: tabCol
+                        anchors.fill: parent
+                        spacing: 0
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            spacing: 10
+
+                            LoafIcon {
+                                name: tabCard.modelData.icon || "tag"
+                                size: 16
+                                color: theme.primary
+                            }
+
+                            Text {
+                                text: tabCard.modelData.name || ""
+                                color: theme.textMain
+                                font.pixelSize: theme.fs(13)
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: qsTr("%1 items").arg(tabCard.modelData.items ? tabCard.modelData.items.length : 0)
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(11)
+                            }
+
+                            LoafButton {
+                                icon: "plus"
+                                variant: "text"
+                                Accessible.name: qsTr("Add folder to tab")
+                                ToolTip.visible: hovered
+                                ToolTip.text: qsTr("Add Folder")
+                                onClicked: {
+                                    addFolderToTabPrompt.tabId = tabCard.modelData.id;
+                                    addFolderToTabPrompt.open();
+                                }
+                            }
+
+                            LoafButton {
+                                icon: "pencil-simple"
+                                variant: "text"
+                                Accessible.name: qsTr("Rename tab")
+                                ToolTip.visible: hovered
+                                ToolTip.text: qsTr("Rename")
+                                onClicked: {
+                                    renameCustomTabPrompt.tabId = tabCard.modelData.id;
+                                    renameCustomTabPrompt.open();
+                                }
+                            }
+
+                            LoafButton {
+                                icon: "trash"
+                                variant: "danger"
+                                Accessible.name: qsTr("Delete tab")
+                                ToolTip.visible: hovered
+                                ToolTip.text: qsTr("Delete")
+                                onClicked: theme.removeCustomTab(tabCard.modelData.id)
+                            }
+                        }
+
+                        Repeater {
+                            model: tabCard.modelData.items || []
+
+                            delegate: Rectangle {
+                                id: folderRow
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                radius: theme.radiusM
+                                color: itemHover.containsMouse ? theme.hoverOverlay : "transparent"
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    spacing: 10
+
+                                    LoafIcon {
+                                        name: folderRow.modelData.icon || "folder"
+                                        size: 16
+                                        color: theme.secondary
+                                    }
+
+                                    Text {
+                                        text: folderRow.modelData.name || ""
+                                        color: theme.textMain
+                                        font.pixelSize: theme.fs(13)
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        text: folderRow.modelData.path || ""
+                                        color: theme.textMuted
+                                        font.pixelSize: theme.fs(10)
+                                        font.family: "monospace"
+                                        elide: Text.ElideMiddle
+                                        Layout.maximumWidth: 140
+                                    }
+
+                                    LoafButton {
+                                        icon: "x"
+                                        variant: "text"
+                                        Accessible.name: qsTr("Remove folder")
+                                        onClicked: theme.removeCustomTabItem(tabCard.modelData.id, folderRow.modelData.id)
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: itemHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                LoafButton {
+                    text: qsTr("Done")
+                    variant: "filled"
+                    onClicked: customizePlaces.close()
+                }
+            }
+        }
+
+        // 3. STORAGE DRIVES
+        ColumnLayout {
+            visible: customizePlaces.activeTab === "drives"
+            Layout.fillWidth: true
+            spacing: 8
+
+            LoafSwitch {
+                Layout.fillWidth: true
+                label: qsTr("Show internal drives in sidebar")
+                checked: theme.sidebarShowInternalDrives
+                onToggled: function(c) { theme.sidebarShowInternalDrives = c; }
+            }
+
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+
+            Text {
+                visible: customizePlaces.allDrives.length === 0
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+                text: qsTr("No drives are currently available.")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(12)
+                wrapMode: Text.Wrap
+            }
+
+            ListView {
+                id: customizeDrivesList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
+                clip: true
+                model: customizePlaces.allDrives
+                ScrollBar.vertical: ScrollBar {}
+                spacing: 4
+
+                delegate: Rectangle {
+                    id: driveRow
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width
+                    height: 40
+                    radius: theme.radiusM
+                    color: driveRowHover.containsMouse ? theme.hoverOverlay : "transparent"
+
+                    readonly property string driveId: (modelData && (modelData.device || modelData.name)) || ""
+                    readonly property bool isInternal: modelData && !modelData.is_external && modelData.provider !== "mtp"
+                    readonly property bool isIndividuallyHidden: theme.isDriveHiddenInSidebar(driveId)
+                    readonly property bool isEffectivelyHidden: isIndividuallyHidden || (!theme.sidebarShowInternalDrives && isInternal)
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 10
+
+                        Item { width: 20; height: 32 }
+
+                        LoafIcon {
+                            name: modelData.icon || (modelData.provider === "mtp" ? "device-mobile" : (modelData.is_external ? "usb" : "hard-drive"))
+                            size: 16
+                            color: driveRow.isEffectivelyHidden ? theme.outline : theme.primary
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                text: theme.resolveRustMessage((modelData.name && String(modelData.name).length > 0 ? modelData.name : modelData.device) || "")
+                                color: driveRow.isEffectivelyHidden ? theme.textMuted : theme.textMain
+                                font.pixelSize: theme.fs(13)
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                opacity: driveRow.isEffectivelyHidden ? 0.6 : 1.0
+                            }
+
+                            Text {
+                                text: (driveRow.isInternal ? qsTr("Internal") : qsTr("External"))
+                                    + (modelData.device ? " • " + modelData.device : "")
+                                    + (modelData.mount_point ? " • " + modelData.mount_point : "")
+                                    + (!theme.sidebarShowInternalDrives && driveRow.isInternal ? " (" + qsTr("hidden by setting") + ")" : "")
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(11)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+
+                        LoafButton {
+                            icon: driveRow.isEffectivelyHidden ? "eye-slash" : "eye"
+                            variant: "text"
+                            Accessible.name: driveRow.isEffectivelyHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                            tooltipText: Accessible.name
+                            onClicked: {
+                                if (driveRow.isInternal && !theme.sidebarShowInternalDrives) {
+                                    theme.sidebarShowInternalDrives = true;
+                                    if (driveRow.isIndividuallyHidden)
+                                        theme.setDriveHiddenInSidebar(driveRow.driveId, false);
+                                } else {
+                                    theme.setDriveHiddenInSidebar(driveRow.driveId, !driveRow.isIndividuallyHidden);
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            id: driveRowHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+                    }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                LoafButton {
+                    text: qsTr("Unhide All Drives")
+                    icon: "arrow-counter-clockwise"
+                    variant: "tonal"
+                    enabled: Object.keys(theme.sidebarHiddenDrives).length > 0 || !theme.sidebarShowInternalDrives
+                    onClicked: {
+                        theme.sidebarHiddenDrives = {};
+                        theme.sidebarShowInternalDrives = true;
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                LoafButton {
+                    text: qsTr("Done")
+                    variant: "filled"
+                    onClicked: customizePlaces.close()
+                }
+            }
+        }
+
+        // 4. NETWORK DRIVES
+        ColumnLayout {
+            visible: customizePlaces.activeTab === "network"
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                visible: customizeNetworkList.count === 0
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+                text: qsTr("No network locations are currently available.")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(12)
+                wrapMode: Text.Wrap
+            }
+
+            ListView {
+                id: customizeNetworkList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
+                clip: true
+                model: {
+                    var np = [];
+                    for (var i = 0; i < customizePlaces.all.length; ++i) {
+                        var p = customizePlaces.all[i];
+                        if (p.kind === "network" || p.kind === "smb" || p.kind === "smb-discovery")
+                            np.push(p);
+                    }
+                    return np;
+                }
+                ScrollBar.vertical: ScrollBar {}
+                spacing: 4
+
+                delegate: Rectangle {
+                    id: netRow
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width
+                    height: 40
+                    radius: theme.radiusM
+                    color: netRowHover.containsMouse ? theme.hoverOverlay : "transparent"
+
+                    readonly property string netId: (modelData && (modelData.id || modelData.path || modelData.name)) || ""
+                    readonly property bool isHidden: theme.isDriveHiddenInSidebar(netId)
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 10
+
+                        Item { width: 20; height: 32 }
+
+                        LoafIcon {
+                            name: modelData.icon || "network"
+                            size: 16
+                            color: netRow.isHidden ? theme.outline : theme.primary
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                text: theme.resolveRustMessage(modelData.name || modelData.label || modelData.server || "")
+                                color: netRow.isHidden ? theme.textMuted : theme.textMain
+                                font.pixelSize: theme.fs(13)
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                opacity: netRow.isHidden ? 0.6 : 1.0
+                            }
+
+                            Text {
+                                text: modelData.path || modelData.server || qsTr("Network share")
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(11)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+
+                        LoafButton {
+                            icon: netRow.isHidden ? "eye-slash" : "eye"
+                            variant: "text"
+                            Accessible.name: netRow.isHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                            tooltipText: Accessible.name
+                            onClicked: theme.setDriveHiddenInSidebar(netRow.netId, !netRow.isHidden)
+                        }
+
+                        LoafButton {
+                            icon: "trash"
+                            variant: "text"
+                            enabled: !!modelData.profile_id
+                                || modelData.kind === "smb-discovery"
+                                || (modelData.kind === "network" && !!modelData.path)
+                            Accessible.name: qsTr("Remove network share")
+                            tooltipText: enabled ? Accessible.name : ""
+                            onClicked: {
+                                if (modelData.profile_id) {
+                                    window.removeNetworkDrive(modelData.profile_id, modelData.name);
+                                } else if (modelData.kind === "smb-discovery") {
+                                    core.ignore_smb_server(modelData.server);
+                                } else if (modelData.kind === "network" && modelData.path) {
+                                    core.remove_bookmark(modelData.path);
+                                }
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        id: netRowHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                    }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                LoafButton {
+                    text: qsTr("Add Network Share…")
+                    icon: "plus"
+                    variant: "tonal"
+                    onClicked: {
+                        customizePlaces.close();
+                        window.openNetworkEditor({});
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                LoafButton {
+                    text: qsTr("Done")
+                    variant: "filled"
+                    onClicked: customizePlaces.close()
+                }
+            }
+        }
+    }
+
+    LoafTextPrompt {
+        id: newCustomTabPrompt
+        title: qsTr("New Sidebar Tab")
+        label: qsTr("Enter the name for your custom sidebar tab:")
+        placeholder: qsTr("e.g. Work, Projects, Media")
+        confirmText: qsTr("Create Tab")
+        onAccepted: function(text) {
+            var n = (text || "").trim();
+            if (n.length > 0) theme.addCustomTab(n);
+        }
+    }
+
+    LoafTextPrompt {
+        id: renameCustomTabPrompt
+        property string tabId: ""
+        title: qsTr("Rename Sidebar Tab")
+        label: qsTr("Enter the new name for this tab:")
+        confirmText: qsTr("Rename")
+        onAccepted: function(text) {
+            var n = (text || "").trim();
+            if (n.length > 0 && tabId.length > 0) {
+                theme.renameCustomTab(tabId, n);
+            }
+        }
+    }
+
+    LoafTextPrompt {
+        id: addFolderToTabPrompt
+        property string tabId: ""
+        title: qsTr("Add Folder to Tab")
+        label: qsTr("Enter the full path of the folder to add:")
+        placeholder: "/home/user/folder"
+        confirmText: qsTr("Add")
+        selectBasename: false
+        onAccepted: function(pathText) {
+            var p = (pathText || "").trim();
+            if (p.length > 0 && tabId.length > 0) {
+                theme.addCustomTabItem(tabId, { path: p });
             }
         }
     }
