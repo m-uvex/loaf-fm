@@ -4555,6 +4555,8 @@ ApplicationWindow {
                         anchors.rightMargin: 8
                         spacing: 10
 
+                        Item { width: 20; height: 32 }
+
                         LoafIcon {
                             name: modelData.icon || (modelData.provider === "mtp" ? "device-mobile" : (modelData.is_external ? "usb" : "hard-drive"))
                             size: 16
@@ -4566,7 +4568,7 @@ ApplicationWindow {
                             spacing: 1
 
                             Text {
-                                text: (modelData.name && String(modelData.name).length > 0 ? modelData.name : modelData.device) || ""
+                                text: theme.resolveRustMessage((modelData.name && String(modelData.name).length > 0 ? modelData.name : modelData.device) || "")
                                 color: driveRow.isEffectivelyHidden ? theme.textMuted : theme.textMain
                                 font.pixelSize: theme.fs(13)
                                 font.bold: true
@@ -4591,6 +4593,8 @@ ApplicationWindow {
                             icon: driveRow.isEffectivelyHidden ? "eye-slash" : "eye"
                             variant: "text"
                             Accessible.name: driveRow.isEffectivelyHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                            ToolTip.visible: hovered
+                            ToolTip.text: Accessible.name
                             onClicked: {
                                 if (driveRow.isInternal && !theme.sidebarShowInternalDrives) {
                                     theme.sidebarShowInternalDrives = true;
@@ -4677,6 +4681,8 @@ ApplicationWindow {
                         anchors.rightMargin: 8
                         spacing: 10
 
+                        Item { width: 20; height: 32 }
+
                         LoafIcon {
                             name: modelData.icon || "network"
                             size: 16
@@ -4688,7 +4694,7 @@ ApplicationWindow {
                             spacing: 1
 
                             Text {
-                                text: modelData.name || ""
+                                text: theme.resolveRustMessage(modelData.name || modelData.label || modelData.server || "")
                                 color: netRow.isHidden ? theme.textMuted : theme.textMain
                                 font.pixelSize: theme.fs(13)
                                 font.bold: true
@@ -4710,7 +4716,25 @@ ApplicationWindow {
                             icon: netRow.isHidden ? "eye-slash" : "eye"
                             variant: "text"
                             Accessible.name: netRow.isHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                            ToolTip.visible: hovered
+                            ToolTip.text: Accessible.name
                             onClicked: theme.setDriveHiddenInSidebar(netRow.netId, !netRow.isHidden)
+                        }
+
+                        LoafButton {
+                            icon: "trash"
+                            variant: "text"
+                            enabled: !!modelData.profile_id || modelData.kind === "smb-discovery"
+                            Accessible.name: qsTr("Remove network share")
+                            ToolTip.visible: hovered && enabled
+                            ToolTip.text: Accessible.name
+                            onClicked: {
+                                if (modelData.profile_id) {
+                                    window.removeNetworkDrive(modelData.profile_id, modelData.name);
+                                } else if (modelData.kind === "smb-discovery") {
+                                    core.ignore_smb_server(modelData.server);
+                                }
+                            }
                         }
                     }
 
