@@ -7,8 +7,8 @@ Item {
     id: root
 
     Layout.fillWidth: true
-    Layout.preferredHeight: root.hasStorage ? 164 : 128
-    implicitHeight: root.hasStorage ? 164 : 128
+    Layout.preferredHeight: root.hasUsage ? 164 : 128
+    implicitHeight: root.hasUsage ? 164 : 128
     implicitWidth: 320
 
     property var remote: ({})
@@ -25,9 +25,6 @@ Item {
     readonly property bool hasUsage: root.connected && root.remote.protocol === "smb" && root.totalBytes > 0
     readonly property real usage: Math.max(0, Math.min(1, ((root.remote && root.remote.percent) || 0) / 100))
     readonly property bool almostFull: root.hasUsage && root.usage >= 0.9
-
-    readonly property bool hasStorage: root.hasUsage
-    readonly property real storageUsage: root.usage
 
     function formatBytes(bytes) {
         var b = Number(bytes) || 0;
@@ -262,33 +259,6 @@ Item {
             font.bold: true
         }
 
-        UsageBar {
-            visible: root.hasStorage
-            Layout.fillWidth: true
-            value: root.storageUsage
-            barColor: root.storageUsage >= 0.9 ? theme.danger : theme.primary
-        }
-
-        RowLayout {
-            visible: root.hasStorage
-            Layout.fillWidth: true
-            spacing: 8
-
-            Text {
-                text: qsTr("%1 used").arg(root.remote.used_str || "")
-                color: theme.textMuted
-                font.pixelSize: theme.fs(11)
-                elide: Text.ElideRight
-                Layout.fillWidth: true
-            }
-
-            Text {
-                text: qsTr("%1 free of %2").arg(root.remote.free_str || "").arg(root.remote.total_str || "")
-                color: theme.textMuted
-                font.pixelSize: theme.fs(11)
-                horizontalAlignment: Text.AlignRight
-            }
-        }
     }
 
     MouseArea {

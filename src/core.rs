@@ -728,6 +728,24 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
     }))
 }
 
+fn canonical_remote_uri(uri: &str) -> String {
+    let Some((scheme, rest)) = uri.split_once("://") else {
+        return uri.to_string();
+    };
+    let authority_end = rest.find('/').unwrap_or(rest.len());
+    let (authority, path) = rest.split_at(authority_end);
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host)
+        .to_ascii_lowercase();
+    format!(
+        "{}://{}{}",
+        scheme.to_ascii_lowercase(),
+        host,
+        path.trim_end_matches('/')
+    )
+}
+
 /// Every sidebar entry, with a `hidden` flag.
 fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     let cfg = places_config();
@@ -783,19 +801,25 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
     // Network bookmarks (remote URIs) from the shared GTK bookmarks
     // file, e.g. shortcuts saved by Nemo/Nautilus. Loaf can't browse them
     // internally, so they open with the system's default handler.
+    let profiles = network::profiles();
+    let profile_uris: std::collections::HashSet<String> = profiles
+        .iter()
+        .map(|p| canonical_remote_uri(&network::uri(p)))
+        .collect();
+    let mut network_bookmark_uris = std::collections::HashSet::new();
     for b in xdg::bookmarks() {
         if let Some(entry) = network_place(&b) {
-            items.push(entry);
+            let uri = entry["path"].as_str().unwrap_or_default();
+            let canonical_uri = canonical_remote_uri(uri);
+            if !profile_uris.contains(&canonical_uri) && network_bookmark_uris.insert(canonical_uri)
+            {
+                items.push(entry);
+            }
         }
     }
-    let profiles = network::profiles();
     for p in &profiles {
         let state = network::state_for(p);
         items.push(serde_json::json!({
-            "id": format!("network:{}", p.id),
-            "kind": "network",
-            "protocol": p.protocol.as_str(),
-            "name": state.label,
             "id": format!("smb:{}", p.id),
             "kind": "smb",
             "name": Message::raw(&state.label).to_string(),
@@ -4271,6 +4295,18 @@ mod tests {
             label: String::new(),
         };
         assert!(network_place(&junk).is_none());
+    }
+
+    #[test]
+    fn canonical_remote_uri_normalizes_scheme_host_and_trailing_slash() {
+        assert_eq!(
+            canonical_remote_uri("SMB://Alice@NAS.EXAMPLE/share/"),
+            canonical_remote_uri("smb://Alice@nas.example/share")
+        );
+        assert_ne!(
+            canonical_remote_uri("smb://nas.example/share"),
+            canonical_remote_uri("smb://nas.example/other")
+        );
     }
 
     #[test]

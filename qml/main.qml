@@ -4139,7 +4139,7 @@ ApplicationWindow {
     LoafDialog {
         id: customizePlaces
         title: qsTr("Customize Sidebar")
-        dialogWidth: 460
+        dialogWidth: Math.max(280, Math.min(560, window.width - 32))
         property var all: []
         property var allDrives: []
         property string activeTab: "places"
@@ -4164,10 +4164,10 @@ ApplicationWindow {
         LoafSegmented {
             Layout.fillWidth: true
             options: [
-                { value: "places", label: qsTr("Places") },
-                { value: "custom", label: qsTr("Custom Tabs") },
-                { value: "drives", label: qsTr("Drives") },
-                { value: "network", label: qsTr("Network") }
+                { value: "places", label: qsTr("Places"), shortLabel: qsTr("Places"), icon: "folder" },
+                { value: "custom", label: qsTr("Custom"), shortLabel: qsTr("Custom"), icon: "tag" },
+                { value: "drives", label: qsTr("Drives"), shortLabel: qsTr("Drives"), icon: "hard-drives" },
+                { value: "network", label: qsTr("Network"), shortLabel: qsTr("Network"), icon: "network" }
             ]
             value: customizePlaces.activeTab
             onSelected: function(v) { customizePlaces.activeTab = v; }
@@ -4182,7 +4182,7 @@ ApplicationWindow {
             ListView {
                 id: customizePlacesList
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(380, contentHeight)
+                Layout.preferredHeight: Math.min(380, window.height * 0.42, contentHeight)
                 clip: true
                 model: customizePlaces.all
                 ScrollBar.vertical: ScrollBar {}
@@ -4251,6 +4251,7 @@ ApplicationWindow {
                         icon: placeRow.modelData.hidden ? "eye-slash" : "eye"
                         variant: "text"
                         Accessible.name: placeRow.modelData.hidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
+                        tooltipText: Accessible.name
                         onClicked: core.set_place_hidden(placeRow.modelData.id, !placeRow.modelData.hidden)
                     }
                     LoafButton {
@@ -4258,6 +4259,7 @@ ApplicationWindow {
                         variant: "text"
                         enabled: placeRow.modelData.kind === "bookmark" || (placeRow.modelData.id && placeRow.modelData.id.indexOf("bookmark:") === 0)
                         Accessible.name: qsTr("Remove bookmark")
+                        tooltipText: Accessible.name
                         onClicked: {
                             if (placeRow.modelData.path)
                                 core.remove_bookmark(placeRow.modelData.path);
@@ -4360,7 +4362,7 @@ ApplicationWindow {
                 id: customTabsList
                 visible: theme.sidebarCustomTabs && theme.sidebarCustomTabs.length > 0
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(320, contentHeight)
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
                 clip: true
                 model: theme.sidebarCustomTabs
                 ScrollBar.vertical: ScrollBar {}
@@ -4526,10 +4528,21 @@ ApplicationWindow {
 
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: theme.separator }
 
+            Text {
+                visible: customizePlaces.allDrives.length === 0
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+                text: qsTr("No drives are currently available.")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(12)
+                wrapMode: Text.Wrap
+            }
+
             ListView {
                 id: customizeDrivesList
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(320, contentHeight)
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
                 clip: true
                 model: customizePlaces.allDrives
                 ScrollBar.vertical: ScrollBar {}
@@ -4593,13 +4606,15 @@ ApplicationWindow {
                             icon: driveRow.isEffectivelyHidden ? "eye-slash" : "eye"
                             variant: "text"
                             Accessible.name: driveRow.isEffectivelyHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
-                            ToolTip.visible: hovered
-                            ToolTip.text: Accessible.name
+                            tooltipText: Accessible.name
                             onClicked: {
                                 if (driveRow.isInternal && !theme.sidebarShowInternalDrives) {
                                     theme.sidebarShowInternalDrives = true;
+                                    if (driveRow.isIndividuallyHidden)
+                                        theme.setDriveHiddenInSidebar(driveRow.driveId, false);
+                                } else {
+                                    theme.setDriveHiddenInSidebar(driveRow.driveId, !driveRow.isIndividuallyHidden);
                                 }
-                                theme.setDriveHiddenInSidebar(driveRow.driveId, !driveRow.isIndividuallyHidden);
                             }
                         }
 
@@ -4646,10 +4661,21 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 8
 
+            Text {
+                visible: customizeNetworkList.count === 0
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+                text: qsTr("No network locations are currently available.")
+                color: theme.textMuted
+                font.pixelSize: theme.fs(12)
+                wrapMode: Text.Wrap
+            }
+
             ListView {
                 id: customizeNetworkList
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(320, contentHeight)
+                Layout.preferredHeight: Math.min(320, window.height * 0.42, contentHeight)
                 clip: true
                 model: {
                     var np = [];
@@ -4716,23 +4742,25 @@ ApplicationWindow {
                             icon: netRow.isHidden ? "eye-slash" : "eye"
                             variant: "text"
                             Accessible.name: netRow.isHidden ? qsTr("Show in sidebar") : qsTr("Hide from sidebar")
-                            ToolTip.visible: hovered
-                            ToolTip.text: Accessible.name
+                            tooltipText: Accessible.name
                             onClicked: theme.setDriveHiddenInSidebar(netRow.netId, !netRow.isHidden)
                         }
 
                         LoafButton {
                             icon: "trash"
                             variant: "text"
-                            enabled: !!modelData.profile_id || modelData.kind === "smb-discovery"
+                            enabled: !!modelData.profile_id
+                                || modelData.kind === "smb-discovery"
+                                || (modelData.kind === "network" && !!modelData.path)
                             Accessible.name: qsTr("Remove network share")
-                            ToolTip.visible: hovered && enabled
-                            ToolTip.text: Accessible.name
+                            tooltipText: enabled ? Accessible.name : ""
                             onClicked: {
                                 if (modelData.profile_id) {
                                     window.removeNetworkDrive(modelData.profile_id, modelData.name);
                                 } else if (modelData.kind === "smb-discovery") {
                                     core.ignore_smb_server(modelData.server);
+                                } else if (modelData.kind === "network" && modelData.path) {
+                                    core.remove_bookmark(modelData.path);
                                 }
                             }
                         }
