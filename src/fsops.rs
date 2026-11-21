@@ -172,6 +172,27 @@ fn copy_data(
     }
 }
 
+/// Best-effort permission preservation: non-POSIX filesystems (CIFS/SMB
+/// mounted with `nounix`, exFAT, FAT32, NTFS) return EOPNOTSUPP/EPERM/ENOSYS
+/// when setting POSIX mode bits on a newly created file or directory.
+fn ignore_unsupported_perm(res: io::Result<()>) -> io::Result<()> {
+    match res {
+        Ok(()) => Ok(()),
+        Err(e)
+            if matches!(
+                e.raw_os_error(),
+                Some(libc::EOPNOTSUPP)
+                    | Some(libc::ENOSYS)
+                    | Some(libc::EINVAL)
+                    | Some(libc::EPERM)
+            ) =>
+        {
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 fn copy_file(src: &Path, dst: &Path, meta: &fs::Metadata, mon: &dyn Monitor) -> io::Result<()> {
     let mut input = fs::File::open(src)?;
     // create_new: never clobber something that appeared in the meantime.
@@ -181,7 +202,9 @@ fn copy_file(src: &Path, dst: &Path, meta: &fs::Metadata, mon: &dyn Monitor) -> 
         .mode(0o600)
         .open(dst)?;
     let result = copy_data(&mut input, &mut output, src, mon).and_then(|_| {
-        output.set_permissions(fs::Permissions::from_mode(meta.mode() & 0o7777))?;
+        ignore_unsupported_perm(
+            output.set_permissions(fs::Permissions::from_mode(meta.mode() & 0o7777)),
+        )?;
         set_times(output.as_raw_fd(), meta);
         Ok(())
     });
@@ -229,7 +252,10 @@ fn copy_tree_inner(src: &Path, dst: &Path, mon: &dyn Monitor) -> io::Result<()> 
             let entry = entry?;
             copy_tree_inner(&entry.path(), &dst.join(entry.file_name()), mon)?;
         }
-        fs::set_permissions(dst, fs::Permissions::from_mode(meta.mode() & 0o7777))?;
+        ignore_unsupported_perm(fs::set_permissions(
+            dst,
+            fs::Permissions::from_mode(meta.mode() & 0o7777),
+        ))?;
         set_path_times(dst, &meta);
         mon.advance(0, src);
     } else if ft.is_file() {
@@ -415,7 +441,7 @@ pub fn rename_noreplace(from: &Path, to: &Path) -> io::Result<()> {
     let e = io::Error::last_os_error();
     match e.raw_os_error() {
         // Filesystem without RENAME_NOREPLACE support: best effort.
-        Some(libc::EINVAL) | Some(libc::ENOSYS) => {
+        Some(libc::EINVAL) | Some(libc::ENOSYS) | Some(libc::EOPNOTSUPP) => {
             if fs::symlink_metadata(to).is_ok() {
                 return Err(io::Error::from(io::ErrorKind::AlreadyExists));
             }
@@ -612,5 +638,14 @@ mod tests {
         assert_eq!(unique_name(&d, ".bashrc"), d.join(".bashrc (2)"));
         assert_eq!(unique_name(&d, "free"), d.join("free"));
         fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn ignores_unsupported_permission_errors() {
+        for code in [libc::EOPNOTSUPP, libc::ENOSYS, libc::EINVAL, libc::EPERM] {
+            assert!(ignore_unsupported_perm(Err(io::Error::from_raw_os_error(code))).is_ok());
+        }
+        let fatal = ignore_unsupported_perm(Err(io::Error::from_raw_os_error(libc::EIO)));
+        assert_eq!(fatal.unwrap_err().raw_os_error(), Some(libc::EIO));
     }
 }
