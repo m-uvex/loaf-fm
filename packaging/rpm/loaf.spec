@@ -36,6 +36,12 @@ Requires:       qt6-qtbase-gui
 Requires:       qt6-qtdeclarative
 Requires:       qt6-qtsvg
 Requires:       hicolor-icon-theme
+Requires:       gvfs
+%if 0%{?suse_version}
+Requires:       gvfs-backend-samba
+%else
+Requires:       gvfs-smb
+%endif
 Recommends:     qt6-qtwayland
 # Archives: 7-Zip handles zip/7z/rar/iso and encrypted archives.
 Recommends:     (7zip or p7zip)

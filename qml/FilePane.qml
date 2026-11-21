@@ -532,7 +532,8 @@ Item {
     readonly property real chromeScale: Math.min(1, zoom)
     readonly property int iconBox: Math.round(46 * zoom)
     readonly property int cellW: Math.round(Math.max(124 * chromeScale, iconBox + 48))
-    readonly property int cellH: Math.round(iconBox + 68 * chromeScale)
+    readonly property int cellH: Math.round(iconBox + 68 * chromeScale * theme.densityFactor)
+    readonly property int listRowH: Math.round(38 * Math.max(0.85, Math.min(1.3, zoom)) * theme.densityFactor)
     readonly property int iconSize: Math.round(42 * zoom)
     // Thumbnails are requested for the zoom being animated to, not every
     // step of the spring, so a zoom change loads each one once.
@@ -774,7 +775,7 @@ Item {
                     traced = traced || {};
                     var on = function (n) { return n >= 0 && !!traced[n] && !!sel[n]; };
                     if (pane.isList()) {
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
+                        var rowH = pane.listRowH;
                         var pitch = rowH + listView.spacing;
                         var itemTop = idx * pitch;
                         if (paneEngine.sort_by === "modified") {
@@ -846,7 +847,7 @@ Item {
                     if (count <= 0)
                         return out;
                     if (pane.isList()) {
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom))) + 3;
+                        var rowH = pane.listRowH + 3;
                         if (paneEngine.sort_by === "modified") {
                             var groups = [];
                             try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
@@ -1080,7 +1081,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: gridScroll.pressed ? theme.primary : (gridScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: gridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1089,7 +1090,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 // Rubber band selection.
@@ -1261,7 +1262,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: groupedGridScroll.pressed ? theme.primary : (groupedGridScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: groupedGridScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1279,7 +1280,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 Rectangle {
@@ -1513,12 +1514,7 @@ Item {
                                 cursorShape: Qt.PointingHandCursor
                                 Accessible.role: Accessible.ColumnHeader
                                 Accessible.name: modelData.label
-                                onClicked: {
-                                    if (paneEngine.sort_by === modelData.key)
-                                        paneEngine.toggle_sort_order();
-                                    else
-                                        paneEngine.set_sort(modelData.key, modelData.defaultAsc);
-                                }
+                                onClicked: window.viewPrefs.sortBy(modelData.key, modelData.defaultAsc)
                             }
                         }
                     }
@@ -1590,7 +1586,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 6
                         radius: 3
-                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outlineAlpha(theme.outline) : theme.outlineAlpha(theme.outlineVariant))
+                        color: listScroll.pressed ? theme.primary : (listScroll.hovered ? theme.outline : theme.outlineVariant)
                         opacity: listScroll.active ? 1.0 : 0.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200 } }
                     }
@@ -1599,7 +1595,7 @@ Item {
                 WheelHandler {
                     target: null
                     acceptedModifiers: Qt.ControlModifier
-                    onWheel: function(event) { theme.stepZoom(event.angleDelta.y > 0 ? 1 : -1); }
+                    onWheel: function(event) { window.viewPrefs.zoom(event.angleDelta.y > 0 ? 1 : -1); }
                 }
 
                 // Rubber band selection.
@@ -1635,7 +1631,7 @@ Item {
                         var w = Math.abs(mx - sx), h = Math.abs(my - sy);
                         listBand.x = x; listBand.y = y; listBand.width = w; listBand.height = h;
                         var sel = Object.assign({}, base);
-                        var rowH = Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)));
+                        var rowH = pane.listRowH;
                         var pitch = rowH + listView.spacing;
                         if (paneEngine.sort_by === "modified") {
                             var groups = [];
@@ -1750,7 +1746,7 @@ Item {
                     id: row
                     ListView.onPooled: rowMouse.dragging = false
                     width: listView.width
-                    height: Math.round(38 * Math.max(0.85, Math.min(1.3, pane.zoom)))
+                    height: pane.listRowH
 
                     required property int index
                     required property string name
@@ -1915,7 +1911,7 @@ Item {
                             Layout.preferredWidth: 100
                             Layout.minimumWidth: 70
                             text: theme.categoryName(row.category)
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.outlineAlpha(theme.outline)
+                            color: row.isSelected ? theme.secondaryContainerFg : theme.outline
                             font.pixelSize: theme.fs(11)
                             elide: Text.ElideRight
                         }

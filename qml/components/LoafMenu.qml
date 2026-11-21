@@ -112,9 +112,11 @@ LoafPopup {
 
     function computeHeight() {
         var opts = menu.model;
-        if (!opts || opts.length === 0)
-            return 2 * menu.contentPadding;
         var total = 2 * menu.contentPadding;
+        if (menu.headerBar && menu.headerBar.visible)
+            total += menu.headerBar.implicitHeight + 6;
+        if (!opts || opts.length === 0)
+            return total;
         for (var i = 0; i < opts.length; ++i) {
             total += 36;
             if (opts[i] && opts[i].separatorBefore)
@@ -348,6 +350,26 @@ LoafPopup {
             menu.closeRecursive();
         else
             menu.close();
+    }
+
+    // Optional header rendered above the rows (e.g. the scope pill in the
+    // View menu). Absent by default, then it takes no part in the layout.
+    property Item headerBar: null
+    property alias headerHostItem: headerHost
+
+    Item {
+        id: headerHost
+        Layout.fillWidth: true
+        visible: menu.headerBar !== null
+        Layout.preferredHeight: visible ? menu.headerBar.implicitHeight + 6 : 0
+        Component.onCompleted: {
+            if (!menu.headerBar)
+                return;
+            menu.headerBar.parent = headerHost;
+            menu.headerBar.anchors.left = headerHost.left;
+            menu.headerBar.anchors.right = headerHost.right;
+            menu.headerBar.anchors.verticalCenter = headerHost.verticalCenter;
+        }
     }
 
     // Rows live in a ListView: only visible rows are created (an app list

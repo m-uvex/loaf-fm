@@ -19,7 +19,7 @@
           ];
         in pkgs.rustPlatform.buildRustPackage {
           pname = "loaf";
-          version = "0.3.0";
+          version = "0.4.0";
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
@@ -28,9 +28,11 @@
             pkg-config
             cmake
             ninja
+            mold
             qt6.qttools
             qt6.wrapQtAppsHook
           ];
+          RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
           dontUseCmakeConfigure = true;
           dontUseNinjaBuild = true;
           dontUseNinjaInstall = true;
@@ -82,6 +84,7 @@
             pkg-config
             cmake
             ninja
+            mold
             rustc
             cargo
             rustfmt
@@ -105,6 +108,10 @@
             # env cleared, dropping QMAKEPATH, so point QMAKE at the qt6-env
             # wrapper whose compiled-in prefix contains all modules.
             export QMAKE="${qtEnv}/bin/qmake"
+            case " ''${RUSTFLAGS:-} " in
+              *-fuse-ld*) ;;
+              *) export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-fuse-ld=mold" ;;
+            esac
           '';
           QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
           QML2_IMPORT_PATH = "${qtEnv}/lib/qt-6/qml";

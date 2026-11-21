@@ -833,14 +833,89 @@ pub fn lower_filter(filter: &str) -> String {
     filter.trim().to_lowercase()
 }
 
+/// Iterative glob matching supporting `*` and `?` on lowercase ASCII/UTF-8 chars.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let t: Vec<char> = text.chars().collect();
+    let (mut pi, mut ti) = (0usize, 0usize);
+    let (mut star, mut match_ti) = (None, 0usize);
+    while ti < t.len() {
+        if pi < p.len() && (p[pi] == '?' || p[pi] == t[ti]) {
+            pi += 1;
+            ti += 1;
+        } else if pi < p.len() && p[pi] == '*' {
+            star = Some(pi);
+            match_ti = ti;
+            pi += 1;
+        } else if let Some(s) = star {
+            pi = s + 1;
+            match_ti += 1;
+            ti = match_ti;
+        } else {
+            return false;
+        }
+    }
+    while pi < p.len() && p[pi] == '*' {
+        pi += 1;
+    }
+    pi == p.len()
+}
+
+/// Parses a size predicate such as `>10mb`, `<=500kb`, or `<1g`.
+fn parse_size_filter(filter_lower: &str) -> Option<(u8, u64)> {
+    let (op, rest) = if let Some(r) = filter_lower.strip_prefix(">=") {
+        (0u8, r.trim())
+    } else if let Some(r) = filter_lower.strip_prefix("<=") {
+        (1u8, r.trim())
+    } else if let Some(r) = filter_lower.strip_prefix('>') {
+        (2u8, r.trim())
+    } else {
+        let r = filter_lower.strip_prefix('<')?;
+        (3u8, r.trim())
+    };
+    let split = rest
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(rest.len());
+    let num: f64 = rest[..split].parse().ok()?;
+    let unit = rest[split..].trim();
+    let mult: f64 = match unit {
+        "" | "b" => 1.0,
+        "k" | "kb" | "kib" => 1024.0,
+        "m" | "mb" | "mib" => 1024.0 * 1024.0,
+        "g" | "gb" | "gib" => 1024.0 * 1024.0 * 1024.0,
+        "t" | "tb" | "tib" => 1024.0 * 1024.0 * 1024.0 * 1024.0,
+        _ => return None,
+    };
+    Some((op, (num * mult) as u64))
+}
+
 /// Which entries are shown: hidden files only when asked, unless the
 /// filter starts with a dot (so ".bashrc" can be found, issue #12).
 /// `filter_lower` comes from `lower_filter`.
+/// Supports plain substring, `*`/`?` globs (`*.rs`), and size predicates (`>10mb`).
 pub fn visible(e: &Entry, show_hidden: bool, filter_lower: &str) -> bool {
     if e.is_hidden && !show_hidden && !filter_lower.starts_with('.') {
         return false;
     }
-    filter_lower.is_empty() || e.name_lower.contains(filter_lower)
+    if filter_lower.is_empty() {
+        return true;
+    }
+    if let Some((op, threshold)) = parse_size_filter(filter_lower) {
+        if e.is_dir {
+            return false;
+        }
+        return match op {
+            0 => e.size >= threshold,
+            1 => e.size <= threshold,
+            2 => e.size > threshold,
+            3 => e.size < threshold,
+            _ => false,
+        };
+    }
+    if filter_lower.contains('*') || filter_lower.contains('?') {
+        return glob_match(filter_lower, &e.name_lower);
+    }
+    e.name_lower.contains(filter_lower)
 }
 
 /// One step that turns the old list into the new one.
@@ -1506,6 +1581,23 @@ mod tests {
         );
         assert!(!visible(&dot, false, "bash"));
         assert!(visible(&dot, true, "bash"));
+    }
+
+    #[test]
+    fn smart_filter_glob_and_size() {
+        let mut rs = e("main.rs", false, 1);
+        rs.size = 2048;
+        let mut big = e("video.mp4", false, 1);
+        big.size = 20 * 1024 * 1024;
+        let dir = e("src", true, 1);
+
+        assert!(visible(&rs, false, "*.rs"));
+        assert!(visible(&rs, false, "m?in.rs"));
+        assert!(!visible(&big, false, "*.rs"));
+        assert!(visible(&big, false, ">10mb"));
+        assert!(!visible(&rs, false, ">10mb"));
+        assert!(visible(&rs, false, "<=2kb"));
+        assert!(!visible(&dir, false, ">0"));
     }
 
     fn check_diff(old: Vec<Entry>, new: Vec<Entry>) {

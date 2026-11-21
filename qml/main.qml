@@ -38,11 +38,196 @@ ApplicationWindow {
     readonly property bool showHidden: activePane ? activePane.engine.show_hidden : false
 
     function toggleShowHidden() {
-        var v = !pane0.engine.show_hidden;
-        if (pane0.engine.show_hidden !== v)
-            pane0.engine.toggle_show_hidden();
-        if (pane1Loader.item && pane1Loader.item.engine.show_hidden !== v)
-            pane1Loader.item.engine.toggle_show_hidden();
+        viewPrefs.setHidden(!pane0.engine.show_hidden);
+    }
+
+    // View preferences resolve by scope: a folder with its own entry uses it,
+    // otherwise it inherits the nearest ancestor's entry, falling back to the
+    // shared universal set at the filesystem root. Entry modes are "dir"
+    // (own set), "universal" (pinned to the universal set) and "parent"
+    // (keep climbing, the default). The scope pill at the top of the View
+    // menu picks the active folder's mode. Exposed as a property so other
+    // components (FilePane, settings tabs) can reach the manager; ids alone
+    // are file-scoped.
+    readonly property alias viewPrefs: viewPrefsManager
+
+    QtObject {
+        id: viewPrefsManager
+
+        readonly property string universalKey: "viewPrefsUniversal"
+        readonly property string dirsKey: "viewPrefsDirs"
+        readonly property int maxDirs: 500
+
+        property var universal: null
+        property var dirs: ({})
+        // Effective mode for the active folder: "dir" (own set), "universal"
+        // (universal pin) or "parent" (inheriting from an ancestor).
+        property string mode: "parent"
+
+        function load() {
+            var u = theme.readSetting(universalKey);
+            universal = (u && u.length > 0) ? JSON.parse(u) : null;
+            if (!universal) {
+                universal = liveSnapshot(pane0.engine);
+                saveUniversal();
+            }
+            var d = theme.readSetting(dirsKey);
+            dirs = (d && d.length > 0) ? JSON.parse(d) : {};
+            refreshMode();
+        }
+
+        function liveSnapshot(eng) {
+            return {
+                view: eng.view_mode, zoom: theme.zoomIndex,
+                sort: eng.sort_by, sortAsc: eng.sort_ascending,
+                group: eng.group_by, groupAsc: eng.group_ascending,
+                folders: eng.folder_position, hidden: eng.show_hidden
+            };
+        }
+
+        function parentPath(p) {
+            if (!p || p.length <= 1)
+                return "";
+            var i = p.lastIndexOf("/");
+            return i <= 0 ? "/" : p.substring(0, i);
+        }
+
+        // Nearest entry at path or above it, climbing through "parent"
+        // entries and absent folders. Null means nothing pinned anywhere
+        // up to the root, i.e. the universal set applies.
+        function resolveEntry(path) {
+            var cur = path;
+            while (cur && cur.length > 0) {
+                var e = dirs[cur];
+                if (e && e.mode !== "parent")
+                    return e;
+                if (cur === "/")
+                    return null;
+                cur = parentPath(cur);
+            }
+            return null;
+        }
+
+        function scopeFor(path, eng) {
+            if (eng && eng.location_kind !== "dir")
+                return universal;
+            var e = resolveEntry(path);
+            return (e && e.mode === "dir") ? e.prefs : universal;
+        }
+
+        function applyTo(eng, p, withZoom) {
+            if (!eng || !p)
+                return;
+            if (eng.view_mode !== p.view)
+                eng.set_view(p.view);
+            if (eng.sort_by !== p.sort || eng.sort_ascending !== p.sortAsc)
+                eng.set_sort(p.sort, p.sortAsc);
+            if (eng.group_by !== p.group || eng.group_ascending !== p.groupAsc)
+                eng.set_group(p.group, p.groupAsc);
+            if (eng.folder_position !== p.folders)
+                eng.change_folder_position(p.folders);
+            if (withZoom && theme.zoomIndex !== p.zoom)
+                theme.zoomIndex = p.zoom;
+            if (eng.show_hidden !== p.hidden)
+                eng.toggle_show_hidden();
+        }
+
+        function syncPane(eng) {
+            if (!eng)
+                return;
+            applyTo(eng, scopeFor(eng.current_path, eng), eng === window.engine);
+            if (eng === window.engine)
+                refreshMode();
+        }
+
+        function syncAll() {
+            syncPane(pane0.engine);
+            if (pane1Loader.item)
+                syncPane(pane1Loader.item.engine);
+            refreshMode();
+        }
+
+        // Mode of the active folder's own pin, for the pill display.
+        // Inherited scopes stay invisible; resolution lives in resolveEntry.
+        function refreshMode() {
+            var eng = window.engine;
+            var e = eng && eng.location_kind === "dir" ? dirs[eng.current_path] : null;
+            mode = e ? e.mode : ((eng && eng.location_kind === "dir") ? "parent" : "universal");
+        }
+
+        function saveUniversal() {
+            theme.writeSetting(universalKey, JSON.stringify(universal));
+        }
+
+        function saveDirs() {
+            var keys = Object.keys(dirs);
+            if (keys.length > maxDirs) {
+                for (var i = 0; i < keys.length - maxDirs; ++i)
+                    delete dirs[keys[i]];
+            }
+            theme.writeSetting(dirsKey, JSON.stringify(dirs));
+        }
+
+        function set(key, value) {
+            var eng = window.engine;
+            if (!eng)
+                return;
+            var path = eng.current_path;
+            // Route by this folder's own entry, not the effective mode: an
+            // inherited dir scope belongs to an ancestor.
+            var selfEntry = eng.location_kind === "dir" ? dirs[path] : null;
+            if (selfEntry && selfEntry.mode === "dir") {
+                selfEntry.prefs[key] = value;
+                saveDirs();
+            } else if (selfEntry && selfEntry.mode === "universal") {
+                universal[key] = value;
+                saveUniversal();
+            } else if (eng.location_kind === "dir") {
+                // Inheriting (or pinned to parent): editing pins an own set
+                // on this folder instead of mutating an ancestor's entry.
+                var prefs = liveSnapshot(eng);
+                prefs[key] = value;
+                dirs[path] = { mode: "dir", prefs: prefs };
+                saveDirs();
+            } else {
+                universal[key] = value;
+                saveUniversal();
+            }
+            syncAll();
+        }
+
+        // Switch the active folder between the three modes: "dir" keeps its
+        // own set, "universal" pins the shared set, "parent" resumes
+        // inheriting from the nearest ancestor with a pin. The folder's
+        // stored set is kept through every switch, so flipping back to This
+        // folder restores it.
+        function setMode(m) {
+            var eng = window.engine;
+            if (!eng || eng.location_kind !== "dir")
+                return;
+            var path = eng.current_path;
+            var e = dirs[path];
+            if (e) {
+                e.mode = m;
+            } else {
+                dirs[path] = { mode: m, prefs: liveSnapshot(eng) };
+            }
+            saveDirs();
+            syncAll();
+        }
+
+        function setView(v) { set("view", v); }
+        function setZoom(i) { set("zoom", Math.max(0, Math.min(theme.zoomLevels.length - 1, Math.round(i)))); }
+        function zoom(dir) { setZoom(theme.zoomIndex + dir); }
+        function toggleView() { set("view", window.engine.view_mode === "grid" ? "list" : "grid"); }
+        function setHidden(v) { set("hidden", v); }
+
+        function sortBy(key, defaultAsc) {
+            var eng = window.engine;
+            var asc = (eng.sort_by === key) ? !eng.sort_ascending : defaultAsc;
+            set("sort", key);
+            set("sortAsc", asc);
+        }
     }
     property var activePane: pane0
     // The engine (model) of the pane the user is working in.
@@ -76,7 +261,7 @@ ApplicationWindow {
     }
 
     onCurrentTabChanged: cancelDriveOpen()
-    onActivePaneChanged: cancelDriveOpen()
+    onActivePaneChanged: { viewPrefs.refreshMode(); if (window.engine) viewPrefs.syncPane(window.engine); cancelDriveOpen(); }
 
     Connections {
         target: window.engine
@@ -145,9 +330,19 @@ ApplicationWindow {
     // Paths currently cut to the clipboard (dimmed in the views).
     property var cutSet: ({})
 
+    readonly property var quickLook: quickLookLoader.item
+    readonly property var propsDialog: propsDialogLoader.item
+    readonly property var batchRename: batchRenameLoader.item
+    readonly property var conflictDialog: conflictDialogLoader.item
+
+    function openQuickLook(path) { quickLookLoader.active = true; quickLookLoader.item.showFor(path); }
+    function openPropsDialog(paths) { propsDialogLoader.active = true; propsDialogLoader.item.showFor(paths); }
+    function openBatchRename(items) { batchRenameLoader.active = true; batchRenameLoader.item.showFor(items); }
+    function openConflictDialog(conflicts, paths, dest, mode, fromCut) { conflictDialogLoader.active = true; conflictDialogLoader.item.showFor(conflicts, paths, dest, mode, fromCut); }
+
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
-    readonly property bool anyModalOpen: inputModal.visible || propsDialog.visible || conflictDialog.visible
-        || passwordModal.visible || quickLook.visible || commandModal.visible || batchRename.visible
+    readonly property bool anyModalOpen: inputModal.visible || (propsDialog && propsDialog.visible) || (conflictDialog && conflictDialog.visible)
+        || passwordModal.visible || (quickLook && quickLook.visible) || commandModal.visible || (batchRename && batchRename.visible)
         || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
         || networkDialog.visible
         || window.isEditingPath
@@ -260,15 +455,15 @@ ApplicationWindow {
         function onPickerDismissed(handle) { window.closePicker(handle); }
         function onCtrlScroll(delta) {
             if (window.activeView === "files")
-                theme.stepZoom(delta);
+                viewPrefs.zoom(delta);
         }
         function onSpacePressed() {
             if (searchInput.activeFocus || window.isEditingPath)
                 return;
-            if (!quickLook.visible && window.gridKeyboardReady) {
+            if (!(quickLook && quickLook.visible) && window.gridKeyboardReady) {
                 window.spaceHeldForQuickLook = true;
                 window.toggleQuickLook();
-            } else if (quickLook.visible) {
+            } else if (quickLook && quickLook.visible) {
                 window.spaceHeldForQuickLook = false;
                 quickLook.close();
             }
@@ -276,7 +471,7 @@ ApplicationWindow {
         // Tap (short press): opens and stays. Hold: closes on release.
         // A press shorter than the hold threshold is a toggle, not a hold.
         function onSpaceReleased(heldDuration) {
-            if (!quickLook.visible || !window.spaceHeldForQuickLook)
+            if (!(quickLook && quickLook.visible) || !window.spaceHeldForQuickLook)
                 return;
             if (heldDuration >= 400) {
                 window.spaceHeldForQuickLook = false;
@@ -338,7 +533,7 @@ ApplicationWindow {
         } else if (pane.engine.location_kind === "mtp") {
             core.open_item(item.path);
         } else if (pane.engine.location_kind === "trash") {
-            quickLook.showFor(item.path);
+            openQuickLook(item.path);
         } else if (core.is_archive_file(item.path) && theme.archiveOpenAction === "extract") {
             core.extract(item.path, true, "");
         } else if (theme.browseArchives && theme.archiveOpenAction === "browse" && core.is_archive_file(item.path)) {
@@ -403,7 +598,7 @@ ApplicationWindow {
         }
         var conflicts = JSON.parse(core.check_conflicts(JSON.stringify(paths), dest) || "[]");
         if (conflicts.length > 0) {
-            conflictDialog.showFor(conflicts, paths, dest, mode, !!fromCut);
+            openConflictDialog(conflicts, paths, dest, mode, !!fromCut);
             return;
         }
         core.transfer(JSON.stringify(paths), dest, mode, "rename");
@@ -452,7 +647,7 @@ ApplicationWindow {
         if (paths.some(function(path) { return path.indexOf("mtp:") === 0; }))
             return;
         if (paths.length > 0)
-            propsDialog.showFor(paths);
+            openPropsDialog(paths);
     }
 
     function startNewFolder() {
@@ -463,13 +658,13 @@ ApplicationWindow {
 
     function previewItem(path) {
         if (path.indexOf("mtp:") === 0) core.preview_mtp(path);
-        else quickLook.showFor(path);
+        else openQuickLook(path);
     }
 
     property bool spaceHeldForQuickLook: false
 
     function toggleQuickLook() {
-        if (quickLook.visible) {
+        if (quickLook && quickLook.visible) {
             quickLook.close();
             return;
         }
@@ -780,13 +975,23 @@ ApplicationWindow {
 
     onClosing: saveSession()
 
+    Connections {
+        target: pane0.engine
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane0.engine); }
+    }
+    Connections {
+        target: pane1Loader.item ? pane1Loader.item.engine : null
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane1Loader.item.engine); }
+    }
+
     Component.onCompleted: {
+        viewPrefs.load();
         refreshCutSet();
         var pending = nativeBridge.takePendingOpen();
         var restored = restoreSession(pending.length > 0);
         if (nativeBridge.startupMode === "mini") {
             sidebar.expanded = false;
-            theme.zoomIndex = 1;
+            viewPrefs.setZoom(1);
         }
         var first = !restored;
         for (var i = 0; i < pending.length; ++i) {
@@ -827,12 +1032,12 @@ ApplicationWindow {
         enabled: window.gridKeyboardReady && (engine.location_kind !== "mtp" || (!engine.read_only && window.selectedPaths().length === 1))
         onActivated: {
             if (window.selectedPaths().length > 1)
-                batchRename.showFor(window.activePane.selectedItems());
+                openBatchRename(window.activePane.selectedItems());
             else
                 window.activePane.startRename();
         }
     }
-    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: quickLook.visible || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
+    Shortcut { sequence: theme.shortcutFor("quickLook"); enabled: (quickLook && quickLook.visible) || window.gridKeyboardReady; onActivated: window.toggleQuickLook() }
     Shortcut { sequence: theme.shortcutFor("trash"); enabled: window.gridKeyboardReady; onActivated: window.trashSelection() }
     Shortcut { sequence: theme.shortcutFor("deletePermanent"); enabled: window.gridKeyboardReady; onActivated: window.deleteSelection() }
     Shortcut {
@@ -866,11 +1071,11 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("newFolder"); enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
     Shortcut { sequence: theme.shortcutFor("toggleSplit"); onActivated: window.toggleSplit() }
     Shortcut { sequence: theme.shortcutFor("toggleSidebar"); onActivated: sidebar.expanded = !sidebar.expanded }
-    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
-    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
-    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: theme.zoomIndex = 2 }
-    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: engine.set_view("grid") }
-    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: engine.set_view("list") }
+    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: viewPrefs.zoom(1) }
+    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: viewPrefs.zoom(-1) }
+    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: viewPrefs.setZoom(2) }
+    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: viewPrefs.setView("grid") }
+    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: viewPrefs.setView("list") }
     Shortcut { sequence: theme.shortcutFor("bookmark"); enabled: engine.location_kind === "dir"; onActivated: core.add_bookmark(engine.current_path) }
     Shortcut { sequence: theme.shortcutFor("copyPath"); enabled: window.gridKeyboardReady; onActivated: window.copyPathOfSelection() }
     Shortcut {
@@ -976,7 +1181,7 @@ ApplicationWindow {
             }
         }
         onNotify: function(kind, text) { window.toast(kind, text); }
-        onMtp_preview_ready: function(path) { quickLook.showFor(path); }
+        onMtp_preview_ready: function(path) { openQuickLook(path); }
         onOperation_finished: function(kind, ok, resultJson) {
             var r = null;
             try { r = JSON.parse(resultJson); } catch (e) { r = null; }
@@ -1317,7 +1522,7 @@ ApplicationWindow {
                         visible: window.isEditingPath
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         selectByMouse: true
                         verticalAlignment: TextInput.AlignVCenter
                         clip: true
@@ -1357,7 +1562,7 @@ ApplicationWindow {
                                     ? engine.current_path : engine.location_kind + "://"))
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         elide: Text.ElideMiddle
                         verticalAlignment: Text.AlignVCenter
                         Accessible.role: Accessible.StaticText
@@ -1497,7 +1702,7 @@ ApplicationWindow {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -1524,7 +1729,7 @@ ApplicationWindow {
                         visible: window.activeView === "settings"
                         name: "caret-right"
                         size: 11
-                        color: theme.outlineAlpha(theme.outline)
+                        color: theme.outline
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Rectangle {
@@ -1585,7 +1790,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: engine.searching ? "hourglass" : "magnifying-glass"
                         size: 16
-                        color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outline)
+                        color: searchInput.activeFocus ? theme.primary : theme.outline
                     }
 
                     TextInput {
@@ -1602,7 +1807,7 @@ ApplicationWindow {
                         Text {
                             text: window.activeView === "settings" ? qsTr("Search settings…")
                                 : (engine.is_searching_everywhere ? qsTr("Search…") : qsTr("Filter this folder…"))
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             font.pixelSize: theme.fs(13)
                             visible: !searchInput.text && !searchInput.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -1694,79 +1899,167 @@ ApplicationWindow {
                     }
                 }
             }
+            // M3E segmented pair: one pill silhouette, two independent
+            // buttons. The group clip gives the outer corners the full pill
+            // radius while each half paints its own small radius, so the seam
+            // corners read square and the pair reads as connected.
             Rectangle {
-                id: viewDropdownButton
+                id: viewBtnGroup
                 visible: window.activeView === "files"
                 Layout.preferredHeight: 42
-                Layout.preferredWidth: viewRow.implicitWidth + 20
-                Layout.minimumWidth: viewRow.implicitWidth + 20
+                Layout.preferredWidth: 42 + 1 + viewTextRow.implicitWidth + 20
+                Layout.minimumWidth: 42 + 1 + viewTextRow.implicitWidth + 20
                 radius: theme.radiusFull
                 color: theme.backdropSurface(theme.surfaceContainer)
-                border.width: 1
-                border.color: theme.outlineAlpha(theme.outlineVariant)
+                border.width: viewIconBtn.activeFocus || viewTextView.activeFocus ? 2 : 1
+                border.color: viewIconBtn.activeFocus || viewTextView.activeFocus
+                    ? theme.primary
+                    : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 RowLayout {
-                    id: viewRow
-                    anchors.centerIn: parent
-                    spacing: 4
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    spacing: 0
+
                     Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: cycleMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                        id: viewIconBtn
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 42
+                        Layout.minimumWidth: 42
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("Toggle grid or list view")
+                        Accessible.onPressAction: viewIconBtn.toggleView()
+                        Keys.onReturnPressed: viewIconBtn.toggleView()
+                        Keys.onEnterPressed: viewIconBtn.toggleView()
+                        Keys.onSpacePressed: function(event) { viewIconBtn.toggleView(); event.accepted = true; }
+
+                        function toggleView() {
+                            viewPrefs.toggleView();
+                        }
+
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewIconBtn.height; height: viewIconBtn.height
+                            radius: viewIconBtn.height / 2
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: viewIconBtn.height / 2; y: 0
+                            width: viewIconBtn.width - viewIconBtn.height / 2
+                            height: viewIconBtn.height
+                            radius: theme.radiusS
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+
                         LoafIcon {
                             anchors.centerIn: parent
                             name: engine.view_mode === "list" ? "list" : "squares-four"
                             size: 16
-                            color: theme.primary
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainerFg
+                                : theme.primary
                         }
+
                         MouseArea {
-                            id: cycleMouse
+                            id: viewIconArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: engine.set_view(engine.view_mode === "grid" ? "list" : "grid")
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewIconBtn, viewIconBtn.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewIconBtn)
+                            onClicked: viewIconBtn.toggleView()
                         }
                     }
-                    Item {
-                        implicitWidth: dropRow.implicitWidth + 10
-                        implicitHeight: 32
+
+                    Rectangle {
+                        id: viewSeam
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 1
+                        color: theme.outlineAlpha(theme.outlineVariant)
+                    }
+
+                    Rectangle {
+                        id: viewTextView
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: viewTextRow.implicitWidth + 20
+                        Layout.minimumWidth: viewTextRow.implicitWidth + 20
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("View options")
+                        Accessible.onPressAction: viewTextView.toggleMenu()
+                        Keys.onReturnPressed: viewTextView.toggleMenu()
+                        Keys.onEnterPressed: viewTextView.toggleMenu()
+                        Keys.onSpacePressed: function(event) { viewTextView.toggleMenu(); event.accepted = true; }
+
+                        function toggleMenu() {
+                            if (viewMenu.visible)
+                                viewMenu.close();
+                            else
+                                viewMenu.openViewMenu();
+                        }
 
                         Rectangle {
-                            anchors.fill: parent
-                            radius: 16
-                            color: dropMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            x: viewTextView.width - viewTextView.height; y: 0
+                            width: viewTextView.height; height: viewTextView.height
+                            radius: viewTextView.height / 2
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewTextView.width - viewTextView.height / 2
+                            height: viewTextView.height
+                            radius: theme.radiusS
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
                         }
 
                         RowLayout {
-                            id: dropRow
+                            id: viewTextRow
                             anchors.centerIn: parent
-                            spacing: 5
-                            Text { visible: window.width >= 900; text: qsTr("View"); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outlineAlpha(theme.outline) }
+                            spacing: 6
+                            Text {
+                                visible: window.width >= 900
+                                text: qsTr("View")
+                                font.pixelSize: theme.fs(12)
+                                font.bold: true
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.textMain
+                            }
+                            LoafIcon {
+                                name: "caret-down"
+                                size: 11
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.outline
+                                rotation: viewMenu.visible ? 180 : 0
+                                Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 160 } }
+                            }
                         }
 
                         MouseArea {
-                            id: dropMouse
+                            id: viewTextArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (viewMenuPopup.visible) {
-                                    viewMenuPopup.close();
-                                } else {
-                                    var pt = mapToItem(window.contentItem, viewDropdownButton.width - viewMenuPopup.width, viewDropdownButton.height + 6);
-                                    viewMenuPopup.openAt(pt.x, pt.y);
-                                }
-                            }
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewTextView, viewTextView.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewTextView)
+                            onClicked: viewTextView.toggleMenu()
                         }
                     }
                 }
             }
-
             Rectangle {
                 id: mainEmptyTrashChip
                 visible: window.activeView === "files" && engine.location_kind === "trash" && engine.item_count > 0
@@ -1776,7 +2069,7 @@ ApplicationWindow {
                 radius: theme.radiusFull
                 color: emptyTrashMouse.containsMouse ? theme.hoverOverlay : theme.backdropSurface(theme.surfaceContainer)
                 border.width: 1
-                border.color: emptyTrashMouse.containsMouse ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
+                border.color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1788,16 +2081,16 @@ ApplicationWindow {
                     spacing: 8
 
                     LoafIcon {
-                        name: "trash"
+                        name: "broom"
                         size: 16
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMuted
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMuted
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     }
 
                     Text {
                         visible: window.width >= 900
-                        text: qsTr("Empty Trash")
-                        color: emptyTrashMouse.containsMouse ? theme.danger : theme.textMain
+                        text: window.emptyTrashArmed ? qsTr("Click again to confirm") : qsTr("Empty Trash")
+                        color: emptyTrashMouse.containsMouse || window.emptyTrashArmed ? theme.danger : theme.textMain
                         font.pixelSize: theme.fs(13)
                         font.bold: true
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
@@ -1809,7 +2102,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: window.confirmEmptyTrash()
+                    onClicked: window.confirmEmptyTrash(true)
                 }
             }
         }
@@ -2332,9 +2625,41 @@ ApplicationWindow {
             }
         }
     }
-    function confirmEmptyTrash() {
-        confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
-            qsTr("Empty Trash"), function() { core.empty_trash(); });
+    // Two-step empty trash: first click arms, a hint toast follows half a
+    // second later if no second click comes, second click empties. The
+    // blocking "Empty the trash?" dialog is gone.
+    property bool emptyTrashArmed: false
+    Timer {
+        id: emptyTrashHintTimer
+        interval: 500
+        onTriggered: if (window.emptyTrashArmed)
+            window.toast("info", qsTr("Click again to confirm"))
+    }
+    Timer {
+        id: emptyTrashDisarmTimer
+        interval: 4000
+        onTriggered: window.emptyTrashArmed = false
+    }
+    // Two-step empty trash: first click arms, second click empties. Full-size
+    // header chip shows the hint on its own label; the mini (icon-only) chip
+    // falls back to the confirm dialog; the rail broom gets a toast hint.
+    function confirmEmptyTrash(inButtonLabel) {
+        if (window.emptyTrashArmed) {
+            window.emptyTrashArmed = false;
+            emptyTrashHintTimer.stop();
+            emptyTrashDisarmTimer.stop();
+            core.empty_trash();
+            return;
+        }
+        if (inButtonLabel && window.width < 900) {
+            confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
+                qsTr("Empty Trash"), function() { core.empty_trash(); });
+            return;
+        }
+        window.emptyTrashArmed = true;
+        emptyTrashDisarmTimer.restart();
+        if (!inButtonLabel)
+            emptyTrashHintTimer.restart();
     }
 
     function menuFromTree(tree, onPick) {
@@ -2504,7 +2829,7 @@ ApplicationWindow {
         }
         if (kind === "trash") {
             m.push({ text: qsTr("Restore"), icon: "arrow-counter-clockwise", action: function() { core.restore_items(JSON.stringify(paths)); pane.clearSelection(); } });
-            m.push({ text: qsTr("Preview"), icon: "eye", shortcut: "Space", action: function() { quickLook.showFor(item.path); } });
+            m.push({ text: qsTr("Preview"), icon: "eye", shortcut: "Space", action: function() { openQuickLook(item.path); } });
             m.push({ text: qsTr("Delete Permanently"), icon: "trash", danger: true, separatorBefore: true, shortcut: "Del", action: function() { window.deleteSelection(); } });
             m.push({ text: qsTr("Properties"), icon: "info", separatorBefore: true, action: function() { window.showProperties(paths); } });
             if (m.length === 0)
@@ -2556,7 +2881,7 @@ ApplicationWindow {
                 m.push({ text: qsTr("Extract to Folder"), icon: "folder-plus", itemKey: "extract", action: function() { core.extract(item.path, true, ""); } });
             }
         }
-        m.push({ text: qsTr("Quick Look"), icon: "eye", shortcut: "Space", itemKey: "quick_look", action: function() { quickLook.showFor(item.path); } });
+        m.push({ text: qsTr("Quick Look"), icon: "eye", shortcut: "Space", itemKey: "quick_look", action: function() { openQuickLook(item.path); } });
         if (!inArchive) {
             var termDir = item.is_dir ? item.path : (item.parent_path || pane.engine.current_path);
             m.push({ text: qsTr("Open in Terminal"), icon: "terminal", itemKey: "terminal", action: function() { core.open_terminal(termDir); } });
@@ -2567,11 +2892,11 @@ ApplicationWindow {
             m.push({ text: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C", itemKey: "copy", action: function() { window.copySelection(false); } });
             if (item.is_dir && single && nativeBridge.clipboardHasFiles())
                 m.push({ text: qsTr("Paste Into Folder"), icon: "clipboard", itemKey: "paste", action: function() { window.pasteInto(item.path); } });
-            m.push({ text: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C", itemKey: "copy_path", action: function() { window.copyPathOfSelection(); } });
+            m.push({ text: qsTr("Copy Path"), icon: "copy-simple", shortcut: theme.shortcutFor("copyPath"), itemKey: "copy_path", action: function() { window.copyPathOfSelection(); } });
             if (single)
                 m.push({ text: qsTr("Rename…"), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { pane.startRename(); } });
             else
-                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { batchRename.showFor(pane.selectedItems()); } });
+                m.push({ text: qsTr("Rename %n item(s)…", "", paths.length), icon: "pencil-simple", shortcut: "F2", itemKey: "rename", action: function() { openBatchRename(pane.selectedItems()); } });
             if (kind === "dir") {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });
@@ -2641,7 +2966,7 @@ ApplicationWindow {
         var m = [];
         if (kind === "trash") {
             if (e.item_count > 0) {
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { core.empty_trash(); } });
                 m.push({ text: qsTr("Select All"), icon: "selection-all", shortcut: "Ctrl+A", itemKey: "select_all", separatorBefore: true, action: function() { pane.selectAll(); } });
             }
             if (m.length === 0)
@@ -3009,7 +3334,7 @@ ApplicationWindow {
                     if (window.pcView) window.pcView.requestPcRename();
                 } });
             if (place.kind === "trash")
-                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { window.confirmEmptyTrash(); } });
+                m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { core.empty_trash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
                 m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
@@ -3056,90 +3381,65 @@ ApplicationWindow {
         }
     }
     LoafMenu {
-        id: viewMenuPopup
-        menuMinWidth: 290
-        menuMaxWidth: 340
+        id: viewMenu
+        menuMinWidth: 240
+        menuMaxWidth: 320
         model: []
 
-        Flickable {
-            id: viewMenuFlickable
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(viewMenuContent.implicitHeight, Math.max(120, window.height - 40))
-            contentWidth: width
-            contentHeight: viewMenuContent.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar { policy: viewMenuFlickable.contentHeight > viewMenuFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+        // Scope pill: which scope the active folder's edits land in, and
+        // whether it inherits an ancestor's scope at all.
+        headerBar: LoafSegmented {
+            id: viewScopeToggle
+            visible: true
+            Accessible.name: qsTr("View options scope")
+            options: [
+                { value: "universal", label: qsTr("Universal") },
+                { value: "dir", label: qsTr("This folder") },
+                { value: "parent", label: qsTr("Parent") }
+            ]
+            value: viewPrefs.mode
+            onSelected: function(v) { viewPrefs.setMode(v); }
+        }
 
-            ColumnLayout {
-                id: viewMenuContent
-                width: viewMenuFlickable.width
-                spacing: 4
+        // Rebuilt on every open so checkmarks track engine state exactly.
+        // Same LoafMenu the RMB context menu uses; the button drops it
+        // below itself, right-aligned.
+        function openViewMenu() {
+            var sortKeys = ["name", "modified", "size", "type"];
+            var sortLabels = [qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
+            var groupKeys = ["none", "name", "modified", "size", "type"];
+            var groupLabels = [qsTr("None"), qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
 
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("VIEW MODE"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "grid", label: qsTr("Grid"), icon: "squares-four" }, { value: "list", label: qsTr("List"), icon: "list" }]
-                    value: engine.view_mode
-                    onSelected: function(v) { engine.set_view(v); }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 8; Layout.rightMargin: 8
-                    Text { text: qsTr("Icon size"); color: theme.textMain; font.pixelSize: theme.fs(12); Layout.fillWidth: true }
-                    LoafButton { icon: "magnifying-glass-minus"; variant: "tonal"; enabled: theme.zoomIndex > 0; onClicked: theme.stepZoom(-1) }
-                    Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                    LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.group_by === "modified"; onTriggered: engine.set_group("modified", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.group_by === "size"; onTriggered: engine.set_group("size", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.group_by === "type"; onTriggered: engine.set_group("type", engine.group_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    visible: engine.group_by !== "none"
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.group_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.sort_by === "size"; onTriggered: engine.set_sort("size", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.sort_by === "type"; onTriggered: engine.set_sort("type", engine.sort_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.sort_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_sort(engine.sort_by, v === "asc"); }
-                }
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("FOLDERS"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "first", label: qsTr("First") }, { value: "last", label: qsTr("Last") }, { value: "mixed", label: qsTr("Mixed") }]
-                    value: engine.folder_position
-                    onSelected: function(v) { engine.change_folder_position(v); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
-                LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
-            }
+            var m = [];
+            m.push({ text: qsTr("Grid"), icon: "squares-four", checkable: true, checked: engine.view_mode === "grid", action: function() { viewPrefs.setView("grid"); } });
+            m.push({ text: qsTr("List"), icon: "list", checkable: true, checked: engine.view_mode === "list", action: function() { viewPrefs.setView("list"); } });
+            m.push({ text: qsTr("Icon Size"), icon: "magnifying-glass", separatorBefore: true, submenu: theme.zoomLevels.map(function(z, i) {
+                return { text: Math.round(z * 100) + "%", checkable: true, checked: theme.zoomIndex === i, action: function() { viewPrefs.setZoom(i); } };
+            }) });
+            m.push({ text: qsTr("Folders"), icon: "folder", separatorBefore: true, submenu: ["first", "last", "mixed"].map(function(v) {
+                var label = v === "first" ? qsTr("Folders First") : (v === "last" ? qsTr("Folders Last") : qsTr("Mixed"));
+                return { text: label, checkable: true, checked: engine.folder_position === v, action: function() { viewPrefs.set("folders", v); } };
+            }) });
+            m.push({ text: qsTr("Sort By"), icon: "arrow-down", separatorBefore: true, submenu: sortKeys.map(function(k, i) {
+                return { text: sortLabels[i], checkable: true, checked: engine.sort_by === k, action: function() { viewPrefs.set("sort", k); } };
+            }) });
+            m.push({ text: qsTr("Reverse Order"), icon: "arrows-down-up", checkable: true, checked: !engine.sort_ascending, action: function() { viewPrefs.set("sortAsc", !engine.sort_ascending); } });
+            m.push({ text: qsTr("Group By"), icon: "rows", separatorBefore: true, submenu: groupKeys.map(function(k, i) {
+                return { text: groupLabels[i], checkable: true, checked: engine.group_by === k, action: function() { viewPrefs.set("group", k); } };
+            }) });
+            m.push({ text: qsTr("Reverse Group Order"), icon: "arrows-down-up", checkable: true, enabled: engine.group_by !== "none", checked: !engine.group_ascending, action: function() { viewPrefs.set("groupAsc", !engine.group_ascending); } });
+            m.push({ text: qsTr("Show Hidden Files"), icon: "eye", separatorBefore: true, checkable: true, checked: window.showHidden, shortcut: theme.shortcutFor("toggleHidden"), action: function() { viewPrefs.setHidden(!window.showHidden); } });
+            m.push({ text: qsTr("Split View"), icon: "columns", checkable: true, checked: window.splitView, shortcut: theme.shortcutFor("toggleSplit"), action: function() { window.toggleSplit(); } });
+            model = m;
+            openBelowRight(viewTextView);
         }
     }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
     LoafTooltip { id: tooltip }
-    QuickLook { id: quickLook }
-    PropertiesDialog { id: propsDialog }
-    BatchRenameDialog { id: batchRename }
-    ConflictDialog { id: conflictDialog }
+    Loader { id: quickLookLoader; active: false; sourceComponent: QuickLook {} }
+    Loader { id: propsDialogLoader; active: false; sourceComponent: PropertiesDialog {} }
+    Loader { id: batchRenameLoader; active: false; sourceComponent: BatchRenameDialog {} }
+    Loader { id: conflictDialogLoader; active: false; sourceComponent: ConflictDialog {} }
 
     LoafTextPrompt {
         id: inputModal
@@ -3508,7 +3808,7 @@ ApplicationWindow {
             id: pathField
             Layout.fillWidth: true
             color: theme.textMain
-            font.family: "monospace"
+            font.family: theme.monoFont
             Keys.onTabPressed: function(e) { text = core.complete_path(text, true); e.accepted = true; }
         }
         RowLayout {
@@ -3567,7 +3867,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: dragHandleArea
@@ -3595,7 +3895,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
                         size: 16
-                        color: placeRow.modelData.hidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
                     }
 
                     Text {
@@ -3685,7 +3985,7 @@ ApplicationWindow {
             { id: "run", name: qsTr("Run Executable"), icon: "play", shortcut: "" },
             { id: "cut", name: qsTr("Cut"), icon: "scissors", shortcut: "Ctrl+X" },
             { id: "copy", name: qsTr("Copy"), icon: "copy", shortcut: "Ctrl+C" },
-            { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: "Ctrl+Shift+C" },
+            { id: "copy_path", name: qsTr("Copy Path"), icon: "copy-simple", shortcut: theme.shortcutFor("copyPath") },
             { id: "paste", name: qsTr("Paste"), icon: "clipboard", shortcut: "Ctrl+V" },
             { id: "rename", name: qsTr("Rename"), icon: "pencil-simple", shortcut: "F2" },
             { id: "duplicate", name: qsTr("Duplicate"), icon: "copy-simple", shortcut: "" },
@@ -3773,7 +4073,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: actionDragHandle.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: actionDragHandle.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: actionDragHandle
@@ -3795,7 +4095,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: actionRow.modelData.icon || "circle"
                         size: 16
-                        color: actionRow.isHidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: actionRow.isHidden ? theme.outline : theme.primary
                     }
 
                     Text {

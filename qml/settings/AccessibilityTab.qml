@@ -25,16 +25,15 @@ ColumnLayout {
     readonly property bool matchThumbnails: matches("picture thumbnails preview image photo svg gallery")
     readonly property bool matchThumbShape: matches("thumbnail shape square crop original aspect ratio preview image photo")
     readonly property bool matchShapes: matches("decorative background shapes blobs ambient bubbles")
-    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom")
+    readonly property bool matchFontSize: matches("text size font scale accessibility larger zoom density compact comfortable spacious")
     readonly property bool matchIconSize: matches("icon size zoom view grid thumbnails scale")
-    readonly property bool matchFontChoice: matches("font chooser typography typeface opendyslexic dyslexic google flex sans system accessibility")
     readonly property bool matchHighContrast: matches("high contrast contrast visibility accessibility wcag theme legibility")
     readonly property bool matchTooltips: matches("tooltips tooltip hover hint label help discoverability")
 
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchLowPower ? 1 : 0) + (matchMotion ? 1 : 0) + (matchThumbnails ? 1 : 0)
             + (matchShapes ? 1 : 0) + (matchFontSize ? 1 : 0) + (matchIconSize ? 1 : 0) + (matchThumbShape ? 1 : 0)
-            + (matchFontChoice ? 1 : 0) + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
+            + (matchHighContrast ? 1 : 0) + (matchTooltips ? 1 : 0))
         : 0
 
     Layout.fillWidth: true
@@ -155,7 +154,7 @@ ColumnLayout {
                 value: theme.zoomIndex
                 customValueText: Math.round(theme.zoom * 100) + "%"
                 accessibleName: qsTr("Icon zoom size")
-                onMoved: function(v) { theme.zoomIndex = Math.round(v); }
+                onMoved: function(v) { window.viewPrefs.setZoom(v); }
             }
         }
 
@@ -182,9 +181,9 @@ ColumnLayout {
 
     // Category 3: Readability & Vision
     SettingCard {
-        visible: root.matchHighContrast || root.matchFontChoice || root.matchTooltips
+        visible: root.matchHighContrast || root.matchTooltips
         title: qsTr("Readability & Vision")
-        subtitle: qsTr("Typography and contrast adjustments for improved accessibility")
+        subtitle: qsTr("Contrast and tooltip adjustments for improved accessibility")
         icon: "eye"
 
         SettingRow {
@@ -199,47 +198,27 @@ ColumnLayout {
             }
         }
 
-        SettingDivider { visible: root.matchHighContrast && root.matchFontChoice }
+        SettingDivider { visible: root.matchHighContrast && (root.matchFontSize || root.matchTooltips) }
 
         SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-t"
-            title: qsTr("Font chooser")
-            subtitle: qsTr("Choose the interface typography (System uses the default desktop font)")
+            visible: root.matchFontSize
+            icon: "rows"
+            title: qsTr("Layout density")
+            subtitle: qsTr("Adjust vertical spacing and row height in file lists and grids")
 
             LoafSegmented {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 380
+                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 220 : 360
                 options: [
-                    { value: "system", label: qsTr("System"), shortLabel: qsTr("System") },
-                    { value: "google_flex", label: qsTr("Google Flex Sans"), shortLabel: qsTr("Flex") },
-                    { value: "opendyslexic", label: qsTr("OpenDyslexic"), shortLabel: qsTr("Dyslexic") }
+                    { value: "compact", label: qsTr("Compact"), shortLabel: qsTr("Compact") },
+                    { value: "comfortable", label: qsTr("Comfortable"), shortLabel: qsTr("Normal") },
+                    { value: "spacious", label: qsTr("Spacious"), shortLabel: qsTr("Spacious") }
                 ]
-                value: theme.fontChoice
-                onSelected: function(v) { theme.fontChoice = v; }
+                value: theme.density
+                onSelected: function(v) { theme.density = v; }
             }
         }
 
-        SettingDivider { visible: root.matchFontChoice }
-
-        SettingRow {
-            visible: root.matchFontChoice
-            icon: "text-bolder"
-            title: qsTr("Font weight")
-            subtitle: qsTr("Adjust text stroke weight from light to bold across the interface")
-
-            LoafSlider {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 170 : 260
-                from: 200
-                to: 800
-                stepSize: 100
-                value: theme.fontWeight
-                customValueText: theme.weightName(theme.fontWeight)
-                accessibleName: qsTr("Font weight")
-                onMoved: function(v) { theme.fontWeight = Math.round(v); }
-            }
-        }
-
-        SettingDivider { visible: root.matchFontChoice && root.matchTooltips }
+        SettingDivider { visible: (root.matchFontSize || root.matchHighContrast) && root.matchTooltips }
 
         SettingRow {
             visible: root.matchTooltips

@@ -443,7 +443,7 @@ Window {
                         visible: pathEditing
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         selectByMouse: true
                         verticalAlignment: TextInput.AlignVCenter
                         clip: true
@@ -484,7 +484,7 @@ Window {
                             ? pane.engine.current_path : pane.engine.location_kind + "://"
                         color: theme.textMain
                         font.pixelSize: theme.fs(13)
-                        font.family: "monospace"
+                        font.family: theme.monoFont
                         elide: Text.ElideMiddle
                         verticalAlignment: Text.AlignVCenter
                         Accessible.role: Accessible.StaticText
@@ -594,7 +594,7 @@ Window {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -637,7 +637,7 @@ Window {
 
                         Text {
                             text: pane.engine.location_kind === "search" ? qsTr("Search…") : qsTr("Filter this folder…")
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             font.pixelSize: theme.fs(13)
                             visible: !searchField.text && !searchField.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
