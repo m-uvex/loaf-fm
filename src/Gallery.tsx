@@ -8,6 +8,8 @@ type Stop = {
   body: string;
 };
 
+const THEME_PANELS = ["lavender", "nord", "amber"] as const;
+
 const stops: Stop[] = [
   {
     id: "thispc",
@@ -17,7 +19,7 @@ const stops: Stop[] = [
   {
     id: "themes",
     title: "Themes",
-    body: "Pick from tuned palettes or pull an accent straight from your wallpaper. Opacity sliders for the window and panels, plus a quieter low-power look when you want it.",
+    body: "Pick from tuned palettes or pull an accent straight from your wallpaper. Same layout, different mood — the colors shift, everything else stays put.",
   },
   {
     id: "quicklook",
@@ -75,6 +77,67 @@ function useTheme(): "light" | "dark" {
   return theme;
 }
 
+function ThemesTriptych({ theme }: { theme: "light" | "dark" }) {
+  const [active, setActive] = useState<number | null>(null);
+  // Equal thirds by default; hovered panel expands, others shrink.
+  const splits =
+    active === null
+      ? [0, 100 / 3, 200 / 3, 100]
+      : active === 0
+        ? [0, 50, 75, 100]
+        : active === 1
+          ? [0, 25, 75, 100]
+          : [0, 25, 50, 100];
+
+  return (
+    <div
+      className="themes-triptych"
+      onMouseLeave={() => setActive(null)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setActive(null);
+      }}
+    >
+      {THEME_PANELS.map((palette, i) => {
+        const left = splits[i];
+        const right = 100 - splits[i + 1];
+        return (
+          <div key={palette} className="themes-layer" style={{ clipPath: `inset(0 ${right}% 0 ${left}% round 0px)` }}>
+            <img
+              src={`/gallery/themes-${palette}-${theme}.png`}
+              alt={`Loaf This PC in ${palette} theme`}
+              loading="lazy"
+              width="1600"
+              height="900"
+              draggable={false}
+            />
+          </div>
+        );
+      })}
+      <div className="themes-panels" aria-hidden="false">
+        {THEME_PANELS.map((palette, i) => {
+          const left = splits[i];
+          const width = splits[i + 1] - splits[i];
+          return (
+            <button
+              key={palette}
+              type="button"
+              className={`themes-panel${active === i ? " is-active" : ""}`}
+              style={{ left: `${left}%`, width: `${width}%` }}
+              onMouseEnter={() => setActive(i)}
+              onFocus={() => setActive(i)}
+              aria-label={`Preview ${palette} theme`}
+            />
+          );
+        })}
+      </div>
+      <div className="themes-dividers" aria-hidden="true">
+        <span className="themes-divider" style={{ left: `${splits[1]}%` }} />
+        <span className="themes-divider" style={{ left: `${splits[2]}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function GalleryRow({ stop, index }: { stop: Stop; index: number }) {
   const theme = useTheme();
   const artRef = useRef<HTMLDivElement | null>(null);
@@ -101,22 +164,26 @@ function GalleryRow({ stop, index }: { stop: Stop; index: number }) {
     el.style.setProperty("--ry", "0deg");
   };
 
-  if (missing) return null;
+  if (stop.id !== "themes" && missing) return null;
 
   return (
     <article className={`walk-row${index % 2 ? " walk-row--flip" : ""}`}>
       <figure className="walk-figure" onMouseMove={tilt} onMouseLeave={resetTilt}>
         <div className="shot-tilt" ref={artRef}>
           <div className="shot-float">
-            <img
-              src={src}
-              alt={`Loaf showing ${stop.title}`}
-              loading={index === 0 ? "eager" : "lazy"}
-              width="1600"
-              height="900"
-              draggable={false}
-              onError={() => setMissing(true)}
-            />
+            {stop.id === "themes" ? (
+              <ThemesTriptych theme={theme} />
+            ) : (
+              <img
+                src={src}
+                alt={`Loaf showing ${stop.title}`}
+                loading={index === 0 ? "eager" : "lazy"}
+                width="1600"
+                height="900"
+                draggable={false}
+                onError={() => setMissing(true)}
+              />
+            )}
           </div>
         </div>
       </figure>

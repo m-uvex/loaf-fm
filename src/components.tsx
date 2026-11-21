@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   Copy,
@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Github,
   GitPullRequest,
-  Monitor,
   Sun,
   Moon,
   Menu,
@@ -33,7 +32,6 @@ export function Brand() {
 
 const navLinks = [
   { href: "/#features", label: "The good bits" },
-  { href: "/install.html", label: "Installation" },
   { href: "/gallery.html", label: "Gallery" },
   { href: "/#get-involved", label: "Get involved" },
 ];
@@ -59,8 +57,8 @@ export function TopNav() {
         {navLinks.map(({ href, label }) => (
           <a key={href} href={href} onClick={closeMenu}>{label}</a>
         ))}
-        <a className="nav-cta" href={repo} target="_blank" rel="noreferrer" onClick={closeMenu}>
-          Visit the repo <ArrowUpRight size={16} aria-hidden="true" />
+        <a className="nav-cta" href="/install.html" onClick={closeMenu}>
+          Install <ArrowRight size={16} aria-hidden="true" />
         </a>
       </div>
     </nav>
@@ -75,11 +73,14 @@ function DiscordGlyph() {
   );
 }
 
-const themeIcons = { auto: Monitor, light: Sun, dark: Moon } as const;
-const themeLabels = { auto: "Auto", light: "Light", dark: "Dark" } as const;
+const themeIcons = { light: Sun, dark: Moon } as const;
+const themeLabels = { light: "Light", dark: "Dark" } as const;
 
 export function FooterIslands() {
   const [mode, setMode] = useState<ThemeMode>(() => getMode());
+  const [showTop, setShowTop] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const collapseTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const sync = () => setMode(getMode());
@@ -87,55 +88,99 @@ export function FooterIslands() {
     return () => window.removeEventListener("loaf-theme-change", sync);
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 420);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  const clearCollapse = () => {
+    if (collapseTimer.current !== null) {
+      window.clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+  };
+  const openDock = () => {
+    clearCollapse();
+    setExpanded(true);
+  };
+  const scheduleCollapse = () => {
+    clearCollapse();
+    collapseTimer.current = window.setTimeout(() => setExpanded(false), 800);
+  };
+  useEffect(() => clearCollapse, []);
+
   const cycle = () => {
-    const next = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
-    applyTheme(next);
+    applyTheme(mode === "light" ? "dark" : "light");
   };
 
   const ThemeIcon = themeIcons[mode];
 
   return (
-    <footer className="footer-islands">
-      <div className="island island-bar">
-        <a className="brand foot-brand" href="/" aria-label="Loaf home">
-          <img className="brand-mark" src="/loaf-badge.png" alt="" width={28} height={28} />
-          <span className="foot-tagline">Toasted to perfection</span>
-        </a>
-        <nav className="icon-row" aria-label="Footer">
-          <a className="icon-pill" href={repo} target="_blank" rel="noreferrer" aria-label="Loaf on GitHub">
-            <Github size={16} aria-hidden="true" />
-            <span>GitHub</span>
+    <footer
+      className={`footer-islands${expanded ? " is-expanded" : ""}`}
+      onMouseEnter={openDock}
+      onMouseLeave={scheduleCollapse}
+      onFocusCapture={openDock}
+      onClick={openDock}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) scheduleCollapse();
+      }}
+    >
+      <div className="island island-bar" aria-expanded={expanded}>
+        <span className="dock-handle" aria-hidden="true" />
+        <div className="dock-body">
+          <a className="brand foot-brand" href="/" aria-label="Loaf home">
+            <img className="brand-mark" src="/loaf-badge.png" alt="" width={28} height={28} />
+            <span className="foot-tagline">Toasted to perfection</span>
           </a>
-          <a className="icon-pill" href={discord} target="_blank" rel="noreferrer" aria-label="Loaf on Discord">
-            <DiscordGlyph />
-            <span>Discord</span>
-          </a>
-          <a
-            className="icon-pill"
-            href={`${repo}/blob/main/CONTRIBUTING.md`}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Contribute to Loaf"
-          >
-            <GitPullRequest size={16} aria-hidden="true" />
-            <span>Contribute</span>
-          </a>
-          <span className="icon-sep" aria-hidden="true" />
-          <button
-            className="icon-pill"
-            type="button"
-            onClick={cycle}
-            aria-label={`Theme: ${themeLabels[mode]} (auto follows your system). Click to change.`}
-            title={`Theme: ${themeLabels[mode]} — click to change`}
-          >
-            <ThemeIcon size={16} aria-hidden="true" />
-            <span>{themeLabels[mode]}</span>
-          </button>
-          <a className="icon-pill" href="#top" aria-label="Back to top">
-            <ArrowUp size={16} aria-hidden="true" />
-            <span>Top</span>
-          </a>
-        </nav>
+          <nav className="icon-row" aria-label="Footer">
+            <a className="icon-pill" href={repo} target="_blank" rel="noreferrer" aria-label="Loaf on GitHub">
+              <Github size={16} aria-hidden="true" />
+              <span>GitHub</span>
+            </a>
+            <a className="icon-pill" href={discord} target="_blank" rel="noreferrer" aria-label="Loaf on Discord">
+              <DiscordGlyph />
+              <span>Discord</span>
+            </a>
+            <a
+              className="icon-pill"
+              href={`${repo}/blob/main/CONTRIBUTING.md`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Contribute to Loaf"
+            >
+              <GitPullRequest size={16} aria-hidden="true" />
+              <span>Contribute</span>
+            </a>
+            <span className="icon-sep" aria-hidden="true" />
+            <button
+              className="icon-pill"
+              type="button"
+              onClick={cycle}
+              aria-label={`Theme: ${themeLabels[mode]}. Click to switch.`}
+              title={`Theme: ${themeLabels[mode]}`}
+            >
+              <ThemeIcon size={16} aria-hidden="true" />
+              <span>{themeLabels[mode]}</span>
+            </button>
+            <a
+              className={`icon-pill top-pill${showTop ? "" : " is-hidden"}`}
+              href="#top"
+              aria-label="Back to top"
+              aria-hidden={showTop ? undefined : true}
+              tabIndex={showTop ? 0 : -1}
+            >
+              <ArrowUp size={16} aria-hidden="true" />
+              <span>Top</span>
+            </a>
+          </nav>
+        </div>
       </div>
     </footer>
   );
