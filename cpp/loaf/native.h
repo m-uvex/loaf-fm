@@ -43,6 +43,10 @@ class LoafNative : public QObject
     Q_PROPERTY(bool isAdmin READ isAdmin CONSTANT)
     // Whether the window was created with an alpha channel (see native.cpp).
     Q_PROPERTY(bool alphaBuffer READ alphaBuffer CONSTANT)
+    // Scroll strength multiplier (1..100, default 33 = 1.0x).
+    Q_PROPERTY(int scrollStrength READ scrollStrength WRITE setScrollStrength NOTIFY scrollStrengthChanged)
+    // Motion animation flag synced with Theme.animate.
+    Q_PROPERTY(bool animate READ animate WRITE setAnimate NOTIFY animateChanged)
 public:
     explicit LoafNative(QObject *parent = nullptr);
 
@@ -66,6 +70,7 @@ public:
     Q_INVOKABLE void cancelPicker(const QString &handle);
     Q_INVOKABLE bool fileExists(const QString &path) const;
     Q_INVOKABLE bool isDirectory(const QString &path) const;
+    Q_INVOKABLE bool isWritable(const QString &path) const;
     // Makes a picker window transient for the caller's window on X11
     // ("x11:0x..." handles); Wayland needs xdg-foreign, which Qt Quick does
     // not expose, so there we degrade gracefully.
@@ -77,7 +82,14 @@ public:
     bool portalOnly() const { return m_portalOnly; }
     bool isAdmin() const;
     bool alphaBuffer() const;
+    int scrollStrength() const { return m_scrollStrength; }
+    void setScrollStrength(int value);
+    bool animate() const { return m_animate; }
+    void setAnimate(bool value);
+    Q_INVOKABLE void cancelScrollAnimation();
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE int dropButtons() const { return m_dropButtons; }
+    Q_INVOKABLE int dropModifiers() const { return m_dropModifiers; }
     Q_INVOKABLE QString systemFontFamily() const;
     Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
     Q_INVOKABLE QStringList systemFontFamilies() const;
@@ -85,6 +97,9 @@ public:
     Q_INVOKABLE void computeChecksums(const QString &path);
 
 Q_SIGNALS:
+    void scrollStrengthChanged();
+    void animateChanged();
+    void cancelScrollRequested();
     void checksumsReady(const QString &path, const QString &md5, const QString &sha256, const QString &error);
     void ctrlScroll(int delta);
     void spacePressed();
@@ -99,6 +114,9 @@ Q_SIGNALS:
     // The request was closed from the D-Bus side (Request.Close()).
     void pickerDismissed(const QString &handle);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private Q_SLOTS:
     void notifyMtpDevicesChanged() { Q_EMIT mtpDevicesChanged(); }
 
@@ -108,8 +126,12 @@ private:
     QStringList m_pending;
     QString m_mode = QStringLiteral("tab");
     bool m_portalOnly = false;
+    int m_scrollStrength = 33;
+    bool m_animate = true;
     QVariantMap m_clipboard;
     class PortalService *m_portal = nullptr;
+    int m_dropButtons = 0;
+    int m_dropModifiers = 0;
 };
 
 // org.freedesktop.FileManager1 (used by browsers' "Show in folder").

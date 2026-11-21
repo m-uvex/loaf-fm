@@ -71,6 +71,7 @@ Item {
     property string openFolderMode: "current" // "current", "split", "tab"
     property string archiveOpenAction: "browse" // "browse", "extract", "open"
     property string clickToOpen: "double" // "double", "single"
+    property int scrollStrength: 33
     // Which file-view icons pick up the accent tint.
     property string iconColorMode: "folders" // "folders", "files", "all", "none"
     // The foreground Material color used for the tint above.
@@ -376,6 +377,13 @@ Item {
     function syncAppFont() {
         if (typeof nativeBridge !== "undefined" && nativeBridge)
             nativeBridge.setApplicationFont(defaultFontFamily, fontWeight);
+    }
+
+    function syncScrollStrength() {
+        if (typeof nativeBridge !== "undefined" && nativeBridge && "scrollStrength" in nativeBridge)
+            nativeBridge.scrollStrength = scrollStrength;
+        if (typeof nativeBridge !== "undefined" && nativeBridge && "animate" in nativeBridge)
+            nativeBridge.animate = animate;
     }
 
     property bool highContrast: false
@@ -2479,8 +2487,18 @@ Item {
             fontWeight = Math.max(200, Math.min(800, parseInt(value)));
         value = readSetting("highContrast");
         if (value.length > 0) highContrast = (value === "true");
+
+        value = readSetting("scrollStrength");
+        if (value.trim().length > 0 && isFinite(Number(value))) {
+            var parsedScroll = Math.round(Number(value));
+            scrollStrength = Math.max(1, Math.min(100, parsedScroll));
+        } else {
+            scrollStrength = 33;
+        }
+
         loaded = true;
         syncAppFont();
+        syncScrollStrength();
     }
 
     // Writes are skipped until the stored values have been read.
@@ -2551,6 +2569,11 @@ Item {
     onMonoFontFamilyChanged: writeSetting("monoFontFamily", monoFontFamily)
     onDensityChanged: writeSetting("density", density)
     onFontWeightChanged: { writeSetting("fontWeight", fontWeight); syncAppFont(); }
+    onAnimateChanged: syncScrollStrength()
     onDefaultFontFamilyChanged: syncAppFont()
     onHighContrastChanged: writeSetting("highContrast", highContrast ? "true" : "false")
+    onScrollStrengthChanged: {
+        writeSetting("scrollStrength", scrollStrength);
+        syncScrollStrength();
+    }
 }

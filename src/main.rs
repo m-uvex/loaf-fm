@@ -18,6 +18,7 @@ pub mod network;
 pub mod pane;
 pub mod portal;
 pub mod portal_bridge;
+pub mod rclone;
 pub mod search;
 pub mod share;
 pub mod smb;
