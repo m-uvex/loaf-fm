@@ -21,6 +21,11 @@
   <url type="bugtracker">https://github.com/m-uvex/loaf-fm/issues</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.4.0" date="2026-11-21">
+      <description>
+        <p>Loaf 0.4.0: full interface translations, customizable shortcuts, transfer speed and ETA, quick inline filters, file grouping, redesigned view menu with per-folder views, accessibility and appearance options, file checksums, and many polish and reliability improvements.</p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-08">
       <description>
         <p>Loaf 0.3.0: WebDAV and unified network drives, XDG desktop portal file chooser, Devices sidebar with phone MTP support, modular settings overhaul, and major performance optimizations.</p>
