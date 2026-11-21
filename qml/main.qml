@@ -3721,11 +3721,6 @@ ApplicationWindow {
             }
         }
 
-        LoafTextField { id: smbNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "Studio NAS" }
-        Text { text: qsTr("Server"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "192.168.1.20" }
-        Text { text: qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "media" }
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
