@@ -553,6 +553,7 @@ pub struct CoreRust {
     history_running: bool,
     drives: Vec<drives::Drive>,
     drive_generation: Arc<AtomicU64>,
+    network_generation: Arc<AtomicU64>,
     size_generation: Arc<AtomicU64>,
     device_watcher: Option<watcher::DeviceWatcher>,
 }
@@ -591,6 +592,7 @@ impl Default for CoreRust {
             history_running: false,
             drives: Vec::new(),
             drive_generation: Arc::new(AtomicU64::new(0)),
+            network_generation: Arc::new(AtomicU64::new(0)),
             size_generation: Arc::new(AtomicU64::new(0)),
             device_watcher: None,
         }
@@ -1595,14 +1597,24 @@ impl qobject::LoafCore {
         self.as_mut().load_places();
     }
 
-    pub fn load_network_profiles(mut self: Pin<&mut Self>) {
-        let json = network::list_json();
-        if self.network_profiles_json().to_string() != json {
-            self.as_mut().set_network_profiles_json(q(&json));
-        }
-        if self.smb_profiles_json().to_string() != json {
-            self.as_mut().set_smb_profiles_json(q(&json));
-        }
+    pub fn load_network_profiles(self: Pin<&mut Self>) {
+        let thread = self.qt_thread();
+        let generation = self.network_generation.clone();
+        let requested = generation.fetch_add(1, Ordering::Relaxed) + 1;
+        std::thread::spawn(move || {
+            let json = network::list_json();
+            let _ = thread.queue(move |mut core| {
+                if generation.load(Ordering::Relaxed) != requested {
+                    return;
+                }
+                if core.network_profiles_json().to_string() != json {
+                    core.as_mut().set_network_profiles_json(q(&json));
+                }
+                if core.smb_profiles_json().to_string() != json {
+                    core.as_mut().set_smb_profiles_json(q(&json));
+                }
+            });
+        });
     }
 
     pub fn save_network_profile(
