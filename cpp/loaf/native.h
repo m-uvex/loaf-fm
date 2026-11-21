@@ -78,9 +78,14 @@ public:
     bool isAdmin() const;
     bool alphaBuffer() const;
     Q_INVOKABLE int systemScrollLines() const;
+    Q_INVOKABLE QString systemFontFamily() const;
     Q_INVOKABLE void setApplicationFont(const QString &family, int weight = 400);
+    Q_INVOKABLE QStringList systemFontFamilies() const;
+    Q_INVOKABLE QStringList monospaceFontFamilies() const;
+    Q_INVOKABLE void computeChecksums(const QString &path);
 
 Q_SIGNALS:
+    void checksumsReady(const QString &path, const QString &md5, const QString &sha256, const QString &error);
     void ctrlScroll(int delta);
     void spacePressed();
     void spaceReleased(qint64 heldDuration);

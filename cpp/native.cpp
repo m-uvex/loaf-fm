@@ -8,7 +8,11 @@
 
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDBusArgument>
+#include <QFontDatabase>
+#include <QPointer>
+#include <thread>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
@@ -34,6 +38,7 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QFont>
+#include <QFontDatabase>
 #include <QWheelEvent>
 #include <QKeyEvent>
 #include <QDateTime>
@@ -126,9 +131,24 @@ static QStringList toLocalPaths(const QStringList &items)
     return out;
 }
 
+// The platform font the app was started with. "system" in the font chooser
+// means exactly this font, so it is captured before anything calls
+// setApplicationFont().
+static QFont g_initialAppFont;
+static bool g_initialAppFontCaptured = false;
+
+static void captureInitialAppFont()
+{
+    if (g_initialAppFontCaptured || !QGuiApplication::instance())
+        return;
+    g_initialAppFont = QGuiApplication::font();
+    g_initialAppFontCaptured = true;
+}
+
 LoafNative::LoafNative(QObject *parent)
     : QObject(parent)
 {
+    captureInitialAppFont();
     QDBusConnection::sessionBus().connect(QStringLiteral("org.kde.kmtpd5"),
         QStringLiteral("/modules/kmtpd"), QStringLiteral("org.kde.kmtp.Daemon"),
         QStringLiteral("devicesChanged"), this, SLOT(notifyMtpDevicesChanged()));
@@ -357,13 +377,86 @@ int LoafNative::systemScrollLines() const
 void LoafNative::setApplicationFont(const QString &family, int weight)
 {
     QFont f;
-    if (!family.trimmed().isEmpty()) {
-        f.setFamily(family.trimmed());
+    const QString trimmed = family.trimmed();
+    if (trimmed.isEmpty()) {
+        f = g_initialAppFont;
+    } else {
+        f.setFamily(trimmed);
     }
     if (weight > 0) {
         f.setWeight(static_cast<QFont::Weight>(std::clamp(weight, 100, 900)));
     }
     QGuiApplication::setFont(f);
+}
+
+QString LoafNative::systemFontFamily() const
+{
+    captureInitialAppFont();
+    QString family = g_initialAppFontCaptured ? g_initialAppFont.family() : QString();
+    if (family.isEmpty() && QGuiApplication::instance())
+        family = QGuiApplication::font().family();
+    if (family.isEmpty())
+        family = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family();
+    return family;
+}
+
+QStringList LoafNative::systemFontFamilies() const
+{
+    return QFontDatabase::families();
+}
+
+QStringList LoafNative::monospaceFontFamilies() const
+{
+    QStringList out;
+    const QStringList all = QFontDatabase::families();
+    for (const QString &fam : all) {
+        if (QFontDatabase::isFixedPitch(fam))
+            out.append(fam);
+    }
+    return out;
+}
+
+void LoafNative::computeChecksums(const QString &path)
+{
+    QPointer<LoafNative> self(this);
+    std::thread([self, path]() {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            const QString err = file.errorString();
+            if (self) {
+                QMetaObject::invokeMethod(self, [self, path, err]() {
+                    if (self) Q_EMIT self->checksumsReady(path, QString(), QString(), err);
+                }, Qt::QueuedConnection);
+            }
+            return;
+        }
+        QCryptographicHash md5(QCryptographicHash::Md5);
+        QCryptographicHash sha256(QCryptographicHash::Sha256);
+        QByteArray buf(256 * 1024, Qt::Uninitialized);
+        while (!file.atEnd()) {
+            const qint64 n = file.read(buf.data(), buf.size());
+            if (n < 0) {
+                const QString err = file.errorString();
+                if (self) {
+                    QMetaObject::invokeMethod(self, [self, path, err]() {
+                        if (self) Q_EMIT self->checksumsReady(path, QString(), QString(), err);
+                    }, Qt::QueuedConnection);
+                }
+                return;
+            }
+            if (n > 0) {
+                md5.addData(QByteArrayView(buf.constData(), n));
+                sha256.addData(QByteArrayView(buf.constData(), n));
+            }
+        }
+        const QString md5Hex = QString::fromLatin1(md5.result().toHex());
+        const QString sha256Hex = QString::fromLatin1(sha256.result().toHex());
+        if (self) {
+            QMetaObject::invokeMethod(self, [self, path, md5Hex, sha256Hex]() {
+                if (self) Q_EMIT self->checksumsReady(path, md5Hex, sha256Hex, QString());
+            }, Qt::QueuedConnection);
+        }
+    }).detach();
 }
 
 class WheelEventFilter : public QObject

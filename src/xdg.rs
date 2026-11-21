@@ -117,7 +117,7 @@ pub fn default_places() -> Vec<Place> {
         v.push(Place {
             id: key.into(),
             name: Message::raw(
-                &p.file_name()
+                p.file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| key.into()),
             )
@@ -149,7 +149,7 @@ pub fn default_places() -> Vec<Place> {
             v.push(Place {
                 id: "PROJECTS".into(),
                 name: Message::raw(
-                    &p.file_name()
+                    p.file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_else(|| "Projects".into()),
                 )
@@ -172,7 +172,7 @@ pub fn default_places() -> Vec<Place> {
             v.push(Place {
                 id: "GAMES".into(),
                 name: Message::raw(
-                    &p.file_name()
+                    p.file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_else(|| "Games".into()),
                 )

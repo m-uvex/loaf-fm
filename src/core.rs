@@ -235,6 +235,15 @@ pub mod qobject {
         #[qinvokable]
         fn default_app_for(self: &LoafCore, path: &QString) -> QString;
         #[qinvokable]
+        fn default_app_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        #[qinvokable]
+        fn used_mime_types(self: &LoafCore) -> QString;
+        #[qinvokable]
+        fn apps_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        #[qinvokable]
+        fn set_default_mime_app(self: Pin<&mut LoafCore>, mime: &QString, app_id: &QString)
+            -> bool;
+        #[qinvokable]
         fn open_with_app(self: Pin<&mut LoafCore>, paths_json: &QString, app_id: &QString);
         #[qinvokable]
         fn set_default_app(self: Pin<&mut LoafCore>, path: &QString, app_id: &QString);
@@ -372,6 +381,52 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+#[derive(Default)]
+struct SpeedTracker {
+    last_ms: u64,
+    last_bytes: u64,
+    ema_bps: f64,
+}
+
+fn format_speed(bps: f64) -> String {
+    if !bps.is_finite() || bps < 1.0 {
+        return String::new();
+    }
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    if bps >= GB {
+        format!("{:.1} GB/s", bps / GB)
+    } else if bps >= MB {
+        format!("{:.1} MB/s", bps / MB)
+    } else if bps >= KB {
+        format!("{:.0} KB/s", bps / KB)
+    } else {
+        format!("{:.0} B/s", bps)
+    }
+}
+
+fn format_eta(secs: u64) -> String {
+    if secs == 0 {
+        return String::new();
+    }
+    if secs < 60 {
+        format!("{}s left", secs)
+    } else if secs < 3600 {
+        let m = secs / 60;
+        let s = secs % 60;
+        if s == 0 {
+            format!("{}m left", m)
+        } else {
+            format!("{}m {}s left", m, s)
+        }
+    } else {
+        let h = secs / 3600;
+        let m = (secs % 3600) / 60;
+        format!("{}h {}m left", h, m)
+    }
+}
+
 struct Op {
     id: u64,
     title: String,
@@ -381,6 +436,7 @@ struct Op {
     cancel: AtomicBool,
     current: Mutex<String>,
     last_publish: AtomicU64,
+    speed: Mutex<SpeedTracker>,
     started: Instant,
     thread: CxxQtThread<qobject::LoafCore>,
 }
@@ -652,7 +708,7 @@ fn network_place(b: &xdg::Bookmark) -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "id": format!("network:{}", b.uri),
         "kind": "network",
-        "name": Message::raw(&b.display_name()).to_string(),
+        "name": Message::raw(b.display_name()).to_string(),
         "path": b.uri,
         "icon": "network",
         "system_icon": "folder-remote-symbolic",
@@ -704,7 +760,7 @@ fn build_places(hostname: &str, device_type: &str) -> Vec<serde_json::Value> {
         items.push(serde_json::json!({
             "id": format!("bookmark:{}", path.to_string_lossy()),
             "kind": "bookmark",
-            "name": Message::raw(&b.display_name()).to_string(),
+            "name": Message::raw(b.display_name()).to_string(),
             "path": path.to_string_lossy(),
             "icon": "folder-simple",
             "system_icon": "folder-symbolic",
@@ -830,7 +886,34 @@ impl qobject::LoafCore {
                 } else {
                     -1.0
                 };
-                let detail = if total > 0 && op.kind != "delete" && op.kind != "trash" {
+                let is_byte_op = total > 0 && op.kind != "delete" && op.kind != "trash";
+                let (speed_text, eta_text) = if is_byte_op {
+                    let now_ms = op.started.elapsed().as_millis() as u64;
+                    let mut st = util::lock(&op.speed);
+                    let dt_ms = now_ms.saturating_sub(st.last_ms);
+                    if dt_ms >= 150 && done >= st.last_bytes {
+                        let inst_bps = (done - st.last_bytes) as f64 / (dt_ms as f64 / 1000.0);
+                        st.ema_bps = if st.ema_bps <= 0.0 {
+                            inst_bps
+                        } else {
+                            st.ema_bps * 0.65 + inst_bps * 0.35
+                        };
+                        st.last_ms = now_ms;
+                        st.last_bytes = done;
+                    } else if st.ema_bps <= 0.0 && now_ms >= 200 && done > 0 {
+                        st.ema_bps = done as f64 / (now_ms as f64 / 1000.0);
+                    }
+                    let bps = st.ema_bps;
+                    let eta_secs = if bps >= 1.0 && total > done {
+                        ((total - done) as f64 / bps).ceil() as u64
+                    } else {
+                        0
+                    };
+                    (format_speed(bps), format_eta(eta_secs))
+                } else {
+                    (String::new(), String::new())
+                };
+                let detail = if is_byte_op {
                     Message::key(MessageKey::OpDetailProgress)
                         .text(util::format_size(done))
                         .text(util::format_size(total))
@@ -849,6 +932,8 @@ impl qobject::LoafCore {
                     "kind": op.kind,
                     "progress": progress,
                     "detail": detail,
+                    "speed": speed_text,
+                    "eta": eta_text,
                     "current": util::lock(&op.current).clone(),
                     "seconds": op.started.elapsed().as_secs(),
                 })
@@ -878,6 +963,7 @@ impl qobject::LoafCore {
             cancel: AtomicBool::new(false),
             current: Mutex::new(String::new()),
             last_publish: AtomicU64::new(0),
+            speed: Mutex::new(SpeedTracker::default()),
             started: Instant::now(),
             thread: self.qt_thread(),
         });
@@ -1960,7 +2046,7 @@ impl qobject::LoafCore {
         // Never "run" a file by double click; desktop entries and scripts
         // open in their default viewer (text editor), like Nautilus does.
         let launched = match apps::default_for(&mime) {
-            Some(app) => apps::launch(&app, &[path.clone()]).is_ok(),
+            Some(app) => apps::launch(&app, std::slice::from_ref(&path)).is_ok(),
             None => false,
         };
         if !launched {
@@ -1981,6 +2067,7 @@ impl qobject::LoafCore {
                 return;
             }
         }
+        Self::record_used_mime_type(&mime);
         std::thread::spawn(move || xdg::add_recent(&path, &mime));
     }
 
@@ -2058,10 +2145,14 @@ impl qobject::LoafCore {
             native::mime_type(&p, false)
         };
         let theme_name = self.icon_theme().to_string();
-        static CACHE: Mutex<Option<std::collections::HashMap<(String, String), QString>>> = Mutex::new(None);
+        static CACHE: Mutex<Option<std::collections::HashMap<(String, String), QString>>> =
+            Mutex::new(None);
         let cache_key = (mime.clone(), theme_name.clone());
         if let Ok(mut guard) = CACHE.lock() {
-            if let Some(hit) = guard.get_or_insert_with(std::collections::HashMap::new).get(&cache_key) {
+            if let Some(hit) = guard
+                .get_or_insert_with(std::collections::HashMap::new)
+                .get(&cache_key)
+            {
                 return hit.clone();
             }
         }
@@ -2102,7 +2193,9 @@ impl qobject::LoafCore {
         });
         let res = q(&serde_json::to_string(&payload).unwrap_or_else(|_| "{}".into()));
         if let Ok(mut guard) = CACHE.lock() {
-            guard.get_or_insert_with(std::collections::HashMap::new).insert(cache_key, res.clone());
+            guard
+                .get_or_insert_with(std::collections::HashMap::new)
+                .insert(cache_key, res.clone());
         }
         res
     }
@@ -2135,6 +2228,79 @@ impl qobject::LoafCore {
         q(&apps::default_for(&mime).map(|a| a.id).unwrap_or_default())
     }
 
+    pub fn default_app_for_mime(&self, mime: &QString) -> QString {
+        q(&apps::default_for(&mime.to_string())
+            .map(|app| app.id)
+            .unwrap_or_default())
+    }
+
+    pub fn used_mime_types(&self) -> QString {
+        let mimes: Vec<String> = state::get("openedMimeTypes")
+            .unwrap_or_default()
+            .split('\u{1}')
+            .filter(|mime| {
+                mime.contains('/') && !mime.contains('*') && !mime.starts_with("x-scheme-handler/")
+            })
+            .map(String::from)
+            .collect();
+        let entries: Vec<serde_json::Value> = mimes
+            .into_iter()
+            .map(|mime| {
+                let comment = native::mime_comment(&mime);
+                let label = if comment.is_empty() || comment == mime {
+                    mime.clone()
+                } else {
+                    format!("{} ({})", comment, mime)
+                };
+                serde_json::json!({"mime": mime, "label": label})
+            })
+            .collect();
+        q(&serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn apps_for_mime(&self, mime: &QString) -> QString {
+        Self::app_entries(
+            apps::for_mime(&mime.to_string()),
+            &self.icon_theme().to_string(),
+        )
+    }
+
+    pub fn set_default_mime_app(
+        mut self: Pin<&mut Self>,
+        mime: &QString,
+        app_id: &QString,
+    ) -> bool {
+        let mime = mime.to_string();
+        let app_id = app_id.to_string();
+        let app = apps::find(&app_id).filter(|app| {
+            app.mimes
+                .iter()
+                .any(|declared| apps::mime_covers(declared, &mime))
+        });
+        let Some(app) = app else {
+            self.as_mut().notify(
+                q("error"),
+                q("That application does not support this file type"),
+            );
+            return false;
+        };
+        match apps::set_default(&mime, &app_id) {
+            Ok(()) => {
+                Self::record_used_mime_type(&mime);
+                let comment = native::mime_comment(&mime);
+                self.as_mut().notify(
+                    q("info"),
+                    q(&format!("{} now opens {} files", app.name, comment)),
+                );
+                true
+            }
+            Err(e) => {
+                self.as_mut().notify(q("error"), q(&e.to_string()));
+                false
+            }
+        }
+    }
+
     fn push_recent_app(id: &str) {
         let mut list: Vec<String> = state::get("recentOpenApps")
             .unwrap_or_default()
@@ -2148,6 +2314,23 @@ impl qobject::LoafCore {
         state::set("recentOpenApps", &list.join("\u{1}"));
     }
 
+    fn record_used_mime_type(mime: &str) {
+        if !mime.contains('/') || mime.contains('*') || mime.starts_with("x-scheme-handler/") {
+            return;
+        }
+        let mut list: Vec<String> = state::get("openedMimeTypes")
+            .unwrap_or_default()
+            .split('\u{1}')
+            .filter(|value| !value.is_empty())
+            .map(String::from)
+            .collect();
+        if !list.iter().any(|value| value == mime) {
+            list.push(mime.to_string());
+            list.sort();
+            state::set("openedMimeTypes", &list.join("\u{1}"));
+        }
+    }
+
     pub fn open_with_app(mut self: Pin<&mut Self>, paths_json: &QString, app_id: &QString) {
         let paths = parse_paths(paths_json);
         let id = app_id.to_string();
@@ -2159,14 +2342,24 @@ impl qobject::LoafCore {
             return;
         };
         Self::push_recent_app(&id);
-        if let Err(e) = apps::launch(&app, &paths) {
-            self.as_mut().notify(
+        match apps::launch(&app, &paths) {
+            Ok(()) => {
+                for path in paths {
+                    let mime = if path.is_dir() {
+                        "inode/directory".to_string()
+                    } else {
+                        native::mime_type(&path, true)
+                    };
+                    Self::record_used_mime_type(&mime);
+                }
+            }
+            Err(e) => self.as_mut().notify(
                 q("error"),
                 q(&Message::key(MessageKey::NotifyAppStartError)
                     .text(app.name.clone())
                     .text(e.to_string())
                     .to_string()),
-            );
+            ),
         }
     }
 
@@ -2179,6 +2372,7 @@ impl qobject::LoafCore {
         };
         match apps::set_default(&mime, &app_id.to_string()) {
             Ok(()) => {
+                Self::record_used_mime_type(&mime);
                 let comment = native::mime_comment(&mime);
                 let name = apps::find(&app_id.to_string())
                     .map(|a| a.name)
@@ -3188,22 +3382,18 @@ impl qobject::LoafCore {
         if paths.is_empty() {
             return;
         }
-        let compress_folders = match self
-            .get_setting(&q("shareCompressFolders"))
-            .to_string()
-            .as_str()
-        {
-            "false" => false,
-            _ => true,
-        };
-        let compress_files = match self
-            .get_setting(&q("shareCompressFiles"))
-            .to_string()
-            .as_str()
-        {
-            "true" => true,
-            _ => false,
-        };
+        let compress_folders = !matches!(
+            self.get_setting(&q("shareCompressFolders"))
+                .to_string()
+                .as_str(),
+            "false"
+        );
+        let compress_files = matches!(
+            self.get_setting(&q("shareCompressFiles"))
+                .to_string()
+                .as_str(),
+            "true"
+        );
         let format = match self
             .get_setting(&q("shareCompressFormat"))
             .to_string()
@@ -4049,5 +4239,17 @@ mod tests {
         let dup = batch_rename_pairs(&[(d.join("a"), d.join("y")), (d.join("b"), d.join("y"))]);
         assert!(dup.is_err());
         std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn format_speed_and_eta_readable() {
+        assert_eq!(format_speed(0.0), "");
+        assert_eq!(format_speed(512.0), "512 B/s");
+        assert_eq!(format_speed(2048.0), "2 KB/s");
+        assert_eq!(format_speed(15.5 * 1024.0 * 1024.0), "15.5 MB/s");
+        assert_eq!(format_eta(0), "");
+        assert_eq!(format_eta(42), "42s left");
+        assert_eq!(format_eta(125), "2m 5s left");
+        assert_eq!(format_eta(3660), "1h 1m left");
     }
 }

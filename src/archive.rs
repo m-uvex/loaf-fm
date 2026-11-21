@@ -194,10 +194,9 @@ fn last_error_line(output: &str) -> String {
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
-        .filter(|l| {
+        .rfind(|l| {
             l.to_lowercase().contains("error") || l.starts_with("tar:") || l.contains("cannot")
         })
-        .last()
         .map(str::to_string)
         .unwrap_or_else(|| Message::key(MessageKey::ArchiveErrorToolFailed).to_string())
 }

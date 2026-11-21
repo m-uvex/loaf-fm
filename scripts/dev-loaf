@@ -1,0 +1,446 @@
+#!/usr/bin/env python3
+"""Portable development launcher for Loaf.
+
+Explicitly builds and publishes a cached binary, runs it instantly without Cargo,
+supports named snapshots, and generates an isolated development desktop entry.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+SNAPSHOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def get_repo_root() -> Path:
+    """Return the absolute Path to the repository root."""
+    return Path(__file__).resolve().parent.parent
+
+
+def get_launcher_dir(repo_root: Path) -> Path:
+    """Return the directory where published dev binaries and snapshots live."""
+    return repo_root / "target" / "dev-launcher"
+
+
+def validate_snapshot_name(name: str | None) -> None:
+    """Ensure snapshot name is safe against path traversal and special characters."""
+    if name is None or not name:
+        raise ValueError("Snapshot name cannot be empty.")
+    if name in (".", "..") or not SNAPSHOT_NAME_PATTERN.fullmatch(name):
+        raise ValueError(
+            f"Invalid snapshot name '{name}'. Only alphanumeric characters, dashes, dots, and underscores are allowed."
+        )
+
+
+def set_qt_env_fallbacks() -> None:
+    """Set Qt plugin and QML search paths if not already in environment."""
+    if "QT_PLUGIN_PATH" not in os.environ:
+        for p in ("/usr/lib/qt6/plugins", "/usr/lib64/qt6/plugins", "/usr/lib/x86_64-linux-gnu/qt6/plugins"):
+            if os.path.isdir(p):
+                os.environ["QT_PLUGIN_PATH"] = p
+                break
+
+    if "QML2_IMPORT_PATH" not in os.environ:
+        for p in ("/usr/lib/qt6/qml", "/usr/lib64/qt6/qml", "/usr/lib/x86_64-linux-gnu/qt6/qml"):
+            if os.path.isdir(p):
+                os.environ["QML2_IMPORT_PATH"] = p
+                break
+
+
+def acquire_build_lock(launcher_dir: Path):
+    """Acquire an exclusive lock to serialize builds and snapshots."""
+    launcher_dir.mkdir(parents=True, exist_ok=True)
+    lock_file = launcher_dir / ".lock"
+    f = open(lock_file, "w")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX)
+    except Exception:
+        f.close()
+        raise
+    return f
+
+
+def release_build_lock(lock_handle) -> None:
+    """Release the lock file."""
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_UN)
+    finally:
+        lock_handle.close()
+
+
+def run_build(repo_root: Path, keep_name: str | None = None) -> int:
+    """Build Loaf via Cargo, stage copy, and atomically replace the current binary."""
+    launcher_dir = get_launcher_dir(repo_root)
+    current_binary = launcher_dir / "loaf"
+    snapshots_dir = launcher_dir / "snapshots"
+
+    if keep_name is not None:
+        validate_snapshot_name(keep_name)
+        if not current_binary.exists():
+            sys.stderr.write(
+                f"Error: Cannot keep snapshot '{keep_name}': No current published binary exists.\n"
+                f"Run a normal build first or build without --keep.\n"
+            )
+            return 1
+        snapshots_dir.mkdir(parents=True, exist_ok=True)
+        dest_snapshot = snapshots_dir / f"loaf-{keep_name}"
+        if dest_snapshot.exists():
+            sys.stderr.write(
+                f"Error: Snapshot '{keep_name}' already exists at {dest_snapshot}. Overwrite rejected.\n"
+            )
+            return 1
+
+    lock_handle = acquire_build_lock(launcher_dir)
+    tmp_snapshot: Path | None = None
+    tmp_dest: Path | None = None
+    try:
+        # If --keep requested, re-check under lock and copy current to snapshot before build
+        if keep_name is not None:
+            if not current_binary.exists():
+                sys.stderr.write("Error: Current binary vanished before snapshot.\n")
+                return 1
+            dest_snapshot = snapshots_dir / f"loaf-{keep_name}"
+            if dest_snapshot.exists():
+                sys.stderr.write(
+                    f"Error: Snapshot '{keep_name}' already exists at {dest_snapshot}.\n"
+                )
+                return 1
+            tmp_snapshot = snapshots_dir / f".loaf-{keep_name}.tmp.{os.getpid()}"
+            shutil.copy2(current_binary, tmp_snapshot)
+            os.replace(tmp_snapshot, dest_snapshot)
+            tmp_snapshot = None
+
+        cargo_cmd = [
+            "cargo",
+            "build",
+            "--bin",
+            "loaf",
+            "--message-format=json-render-diagnostics",
+        ]
+        try:
+            # Inherit stderr so large diagnostics/build script output cannot block pipes
+            proc = subprocess.Popen(
+                cargo_cmd,
+                cwd=str(repo_root),
+                stdout=subprocess.PIPE,
+                stderr=None,
+                text=True,
+                bufsize=1,
+            )
+        except FileNotFoundError:
+            sys.stderr.write("Error: 'cargo' executable not found in PATH.\n")
+            return 1
+
+        executable_path: Path | None = None
+
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            line_str = line.strip()
+            if not line_str:
+                continue
+            try:
+                msg = json.loads(line_str)
+            except json.JSONDecodeError:
+                sys.stdout.write(line)
+                continue
+
+            reason = msg.get("reason")
+            if reason == "compiler-artifact":
+                target = msg.get("target", {})
+                if target.get("name") == "loaf" and "bin" in target.get("kind", []):
+                    exe_field = msg.get("executable")
+                    if exe_field:
+                        executable_path = Path(exe_field)
+            elif reason == "compiler-message":
+                rendered = msg.get("message", {}).get("rendered")
+                if rendered:
+                    sys.stderr.write(rendered)
+
+        rc = proc.wait()
+        if rc != 0:
+            sys.stderr.write(f"\nBuild failed with exit code {rc}. Last good build remains active.\n")
+            return rc
+
+        if not executable_path or not executable_path.is_file() or not os.access(executable_path, os.X_OK):
+            sys.stderr.write(
+                f"Error: Build succeeded but failed to locate valid compiled executable from Cargo messages.\n"
+            )
+            return 1
+
+        # Stage copy in destination directory and atomically rename
+        tmp_dest = launcher_dir / f".loaf.tmp.{os.getpid()}"
+        try:
+            shutil.copy2(executable_path, tmp_dest)
+            os.replace(tmp_dest, current_binary)
+            tmp_dest = None
+        except OSError as err:
+            sys.stderr.write(f"Error: Failed to publish binary to {current_binary}: {err}\n")
+            return 1
+
+        print(f"Published dev binary: {current_binary}")
+        return 0
+    finally:
+        if tmp_snapshot and tmp_snapshot.exists():
+            try:
+                tmp_snapshot.unlink()
+            except OSError:
+                pass
+        if tmp_dest and tmp_dest.exists():
+            try:
+                tmp_dest.unlink()
+            except OSError:
+                pass
+        release_build_lock(lock_handle)
+
+
+def run_launch(repo_root: Path, keep_name: str | None = None, extra_args: list[str] | None = None) -> int:
+    """Launch the published current binary or a named snapshot."""
+    launcher_dir = get_launcher_dir(repo_root)
+    if keep_name is not None:
+        validate_snapshot_name(keep_name)
+        target_exe = launcher_dir / "snapshots" / f"loaf-{keep_name}"
+        if not target_exe.exists():
+            sys.stderr.write(
+                f"Error: Saved snapshot '{keep_name}' does not exist at {target_exe}.\n"
+                f"Available snapshots: {list_snapshots(launcher_dir)}\n"
+            )
+            return 1
+    else:
+        target_exe = launcher_dir / "loaf"
+        if not target_exe.exists():
+            sys.stderr.write(
+                f"Error: No published dev binary found at {target_exe}.\n"
+                f"Run '{Path(__file__).resolve().name} build' first to compile and publish.\n"
+            )
+            return 1
+
+    set_qt_env_fallbacks()
+    cmd = [str(target_exe)] + (extra_args or [])
+    try:
+        os.execv(str(target_exe), cmd)
+    except OSError as err:
+        sys.stderr.write(f"Error: Failed to execute {target_exe}: {err}\n")
+        return 1
+    return 0
+
+
+def list_snapshots(launcher_dir: Path) -> str:
+    """Return comma-separated list of existing snapshots or 'none'."""
+    snapshots_dir = launcher_dir / "snapshots"
+    if not snapshots_dir.is_dir():
+        return "none"
+    names = []
+    for f in sorted(snapshots_dir.iterdir()):
+        if f.name.startswith("loaf-"):
+            names.append(f.name[len("loaf-"):])
+    return ", ".join(names) if names else "none"
+
+
+def escape_desktop_exec_arg(arg: str) -> str:
+    r"""Escape an argument according to the Desktop Entry Specification for Exec keys.
+
+    Level 2 (Exec argument inside quotes):
+      % -> %% (literal percent)
+      \ -> \\
+      " -> \"
+      ` -> \`
+      $ -> \$
+    Level 1 (Desktop entry keyfile value):
+      Backslashes in keyfile values must be escaped: \ -> \\
+    Combining both:
+      Literal \ in path becomes \\\\\\\\
+      Literal ", `, $ become \\\", \\`, \\$
+      Literal % becomes %%
+    """
+    if "\n" in arg or "\r" in arg:
+        raise ValueError("Paths containing newlines are not supported in desktop Exec lines.")
+    escaped = arg.replace("%", "%%")
+    escaped = escaped.replace("\\", "\\\\\\\\")
+    escaped = escaped.replace('"', '\\\\"').replace("`", "\\\\`").replace("$", "\\\\$")
+    return f'"{escaped}"'
+
+
+def install_desktop(repo_root: Path) -> int:
+    """Install an isolated user-local desktop entry for this dev checkout."""
+    if "\n" in str(repo_root) or "\r" in str(repo_root):
+        sys.stderr.write("Error: Repository path contains newlines, cannot create desktop entry.\n")
+        return 1
+
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if xdg_data_home:
+        apps_dir = Path(xdg_data_home) / "applications"
+    else:
+        apps_dir = Path.home() / ".local" / "share" / "applications"
+
+    try:
+        apps_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        sys.stderr.write(f"Error: Failed to create applications directory {apps_dir}: {err}\n")
+        return 1
+
+    desktop_file = apps_dir / "loaf-dev.desktop"
+    helper_path = (repo_root / "scripts" / "dev-loaf").resolve()
+    if not helper_path.exists():
+        sys.stderr.write(f"Error: Helper path {helper_path} does not exist.\n")
+        return 1
+
+    if desktop_file.exists():
+        try:
+            content = desktop_file.read_text(encoding="utf-8")
+            match = re.search(r"^X-Loaf-Dev-Checkout=(.*)$", content, re.MULTILINE)
+            if match:
+                prev_checkout = match.group(1).strip()
+                if prev_checkout and prev_checkout != str(repo_root):
+                    sys.stderr.write(
+                        f"Notice: Replacing existing desktop entry pointing to another checkout:\n"
+                        f"  Previous: {prev_checkout}\n"
+                        f"  New:      {repo_root}\n"
+                    )
+        except OSError as err:
+            sys.stderr.write(f"Warning: Could not read existing desktop file: {err}\n")
+
+    py_exe = sys.executable
+    py_token = escape_desktop_exec_arg(py_exe) if (" " in py_exe or any(c in py_exe for c in '$`"\\%')) else py_exe
+    try:
+        escaped_helper = escape_desktop_exec_arg(str(helper_path))
+    except ValueError as err:
+        sys.stderr.write(f"Error: {err}\n")
+        return 1
+
+    exec_main = f"{py_token} {escaped_helper} run -- %U"
+    exec_new_window = f"{py_token} {escaped_helper} run -- --new-window"
+
+    desktop_content = f"""[Desktop Entry]
+Name=Loaf (Development)
+Comment=Material 3 Expressive File Manager (Development Build)
+GenericName=File Manager
+Exec={exec_main}
+Icon=loaf
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Development;System;FileTools;FileManager;
+MimeType=
+Actions=NewWindow;
+X-Loaf-Dev-Checkout={repo_root}
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec={exec_new_window}
+Icon=loaf
+"""
+
+    tmp_desktop = apps_dir / f".loaf-dev.desktop.tmp.{os.getpid()}"
+    try:
+        tmp_desktop.write_text(desktop_content, encoding="utf-8")
+        os.replace(tmp_desktop, desktop_file)
+    except OSError as err:
+        if tmp_desktop.exists():
+            try:
+                tmp_desktop.unlink()
+            except OSError:
+                pass
+        sys.stderr.write(f"Error: Failed to write desktop entry to {desktop_file}: {err}\n")
+        return 1
+
+    print(f"Installed development desktop entry: {desktop_file}")
+
+    if shutil.which("update-desktop-database"):
+        try:
+            subprocess.run(["update-desktop-database", str(apps_dir)], check=False)
+        except Exception:
+            pass
+
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    repo_root = get_repo_root()
+
+    if not argv:
+        return run_launch(repo_root)
+
+    subcommand = argv[0]
+
+    if subcommand == "build":
+        parser = argparse.ArgumentParser(
+            prog="dev-loaf build",
+            description="Compile Loaf and publish as current launchable dev binary.",
+        )
+        parser.add_argument(
+            "--keep",
+            dest="keep_name",
+            metavar="NAME",
+            help="Snapshot current published binary before build under this name.",
+        )
+        args = parser.parse_args(argv[1:])
+        try:
+            return run_build(repo_root, keep_name=args.keep_name)
+        except (ValueError, OSError) as e:
+            sys.stderr.write(f"Error: {e}\n")
+            return 1
+
+    elif subcommand == "run":
+        run_argv = argv[1:]
+        keep_name: str | None = None
+        extra_args: list[str] = []
+
+        i = 0
+        while i < len(run_argv):
+            arg = run_argv[i]
+            if arg == "--":
+                extra_args.extend(run_argv[i + 1:])
+                break
+            elif arg == "--keep":
+                if i + 1 < len(run_argv):
+                    keep_name = run_argv[i + 1]
+                    i += 2
+                    continue
+                else:
+                    sys.stderr.write("Error: --keep requires a snapshot name.\n")
+                    return 1
+            elif arg.startswith("--keep="):
+                keep_name = arg.split("=", 1)[1]
+                i += 1
+                continue
+            else:
+                extra_args.append(arg)
+                i += 1
+
+        try:
+            return run_launch(repo_root, keep_name=keep_name, extra_args=extra_args)
+        except (ValueError, OSError) as e:
+            sys.stderr.write(f"Error: {e}\n")
+            return 1
+
+    elif subcommand == "install-desktop":
+        return install_desktop(repo_root)
+
+    elif subcommand in ("-h", "--help", "help"):
+        print(
+            "Usage: scripts/dev-loaf [build | run | install-desktop] [options]\n\n"
+            "Commands:\n"
+            "  build [--keep NAME]         Compile and publish binary (replaces current)\n"
+            "  run [--keep NAME] [args...] Launch published binary immediately (no Cargo)\n"
+            "  install-desktop             Install isolated ~/.local/share/applications/loaf-dev.desktop\n"
+            "  (no args)                   Equivalent to 'run'\n"
+        )
+        return 0
+
+    else:
+        return run_launch(repo_root, extra_args=argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
