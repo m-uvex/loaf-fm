@@ -52,6 +52,7 @@ pub mod qobject {
         #[qproperty(bool, read_only)]
         #[qproperty(bool, dir_only)]
         #[qproperty(QString, portal_filter_json)]
+        #[qproperty(i32, meta_revision)]
         type LoafEngine = super::PaneRust;
     }
     unsafe extern "RustQt" {
@@ -163,6 +164,12 @@ pub mod qobject {
         fn toggle_view_mode(self: Pin<&mut LoafEngine>);
         #[qinvokable]
         fn reload_starred(self: Pin<&mut LoafEngine>);
+        #[qinvokable]
+        fn set_extra_columns(self: Pin<&mut LoafEngine>, keys_json: &QString);
+        #[qinvokable]
+        fn entry_meta(self: &LoafEngine, path: &QString, key: &QString) -> QString;
+        #[qinvokable]
+        fn all_columns_json(self: &LoafEngine) -> QString;
 
         /// JSON {location, back, forward} for tabs and session restore.
         #[qinvokable]
@@ -350,6 +357,10 @@ pub struct PaneRust {
     dir_only: bool,
     portal_filter_json: QString,
     portal_filter: Option<crate::portal::filters::Filter>,
+    meta_revision: i32,
+    extra_columns: Vec<String>,
+    meta_cache: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    meta_generation: Arc<AtomicU64>,
 
     loc: Loc,
     /// Location to return to when a search is cleared.
@@ -395,6 +406,10 @@ impl Default for PaneRust {
             dir_only: false,
             portal_filter_json: QString::default(),
             portal_filter: None,
+            meta_revision: 0,
+            extra_columns: Vec::new(),
+            meta_cache: std::collections::HashMap::new(),
+            meta_generation: Arc::new(AtomicU64::new(0)),
             loc: Loc::Dir(home),
             before_search: None,
             all: Vec::new(),
@@ -1029,6 +1044,7 @@ impl qobject::LoafEngine {
                 }
                 pane.as_mut().set_loading(false);
                 pane.as_mut().loaded();
+                pane.as_mut().trigger_metadata_load();
             });
         });
     }
@@ -1235,6 +1251,7 @@ impl qobject::LoafEngine {
                 pane.as_mut().set_searching(false);
                 pane.as_mut().set_loading(false);
                 pane.as_mut().loaded();
+                pane.as_mut().trigger_metadata_load();
             });
         });
     }
@@ -1278,9 +1295,122 @@ impl qobject::LoafEngine {
         self.as_mut().rust_mut().date_ctx = date_ctx;
         let spec = self.sort_spec();
         let mut all = std::mem::take(&mut self.as_mut().rust_mut().all);
-        listing::sort_with_ctx(&mut all, &spec, &date_ctx);
+        if crate::metadata::is_extra_column(&spec.key) {
+            let key = spec.key.clone();
+            let asc = spec.ascending;
+            let folder_pos = spec.folders.clone();
+            let cache = &self.meta_cache;
+            all.sort_by(|a, b| {
+                if folder_pos == "first" && a.is_dir != b.is_dir {
+                    return if a.is_dir {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Greater
+                    };
+                }
+                if folder_pos == "last" && a.is_dir != b.is_dir {
+                    return if a.is_dir {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
+                    };
+                }
+                let va = cache
+                    .get(&a.path)
+                    .and_then(|m| m.get(&key))
+                    .map(String::as_str)
+                    .unwrap_or("");
+                let vb = cache
+                    .get(&b.path)
+                    .and_then(|m| m.get(&key))
+                    .map(String::as_str)
+                    .unwrap_or("");
+                // Empty metadata values always sort last regardless of direction.
+                match (va.is_empty(), vb.is_empty()) {
+                    (true, false) => return std::cmp::Ordering::Greater,
+                    (false, true) => return std::cmp::Ordering::Less,
+                    (true, true) => return a.name_lower.cmp(&b.name_lower),
+                    (false, false) => {}
+                }
+                let ord = match (va.parse::<f64>(), vb.parse::<f64>()) {
+                    (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
+                    _ => va.to_lowercase().cmp(&vb.to_lowercase()),
+                };
+                let ord = if asc { ord } else { ord.reverse() };
+                ord.then_with(|| a.name_lower.cmp(&b.name_lower))
+            });
+        } else {
+            listing::sort_with_ctx(&mut all, &spec, &date_ctx);
+        }
         self.as_mut().rust_mut().all = all;
         self.refilter(true);
+    }
+
+    fn trigger_metadata_load(self: Pin<&mut Self>) {
+        if self.extra_columns.is_empty()
+            || !matches!(
+                self.loc,
+                Loc::Dir(_) | Loc::Recent | Loc::Starred | Loc::Search { .. }
+            )
+        {
+            return;
+        }
+        let cols = self.extra_columns.clone();
+        let paths: Vec<String> = self.all.iter().map(|e| e.path.clone()).collect();
+        if paths.is_empty() {
+            return;
+        }
+        let gen = self.meta_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let meta_gen = self.meta_generation.clone();
+        let thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let extracted = crate::metadata::extract_batch(&paths, &cols);
+            let _ = thread.queue(move |mut pane| {
+                if meta_gen.load(Ordering::SeqCst) != gen {
+                    return;
+                }
+                pane.as_mut().rust_mut().meta_cache = extracted;
+                let rev = *pane.meta_revision() + 1;
+                pane.as_mut().set_meta_revision(rev);
+                let sort_key = pane.sort_by().to_string();
+                if crate::metadata::is_extra_column(&sort_key) {
+                    pane.as_mut().resort();
+                }
+            });
+        });
+    }
+
+    pub fn set_extra_columns(mut self: Pin<&mut Self>, keys_json: &QString) {
+        let parsed: Vec<String> = serde_json::from_str::<Vec<String>>(&keys_json.to_string())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|k| crate::metadata::is_extra_column(k))
+            .collect();
+        if self.extra_columns == parsed {
+            return;
+        }
+        self.as_mut().rust_mut().extra_columns = parsed;
+        if self.extra_columns.is_empty() {
+            self.as_mut().rust_mut().meta_cache.clear();
+            let rev = *self.meta_revision() + 1;
+            self.as_mut().set_meta_revision(rev);
+        } else {
+            self.trigger_metadata_load();
+        }
+    }
+
+    pub fn entry_meta(&self, path: &QString, key: &QString) -> QString {
+        let p = path.to_string();
+        let k = key.to_string();
+        self.meta_cache
+            .get(&p)
+            .and_then(|m| m.get(&k))
+            .map(|v| QString::from(v.as_str()))
+            .unwrap_or_default()
+    }
+
+    pub fn all_columns_json(&self) -> QString {
+        QString::from(&*crate::metadata::catalog_json())
     }
 
     pub fn set_group(mut self: Pin<&mut Self>, group_by: &QString, ascending: bool) {

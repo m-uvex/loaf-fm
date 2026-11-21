@@ -12,6 +12,7 @@ pub mod info;
 pub mod kdeconnect;
 pub mod listing;
 pub mod message;
+pub mod metadata;
 pub mod mtp;
 pub mod mtp_ops;
 pub mod native;
