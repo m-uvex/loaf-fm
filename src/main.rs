@@ -299,19 +299,31 @@ fn sanitize_display_env() {
         if verbose {
             eprintln!("loaf: recovered WAYLAND_DISPLAY={wayland}");
         }
-        std::env::set_var("WAYLAND_DISPLAY", wayland);
+        // SAFETY: sanitize_display_env runs on the main thread before Qt or worker threads spawn.
+        #[allow(unused_unsafe)]
+        unsafe {
+            std::env::set_var("WAYLAND_DISPLAY", wayland);
+        }
     }
     if let Some(display) = patch.display {
         if verbose {
             eprintln!("loaf: recovered DISPLAY={display}");
         }
-        std::env::set_var("DISPLAY", display);
+        // SAFETY: sanitize_display_env runs on the main thread before Qt or worker threads spawn.
+        #[allow(unused_unsafe)]
+        unsafe {
+            std::env::set_var("DISPLAY", display);
+        }
     }
     if let Some(qpa) = patch.qt_qpa_platform {
         if verbose {
             eprintln!("loaf: fallback QT_QPA_PLATFORM={qpa}");
         }
-        std::env::set_var("QT_QPA_PLATFORM", qpa);
+        // SAFETY: sanitize_display_env runs on the main thread before Qt or worker threads spawn.
+        #[allow(unused_unsafe)]
+        unsafe {
+            std::env::set_var("QT_QPA_PLATFORM", qpa);
+        }
     }
 }
 
