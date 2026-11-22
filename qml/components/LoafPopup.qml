@@ -141,6 +141,14 @@ Popup {
         popup.openAt(p.x, p.y);
     }
 
+    // Open directly below the anchor with the right edges aligned, for
+    // dropdowns hanging off right-side toolbar buttons.
+    function openBelowRight(anchorItem) {
+        if (!anchorItem || !anchorItem.mapToItem) return;
+        var p = anchorItem.mapToItem(null, anchorItem.width - popup.width, anchorItem.height + 6);
+        popup.openAt(p.x, p.y);
+    }
+
     function openAdjacentTo(anchorItem, parentMenu) {
         if (!anchorItem || !anchorItem.mapToItem) return;
         var p = anchorItem.mapToItem(null, 0, 0);

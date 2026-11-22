@@ -208,6 +208,17 @@ fn main() {
         })
     };
     builder.build();
+    let rustflags = std::env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux")
+        && !rustflags.contains("-fuse-ld")
+        && std::process::Command::new("mold")
+            .arg("--version")
+            .output()
+            .is_ok_and(|out| out.status.success())
+    {
+        println!("cargo:rustc-link-arg=-fuse-ld=mold");
+    }
+    println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
     // Our C++ code in the cxx-qt static library uses these modules; with
     // --as-needed the early -l flags are dropped, so repeat them last.
     for lib in ["Qt6Quick", "Qt6Qml", "Qt6DBus", "Qt6Gui", "Qt6Core"] {

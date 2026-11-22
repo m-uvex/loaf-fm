@@ -78,6 +78,13 @@ pub struct NetworkProfileState {
     pub path: String,
     pub label: String,
     pub icon: String,
+    pub total_bytes: u64,
+    pub used_bytes: u64,
+    pub free_bytes: u64,
+    pub total_str: String,
+    pub used_str: String,
+    pub free_str: String,
+    pub percent: f64,
 }
 
 #[derive(Debug)]
@@ -507,78 +514,128 @@ fn normalize_path_prefix(p: &str) -> String {
     }
 }
 
+fn unescape_mount_field(s: &str) -> String {
+    s.replace("\\040", " ")
+        .replace("\\011", "\t")
+        .replace("\\012", "\n")
+        .replace("\\134", "\\")
+}
+
+/// Match an active kernel CIFS/SMB3 mount in `/proc/self/mounts` (e.g. from
+/// `/etc/fstab` or `mount -t cifs`) so profiles mounted outside GVfs are also
+/// recognized as connected and report disk usage.
+fn parse_cifs_mount_line(line: &str, want_host: &str, want_share: &str) -> Option<PathBuf> {
+    let mut parts = line.split_whitespace();
+    let src = unescape_mount_field(parts.next()?);
+    let target = unescape_mount_field(parts.next()?);
+    let fstype = parts.next()?;
+    if fstype != "cifs" && fstype != "smb3" {
+        return None;
+    }
+    let rest = src.strip_prefix("//")?;
+    let (host, share) = rest.split_once('/')?;
+    if same(host, want_host) && same(share.trim_matches('/'), want_share) {
+        Some(PathBuf::from(target))
+    } else {
+        None
+    }
+}
+
+fn kernel_cifs_mount_path(want_host: &str, want_share: &str) -> Option<PathBuf> {
+    let mounts = std::fs::read_to_string("/proc/self/mounts").ok()?;
+    for line in mounts.lines() {
+        if let Some(path) = parse_cifs_mount_line(line, want_host, want_share) {
+            if path.is_dir() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
 pub fn connected_path(profile: &NetworkProfile) -> Option<PathBuf> {
-    let dir = gvfs_dir();
-    let entries = std::fs::read_dir(&dir).ok()?;
     let (want_host, host_port) = split_server(&profile.server);
     let want_port = profile.port.or(host_port);
     let want_user = profile.username.trim();
 
-    match profile.protocol {
-        Protocol::Smb => {
-            let want_share = profile.share.trim().trim_matches('/');
-            let want_domain = profile.domain.trim();
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let Some(found) = parse_smb_mount_entry(&name) else {
-                    continue;
-                };
-                if !same(&found.server, want_host) {
-                    continue;
+    if let Ok(entries) = std::fs::read_dir(gvfs_dir()) {
+        match profile.protocol {
+            Protocol::Smb => {
+                let want_share = profile.share.trim().trim_matches('/');
+                let want_domain = profile.domain.trim();
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    let Some(found) = parse_smb_mount_entry(&name) else {
+                        continue;
+                    };
+                    if !same(&found.server, want_host) {
+                        continue;
+                    }
+                    if found.port != want_port {
+                        continue;
+                    }
+                    if !same(found.share.trim_matches('/'), want_share) {
+                        continue;
+                    }
+                    if !want_user.is_empty()
+                        && !found.user.is_empty()
+                        && !same(&found.user, want_user)
+                    {
+                        continue;
+                    }
+                    if !want_domain.is_empty()
+                        && !found.domain.is_empty()
+                        && !same(&found.domain, want_domain)
+                    {
+                        continue;
+                    }
+                    let path = entry.path();
+                    if path.is_dir() {
+                        return Some(path);
+                    }
                 }
-                if found.port != want_port {
-                    continue;
-                }
-                if !same(found.share.trim_matches('/'), want_share) {
-                    continue;
-                }
-                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user)
-                {
-                    continue;
-                }
-                if !want_domain.is_empty()
-                    && !found.domain.is_empty()
-                    && !same(&found.domain, want_domain)
-                {
-                    continue;
-                }
-                let path = entry.path();
-                if path.is_dir() {
-                    return Some(path);
+            }
+            Protocol::Webdav => {
+                let want_prefix = normalize_path_prefix(&profile.share);
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    let Some(found) = parse_dav_mount_entry(&name) else {
+                        continue;
+                    };
+                    let found_host = found.host.trim_matches('[').trim_matches(']');
+                    let target_host = want_host.trim_matches('[').trim_matches(']');
+                    if !same(found_host, target_host) {
+                        continue;
+                    }
+                    if found.ssl != profile.ssl {
+                        continue;
+                    }
+                    if found.port != want_port {
+                        continue;
+                    }
+                    let found_prefix = normalize_path_prefix(&found.prefix);
+                    if !same(&found_prefix, &want_prefix) {
+                        continue;
+                    }
+                    if !want_user.is_empty()
+                        && !found.user.is_empty()
+                        && !same(&found.user, want_user)
+                    {
+                        continue;
+                    }
+                    let path = entry.path();
+                    if path.is_dir() {
+                        return Some(path);
+                    }
                 }
             }
         }
-        Protocol::Webdav => {
-            let want_prefix = normalize_path_prefix(&profile.share);
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let Some(found) = parse_dav_mount_entry(&name) else {
-                    continue;
-                };
-                let found_host = found.host.trim_matches('[').trim_matches(']');
-                let target_host = want_host.trim_matches('[').trim_matches(']');
-                if !same(found_host, target_host) {
-                    continue;
-                }
-                if found.ssl != profile.ssl {
-                    continue;
-                }
-                if found.port != want_port {
-                    continue;
-                }
-                let found_prefix = normalize_path_prefix(&found.prefix);
-                if !same(&found_prefix, &want_prefix) {
-                    continue;
-                }
-                if !want_user.is_empty() && !found.user.is_empty() && !same(&found.user, want_user)
-                {
-                    continue;
-                }
-                let path = entry.path();
-                if path.is_dir() {
-                    return Some(path);
-                }
-            }
+    }
+
+    if profile.protocol == Protocol::Smb {
+        let want_share = profile.share.trim().trim_matches('/');
+        if !want_share.is_empty() {
+            return kernel_cifs_mount_path(want_host, want_share);
         }
     }
     None
@@ -656,8 +713,29 @@ pub fn unmount(profile: &NetworkProfile) -> Result<(), String> {
     }
 }
 
-pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
+fn compute_usage(total: u64, free: u64) -> (u64, u64, u64, f64) {
+    let used = total.saturating_sub(free);
+    let pct = if total > 0 {
+        ((used as f64 / total as f64) * 1000.0).round() / 10.0
+    } else {
+        0.0
+    };
+    (total, used, free, pct)
+}
+
+fn build_state(profile: &NetworkProfile, with_usage: bool) -> NetworkProfileState {
     let path = connected_path(profile);
+    let path_str = path
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let (total_bytes, used_bytes, free_bytes, percent) = if with_usage && !path_str.is_empty() {
+        crate::drives::statvfs(&path_str)
+            .map(|(t, f)| compute_usage(t, f))
+            .unwrap_or((0, 0, 0, 0.0))
+    } else {
+        (0, 0, 0, 0.0)
+    };
     NetworkProfileState {
         id: profile.id.clone(),
         protocol: profile.protocol.as_str().to_string(),
@@ -669,16 +747,41 @@ pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
         port: profile.port,
         ssl: profile.ssl,
         connected: path.is_some(),
-        path: path
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default(),
+        path: path_str,
         label: profile.label(),
         icon: profile.protocol.icon().to_string(),
+        total_bytes,
+        used_bytes,
+        free_bytes,
+        total_str: if total_bytes > 0 {
+            util::format_size(total_bytes)
+        } else {
+            String::new()
+        },
+        used_str: if total_bytes > 0 {
+            util::format_size(used_bytes)
+        } else {
+            String::new()
+        },
+        free_str: if total_bytes > 0 {
+            util::format_size(free_bytes)
+        } else {
+            String::new()
+        },
+        percent,
     }
 }
 
+pub fn state_for(profile: &NetworkProfile) -> NetworkProfileState {
+    build_state(profile, false)
+}
+
+pub fn state_for_with_usage(profile: &NetworkProfile) -> NetworkProfileState {
+    build_state(profile, true)
+}
+
 pub fn list_json() -> String {
-    let list: Vec<NetworkProfileState> = profiles().iter().map(state_for).collect();
+    let list: Vec<NetworkProfileState> = profiles().iter().map(state_for_with_usage).collect();
     serde_json::to_string(&list).unwrap_or_else(|_| "[]".into())
 }
 
@@ -757,5 +860,20 @@ mod tests {
         assert!(dav_entry.ssl);
         assert_eq!(dav_entry.prefix, "/remote.php/webdav");
         assert_eq!(dav_entry.user, "alice");
+    }
+
+    #[test]
+    fn parses_kernel_cifs_mounts_and_usage() {
+        let line = "//192.168.99.50/Share1 /mnt/nas/LAN/Share1 cifs rw,relatime 0 0";
+        assert_eq!(
+            parse_cifs_mount_line(line, "192.168.99.50", "share1"),
+            Some(PathBuf::from("/mnt/nas/LAN/Share1"))
+        );
+        assert_eq!(parse_cifs_mount_line(line, "192.168.1.50", "share1"), None);
+
+        let (total, used, free, pct) = compute_usage(200, 50);
+        assert_eq!((total, used, free), (200, 150, 50));
+        assert_eq!(pct, 75.0);
+        assert_eq!(compute_usage(0, 0).3, 0.0);
     }
 }

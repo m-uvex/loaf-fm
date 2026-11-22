@@ -38,11 +38,196 @@ ApplicationWindow {
     readonly property bool showHidden: activePane ? activePane.engine.show_hidden : false
 
     function toggleShowHidden() {
-        var v = !pane0.engine.show_hidden;
-        if (pane0.engine.show_hidden !== v)
-            pane0.engine.toggle_show_hidden();
-        if (pane1Loader.item && pane1Loader.item.engine.show_hidden !== v)
-            pane1Loader.item.engine.toggle_show_hidden();
+        viewPrefs.setHidden(!pane0.engine.show_hidden);
+    }
+
+    // View preferences resolve by scope: a folder with its own entry uses it,
+    // otherwise it inherits the nearest ancestor's entry, falling back to the
+    // shared universal set at the filesystem root. Entry modes are "dir"
+    // (own set), "universal" (pinned to the universal set) and "parent"
+    // (keep climbing, the default). The scope pill at the top of the View
+    // menu picks the active folder's mode. Exposed as a property so other
+    // components (FilePane, settings tabs) can reach the manager; ids alone
+    // are file-scoped.
+    readonly property alias viewPrefs: viewPrefsManager
+
+    QtObject {
+        id: viewPrefsManager
+
+        readonly property string universalKey: "viewPrefsUniversal"
+        readonly property string dirsKey: "viewPrefsDirs"
+        readonly property int maxDirs: 500
+
+        property var universal: null
+        property var dirs: ({})
+        // Effective mode for the active folder: "dir" (own set), "universal"
+        // (universal pin) or "parent" (inheriting from an ancestor).
+        property string mode: "parent"
+
+        function load() {
+            var u = theme.readSetting(universalKey);
+            universal = (u && u.length > 0) ? JSON.parse(u) : null;
+            if (!universal) {
+                universal = liveSnapshot(pane0.engine);
+                saveUniversal();
+            }
+            var d = theme.readSetting(dirsKey);
+            dirs = (d && d.length > 0) ? JSON.parse(d) : {};
+            refreshMode();
+        }
+
+        function liveSnapshot(eng) {
+            return {
+                view: eng.view_mode, zoom: theme.zoomIndex,
+                sort: eng.sort_by, sortAsc: eng.sort_ascending,
+                group: eng.group_by, groupAsc: eng.group_ascending,
+                folders: eng.folder_position, hidden: eng.show_hidden
+            };
+        }
+
+        function parentPath(p) {
+            if (!p || p.length <= 1)
+                return "";
+            var i = p.lastIndexOf("/");
+            return i <= 0 ? "/" : p.substring(0, i);
+        }
+
+        // Nearest entry at path or above it, climbing through "parent"
+        // entries and absent folders. Null means nothing pinned anywhere
+        // up to the root, i.e. the universal set applies.
+        function resolveEntry(path) {
+            var cur = path;
+            while (cur && cur.length > 0) {
+                var e = dirs[cur];
+                if (e && e.mode !== "parent")
+                    return e;
+                if (cur === "/")
+                    return null;
+                cur = parentPath(cur);
+            }
+            return null;
+        }
+
+        function scopeFor(path, eng) {
+            if (eng && eng.location_kind !== "dir")
+                return universal;
+            var e = resolveEntry(path);
+            return (e && e.mode === "dir") ? e.prefs : universal;
+        }
+
+        function applyTo(eng, p, withZoom) {
+            if (!eng || !p)
+                return;
+            if (eng.view_mode !== p.view)
+                eng.set_view(p.view);
+            if (eng.sort_by !== p.sort || eng.sort_ascending !== p.sortAsc)
+                eng.set_sort(p.sort, p.sortAsc);
+            if (eng.group_by !== p.group || eng.group_ascending !== p.groupAsc)
+                eng.set_group(p.group, p.groupAsc);
+            if (eng.folder_position !== p.folders)
+                eng.change_folder_position(p.folders);
+            if (withZoom && theme.zoomIndex !== p.zoom)
+                theme.zoomIndex = p.zoom;
+            if (eng.show_hidden !== p.hidden)
+                eng.toggle_show_hidden();
+        }
+
+        function syncPane(eng) {
+            if (!eng)
+                return;
+            applyTo(eng, scopeFor(eng.current_path, eng), eng === window.engine);
+            if (eng === window.engine)
+                refreshMode();
+        }
+
+        function syncAll() {
+            syncPane(pane0.engine);
+            if (pane1Loader.item)
+                syncPane(pane1Loader.item.engine);
+            refreshMode();
+        }
+
+        // Mode of the active folder's own pin, for the pill display.
+        // Inherited scopes stay invisible; resolution lives in resolveEntry.
+        function refreshMode() {
+            var eng = window.engine;
+            var e = eng && eng.location_kind === "dir" ? dirs[eng.current_path] : null;
+            mode = e ? e.mode : ((eng && eng.location_kind === "dir") ? "parent" : "universal");
+        }
+
+        function saveUniversal() {
+            theme.writeSetting(universalKey, JSON.stringify(universal));
+        }
+
+        function saveDirs() {
+            var keys = Object.keys(dirs);
+            if (keys.length > maxDirs) {
+                for (var i = 0; i < keys.length - maxDirs; ++i)
+                    delete dirs[keys[i]];
+            }
+            theme.writeSetting(dirsKey, JSON.stringify(dirs));
+        }
+
+        function set(key, value) {
+            var eng = window.engine;
+            if (!eng)
+                return;
+            var path = eng.current_path;
+            // Route by this folder's own entry, not the effective mode: an
+            // inherited dir scope belongs to an ancestor.
+            var selfEntry = eng.location_kind === "dir" ? dirs[path] : null;
+            if (selfEntry && selfEntry.mode === "dir") {
+                selfEntry.prefs[key] = value;
+                saveDirs();
+            } else if (selfEntry && selfEntry.mode === "universal") {
+                universal[key] = value;
+                saveUniversal();
+            } else if (eng.location_kind === "dir") {
+                // Inheriting (or pinned to parent): editing pins an own set
+                // on this folder instead of mutating an ancestor's entry.
+                var prefs = liveSnapshot(eng);
+                prefs[key] = value;
+                dirs[path] = { mode: "dir", prefs: prefs };
+                saveDirs();
+            } else {
+                universal[key] = value;
+                saveUniversal();
+            }
+            syncAll();
+        }
+
+        // Switch the active folder between the three modes: "dir" keeps its
+        // own set, "universal" pins the shared set, "parent" resumes
+        // inheriting from the nearest ancestor with a pin. The folder's
+        // stored set is kept through every switch, so flipping back to This
+        // folder restores it.
+        function setMode(m) {
+            var eng = window.engine;
+            if (!eng || eng.location_kind !== "dir")
+                return;
+            var path = eng.current_path;
+            var e = dirs[path];
+            if (e) {
+                e.mode = m;
+            } else {
+                dirs[path] = { mode: m, prefs: liveSnapshot(eng) };
+            }
+            saveDirs();
+            syncAll();
+        }
+
+        function setView(v) { set("view", v); }
+        function setZoom(i) { set("zoom", Math.max(0, Math.min(theme.zoomLevels.length - 1, Math.round(i)))); }
+        function zoom(dir) { setZoom(theme.zoomIndex + dir); }
+        function toggleView() { set("view", window.engine.view_mode === "grid" ? "list" : "grid"); }
+        function setHidden(v) { set("hidden", v); }
+
+        function sortBy(key, defaultAsc) {
+            var eng = window.engine;
+            var asc = (eng.sort_by === key) ? !eng.sort_ascending : defaultAsc;
+            set("sort", key);
+            set("sortAsc", asc);
+        }
     }
     property var activePane: pane0
     // The engine (model) of the pane the user is working in.
@@ -76,7 +261,7 @@ ApplicationWindow {
     }
 
     onCurrentTabChanged: cancelDriveOpen()
-    onActivePaneChanged: cancelDriveOpen()
+    onActivePaneChanged: { viewPrefs.refreshMode(); if (window.engine) viewPrefs.syncPane(window.engine); cancelDriveOpen(); }
 
     Connections {
         target: window.engine
@@ -164,6 +349,7 @@ ApplicationWindow {
     readonly property bool gridKeyboardReady: activeView === "files" && !searchInput.activeFocus
         && !sidebar.keyboardHasFocus
         && !newTabToolbarButton.activeFocus && !newWindowToolbarButton.activeFocus
+        && !refreshToolbarButton.activeFocus
         && !pathInput.activeFocus && !anyModalOpen && !!activePane && activePane.renamingPath === ""
     // helpers used by the panes and dialogs
 
@@ -253,6 +439,23 @@ ApplicationWindow {
         cutSet = s;
     }
 
+    function refreshCurrentView() {
+        if (window.activeView === "pc") {
+            core.load_places();
+            core.load_drives();
+            core.refresh_frequent_dirs();
+            core.refresh_smb_discovery();
+            return;
+        }
+        if (window.activeView !== "files") {
+            engine.refresh();
+            return;
+        }
+        pane0.engine.refresh_with_reset();
+        if (window.splitView && pane1Loader.item)
+            pane1Loader.item.engine.refresh_with_reset();
+    }
+
     Connections {
         target: nativeBridge
         function onClipboardChanged() {
@@ -270,7 +473,7 @@ ApplicationWindow {
         function onPickerDismissed(handle) { window.closePicker(handle); }
         function onCtrlScroll(delta) {
             if (window.activeView === "files")
-                theme.stepZoom(delta);
+                viewPrefs.zoom(delta);
         }
         function onSpacePressed() {
             if (searchInput.activeFocus || window.isEditingPath)
@@ -427,6 +630,54 @@ ApplicationWindow {
         transfer(paths, destDir, asCopy ? "copy" : "move");
     }
 
+    function canLinkDrop(paths, destDir) {
+        return paths && paths.length > 0 && destDir && destDir.indexOf("/") === 0
+            && nativeBridge.isDirectory(destDir) && nativeBridge.isWritable(destDir)
+            && paths.every(function(path) { return path.indexOf("/") === 0; });
+    }
+
+    function handleTabDrop(drop, paths, destDir, px, py) {
+        if (!destDir || !paths || paths.length === 0) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        if (destDir.indexOf("/") === 0) {
+            if (!nativeBridge.isWritable(destDir) || !nativeBridge.isDirectory(destDir)) {
+                if (drop) drop.accept(Qt.IgnoreAction);
+                return false;
+            }
+        }
+        var isInternal = drop && drop.source === dragProxy;
+        var supported = ((drop && drop.supportedActions !== undefined) ? drop.supportedActions
+            : (Qt.CopyAction | Qt.MoveAction)) & (Qt.CopyAction | Qt.MoveAction | Qt.LinkAction);
+        var canLink = window.canLinkDrop(paths, destDir);
+        // Loaf owns the asynchronous transfer; external Move acknowledgements can delete the source prematurely.
+        var acknowledgement = (supported & Qt.CopyAction) ? Qt.CopyAction
+            : ((supported & Qt.LinkAction) && canLink ? Qt.LinkAction
+                : (isInternal && (supported & Qt.MoveAction) ? Qt.MoveAction : Qt.IgnoreAction));
+        if (acknowledgement === Qt.IgnoreAction) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        var rightButton = isInternal ? dragManager.isRmb : !!(nativeBridge.dropButtons() & Qt.RightButton);
+        if (rightButton) {
+            if (drop) drop.accept(acknowledgement);
+            rmbDropMenu.showAt(px, py, paths, destDir, supported);
+            return true;
+        }
+        var asCopy = isInternal ? dragManager.asCopy : !!(nativeBridge.dropModifiers() & Qt.ControlModifier);
+        var mode = asCopy ? ((supported & Qt.CopyAction) ? "copy" : "")
+            : ((supported & Qt.MoveAction) ? "move"
+                : ((supported & Qt.CopyAction) ? "copy" : (canLink ? "link" : "")));
+        if (!mode) {
+            if (drop) drop.accept(Qt.IgnoreAction);
+            return false;
+        }
+        if (drop) drop.accept(acknowledgement);
+        window.transfer(paths, destDir, mode);
+        return true;
+    }
+
     function trashSelection() {
         var paths = selectedPaths();
         if (paths.length === 0)
@@ -556,6 +807,74 @@ ApplicationWindow {
                 loc = loc.substring(10).split("#")[0];
             var parts = loc.split("/").filter(function(p) { return p.length > 0; });
             return parts.length > 0 ? parts[parts.length - 1] : "/";
+        } catch (e) {
+            return "";
+        }
+    }
+
+    // Resolves current folder destination for active or inactive tab, targeting
+    // left or right pane if split. Virtual non-folder targets return empty string.
+    function resolveTabDestination(tabIndex, splitRight) {
+        if (tabIndex < 0 || tabIndex >= tabs.length)
+            return "";
+        if (tabIndex === currentTab) {
+            if (activeView === "settings" || activeView === "pc")
+                return "";
+            if (splitRight && splitView && pane1Loader.item) {
+                var rEngine = pane1Loader.item.engine;
+                var rk = rEngine.location_kind;
+                if (rEngine.read_only)
+                    return "";
+                return (rk === "dir" || rk === "mtp") ? rEngine.current_path : "";
+            }
+            var lEngine = pane0.engine;
+            var lk = lEngine.location_kind;
+            if (lEngine.read_only)
+                return "";
+            return (lk === "dir" || lk === "mtp") ? lEngine.current_path : "";
+        }
+        var t = tabs[tabIndex];
+        if (!t || t.view === "settings" || t.view === "pc")
+            return "";
+        var paneIdx = (splitRight && t.split) ? 1 : 0;
+        var stateStr = (t.states && t.states.length > paneIdx) ? t.states[paneIdx] : "";
+        if (!stateStr)
+            return "";
+        try {
+            var loc = JSON.parse(stateStr).location || "";
+            if (!loc || typeof loc !== "string")
+                return "";
+            if (loc.indexOf("mtp:") === 0) {
+                var rest = loc.substring(4);
+                if (rest.indexOf("//loaf/") === 0)
+                    rest = rest.substring(7);
+                else if (rest.indexOf("//") === 0) {
+                    rest = rest.substring(2);
+                    if (rest.indexOf("loaf/") === 0)
+                        rest = rest.substring(5);
+                } else if (rest.indexOf("/") === 0) {
+                    rest = rest.substring(1);
+                }
+                var mtpParts = rest.split("/").filter(function(p) { return p.length > 0; });
+                return mtpParts.length >= 2 ? loc : "";
+            }
+            if (loc.indexOf("file://") === 0) {
+                var rawFile = loc.substring(7);
+                try {
+                    loc = decodeURIComponent(rawFile);
+                } catch (e) {
+                    loc = rawFile;
+                }
+            } else if (loc === "~")
+                loc = core.user_dir("HOME");
+            else if (loc.indexOf("~/") === 0)
+                loc = core.user_dir("HOME") + loc.substring(1);
+            if (loc.indexOf("/") === 0 && loc.indexOf("trash:") !== 0 && loc.indexOf("recent:") !== 0 && loc.indexOf("starred:") !== 0 && loc.indexOf("archive://") !== 0) {
+                if (!nativeBridge.isDirectory(loc))
+                    return "";
+                return loc;
+            }
+            return "";
         } catch (e) {
             return "";
         }
@@ -790,13 +1109,23 @@ ApplicationWindow {
 
     onClosing: saveSession()
 
+    Connections {
+        target: pane0.engine
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane0.engine); }
+    }
+    Connections {
+        target: pane1Loader.item ? pane1Loader.item.engine : null
+        function onCurrent_pathChanged() { viewPrefs.syncPane(pane1Loader.item.engine); }
+    }
+
     Component.onCompleted: {
+        viewPrefs.load();
         refreshCutSet();
         var pending = nativeBridge.takePendingOpen();
         var restored = restoreSession(pending.length > 0);
         if (nativeBridge.startupMode === "mini") {
             sidebar.expanded = false;
-            theme.zoomIndex = 1;
+            viewPrefs.setZoom(1);
         }
         var first = !restored;
         for (var i = 0; i < pending.length; ++i) {
@@ -867,7 +1196,7 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("up"); onActivated: engine.navigate_up() }
     Shortcut { sequence: theme.shortcutFor("home"); onActivated: { window.showFiles(); engine.set_path(core.user_dir("HOME")); } }
     Shortcut { sequence: theme.shortcutFor("backAlt"); enabled: window.gridKeyboardReady && engine.can_go_back; onActivated: engine.go_back() }
-    Shortcut { sequences: [theme.shortcutFor("refresh"), "Ctrl+R"]; onActivated: engine.refresh() }
+    Shortcut { sequences: [theme.shortcutFor("refresh"), "Ctrl+R"]; onActivated: window.refreshCurrentView() }
     Shortcut { sequence: theme.shortcutFor("newTab"); onActivated: window.newTab((engine.location_kind === "dir" || engine.location_kind === "mtp") ? engine.current_path : "") }
     Shortcut { sequence: theme.shortcutFor("closeTab"); onActivated: window.closeTab(window.currentTab) }
     Shortcut { sequences: [theme.shortcutFor("nextTab"), "Ctrl+PgDown"]; onActivated: window.switchTab((window.currentTab + 1) % window.tabs.length) }
@@ -876,11 +1205,11 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("newFolder"); enabled: !window.anyModalOpen; onActivated: window.startNewFolder() }
     Shortcut { sequence: theme.shortcutFor("toggleSplit"); onActivated: window.toggleSplit() }
     Shortcut { sequence: theme.shortcutFor("toggleSidebar"); onActivated: sidebar.expanded = !sidebar.expanded }
-    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: theme.stepZoom(1) }
-    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: theme.stepZoom(-1) }
-    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: theme.zoomIndex = 2 }
-    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: engine.set_view("grid") }
-    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: engine.set_view("list") }
+    Shortcut { sequences: [theme.shortcutFor("zoomIn"), "Ctrl++", StandardKey.ZoomIn]; onActivated: viewPrefs.zoom(1) }
+    Shortcut { sequences: [theme.shortcutFor("zoomOut"), StandardKey.ZoomOut]; onActivated: viewPrefs.zoom(-1) }
+    Shortcut { sequence: theme.shortcutFor("zoomReset"); onActivated: viewPrefs.setZoom(2) }
+    Shortcut { sequence: theme.shortcutFor("viewGrid"); onActivated: viewPrefs.setView("grid") }
+    Shortcut { sequence: theme.shortcutFor("viewList"); onActivated: viewPrefs.setView("list") }
     Shortcut { sequence: theme.shortcutFor("bookmark"); enabled: engine.location_kind === "dir"; onActivated: core.add_bookmark(engine.current_path) }
     Shortcut { sequence: theme.shortcutFor("copyPath"); enabled: window.gridKeyboardReady; onActivated: window.copyPathOfSelection() }
     Shortcut {
@@ -1062,6 +1391,10 @@ ApplicationWindow {
         onShare_link_error: function(message) {
             window.toast("error", qsTr("Could not share via link: %1").arg(theme.resolveRustMessage(message)));
         }
+        onRclone_link_ready: function(url) {
+            nativeBridge.setClipboardText(url);
+            window.toast("info", qsTr("rclone link copied to clipboard"));
+        }
         onStarred_changed: {
             pane0.engine.reload_starred();
             if (pane1Loader.item)
@@ -1191,10 +1524,12 @@ ApplicationWindow {
                 readonly property bool showBack: theme.toolbarOperations !== "hidden"
                 readonly property bool showForward: theme.toolbarOperations === "always"
                     || (theme.toolbarOperations === "auto" && canForward)
-                visible: showBack || showForward
-                Layout.preferredWidth: (showBack && showForward) ? 82 : 44
-                Layout.minimumWidth: (showBack && showForward) ? 82 : 44
-                opacity: (canBack || canForward) ? 1.0 : 0.45
+                readonly property bool showRefresh: window.activeView === "files" || window.activeView === "pc"
+                readonly property int actionCount: (showBack ? 1 : 0) + (showForward ? 1 : 0) + (showRefresh ? 1 : 0)
+                visible: actionCount > 0
+                Layout.preferredWidth: actionCount === 1 ? 44 : (36 * actionCount + 10)
+                Layout.minimumWidth: Layout.preferredWidth
+                opacity: (canBack || canForward || showRefresh) ? 1.0 : 0.45
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -1223,6 +1558,18 @@ ApplicationWindow {
                         systemIcon: "go-next-symbolic"
                         accessibleName: qsTr("Forward")
                         onClicked: engine.go_forward()
+                    }
+                    TopIconButton {
+                        id: refreshToolbarButton
+                        visible: navChip.showRefresh
+                        iconName: "arrow-clockwise"
+                        systemIcon: "view-refresh-symbolic"
+                        accessibleName: qsTr("Refresh")
+                        activeFocusOnTab: true
+                        Keys.onSpacePressed: clicked()
+                        Keys.onReturnPressed: clicked()
+                        Keys.onEnterPressed: clicked()
+                        onClicked: window.refreshCurrentView()
                     }
                 }
             }
@@ -1507,7 +1854,7 @@ ApplicationWindow {
                             visible: crumbDelegate.index < breadcrumbs.count - 1
                             name: "caret-right"
                             size: 11
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             Layout.alignment: Qt.AlignVCenter
                         }
                     }
@@ -1534,7 +1881,7 @@ ApplicationWindow {
                         visible: window.activeView === "settings"
                         name: "caret-right"
                         size: 11
-                        color: theme.outlineAlpha(theme.outline)
+                        color: theme.outline
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Rectangle {
@@ -1595,7 +1942,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: engine.searching ? "hourglass" : "magnifying-glass"
                         size: 16
-                        color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outline)
+                        color: searchInput.activeFocus ? theme.primary : theme.outline
                     }
 
                     TextInput {
@@ -1612,7 +1959,7 @@ ApplicationWindow {
                         Text {
                             text: window.activeView === "settings" ? qsTr("Search settings…")
                                 : (engine.is_searching_everywhere ? qsTr("Search…") : qsTr("Filter this folder…"))
-                            color: theme.outlineAlpha(theme.outline)
+                            color: theme.outline
                             font.pixelSize: theme.fs(13)
                             visible: !searchInput.text && !searchInput.activeFocus
                             anchors.verticalCenter: parent.verticalCenter
@@ -1704,79 +2051,167 @@ ApplicationWindow {
                     }
                 }
             }
+            // M3E segmented pair: one pill silhouette, two independent
+            // buttons. The group clip gives the outer corners the full pill
+            // radius while each half paints its own small radius, so the seam
+            // corners read square and the pair reads as connected.
             Rectangle {
-                id: viewDropdownButton
+                id: viewBtnGroup
                 visible: window.activeView === "files"
                 Layout.preferredHeight: 42
-                Layout.preferredWidth: viewRow.implicitWidth + 20
-                Layout.minimumWidth: viewRow.implicitWidth + 20
+                Layout.preferredWidth: 42 + 1 + viewTextRow.implicitWidth + 20
+                Layout.minimumWidth: 42 + 1 + viewTextRow.implicitWidth + 20
                 radius: theme.radiusFull
                 color: theme.backdropSurface(theme.surfaceContainer)
-                border.width: 1
-                border.color: theme.outlineAlpha(theme.outlineVariant)
+                border.width: viewIconBtn.activeFocus || viewTextView.activeFocus ? 2 : 1
+                border.color: viewIconBtn.activeFocus || viewTextView.activeFocus
+                    ? theme.primary
+                    : theme.outlineAlpha(theme.outlineVariant)
                 clip: true
 
                 RowLayout {
-                    id: viewRow
-                    anchors.centerIn: parent
-                    spacing: 4
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    spacing: 0
+
                     Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: cycleMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                        id: viewIconBtn
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 42
+                        Layout.minimumWidth: 42
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("Toggle grid or list view")
+                        Accessible.onPressAction: viewIconBtn.toggleView()
+                        Keys.onReturnPressed: viewIconBtn.toggleView()
+                        Keys.onEnterPressed: viewIconBtn.toggleView()
+                        Keys.onSpacePressed: function(event) { viewIconBtn.toggleView(); event.accepted = true; }
+
+                        function toggleView() {
+                            viewPrefs.toggleView();
+                        }
+
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewIconBtn.height; height: viewIconBtn.height
+                            radius: viewIconBtn.height / 2
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: viewIconBtn.height / 2; y: 0
+                            width: viewIconBtn.width - viewIconBtn.height / 2
+                            height: viewIconBtn.height
+                            radius: theme.radiusS
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+
                         LoafIcon {
                             anchors.centerIn: parent
                             name: engine.view_mode === "list" ? "list" : "squares-four"
                             size: 16
-                            color: theme.primary
+                            color: viewIconArea.containsMouse || viewIconArea.pressed
+                                ? theme.secondaryContainerFg
+                                : theme.primary
                         }
+
                         MouseArea {
-                            id: cycleMouse
+                            id: viewIconArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: engine.set_view(engine.view_mode === "grid" ? "list" : "grid")
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewIconBtn, viewIconBtn.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewIconBtn)
+                            onClicked: viewIconBtn.toggleView()
                         }
                     }
-                    Item {
-                        implicitWidth: dropRow.implicitWidth + 10
-                        implicitHeight: 32
+
+                    Rectangle {
+                        id: viewSeam
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 1
+                        color: theme.outlineAlpha(theme.outlineVariant)
+                    }
+
+                    Rectangle {
+                        id: viewTextView
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: viewTextRow.implicitWidth + 20
+                        Layout.minimumWidth: viewTextRow.implicitWidth + 20
+                        color: "transparent"
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: qsTr("View options")
+                        Accessible.onPressAction: viewTextView.toggleMenu()
+                        Keys.onReturnPressed: viewTextView.toggleMenu()
+                        Keys.onEnterPressed: viewTextView.toggleMenu()
+                        Keys.onSpacePressed: function(event) { viewTextView.toggleMenu(); event.accepted = true; }
+
+                        function toggleMenu() {
+                            if (viewMenu.visible)
+                                viewMenu.close();
+                            else
+                                viewMenu.openViewMenu();
+                        }
 
                         Rectangle {
-                            anchors.fill: parent
-                            radius: 16
-                            color: dropMouse.containsMouse ? theme.hoverOverlay : "transparent"
-                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            x: viewTextView.width - viewTextView.height; y: 0
+                            width: viewTextView.height; height: viewTextView.height
+                            radius: viewTextView.height / 2
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
+                        }
+                        Rectangle {
+                            x: 0; y: 0
+                            width: viewTextView.width - viewTextView.height / 2
+                            height: viewTextView.height
+                            radius: theme.radiusS
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                ? theme.secondaryContainer
+                                : "transparent"
                         }
 
                         RowLayout {
-                            id: dropRow
+                            id: viewTextRow
                             anchors.centerIn: parent
-                            spacing: 5
-                            Text { visible: window.width >= 900; text: qsTr("View"); color: theme.textMain; font.pixelSize: theme.fs(12); font.bold: true }
-                            LoafIcon { name: viewMenuPopup.visible ? "caret-up" : "caret-down"; size: 11; color: theme.outlineAlpha(theme.outline) }
+                            spacing: 6
+                            Text {
+                                visible: window.width >= 900
+                                text: qsTr("View")
+                                font.pixelSize: theme.fs(12)
+                                font.bold: true
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.textMain
+                            }
+                            LoafIcon {
+                                name: "caret-down"
+                                size: 11
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                    ? theme.secondaryContainerFg
+                                    : theme.outline
+                                rotation: viewMenu.visible ? 180 : 0
+                                Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 160 } }
+                            }
                         }
 
                         MouseArea {
-                            id: dropMouse
+                            id: viewTextArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (viewMenuPopup.visible) {
-                                    viewMenuPopup.close();
-                                } else {
-                                    var pt = mapToItem(window.contentItem, viewDropdownButton.width - viewMenuPopup.width, viewDropdownButton.height + 6);
-                                    viewMenuPopup.openAt(pt.x, pt.y);
-                                }
-                            }
+                            onEntered: if (typeof tooltip !== "undefined") tooltip.show(viewTextView, viewTextView.accessibleName)
+                            onExited: if (typeof tooltip !== "undefined") tooltip.hide(viewTextView)
+                            onClicked: viewTextView.toggleMenu()
                         }
                     }
                 }
             }
-
             Rectangle {
                 id: mainEmptyTrashChip
                 visible: window.activeView === "files" && engine.location_kind === "trash" && engine.item_count > 0
@@ -1973,9 +2408,19 @@ ApplicationWindow {
                         readonly property string rightName: current ? (pane1Loader.item ? pane1Loader.item.engine.current_dir_name : (window.tabs[index] ? window.tabs[index].rightTitle || qsTr("Split") : qsTr("Split")))
                             : (window.tabs[index] ? (window.tabs[index].rightTitle || qsTr("Split")) : qsTr("Split"))
 
+                        TextMetrics {
+                            id: tabLeftMetrics
+                            text: tabDelegate.leftName
+                            font: tabLeftLabel.font
+                        }
+                        TextMetrics {
+                            id: tabRightMetrics
+                            text: tabDelegate.rightName
+                            font: tabRightLabel.font
+                        }
                         width: isSplit
-                            ? Math.min(380, Math.max(220, tabLeftLabel.implicitWidth + tabRightLabel.implicitWidth + 88))
-                            : Math.min(240, Math.max(120, tabLeftLabel.implicitWidth + 84))
+                            ? Math.min(380, Math.max(220, tabLeftMetrics.advanceWidth + tabRightMetrics.advanceWidth + 88))
+                            : Math.min(240, Math.max(120, tabLeftMetrics.advanceWidth + 84))
                         height: 34
                         radius: theme.radiusFull
                         border.width: 1
@@ -2002,6 +2447,31 @@ ApplicationWindow {
                                     window.setActivePane(pane1Loader.item);
                                 else
                                     window.setActivePane(pane0);
+                            }
+                        }
+
+                        DropArea {
+                            id: tabDrop
+                            anchors.fill: parent
+                            keys: ["text/uri-list"]
+                            function dropUrls(urls, dropX, dropY, dropEvent) {
+                                var isRight = tabDelegate.isSplit
+                                    && mapToItem(tabDelegate, dropX, dropY).x > tabRightLabel.mapToItem(tabDelegate, 0, 0).x;
+                                var dest = window.resolveTabDestination(tabDelegate.index, isRight);
+                                if (!dest) {
+                                    if (dropEvent) dropEvent.accept(Qt.IgnoreAction);
+                                    return false;
+                                }
+                                var paths = window.urlsToPaths(urls).filter(function(p) { return p !== dest; });
+                                if (paths.length === 0) {
+                                    if (dropEvent) dropEvent.accept(Qt.IgnoreAction);
+                                    return false;
+                                }
+                                var pt = tabDrop.mapToItem(window.contentItem, dropX, dropY);
+                                return window.handleTabDrop(dropEvent, paths, dest, pt.x, pt.y);
+                            }
+                            onDropped: function(drop) {
+                                dropUrls(drop.urls, drop.x, drop.y, drop);
                             }
                         }
 
@@ -2637,6 +3107,98 @@ ApplicationWindow {
             }
             m.push({ text: qsTr("Compress"), icon: "file-archive", itemKey: "compress", submenu: compressSubmenu(paths) });
 
+            if (single) {
+                var rcCtx = null;
+                try { rcCtx = JSON.parse(core.rclone_context(item.path) || "{}"); } catch (e) {}
+                if (rcCtx && rcCtx.available) {
+                    var rcItems = [];
+                    if (rcCtx.in_mount) {
+                        rcItems.push({
+                            text: qsTr("Copy Public Link"),
+                            icon: "link",
+                            action: function() {
+                                window.toast("info", qsTr("Fetching rclone public link…"));
+                                core.rclone_action("copy_link", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Open Link in Browser"),
+                            icon: "globe",
+                            action: function() {
+                                window.toast("info", qsTr("Opening rclone link…"));
+                                core.rclone_action("open_link", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Copy Remote Path (%1)").arg(rcCtx.remote),
+                            icon: "copy-simple",
+                            action: function() {
+                                nativeBridge.setClipboardText(rcCtx.remote_path);
+                                window.toast("info", qsTr("Remote path copied"));
+                            }
+                        });
+                        if (rcCtx.has_rc) {
+                            rcItems.push({
+                                text: qsTr("Refresh Folder Cache"),
+                                icon: "arrow-clockwise",
+                                separatorBefore: true,
+                                action: function() {
+                                    core.rclone_action("refresh_vfs", item.path, "");
+                                }
+                            });
+                        }
+                        rcItems.push({
+                            text: qsTr("Remote Size"),
+                            icon: "hard-drive",
+                            separatorBefore: !rcCtx.has_rc,
+                            action: function() {
+                                window.toast("info", qsTr("Checking remote size…"));
+                                core.rclone_action("size", item.path, "");
+                            }
+                        });
+                        rcItems.push({
+                            text: qsTr("Remote Quota / Info"),
+                            icon: "info",
+                            action: function() {
+                                window.toast("info", qsTr("Checking remote quota…"));
+                                core.rclone_action("about", item.path, "");
+                            }
+                        });
+                    }
+                    if (rcCtx.remotes && rcCtx.remotes.length > 0) {
+                        var copyTargets = [];
+                        var moveTargets = [];
+                        for (var ri = 0; ri < rcCtx.remotes.length; ++ri) {
+                            (function(rem) {
+                                copyTargets.push({
+                                    text: rem,
+                                    icon: "cloud",
+                                    action: function() { core.rclone_action("copy_to_remote", item.path, rem); }
+                                });
+                                moveTargets.push({
+                                    text: rem,
+                                    icon: "cloud",
+                                    action: function() { core.rclone_action("move_to_remote", item.path, rem); }
+                                });
+                            })(rcCtx.remotes[ri]);
+                        }
+                        rcItems.push({
+                            text: qsTr("Copy to Remote"),
+                            icon: "upload-simple",
+                            separatorBefore: rcItems.length > 0,
+                            submenu: copyTargets
+                        });
+                        rcItems.push({
+                            text: qsTr("Move to Remote"),
+                            icon: "arrow-right",
+                            submenu: moveTargets
+                        });
+                    }
+                    if (rcItems.length > 0)
+                        m.push({ text: qsTr("rclone"), icon: "cloud", itemKey: "rclone", submenu: rcItems });
+                }
+            }
+
             var starred = item.starred === true;
             m.push({ text: starred ? qsTr("Unstar") : qsTr("Star"), icon: "star", itemKey: "star", separatorBefore: true, action: function() { core.set_starred(JSON.stringify(paths), !starred); } });
             if (item.is_dir && single) {
@@ -2681,6 +3243,13 @@ ApplicationWindow {
         var e = pane.engine;
         var kind = e.location_kind;
         var m = [];
+        m.push({
+            text: qsTr("Refresh"),
+            icon: "arrow-clockwise",
+            shortcut: "Ctrl+R",
+            itemKey: "refresh",
+            action: function() { window.refreshCurrentView(); }
+        });
         if (kind === "trash") {
             if (e.item_count > 0) {
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, itemKey: "empty_trash", action: function() { core.empty_trash(); } });
@@ -3078,102 +3647,86 @@ ApplicationWindow {
         menuMinWidth: 200
         property var dropPaths: []
         property string dropDest: ""
-        function showAt(px, py, paths, dest) {
-            dropPaths = paths;
+        property int dropSupported: Qt.CopyAction | Qt.MoveAction | Qt.LinkAction
+        function showAt(px, py, paths, dest, supported) {
+            dropPaths = paths.slice ? paths.slice() : paths;
             dropDest = dest;
+            dropSupported = (supported !== undefined) ? supported : (Qt.CopyAction | Qt.MoveAction | Qt.LinkAction);
             if (dest === "trash") {
                 model = [
                     { text: qsTr("Move to Trash"), icon: "trash", danger: true, action: function() { core.trash_items(JSON.stringify(rmbDropMenu.dropPaths)); } },
                     { text: qsTr("Cancel"), icon: "x", separatorBefore: true, action: function() {} }
                 ];
             } else {
-                model = [
-                    { text: qsTr("Copy Here"), icon: "copy", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "copy"); } },
-                    { text: qsTr("Move Here"), icon: "arrows-out-cardinal", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "move"); } },
-                    { text: qsTr("Link Here"), icon: "link", action: function() { core.transfer(JSON.stringify(rmbDropMenu.dropPaths), rmbDropMenu.dropDest, "link", "rename"); } },
-                    { text: qsTr("Cancel"), icon: "x", danger: true, separatorBefore: true, action: function() {} }
-                ];
+                var canLink = window.canLinkDrop(rmbDropMenu.dropPaths, dest);
+                var items = [];
+                if (dropSupported & Qt.CopyAction) {
+                    items.push({ text: qsTr("Copy Here"), icon: "copy", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "copy"); } });
+                }
+                if (dropSupported & Qt.MoveAction) {
+                    items.push({ text: qsTr("Move Here"), icon: "arrows-out-cardinal", action: function() { window.transfer(rmbDropMenu.dropPaths, rmbDropMenu.dropDest, "move"); } });
+                }
+                if (canLink) {
+                    items.push({ text: qsTr("Link Here"), icon: "link", action: function() { core.transfer(JSON.stringify(rmbDropMenu.dropPaths), rmbDropMenu.dropDest, "link", "rename"); } });
+                }
+                items.push({ text: qsTr("Cancel"), icon: "x", danger: true, separatorBefore: true, action: function() {} });
+                model = items;
             }
             openAt(px, py);
         }
     }
     LoafMenu {
-        id: viewMenuPopup
-        menuMinWidth: 290
-        menuMaxWidth: 340
+        id: viewMenu
+        menuMinWidth: 240
+        menuMaxWidth: 320
         model: []
 
-        Flickable {
-            id: viewMenuFlickable
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(viewMenuContent.implicitHeight, Math.max(120, window.height - 40))
-            contentWidth: width
-            contentHeight: viewMenuContent.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar { policy: viewMenuFlickable.contentHeight > viewMenuFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+        // Scope pill: which scope the active folder's edits land in, and
+        // whether it inherits an ancestor's scope at all.
+        headerBar: LoafSegmented {
+            id: viewScopeToggle
+            visible: true
+            Accessible.name: qsTr("View options scope")
+            options: [
+                { value: "universal", label: qsTr("Universal") },
+                { value: "dir", label: qsTr("This folder") },
+                { value: "parent", label: qsTr("Parent") }
+            ]
+            value: viewPrefs.mode
+            onSelected: function(v) { viewPrefs.setMode(v); }
+        }
 
-            ColumnLayout {
-                id: viewMenuContent
-                width: viewMenuFlickable.width
-                spacing: 4
+        // Rebuilt on every open so checkmarks track engine state exactly.
+        // Same LoafMenu the RMB context menu uses; the button drops it
+        // below itself, right-aligned.
+        function openViewMenu() {
+            var sortKeys = ["name", "modified", "size", "type"];
+            var sortLabels = [qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
+            var groupKeys = ["none", "name", "modified", "size", "type"];
+            var groupLabels = [qsTr("None"), qsTr("Name"), qsTr("Date Modified"), qsTr("Size"), qsTr("Type")];
 
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("VIEW MODE"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "grid", label: qsTr("Grid"), icon: "squares-four" }, { value: "list", label: qsTr("List"), icon: "list" }]
-                    value: engine.view_mode
-                    onSelected: function(v) { engine.set_view(v); }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 8; Layout.rightMargin: 8
-                    Text { text: qsTr("Icon size"); color: theme.textMain; font.pixelSize: theme.fs(12); Layout.fillWidth: true }
-                    LoafButton { icon: "magnifying-glass-minus"; variant: "tonal"; enabled: theme.zoomIndex > 0; onClicked: theme.stepZoom(-1) }
-                    Text { text: Math.round(theme.zoom * 100) + "%"; color: theme.textMuted; font.pixelSize: theme.fs(11) }
-                    LoafButton { icon: "magnifying-glass-plus"; variant: "tonal"; enabled: theme.zoomIndex < theme.zoomLevels.length - 1; onClicked: theme.stepZoom(1) }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("GROUP BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("None"); checkable: true; checked: engine.group_by === "none"; onTriggered: engine.set_group("none", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.group_by === "name"; onTriggered: engine.set_group("name", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.group_by === "modified"; onTriggered: engine.set_group("modified", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.group_by === "size"; onTriggered: engine.set_group("size", engine.group_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.group_by === "type"; onTriggered: engine.set_group("type", engine.group_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    visible: engine.group_by !== "none"
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.group_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_group(engine.group_by, v === "asc"); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                Text { Layout.leftMargin: 8; text: qsTr("SORT BY"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafMenuItem { text: qsTr("Name"); checkable: true; checked: engine.sort_by === "name"; onTriggered: engine.set_sort("name", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Date Modified"); checkable: true; checked: engine.sort_by === "modified"; onTriggered: engine.set_sort("modified", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Size"); checkable: true; checked: engine.sort_by === "size"; onTriggered: engine.set_sort("size", engine.sort_ascending) }
-                LoafMenuItem { text: qsTr("Type"); checkable: true; checked: engine.sort_by === "type"; onTriggered: engine.set_sort("type", engine.sort_ascending) }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "asc", label: qsTr("Ascending"), icon: "sort-ascending" }, { value: "desc", label: qsTr("Descending"), icon: "sort-descending" }]
-                    value: engine.sort_ascending ? "asc" : "desc"
-                    onSelected: function(v) { engine.set_sort(engine.sort_by, v === "asc"); }
-                }
-                Text { Layout.leftMargin: 8; Layout.topMargin: 4; text: qsTr("FOLDERS"); color: theme.textMuted; font.pixelSize: theme.fs(10); font.bold: true; font.letterSpacing: 0.8 }
-                LoafSegmented {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 4; Layout.rightMargin: 4
-                    options: [{ value: "first", label: qsTr("First") }, { value: "last", label: qsTr("Last") }, { value: "mixed", label: qsTr("Mixed") }]
-                    value: engine.folder_position
-                    onSelected: function(v) { engine.change_folder_position(v); }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 4; Layout.bottomMargin: 4; color: theme.outlineAlpha(theme.separator) }
-                LoafSwitch { label: qsTr("Show Hidden Files"); checked: window.showHidden; onToggled: window.toggleShowHidden() }
-                LoafSwitch { label: qsTr("Split View (F3)"); checked: window.splitView && window.activeView === "files"; onToggled: window.toggleSplit() }
-            }
+            var m = [];
+            m.push({ text: qsTr("Grid"), icon: "squares-four", checkable: true, checked: engine.view_mode === "grid", action: function() { viewPrefs.setView("grid"); } });
+            m.push({ text: qsTr("List"), icon: "list", checkable: true, checked: engine.view_mode === "list", action: function() { viewPrefs.setView("list"); } });
+            m.push({ text: qsTr("Icon Size"), icon: "magnifying-glass", separatorBefore: true, submenu: theme.zoomLevels.map(function(z, i) {
+                return { text: Math.round(z * 100) + "%", checkable: true, checked: theme.zoomIndex === i, action: function() { viewPrefs.setZoom(i); } };
+            }) });
+            m.push({ text: qsTr("Folders"), icon: "folder", separatorBefore: true, submenu: ["first", "last", "mixed"].map(function(v) {
+                var label = v === "first" ? qsTr("Folders First") : (v === "last" ? qsTr("Folders Last") : qsTr("Mixed"));
+                return { text: label, checkable: true, checked: engine.folder_position === v, action: function() { viewPrefs.set("folders", v); } };
+            }) });
+            m.push({ text: qsTr("Sort By"), icon: "arrow-down", separatorBefore: true, submenu: sortKeys.map(function(k, i) {
+                return { text: sortLabels[i], checkable: true, checked: engine.sort_by === k, action: function() { viewPrefs.set("sort", k); } };
+            }) });
+            m.push({ text: qsTr("Reverse Order"), icon: "arrows-down-up", checkable: true, checked: !engine.sort_ascending, action: function() { viewPrefs.set("sortAsc", !engine.sort_ascending); } });
+            m.push({ text: qsTr("Group By"), icon: "rows", separatorBefore: true, submenu: groupKeys.map(function(k, i) {
+                return { text: groupLabels[i], checkable: true, checked: engine.group_by === k, action: function() { viewPrefs.set("group", k); } };
+            }) });
+            m.push({ text: qsTr("Reverse Group Order"), icon: "arrows-down-up", checkable: true, enabled: engine.group_by !== "none", checked: !engine.group_ascending, action: function() { viewPrefs.set("groupAsc", !engine.group_ascending); } });
+            m.push({ text: qsTr("Show Hidden Files"), icon: "eye", separatorBefore: true, checkable: true, checked: window.showHidden, shortcut: theme.shortcutFor("toggleHidden"), action: function() { viewPrefs.setHidden(!window.showHidden); } });
+            m.push({ text: qsTr("Split View"), icon: "columns", checkable: true, checked: window.splitView, shortcut: theme.shortcutFor("toggleSplit"), action: function() { window.toggleSplit(); } });
+            model = m;
+            openBelowRight(viewTextView);
         }
     }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
@@ -3424,11 +3977,6 @@ ApplicationWindow {
             }
         }
 
-        LoafTextField { id: smbNameField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "Studio NAS" }
-        Text { text: qsTr("Server"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbServerField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "192.168.1.20" }
-        Text { text: qsTr("Share name"); color: theme.textMuted; font.pixelSize: theme.fs(12) }
-        LoafTextField { id: smbShareField; Layout.fillWidth: true; color: theme.textMain; placeholderText: "media" }
         RowLayout {
             Layout.fillWidth: true
             spacing: 12
@@ -3609,7 +4157,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: dragHandleArea.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: dragHandleArea.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: dragHandleArea
@@ -3637,7 +4185,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: placeRow.modelData.icon || "folder"
                         size: 16
-                        color: placeRow.modelData.hidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: placeRow.modelData.hidden ? theme.outline : theme.primary
                     }
 
                     Text {
@@ -3815,7 +4363,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             name: "dots-six-vertical"
                             size: 16
-                            color: actionDragHandle.containsMouse ? theme.primary : theme.outlineAlpha(theme.outline)
+                            color: actionDragHandle.containsMouse ? theme.primary : theme.outline
                         }
                         MouseArea {
                             id: actionDragHandle
@@ -3837,7 +4385,7 @@ ApplicationWindow {
                     LoafIcon {
                         name: actionRow.modelData.icon || "circle"
                         size: 16
-                        color: actionRow.isHidden ? theme.outlineAlpha(theme.outline) : theme.primary
+                        color: actionRow.isHidden ? theme.outline : theme.primary
                     }
 
                     Text {

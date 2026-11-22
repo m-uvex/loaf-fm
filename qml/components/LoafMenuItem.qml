@@ -184,7 +184,7 @@ Item {
             visible: root.hasSubmenu
             name: "caret-right"
             size: 12
-            color: theme.outlineAlpha(theme.outline)
+            color: theme.outline
         }
 
         LoafIcon {
@@ -197,7 +197,7 @@ Item {
         Text {
             visible: root.showTrailingShortcut
             text: root.shortcut
-            color: theme.outlineAlpha(theme.outline)
+            color: theme.outline
             font.pixelSize: theme.fs(11)
             font.family: theme.fontFamily
         }
@@ -223,4 +223,8 @@ Item {
                 root.triggered();
         }
     }
+
+    Accessible.role: root.checkable ? Accessible.RadioButton : Accessible.Button
+    Accessible.name: root.text
+    Accessible.checked: root.checkable && root.checked
 }

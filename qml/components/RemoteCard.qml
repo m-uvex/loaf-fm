@@ -21,6 +21,27 @@ Item {
     readonly property bool connected: root.remote && root.remote.connected === true
     readonly property bool bookmark: root.remote && root.remote.kind === "bookmark"
     readonly property bool active: root.connected || root.bookmark
+    readonly property real totalBytes: (root.remote && Number(root.remote.total_bytes)) || 0
+    readonly property real usedBytes: (root.remote && Number(root.remote.used_bytes)) || 0
+    readonly property bool hasUsage: root.connected && root.totalBytes > 0
+    readonly property real usage: Math.max(0, Math.min(1, ((root.remote && root.remote.percent) || 0) / 100))
+    readonly property bool almostFull: root.hasUsage && root.usage >= 0.9
+
+    function formatBytes(bytes) {
+        var b = Number(bytes) || 0;
+        var gb = 1024 * 1024 * 1024;
+        var tb = 1024 * gb;
+        var mb = 1024 * 1024;
+        if (b >= tb)
+            return (b / tb).toFixed(1) + " TB";
+        if (b >= gb)
+            return (b / gb).toFixed(1) + " GB";
+        if (b >= mb)
+            return (b / mb).toFixed(1) + " MB";
+        if (b > 0)
+            return (b / 1024).toFixed(0) + " KB";
+        return "0 B";
+    }
 
     function remoteIcon() {
         var r = root.remote || {};
@@ -115,7 +136,7 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
-        anchors.rightMargin: 16 + actionButton.width + 12
+        anchors.rightMargin: root.hasUsage ? 18 : 16 + actionButton.width + 12
         spacing: 12
 
         RowLayout {
@@ -142,7 +163,8 @@ Item {
                     anchors.centerIn: parent
                     name: root.remoteIcon()
                     size: 24
-                    color: root.active ? theme.primaryContainerFg : theme.textMuted
+                    color: !root.active ? theme.textMuted
+                           : (root.almostFull ? theme.danger : theme.primaryContainerFg)
                 }
             }
 
@@ -193,9 +215,47 @@ Item {
                     Layout.fillWidth: true
                 }
             }
+
+            Text {
+                visible: root.hasUsage
+                text: Math.round(root.usage * 100) + "%"
+                color: root.almostFull ? theme.danger : theme.primary
+                font.pixelSize: theme.fs(24)
+                font.bold: true
+                font.letterSpacing: -0.5
+            }
+        }
+
+        UsageBar {
+            visible: root.hasUsage
+            Layout.fillWidth: true
+            value: root.usage
+            barColor: root.almostFull ? theme.danger : theme.primary
+        }
+
+        RowLayout {
+            visible: root.hasUsage
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                text: qsTr("%1 used").arg(root.formatBytes(root.usedBytes))
+                color: theme.textMuted
+                font.pixelSize: theme.fs(11)
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+
+            Text {
+                text: qsTr("%1 free of %2").arg(root.formatBytes(Math.max(0, root.totalBytes - root.usedBytes))).arg(root.formatBytes(root.totalBytes))
+                color: theme.textMuted
+                font.pixelSize: theme.fs(11)
+                horizontalAlignment: Text.AlignRight
+            }
         }
 
         Text {
+            visible: !root.hasUsage
             text: root.protocolLabel()
             color: theme.textMuted
             font.pixelSize: theme.fs(11)
@@ -221,6 +281,7 @@ Item {
     LoafButton {
         id: actionButton
         z: 2
+        visible: !root.hasUsage
         anchors.right: parent.right
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
