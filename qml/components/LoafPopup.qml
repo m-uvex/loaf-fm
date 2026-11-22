@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import app.loaf
 
 // LoafPopup -- Material 3 Expressive surface popup.
@@ -14,9 +13,6 @@ Popup {
     property color surfaceColor: theme.submenuEffects ? theme.backdropSurface(theme.menuSurface) : theme.menuSurface
     property color borderColor: theme.outlineAlpha(theme.borderSubtle)
     property real surfaceRadius: theme.radiusL
-    readonly property var captureTarget: (typeof window !== "undefined" && window && window.workspaceArea) ? window.workspaceArea : null
-    readonly property bool enableBackdropBlur: theme.submenuEffects && !theme.lowPower && theme.effectivePanelOpacity < 1.0 && captureTarget !== null
-        && captureTarget.GraphicsInfo.api !== GraphicsInfo.Software && captureTarget.GraphicsInfo.api !== GraphicsInfo.Unknown
 
     // Children land in the host ColumnLayout.
     default property alias content: hostColumn.data
@@ -56,65 +52,9 @@ Popup {
             anchors.topMargin: 3
             anchors.bottomMargin: -3
             radius: popup.surfaceRadius
+            // The filled shadow overlaps the surface and would darken a translucent backing.
+            visible: !theme.submenuEffects || theme.effectivePanelOpacity >= 1.0
             color: theme.shadow
-        }
-        // Opaque theme base prevents underlying sharp text leakage
-        Rectangle {
-            visible: theme.submenuEffects
-            anchors.fill: parent
-            radius: popup.surfaceRadius
-            color: theme.menuSurface
-        }
-        Loader {
-            anchors.fill: parent
-            active: popup.visible && popup.enableBackdropBlur
-            sourceComponent: Item {
-                anchors.fill: parent
-                clip: true
-                ShaderEffectSource {
-                    id: backdropCapture
-                    sourceItem: popup.captureTarget
-                    sourceRect: {
-                        var _x = popup.x, _y = popup.y, _w = popup.width, _h = popup.height, _s = popup.scale;
-                        if (!popup.enableBackdropBlur || !popup.captureTarget || !bgItem || !bgItem.mapToItem)
-                            return Qt.rect(0, 0, 0, 0);
-                        var p0 = bgItem.mapToItem(popup.captureTarget, 0, 0);
-                        var p1 = bgItem.mapToItem(popup.captureTarget, bgItem.width, bgItem.height);
-                        var tw = popup.captureTarget.width;
-                        var th = popup.captureTarget.height;
-                        var sx = Math.max(0, Math.min(tw, Math.min(p0.x, p1.x)));
-                        var sy = Math.max(0, Math.min(th, Math.min(p0.y, p1.y)));
-                        var ex = Math.max(0, Math.min(tw, Math.max(p0.x, p1.x)));
-                        var ey = Math.max(0, Math.min(th, Math.max(p0.y, p1.y)));
-                        var sw = Math.max(0, ex - sx);
-                        var sh = Math.max(0, ey - sy);
-                        return Qt.rect(sx, sy, sw, sh);
-                    }
-                    width: parent.width
-                    height: parent.height
-                    recursive: false
-                    live: popup.visible && popup.enableBackdropBlur
-                    visible: false
-                }
-                MultiEffect {
-                    anchors.fill: parent
-                    source: backdropCapture
-                    autoPaddingEnabled: false
-                    blurEnabled: true
-                    blur: 0.9
-                    blurMax: 32
-                    opacity: 0.88
-                    maskEnabled: true
-                    maskSource: ShaderEffectSource {
-                        sourceItem: Rectangle {
-                            width: popup.width
-                            height: popup.height
-                            radius: popup.surfaceRadius
-                            color: "black"
-                        }
-                    }
-                }
-            }
         }
         Rectangle {
             id: surfaceRect

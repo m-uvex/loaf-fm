@@ -121,15 +121,15 @@ ColumnLayout {
         SettingRow {
             visible: root.matchOpacity
             icon: "stack"
-            title: qsTr("Submenu translucency and blur")
+            title: qsTr("Submenu translucency")
             subtitle: theme.lowPower
                 ? qsTr("Disabled in low-power mode")
-                : qsTr("Extends panel backing opacity and background blur to menus and submenus")
+                : qsTr("Uses panel backing opacity for menus and submenus")
 
             LoafSwitch {
                 checked: theme.submenuEffects
                 enabled: !theme.lowPower
-                Accessible.name: qsTr("Submenu translucency and blur")
+                Accessible.name: qsTr("Submenu translucency")
                 onToggled: function(c) { theme.submenuEffects = c; }
             }
         }
