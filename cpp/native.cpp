@@ -602,7 +602,8 @@ protected:
             default:
                 break;
             }
-            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()) {
+            if (ke->key() == Qt::Key_Space && !ke->isAutoRepeat()
+                    && ke->modifiers() == Qt::NoModifier && !m_spaceHeld) {
                 m_spacePressTime = QDateTime::currentMSecsSinceEpoch();
                 m_spaceHeld = true;
                 Q_EMIT m_native->spacePressed();
