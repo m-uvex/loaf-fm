@@ -63,12 +63,13 @@ Rectangle {
         }
 
         var availableDrives = drives.filter(function(d) {
-            if (rail.pickerMode && d.provider === "mtp")
+            if (rail.pickerMode && (d.provider === "mtp" || d.provider === "kdeconnect"))
                 return false;
             return true;
         }).map(function(d) {
-            var iconName = d.icon || (d.provider === "mtp" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
-            var sysIcon = d.provider === "mtp" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk");
+            var iconName = d.icon || (d.provider === "mtp" || d.provider === "kdeconnect" ? "device-mobile" : (d.is_external ? "usb" : "hard-drive"));
+            var sysIcon = d.provider === "mtp" ? "phone-symbolic"
+                : (d.provider === "kdeconnect" ? "phone-symbolic" : (d.is_external ? "drive-removable-media" : "drive-harddisk"));
             return {
                 id: "device:" + d.device,
                 kind: "device",
@@ -376,11 +377,11 @@ Rectangle {
                     label: theme.resolveRustMessage(entry.modelData.name)
                     showLabel: rail.expanded
                     selected: rail.activeId === entry.modelData.id
-                    dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted)
+                    dimmed: entry.isDevice ? (entry.modelData.drive.provider !== "mtp" && entry.modelData.drive.provider !== "kdeconnect" && !entry.modelData.drive.is_mounted)
                         : entry.modelData.missing === true || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected !== true)
                     dropPath: entry.isDevice ? (entry.modelData.drive.is_mounted ? entry.modelData.path : "")
                         : ((entry.modelData.kind === "place" || entry.modelData.kind === "bookmark" || ((entry.modelData.kind === "smb" || entry.modelData.kind === "network") && entry.modelData.connected === true)) ? entry.modelData.path : "")
-                    accessibleName: label + (entry.isDevice && entry.modelData.drive.provider !== "mtp" && !entry.modelData.drive.is_mounted ? " (" + qsTr("unmounted") + ")" : "")
+                    accessibleName: label + (entry.isDevice && entry.modelData.drive.provider !== "mtp" && entry.modelData.drive.provider !== "kdeconnect" && !entry.modelData.drive.is_mounted ? " (" + qsTr("unmounted") + ")" : "")
                     onActiveFocusChanged: if (activeFocus) placeList.positionViewAtIndex(entry.index, ListView.Contain)
                     onClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, false) : rail.placeClicked(entry.modelData, false)
                     onMiddleClicked: entry.isDevice ? rail.driveClicked(entry.modelData.drive, true) : rail.placeClicked(entry.modelData, true)

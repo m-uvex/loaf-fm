@@ -9,6 +9,7 @@ pub mod drives;
 pub mod fsops;
 pub mod icons;
 pub mod info;
+pub mod kdeconnect;
 pub mod listing;
 pub mod message;
 pub mod mtp;

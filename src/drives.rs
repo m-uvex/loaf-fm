@@ -293,11 +293,12 @@ fn disambiguate_drive_names(drives: &mut [Drive]) {
     }
 }
 
-/// All drives (runs `lsblk` and checks for MTP devices; call from a worker thread).
+/// All drives (runs `lsblk` and checks for MTP/KDE Connect devices; call from a worker thread).
 pub fn list() -> Vec<Drive> {
     let mut drives = list_block();
     let mtp_json = crate::native::list_kmtp_devices_json();
     drives.extend(parse_mtp_devices(&mtp_json));
+    drives.extend(crate::kdeconnect::to_drives());
     drives
 }
 

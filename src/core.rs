@@ -371,6 +371,8 @@ pub mod qobject {
         fn stop_share(self: Pin<&mut LoafCore>, share_id: &QString) -> bool;
         #[qinvokable]
         fn remove_share(self: Pin<&mut LoafCore>, share_id: &QString) -> bool;
+        #[qinvokable]
+        fn share_to_kdeconnect(self: Pin<&mut LoafCore>, device_id: &QString, paths_json: &QString);
     }
 
     impl cxx_qt::Threading for LoafCore {}
@@ -1417,19 +1419,26 @@ impl qobject::LoafCore {
                 .text(dev.clone())
                 .to_string(),
             dev,
-            move || match drives::mount(&dev_clone) {
-                Ok(path) => Ok(serde_json::json!({
-                    "action": "mount",
-                    "device": dev_clone,
-                    "mount_point": path
-                })),
-                Err(e) => Err((
-                    e,
-                    serde_json::json!({
+            move || {
+                let result = if let Some(id) = crate::kdeconnect::parse_device_id(&dev_clone) {
+                    crate::kdeconnect::mount(id)
+                } else {
+                    drives::mount(&dev_clone)
+                };
+                match result {
+                    Ok(path) => Ok(serde_json::json!({
                         "action": "mount",
-                        "device": dev_clone
-                    }),
-                )),
+                        "device": dev_clone,
+                        "mount_point": path
+                    })),
+                    Err(e) => Err((
+                        e,
+                        serde_json::json!({
+                            "action": "mount",
+                            "device": dev_clone
+                        }),
+                    )),
+                }
             },
         );
     }
@@ -1442,18 +1451,25 @@ impl qobject::LoafCore {
                 .text(dev.clone())
                 .to_string(),
             dev,
-            move || match drives::unmount(&dev_clone) {
-                Ok(_) => Ok(serde_json::json!({
-                    "action": "unmount",
-                    "device": dev_clone
-                })),
-                Err(e) => Err((
-                    e,
-                    serde_json::json!({
+            move || {
+                let result = if let Some(id) = crate::kdeconnect::parse_device_id(&dev_clone) {
+                    crate::kdeconnect::unmount(id).map(|_| String::new())
+                } else {
+                    drives::unmount(&dev_clone).map(|_| String::new())
+                };
+                match result {
+                    Ok(_) => Ok(serde_json::json!({
                         "action": "unmount",
                         "device": dev_clone
-                    }),
-                )),
+                    })),
+                    Err(e) => Err((
+                        e,
+                        serde_json::json!({
+                            "action": "unmount",
+                            "device": dev_clone
+                        }),
+                    )),
+                }
             },
         );
     }
@@ -3577,6 +3593,37 @@ impl qobject::LoafCore {
 
     pub fn remove_share(self: Pin<&mut Self>, share_id: &QString) -> bool {
         share::get_manager().remove_share(&share_id.to_string())
+    }
+
+    pub fn share_to_kdeconnect(mut self: Pin<&mut Self>, device_id: &QString, paths_json: &QString) {
+        let id = device_id.to_string();
+        let paths: Vec<String> = serde_json::from_str::<Vec<String>>(&paths_json.to_string())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect();
+        if paths.is_empty() {
+            self.as_mut().notify(q("error"), q("No files to share"));
+            return;
+        }
+        let thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let result = crate::kdeconnect::share_files(&id, &paths);
+            let _ = thread.queue(move |mut core| match result {
+                Ok(()) => {
+                    let n = paths.len();
+                    let msg = if n == 1 {
+                        "Shared 1 file via KDE Connect".to_string()
+                    } else {
+                        format!("Shared {} files via KDE Connect", n)
+                    };
+                    core.as_mut().notify(q("info"), q(&msg));
+                }
+                Err(e) => {
+                    core.as_mut().notify(q("error"), q(&e));
+                }
+            });
+        });
     }
 }
 

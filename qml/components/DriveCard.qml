@@ -83,7 +83,7 @@ Item {
         return d.device ? String(d.device) : "";
     }
 
-    opacity: root.isMounted || (root.drive && root.drive.provider === "mtp") ? 1.0 : 0.85
+    opacity: root.isMounted || (root.drive && (root.drive.provider === "mtp" || root.drive.provider === "kdeconnect")) ? 1.0 : 0.85
     Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140 } }
 
     scale: cardMouse.pressed ? 0.98 : 1.0
@@ -111,7 +111,7 @@ Item {
     Shape {
         id: dashedBorder
         anchors.fill: parent
-        visible: !root.isMounted && !(root.drive && root.drive.provider === "mtp")
+        visible: !root.isMounted && !(root.drive && (root.drive.provider === "mtp" || root.drive.provider === "kdeconnect"))
         readonly property real r: theme.radiusXl
 
         ShapePath {
@@ -192,7 +192,7 @@ Item {
             }
 
             Text {
-                visible: root.isMounted
+                visible: root.isMounted && !(root.drive && root.drive.provider === "kdeconnect")
                 text: Math.round(root.usage * 100) + "%"
                 color: root.almostFull ? theme.danger : theme.primary
                 font.pixelSize: theme.fs(24)
@@ -202,14 +202,14 @@ Item {
         }
 
         UsageBar {
-            visible: root.isMounted
+            visible: root.isMounted && !(root.drive && root.drive.provider === "kdeconnect")
             Layout.fillWidth: true
             value: root.usage
             barColor: root.almostFull ? theme.danger : theme.primary
         }
 
         RowLayout {
-            visible: root.isMounted
+            visible: root.isMounted && !(root.drive && root.drive.provider === "kdeconnect")
             Layout.fillWidth: true
             spacing: 8
 

@@ -335,12 +335,14 @@ Item {
         var mounted = pcView.isMounted(d);
         var external = d && d.is_external === true;
         var isMtp = d && d.provider === "mtp";
+        var isKdeConnect = d && d.provider === "kdeconnect";
+        var isVirtual = isMtp || isKdeConnect;
         var items = [];
 
         items.push({
             "text": qsTr("Open"),
             "icon": "folder-open",
-            "enabled": mounted || isMtp,
+            "enabled": mounted || isVirtual,
             "action": function () { pcView.openDrive(d); }
         });
         if (!mounted) {
@@ -359,7 +361,7 @@ Item {
                 "action": function () { pcView.unmountDrive(d); }
             });
         }
-        if (external && d.disk && !isMtp) {
+        if (external && d.disk && !isVirtual) {
             items.push({
                 "text": qsTr("Eject (Safely Remove)"),
                 "icon": "eject",
@@ -367,7 +369,7 @@ Item {
                 "action": function () { core.eject_drive(d.disk); }
             });
         }
-        if (d.is_encrypted && d.crypt_device && !isMtp) {
+        if (d.is_encrypted && d.crypt_device && !isVirtual) {
             items.push({
                 "text": qsTr("Lock Encrypted Drive"),
                 "icon": "lock",
@@ -375,7 +377,7 @@ Item {
                 "action": function () { core.lock_drive(d.crypt_device); }
             });
         }
-        if (!isMtp) {
+        if (!isVirtual) {
             items.push({
                 "text": qsTr("Rename"),
                 "icon": "pencil-simple",

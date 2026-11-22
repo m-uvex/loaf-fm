@@ -1476,6 +1476,14 @@ ApplicationWindow {
         onTriggered: core.refresh_smb_discovery()
     }
 
+    // Refresh drives periodically to pick up KDE Connect connect/disconnect.
+    Timer {
+        interval: 15000
+        repeat: true
+        running: true
+        onTriggered: core.load_drives()
+    }
+
     Theme {
         id: theme
         // Archives open like folders on double click.
@@ -3153,9 +3161,18 @@ ApplicationWindow {
                 m.push({ text: qsTr("Duplicate"), icon: "copy-simple", itemKey: "duplicate", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "copy", "rename"); } });
                 m.push({ text: qsTr("Make Link"), icon: "link", itemKey: "make_link", action: function() { core.transfer(JSON.stringify(paths), pane.engine.current_path, "link", "rename"); } });
             }
-            if (theme.shareViaLinkEnabled) {
-                var shareSub = [
-                    {
+            var kdeConnectDevices = [];
+            try {
+                var allDrives = JSON.parse(core.drives_json || "[]");
+                for (var kdi = 0; kdi < allDrives.length; ++kdi) {
+                    if (allDrives[kdi].provider === "kdeconnect")
+                        kdeConnectDevices.push(allDrives[kdi]);
+                }
+            } catch (e) {}
+            if (theme.shareViaLinkEnabled || kdeConnectDevices.length > 0) {
+                var shareSub = [];
+                if (theme.shareViaLinkEnabled) {
+                    shareSub.push({
                         text: qsTr("Share via Link"),
                         icon: "link",
                         action: function() {
@@ -3166,8 +3183,21 @@ ApplicationWindow {
                             window.toast("info", qsTr("Preparing link share..."));
                             core.start_share(JSON.stringify(paths));
                         }
-                    }
-                ];
+                    });
+                }
+                for (var kdj = 0; kdj < kdeConnectDevices.length; ++kdj) {
+                    (function(dev) {
+                        var devId = String(dev.device || "").replace(/^kdeconnect:\/\//, "");
+                        var devName = theme.resolveRustMessage(dev.name || devId);
+                        shareSub.push({
+                            text: qsTr("Share to %1").arg(devName),
+                            icon: dev.icon || "device-mobile",
+                            action: function() {
+                                core.share_to_kdeconnect(devId, JSON.stringify(paths));
+                            }
+                        });
+                    })(kdeConnectDevices[kdj]);
+                }
                 m.push({ text: qsTr("Share…"), icon: "share-network", itemKey: "share", submenu: shareSub });
             }
             m.push({ text: qsTr("Compress"), icon: "file-archive", itemKey: "compress", submenu: compressSubmenu(paths) });
