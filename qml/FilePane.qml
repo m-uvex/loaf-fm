@@ -686,6 +686,10 @@ Item {
                         // learn that the selection became empty.
                         selectionCanvas.requestPaint();
                     }
+                    function onListRowHChanged() {
+                        if (pane.isList() && pane.selectedCount > 0)
+                            selectionCanvas.requestPaint();
+                    }
                 }
                 // Scrolling and resizing repaint the outline every frame,
                 // but only when something is selected; with an empty
@@ -706,12 +710,22 @@ Item {
                 Connections {
                     target: listView
                     function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onOriginYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onHeightChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                 }
                 Connections {
                     target: paneEngine
-                    function onView_modeChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onView_modeChanged() {
+                        if (pane.selectedCount > 0) {
+                            selectionCanvas.requestPaint();
+                            repaintTimer.restart();
+                        }
+                    }
                     function onCurrent_pathChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onGroup_byChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
+                    function onGroup_ascendingChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                     function onFilter_textChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                     function onModelReset() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                     function onItem_countChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
@@ -741,14 +755,90 @@ Item {
                 // Only rows near the viewport matter for painting: checking those
                 // against the selection set stays cheap even after Ctrl+A in a
                 // huge folder (looking up every selected path was O(selected x rows)).
-                function collectSelection() {
+                function collectSelection(visible) {
                     var sel = {};
-                    var visible = visibleIndices();
+                    visible = visible || visibleIndices();
                     for (var i = 0; i < visible.length; ++i) {
                         if (pane.selection[paneEngine.path_at(visible[i])] === true)
                             sel[visible[i]] = true;
                     }
                     return sel;
+                }
+
+                function parseListGroups() {
+                    if (paneEngine.group_by === "none")
+                        return null;
+                    try {
+                        var groups = JSON.parse(paneEngine.groups_json());
+                        return (groups && groups.length > 0) ? groups : null;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+
+                function groupIndexFor(groups, idx) {
+                    if (!groups)
+                        return -1;
+                    var lo = 0, hi = groups.length - 1;
+                    while (lo <= hi) {
+                        var mid = (lo + hi) >> 1;
+                        var grp = groups[mid];
+                        if (idx < grp.start)
+                            hi = mid - 1;
+                        else if (idx >= grp.start + grp.count)
+                            lo = mid + 1;
+                        else
+                            return mid;
+                    }
+                    return -1;
+                }
+
+                // Resolve exact y coordinates for visible ListView rows directly
+                // from materialized delegates (immune to Qt ListView originY drift
+                // when section headers are present), anchoring any off-screen slack
+                // rows to their adjacent materialized neighbour.
+                function buildListLayout(visible, groups) {
+                    var rowH = pane.listRowH;
+                    var pitch = rowH + listView.spacing;
+                    var groupOf = {};
+                    var itemY = {};
+                    for (var i = 0; i < visible.length; ++i) {
+                        var idx = visible[i];
+                        if (groups)
+                            groupOf[idx] = groupIndexFor(groups, idx);
+                        var del = listView.itemAtIndex(idx);
+                        if (del)
+                            itemY[idx] = del.y;
+                    }
+                    var sameGrp = function (a, b) {
+                        return !groups || (groupOf[a] >= 0 && groupOf[a] === groupOf[b]);
+                    };
+                    for (var f = 1; f < visible.length; ++f) {
+                        var fi = visible[f], fp = visible[f - 1];
+                        if (itemY[fi] === undefined && fp === fi - 1 && itemY[fp] !== undefined)
+                            itemY[fi] = itemY[fp] + pitch + (sameGrp(fp, fi) ? 0 : 28);
+                    }
+                    for (var b = visible.length - 2; b >= 0; --b) {
+                        var bi = visible[b], bn = visible[b + 1];
+                        if (itemY[bi] === undefined && bn === bi + 1 && itemY[bn] !== undefined)
+                            itemY[bi] = itemY[bn] - pitch - (sameGrp(bi, bn) ? 0 : 28);
+                    }
+                    var ly = {};
+                    var baseOffset = listView.y - listView.contentY;
+                    for (var k = 0; k < visible.length; ++k) {
+                        var ki = visible[k];
+                        var yVal = itemY[ki];
+                        if (yVal === undefined)
+                            yVal = listView.originY + ki * pitch + (groups && groupOf[ki] >= 0 ? (groupOf[ki] + 1) * 28 : 0);
+                        ly[ki] = Math.round(baseOffset + yVal);
+                    }
+                    return {
+                        rowH: rowH,
+                        pitch: pitch,
+                        groups: groups,
+                        groupOf: groupOf,
+                        ly: ly
+                    };
                 }
 
                 function ctxRadius() { return pane.isList() ? 11 : 18; }
@@ -770,13 +860,15 @@ Item {
                 function paintSelection() {
                     var ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
-                    var sel = collectSelection();
-                    if (pane.selectedCount > 0)
-                        paintBlock(ctx, sel);
+                    if (pane.selectedCount <= 0)
+                        return;
+                    var visible = visibleIndices();
+                    var sel = collectSelection(visible);
+                    paintBlock(ctx, sel, visible);
                 }
 
                 // Traces the outline of the selected cells and fills it.
-                function paintBlock(ctx, sel) {
+                function paintBlock(ctx, sel, visible) {
                     // Every side of a selected cell that faces an unselected
                     // cell becomes a directed edge (clockwise, interior on the
                     // right). One row of slack on each side of the viewport
@@ -785,17 +877,18 @@ Item {
                     var isList = pane.isList();
                     var cols = isList ? 1 : pane.cols();
                     var segs = [];
-                    var visible = visibleIndices();
+                    visible = visible || visibleIndices();
                     // Neighbours only count when they are traced too, otherwise
                     // the walk dead-ends and the fill gets cut off at the edge.
                     var traced = {};
                     for (var t = 0; t < visible.length; ++t)
                         traced[visible[t]] = true;
+                    var listLayout = isList ? buildListLayout(visible, parseListGroups()) : null;
                     for (var k = 0; k < visible.length; ++k) {
                         var idx = visible[k];
                         if (!sel[idx])
                             continue;
-                        var g = baseRect(idx, sel, cols, traced);
+                        var g = baseRect(idx, sel, cols, traced, listLayout);
                         if (!g.up) segs.push([g.x0, g.y0, g.x1, g.y0]);
                         if (!g.right) segs.push([g.x1, g.y0, g.x1, g.y1]);
                         if (!g.down) segs.push([g.x1, g.y1, g.x0, g.y1]);
@@ -805,6 +898,14 @@ Item {
                         return;
                     var loops = traceLoops(segs);
                     var rad = ctxRadius();
+                    ctx.save();
+                    if (isList) {
+                        // Clip to listView so scrolled-up selections never bleed
+                        // into the header gap or behind listHeader.
+                        ctx.beginPath();
+                        ctx.rect(listView.x, listView.y, listView.width, listView.height);
+                        ctx.clip();
+                    }
                     ctx.beginPath();
                     for (var l = 0; l < loops.length; ++l)
                         addLoop(ctx, loops[l], rad);
@@ -815,38 +916,49 @@ Item {
                     ctx.lineWidth = 1.5;
                     ctx.lineJoin = "round";
                     ctx.stroke();
+                    ctx.restore();
                 }
 
                 // Final rect of one row/index in canvas coordinates. Selected
                 // neighbours pull the shared edge out to the grid line so two
                 // adjacent cells meet exactly; unselected sides keep the inner
                 // padding, which is what gives the block its soft outline.
-                function baseRect(idx, sel, cols, traced) {
+                function baseRect(idx, sel, cols, traced, listLayout) {
                     traced = traced || {};
                     var on = function (n) { return n >= 0 && !!traced[n] && !!sel[n]; };
                     if (pane.isList()) {
-                        var rowH = pane.listRowH;
-                        var pitch = rowH + listView.spacing;
-                        var itemTop = idx * pitch;
-                        if (paneEngine.sort_by === "modified") {
-                            var groups = [];
-                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
-                            for (var g = 0; g < groups.length; ++g) {
-                                if (idx >= groups[g].start && idx < groups[g].start + groups[g].count) {
-                                    itemTop = idx * pitch + (g + 1) * 28;
-                                    break;
-                                }
-                            }
+                        if (!listLayout) {
+                            var near = [];
+                            if (idx > 0) near.push(idx - 1);
+                            near.push(idx);
+                            if (idx + 1 < paneEngine.item_count) near.push(idx + 1);
+                            listLayout = buildListLayout(near, parseListGroups());
                         }
-                        var ly = Math.round(listHeader.height + 6 + itemTop - listView.contentY);
-                        var up = idx > 0 && on(idx - 1);
-                        var down = on(idx + 1);
+                        var rowH = listLayout.rowH;
+                        var pitch = listLayout.pitch;
+                        var groups = listLayout.groups;
+                        var groupOf = listLayout.groupOf;
+                        var lyMap = listLayout.ly;
+                        var sameGroup = function (a, b) {
+                            return !groups || (groupOf[a] >= 0 && groupOf[a] === groupOf[b]);
+                        };
+                        var canJoin = function (i) {
+                            return i >= 0 && on(i) && on(i + 1)
+                                && sameGroup(i, i + 1)
+                                && lyMap[i] !== undefined
+                                && lyMap[i + 1] !== undefined
+                                && Math.abs(lyMap[i + 1] - (lyMap[i] + pitch)) <= 2;
+                        };
+                        var ly = lyMap[idx];
+                        var up = canJoin(idx - 1);
+                        var down = canJoin(idx);
                         return {
                             x0: 2, x1: listView.width - 2,
-                            // Rows are 3px apart: a selected neighbour pulls
-                            // the edge across the gap so the run is continuous.
+                            // Rows are spaced apart: a selected neighbour in the
+                            // same group pulls the edge across the gap so the run
+                            // is continuous and meets the next row's top exactly.
                             y0: up ? ly : ly + 2,
-                            y1: down ? ly + rowH + 3 : ly + rowH - 2,
+                            y1: down ? lyMap[idx + 1] : ly + rowH - 2,
                             up: up, down: down, left: false, right: false
                         };
                     }
@@ -897,23 +1009,56 @@ Item {
                     if (count <= 0)
                         return out;
                     if (pane.isList()) {
-                        var rowH = pane.listRowH + 3;
-                        if (paneEngine.sort_by === "modified") {
-                            var groups = [];
-                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                        var rowH = pane.listRowH;
+                        var pitch = rowH + listView.spacing;
+                        var topY = listView.contentY;
+                        var bottomY = topY + listView.height;
+                        var first = -1, last = -1;
+                        if (listView.height > 0 && listView.width > 0) {
+                            var step = Math.max(8, Math.min(20, Math.floor(rowH / 2)));
+                            var probeX = Math.min(10, listView.width / 2);
+                            var maxScanY = Math.min(bottomY, listView.originY + listView.contentHeight);
+                            for (var py = topY; py <= maxScanY; py += step) {
+                                var hit = listView.indexAt(probeX, py);
+                                if (hit >= 0) {
+                                    first = hit;
+                                    break;
+                                }
+                            }
+                            if (first >= 0) {
+                                for (var py2 = Math.max(topY, maxScanY - 1); py2 >= topY; py2 -= step) {
+                                    var hit2 = listView.indexAt(probeX, py2);
+                                    if (hit2 >= 0) {
+                                        last = hit2;
+                                        break;
+                                    }
+                                }
+                                if (last < first)
+                                    last = first;
+                            }
+                        }
+                        if (first >= 0 && last >= 0) {
+                            var lo = Math.max(0, first - 1);
+                            var hi = Math.min(count - 1, last + 1);
+                            for (var li = lo; li <= hi; ++li)
+                                out.push(li);
+                            return out;
+                        }
+                        var groups = parseListGroups();
+                        if (groups) {
                             for (var g = 0; g < groups.length; ++g) {
                                 var grp = groups[g];
-                                var headerOffset = (g + 1) * 28;
-                                var min_i = Math.max(grp.start, Math.floor((listView.contentY - rowH - headerOffset) / rowH));
-                                var max_i = Math.min(grp.start + grp.count - 1, Math.ceil((listView.contentY + height + rowH - headerOffset) / rowH));
+                                var headerOffset = listView.originY + (g + 1) * 28;
+                                var min_i = Math.max(grp.start, Math.floor((topY - pitch - headerOffset) / pitch));
+                                var max_i = Math.min(grp.start + grp.count - 1, Math.ceil((bottomY + pitch - headerOffset) / pitch));
                                 for (var r = min_i; r <= max_i; ++r)
                                     out.push(r);
                             }
                         } else {
-                            var first = Math.max(0, Math.floor(listView.contentY / rowH) - 1);
-                            var last = Math.min(count - 1, Math.ceil((listView.contentY + height) / rowH) + 1);
-                            for (var i = first; i <= last; ++i)
-                                out.push(i);
+                            var f0 = Math.max(0, Math.floor((topY - listView.originY) / pitch) - 1);
+                            var l0 = Math.min(count - 1, Math.ceil((bottomY - listView.originY) / pitch) + 1);
+                            for (var u = f0; u <= l0; ++u)
+                                out.push(u);
                         }
                         return out;
                     }
@@ -1730,35 +1875,71 @@ Item {
                         var w = Math.abs(mx - sx), h = Math.abs(my - sy);
                         listBand.x = x; listBand.y = y; listBand.width = w; listBand.height = h;
                         var sel = Object.assign({}, base);
-                        var rowH = pane.listRowH;
-                        var pitch = rowH + listView.spacing;
-                        if (paneEngine.sort_by === "modified") {
-                            var groups = [];
-                            try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
-                            for (var g = 0; g < groups.length; ++g) {
-                                var grp = groups[g];
-                                var headerOffset = (g + 1) * 28;
-                                var min_i = Math.max(grp.start, Math.floor((y - headerOffset) / pitch));
-                                var max_i = Math.min(grp.start + grp.count - 1, Math.floor((y + h - headerOffset) / pitch));
-                                for (var r = min_i; r <= max_i; ++r) {
-                                    var itemTop = r * pitch + headerOffset;
-                                    if (x < listView.width && x + w >= 0 && y + h > itemTop && y < itemTop + rowH) {
+                        var count = paneEngine.item_count;
+                        if (count > 0 && x < listView.width && x + w >= 0) {
+                            var rowH = pane.listRowH;
+                            var pitch = rowH + listView.spacing;
+                            if (paneEngine.group_by !== "none") {
+                                // Hit-test materialized delegates directly so originY drift
+                                // after jumping/scrolling cannot offset the marquee box.
+                                var step = Math.max(8, Math.min(20, Math.floor(rowH / 2)));
+                                var probeX = Math.min(10, listView.width / 2);
+                                var hitFirst = -1, hitLast = -1;
+                                var scanTop = Math.max(y, listView.contentY);
+                                var scanBot = Math.min(y + h, listView.contentY + listView.height);
+                                for (var py = scanTop; py <= scanBot; py += step) {
+                                    var idx = listView.indexAt(probeX, py);
+                                    if (idx >= 0) {
+                                        if (hitFirst < 0) hitFirst = idx;
+                                        hitLast = idx;
+                                    }
+                                }
+                                if (scanBot >= scanTop) {
+                                    var endIdx = listView.indexAt(probeX, scanBot);
+                                    if (endIdx >= 0) {
+                                        if (hitFirst < 0) hitFirst = endIdx;
+                                        hitLast = Math.max(hitLast, endIdx);
+                                    }
+                                }
+                                for (var m = hitFirst; hitFirst >= 0 && m <= hitLast; ++m) {
+                                    var del = listView.itemAtIndex(m);
+                                    if (del && y + h > del.y && y < del.y + del.height) {
+                                        var mp = paneEngine.path_at(m);
+                                        if (mp && mp.length > 0)
+                                            sel[mp] = true;
+                                    }
+                                }
+                                // Cover rows scrolled outside the materialized viewport during auto-scroll.
+                                var groups = [];
+                                try { groups = JSON.parse(paneEngine.groups_json()); } catch (e) { groups = []; }
+                                for (var g = 0; g < groups.length; ++g) {
+                                    var grp = groups[g];
+                                    var headerOffset = listView.originY + (g + 1) * 28;
+                                    var min_i = Math.max(grp.start, Math.floor((y - headerOffset) / pitch));
+                                    var max_i = Math.min(grp.start + grp.count - 1, Math.floor((y + h - headerOffset) / pitch));
+                                    for (var r = min_i; r <= max_i; ++r) {
+                                        var d = listView.itemAtIndex(r);
+                                        var itemTop = d ? d.y : (r * pitch + headerOffset);
+                                        var itemH = d ? d.height : rowH;
+                                        if (y + h > itemTop && y < itemTop + itemH) {
+                                            var p = paneEngine.path_at(r);
+                                            if (p && p.length > 0)
+                                                sel[p] = true;
+                                        }
+                                    }
+                                }
+                            } else {
+                                var r1 = Math.max(0, Math.floor((y - listView.originY) / pitch));
+                                var r2 = Math.min(count - 1, Math.floor((y + h - listView.originY) / pitch));
+                                for (var r = r1; r <= r2; ++r) {
+                                    var d = listView.itemAtIndex(r);
+                                    var t = d ? d.y : (listView.originY + r * pitch);
+                                    var ih = d ? d.height : rowH;
+                                    if (y + h > t && y < t + ih) {
                                         var p = paneEngine.path_at(r);
                                         if (p && p.length > 0)
                                             sel[p] = true;
                                     }
-                                }
-                            }
-                        } else {
-                            var count = paneEngine.item_count;
-                            var r1 = Math.max(0, Math.floor((y - listView.originY) / pitch));
-                            var r2 = Math.min(count - 1, Math.floor((y + h - listView.originY) / pitch));
-                            for (var r = r1; r <= r2; ++r) {
-                                var t = listView.originY + r * pitch;
-                                if (x < listView.width && x + w >= 0 && y + h > t && y < t + rowH) {
-                                    var p = paneEngine.path_at(r);
-                                    if (p && p.length > 0)
-                                        sel[p] = true;
                                 }
                             }
                         }
