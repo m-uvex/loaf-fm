@@ -5,7 +5,6 @@ edition = "2021"
 license = "MIT"
 description = "Material 3 Expressive file manager built with Rust and Qt 6"
 repository = "https://github.com/m-uvex/loaf-fm"
-homepage = "https://github.com/m-uvex/loaf-fm"
 authors = ["Musa Murad <musamurad@proton.me>"]
 
 [dependencies]

@@ -620,6 +620,53 @@ fn builtin_terminal_specs() -> &'static [(
     ]
 }
 
+fn terminal_display_name(bin: &str) -> &str {
+    match bin {
+        "xdg-terminal-exec" => "System terminal launcher",
+        "kgx" => "GNOME Console",
+        "gnome-terminal" => "GNOME Terminal",
+        "konsole" => "Konsole",
+        "kitty" => "Kitty",
+        "alacritty" => "Alacritty",
+        "foot" => "Foot",
+        "wezterm" => "WezTerm",
+        "ghostty" => "Ghostty",
+        "xfce4-terminal" => "Xfce Terminal",
+        "tilix" => "Tilix",
+        "xterm" => "XTerm",
+        _ => bin,
+    }
+}
+
+pub fn available_terminal_options_json(theme_name: &str) -> String {
+    let installed_apps = all();
+    let options: Vec<serde_json::Value> = builtin_terminal_specs()
+        .iter()
+        .filter_map(|(bin, _, _)| {
+            util::which(bin).map(|_| {
+                let icon_name = installed_apps
+                    .iter()
+                    .find(|app| {
+                        tokenize(&app.exec)
+                            .first()
+                            .and_then(|command| Path::new(command).file_name())
+                            .is_some_and(|name| name == std::ffi::OsStr::new(*bin))
+                    })
+                    .map(|app| app.icon.as_str())
+                    .filter(|icon| !icon.is_empty())
+                    .unwrap_or("utilities-terminal");
+                serde_json::json!({
+                    "value": bin,
+                    "label": terminal_display_name(bin),
+                    "iconUrl": crate::icons::resolve(theme_name, icon_name, 48),
+                    "icon": "terminal"
+                })
+            })
+        })
+        .collect();
+    serde_json::to_string(&options).unwrap_or_else(|_| "[]".into())
+}
+
 fn parse_terminal_candidate(
     cmd_str: &str,
     which_fn: impl Fn(&str) -> Option<PathBuf>,
@@ -726,6 +773,19 @@ fn resolve_terminal_with(
     which_fn: impl Fn(&str) -> Option<PathBuf>,
     cfg_dir: &Path,
 ) -> Option<ResolvedTerminal> {
+    resolve_terminal_with_preference(None, env_term, desktop, which_fn, cfg_dir)
+}
+
+fn resolve_terminal_with_preference(
+    preferred_terminal: Option<&str>,
+    env_term: Option<&str>,
+    desktop: &str,
+    which_fn: impl Fn(&str) -> Option<PathBuf>,
+    cfg_dir: &Path,
+) -> Option<ResolvedTerminal> {
+    if let Some(preferred) = preferred_terminal.filter(|value| !value.trim().is_empty()) {
+        return parse_terminal_candidate(preferred, &which_fn);
+    }
     if let Some(t) = env_term {
         if let Some(res) = parse_terminal_candidate(t, &which_fn) {
             return Some(res);
@@ -773,10 +833,17 @@ pub fn open_terminal_in(dir: &Path) -> std::io::Result<()> {
             Message::key(MessageKey::NotifyNoTerminal).to_string(),
         ));
     }
+    let preferred_terminal = crate::state::get("preferredTerminal");
     let env_term = std::env::var("TERMINAL").ok();
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let cfg = util::config_home();
-    let Some(res) = resolve_terminal_with(env_term.as_deref(), &desktop, util::which, &cfg) else {
+    let Some(res) = resolve_terminal_with_preference(
+        preferred_terminal.as_deref(),
+        env_term.as_deref(),
+        &desktop,
+        util::which,
+        &cfg,
+    ) else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             Message::key(MessageKey::NotifyNoTerminal).to_string(),
@@ -1061,6 +1128,28 @@ mod tests {
         let (cmd_bin, cmd_args) = res.for_command();
         assert_eq!(cmd_bin, PathBuf::from("/usr/local/bin/custom-term"));
         assert_eq!(cmd_args, vec!["--flag", "with space", "-e"]);
+
+        // A saved preference takes precedence over environment and desktop settings.
+        let res = resolve_terminal_with_preference(
+            Some("kitty"),
+            Some("custom-term --flag"),
+            "KDE",
+            fake_which,
+            &temp_dir,
+        )
+        .unwrap();
+        assert_eq!(res.bin, PathBuf::from("/bin/kitty"));
+        assert_eq!(res.for_open_in(Path::new("/tmp")).1, vec!["-d", "/tmp"]);
+
+        // An unavailable saved preference is not silently replaced by another terminal.
+        assert!(resolve_terminal_with_preference(
+            Some("missing-terminal"),
+            None,
+            "KDE",
+            fake_which,
+            &temp_dir,
+        )
+        .is_none());
 
         // 3. Precedence: xdg-terminal-exec beats desktop config when no TERMINAL override.
         // xdg-terminal-exec syntax requires monolithic --dir=/path option per upstream spec.

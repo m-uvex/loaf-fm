@@ -5,7 +5,7 @@ import app.loaf
 import ".."
 
 // LoafSelect -- Material 3 Expressive dropdown field built on LoafMenu.
-// options: [{ value, label, iconUrl? }]
+// options: [{ value, label, icon?, iconUrl? }]
 Item {
     id: root
 
@@ -45,6 +45,7 @@ Item {
         menu.model = optionList.map(function (o) {
             return {
                 "text": o.label || "",
+                "icon": o.icon || "",
                 "iconUrl": o.iconUrl || "",
                 "checkable": true,
                 "checked": o.value === root.value,
@@ -70,6 +71,15 @@ Item {
         anchors.leftMargin: 16
         anchors.rightMargin: 12
         spacing: 10
+
+        LoafIcon {
+            visible: root.current !== null
+                && (root.current.icon || "").length > 0
+                && (root.current.iconUrl || "").length === 0
+            name: root.current ? (root.current.icon || "") : ""
+            size: 18
+            color: theme.textMain
+        }
 
         Image {
             visible: root.current !== null && (root.current.iconUrl || "").length > 0

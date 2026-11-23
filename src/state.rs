@@ -103,7 +103,7 @@ pub fn record_visit(path: &str) {
         // Keep the file small: forget the least visited folders.
         if map.len() > 200 {
             let mut v: Vec<(String, u32)> = map.iter().map(|(k, c)| (k.clone(), *c)).collect();
-            v.sort_by(|a, b| b.1.cmp(&a.1));
+            v.sort_by_key(|entry| std::cmp::Reverse(entry.1));
             v.truncate(150);
             *map = v.into_iter().collect();
         }
