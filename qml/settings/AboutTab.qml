@@ -21,6 +21,8 @@ ColumnLayout {
 
     readonly property bool isCompact: (typeof settingsView !== "undefined" && settingsView.isCompact) || root.width < 560
     readonly property string repoUrl: "https://github.com/m-uvex/loaf-fm"
+    readonly property string siteUrl: "https://loaf.muvex.dev"
+    readonly property string discordUrl: "https://discord.gg/VCZf2AqCAG"
 
     function matches(keywords) {
         if (!searchQuery || searchQuery.trim().length === 0) return true;
@@ -35,7 +37,7 @@ ColumnLayout {
         return true;
     }
 
-    readonly property bool matchAbout: matches("about loaf version credits github contributors license repo description")
+    readonly property bool matchAbout: matches("about loaf version credits github contributors license repo description website discord community issue bug report")
     readonly property bool matchContributors: matches("contributors people team authors credits github")
     readonly property int matchCount: (searchQuery && searchQuery.trim().length > 0)
         ? ((matchAbout ? 1 : 0) + (matchContributors ? 1 : 0))
@@ -279,27 +281,24 @@ ColumnLayout {
                 elide: Text.ElideRight
             }
 
-            // Actions, one column on narrow layouts.
-            GridLayout {
+            // Actions: one connected, expressive button row.
+            LoafButtonGroup {
+                Layout.preferredWidth: Math.min(implicitWidth, parent.width)
                 Layout.alignment: Qt.AlignHCenter
-                columns: root.isCompact ? 1 : 2
-                columnSpacing: 10
-                rowSpacing: 10
-
-                LoafButton {
-                    text: qsTr("Repository")
-                    icon: "github-logo"
-                    variant: "filled"
-                    Layout.fillWidth: root.isCompact
-                    onClicked: Qt.openUrlExternally(root.repoUrl)
-                }
-
-                LoafButton {
-                    text: qsTr("Report an issue")
-                    icon: "bug"
-                    variant: "tonal"
-                    Layout.fillWidth: root.isCompact
-                    onClicked: Qt.openUrlExternally(root.repoUrl + "/issues")
+                Layout.preferredHeight: implicitHeight
+                buttons: [
+                    { text: qsTr("Repository"), icon: "github-logo", variant: "filled" },
+                    { text: qsTr("Website"), icon: "globe", variant: "filled" },
+                    { text: qsTr("Discord"), icon: "discord-logo", variant: "filled" },
+                    { text: qsTr("Report an issue"), icon: "bug", variant: "tonal" }
+                ]
+                onClicked: function(index) {
+                    Qt.openUrlExternally([
+                        root.repoUrl,
+                        root.siteUrl,
+                        root.discordUrl,
+                        root.repoUrl + "/issues/new?template=bug_report.md"
+                    ][index]);
                 }
             }
         }

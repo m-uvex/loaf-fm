@@ -146,6 +146,7 @@ fn main() {
             .qml_file("qml/components/LoafSwitch.qml")
             .qml_file("qml/components/LoafSlider.qml")
             .qml_file("qml/components/LoafButton.qml")
+            .qml_file("qml/components/LoafButtonGroup.qml")
             .qml_file("qml/components/LoafCard.qml")
             .qml_file("qml/components/SectionHeader.qml")
             .qml_file("qml/components/LoafDialog.qml")
