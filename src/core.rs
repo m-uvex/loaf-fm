@@ -253,6 +253,11 @@ pub mod qobject {
         fn available_terminal_options_json(self: &LoafCore) -> QString;
         #[qinvokable]
         fn apps_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        /// App id the user explicitly chose for `mime`; empty = system default.
+        #[qinvokable]
+        fn user_default_app_for_mime(self: &LoafCore, mime: &QString) -> QString;
+        #[qinvokable]
+        fn clear_default_mime_app(self: Pin<&mut LoafCore>, mime: &QString) -> bool;
         #[qinvokable]
         fn set_default_mime_app(self: Pin<&mut LoafCore>, mime: &QString, app_id: &QString)
             -> bool;
@@ -2258,7 +2263,11 @@ impl qobject::LoafCore {
     }
 
     fn app_entry(app: &apps::DesktopApp, theme_name: &str) -> serde_json::Value {
-        let icon = if app.icon.starts_with('/') && Path::new(&app.icon).is_file() {
+        // Loaf's own entry always shows the bundled icon, so it matches
+        // even when the installed icon theme copy is missing or stale.
+        let icon = if app.id == "loaf" || app.id.starts_with("loaf.") {
+            "qrc:/loaf/app-icon.svg".to_string()
+        } else if app.icon.starts_with('/') && Path::new(&app.icon).is_file() {
             format!("file://{}", trash::encode_path(Path::new(&app.icon)))
         } else {
             icons::resolve(theme_name, &app.icon, 32)
@@ -2382,7 +2391,32 @@ impl qobject::LoafCore {
     }
 
     pub fn used_mime_types(&self) -> QString {
-        let mimes: Vec<String> = state::get("openedMimeTypes")
+        // Common types are always listed so their default app can be picked
+        // up front; anything more obscure only shows up once a file of that
+        // type has been opened in Loaf.
+        const COMMON: &[(&str, &str)] = &[
+            ("inode/directory", "folder"),
+            ("text/plain", "file-text"),
+            ("application/pdf", "file-pdf"),
+            ("image/png", "file-image"),
+            ("image/jpeg", "file-image"),
+            ("image/gif", "file-image"),
+            ("image/webp", "file-image"),
+            ("image/svg+xml", "file-image"),
+            ("video/mp4", "file-video"),
+            ("video/x-matroska", "file-video"),
+            ("video/webm", "file-video"),
+            ("audio/mpeg", "file-audio"),
+            ("audio/flac", "file-audio"),
+            ("audio/ogg", "file-audio"),
+            ("text/html", "globe"),
+            ("application/zip", "file-zip"),
+            ("application/x-tar", "file-zip"),
+            ("application/x-compressed-tar", "file-zip"),
+            ("application/x-7z-compressed", "file-zip"),
+            ("application/vnd.rar", "file-zip"),
+        ];
+        let opened: Vec<String> = state::get("openedMimeTypes")
             .unwrap_or_default()
             .split('\u{1}')
             .filter(|mime| {
@@ -2390,19 +2424,52 @@ impl qobject::LoafCore {
             })
             .map(String::from)
             .collect();
-        let entries: Vec<serde_json::Value> = mimes
-            .into_iter()
-            .map(|mime| {
-                let comment = native::mime_comment(&mime);
-                let label = if comment.is_empty() || comment == mime {
-                    mime.clone()
-                } else {
-                    format!("{} ({})", comment, mime)
-                };
-                serde_json::json!({"mime": mime, "label": label})
-            })
-            .collect();
+        let entry = |mime: &str, icon: &str| {
+            let comment = native::mime_comment(mime);
+            let label = if comment.is_empty() || comment == mime {
+                mime.to_string()
+            } else {
+                comment
+            };
+            // Types Loaf can browse in-app (see archive::kind_of).
+            let archive = icon == "file-zip"
+                || matches!(
+                    mime,
+                    "application/x-xz-compressed-tar"
+                        | "application/x-bzip-compressed-tar"
+                        | "application/x-bzip2-compressed-tar"
+                        | "application/x-zstd-compressed-tar"
+                        | "application/x-cpio"
+                        | "application/x-iso9660-image"
+                        | "application/vnd.ms-cab-compressed"
+                        | "application/x-arj"
+                        | "application/x-lha"
+                        | "application/x-rar"
+                );
+            serde_json::json!({"mime": mime, "label": label, "icon": icon, "archive": archive})
+        };
+        let mut entries: Vec<serde_json::Value> =
+            COMMON.iter().map(|(mime, icon)| entry(mime, icon)).collect();
+        for mime in &opened {
+            if !COMMON.iter().any(|(m, _)| m == mime) {
+                entries.push(entry(mime, "file"));
+            }
+        }
         q(&serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into()))
+    }
+
+    pub fn user_default_app_for_mime(&self, mime: &QString) -> QString {
+        q(&apps::user_default(&mime.to_string()).unwrap_or_default())
+    }
+
+    pub fn clear_default_mime_app(mut self: Pin<&mut Self>, mime: &QString) -> bool {
+        match apps::clear_default(&mime.to_string()) {
+            Ok(()) => true,
+            Err(e) => {
+                self.as_mut().notify(q("error"), q(&e.to_string()));
+                false
+            }
+        }
     }
 
     pub fn available_terminal_options_json(&self) -> QString {

@@ -348,6 +348,52 @@ pub fn set_default(mime: &str, id: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+/// The app the user explicitly picked for `mime` in their own
+/// `mimeapps.list`, if any. `None` means the system default applies.
+pub fn user_default(mime: &str) -> Option<String> {
+    let path = util::config_home().join("mimeapps.list");
+    let content = fs::read_to_string(path).ok()?;
+    group_values(&content, "[Default Applications]", mime)
+        .into_iter()
+        .next()
+        .map(|id| id.trim_end_matches(".desktop").to_string())
+}
+
+/// Drops the user's own default for `mime`, so the system default applies.
+pub fn clear_default(mime: &str) -> std::io::Result<()> {
+    let path = util::config_home().join("mimeapps.list");
+    let Ok(existing) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let updated = clear_default_in(&existing, mime);
+    if updated != existing {
+        util::write_atomic(&path, updated.as_bytes())?;
+        invalidate();
+    }
+    Ok(())
+}
+
+/// Pure helper behind [`clear_default`] (testable).
+pub fn clear_default_in(existing: &str, mime: &str) -> String {
+    let mut in_group = false;
+    let kept: Vec<&str> = existing
+        .lines()
+        .filter(|line| {
+            let t = line.trim();
+            if t.starts_with('[') {
+                in_group = t == "[Default Applications]";
+                return true;
+            }
+            !(in_group
+                && t.split_once('=')
+                    .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(mime)))
+        })
+        .collect();
+    let mut out = kept.join("\n");
+    out.push('\n');
+    out
+}
+
 /// Pure helper behind [`set_default`] (testable).
 pub fn set_default_in(existing: &str, mime: &str, desktop: &str) -> String {
     let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
@@ -1003,6 +1049,13 @@ mod tests {
         assert!(mime_covers("image/jpg", "image/jpeg"));
         assert!(!mime_covers("image/*", "video/mp4"));
         assert!(!mime_covers("", "text/plain"));
+    }
+
+    #[test]
+    fn mimeapps_clear_removes_only_that_default() {
+        let src = "[Default Applications]\ntext/plain=a.desktop\nimage/png=b.desktop\n[Added Associations]\ntext/plain=c.desktop\n";
+        let out = clear_default_in(src, "text/plain");
+        assert_eq!(out, "[Default Applications]\nimage/png=b.desktop\n[Added Associations]\ntext/plain=c.desktop\n");
     }
 
     #[test]

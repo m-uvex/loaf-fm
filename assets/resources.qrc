@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/loaf">
+    <file alias="app-icon.svg">../packaging/assets/icons/hicolor/scalable/apps/loaf.svg</file>
     <file alias="fonts/Phosphor.ttf">fonts/Phosphor.ttf</file>
     <file alias="fonts/Phosphor-Bold.ttf">fonts/Phosphor-Bold.ttf</file>
     <file alias="fonts/Phosphor-Fill.ttf">fonts/Phosphor-Fill.ttf</file>

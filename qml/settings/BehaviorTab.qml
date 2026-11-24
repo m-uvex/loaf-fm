@@ -39,9 +39,6 @@ ColumnLayout {
         : 0
 
     property var mimeTypeOptions: []
-    property var mimeAppOptions: []
-    property string selectedMimeType: ""
-    property string selectedMimeApp: ""
     property var terminalEmulatorOptions: []
     property string selectedTerminalEmulator: ""
 
@@ -52,15 +49,12 @@ ColumnLayout {
         } catch (e) {
             console.warn("Could not load default applications for " + mime + ": " + e);
         }
-        return apps.map(function(app) {
+        var options = [{ value: "", label: qsTr("System default") }];
+        var loaf = apps.filter(function(app) { return app.id === "loaf" || app.id.indexOf("loaf.") === 0; });
+        var others = apps.filter(function(app) { return loaf.indexOf(app) < 0; });
+        return options.concat(loaf.concat(others).map(function(app) {
             return { value: app.id, label: app.name, iconUrl: app.icon };
-        });
-    }
-
-    function selectMimeType(mime) {
-        selectedMimeType = mime;
-        mimeAppOptions = loadAppOptions(mime);
-        selectedMimeApp = core.default_app_for_mime(mime);
+        }));
     }
 
     function loadDefaultAppSettings() {
@@ -70,14 +64,12 @@ ColumnLayout {
         try {
             var types = JSON.parse(core.used_mime_types() || "[]");
             mimeTypeOptions = types.map(function(type) {
-                return { value: type.mime, label: type.label };
+                return { mime: type.mime, label: type.label, icon: type.icon || "file", archive: !!type.archive };
             });
         } catch (e) {
             console.warn("Could not load supported file types: " + e);
             mimeTypeOptions = [];
         }
-        if (mimeTypeOptions.length > 0)
-            selectMimeType(mimeTypeOptions[0].value);
     }
 
     function loadTerminalEmulatorSettings() {
@@ -102,11 +94,6 @@ ColumnLayout {
     function saveTerminalEmulator(name) {
         core.set_setting("preferredTerminal", name);
         selectedTerminalEmulator = name;
-    }
-
-    function saveDefaultApp(appId) {
-        if (selectedMimeType.length > 0 && core.set_default_mime_app(selectedMimeType, appId))
-            selectedMimeApp = core.default_app_for_mime(selectedMimeType);
     }
 
     onVisibleChanged: if (visible) loadDefaultAppSettings()
@@ -324,43 +311,48 @@ ColumnLayout {
             }
         }
 
-        SettingRow {
-            visible: root.mimeTypeOptions.length > 0
-            icon: "file"
-            title: qsTr("File type")
-            subtitle: qsTr("Types you have opened in Loaf")
+        Repeater {
+            model: root.mimeTypeOptions
 
-            LoafSelect {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
-                options: root.mimeTypeOptions
-                value: root.selectedMimeType
-                placeholder: qsTr("No supported file types")
-                enabled: root.mimeTypeOptions.length > 0
-                onSelected: function(mime) { root.selectMimeType(mime); }
+            SettingRow {
+                id: mimeRow
+                required property var modelData
+                property var appOptions: root.loadAppOptions(modelData.mime)
+                property string userApp: core.user_default_app_for_mime(modelData.mime)
+                readonly property string currentApp: userApp
+
+                // Archive rows only matter when "Opening archives" hands
+                // them to an app; Browse and Extract stay inside Loaf.
+                visible: !modelData.archive || theme.archiveOpenAction === "open"
+
+                function choose(id) {
+                    var mime = modelData.mime;
+                    if (id === "") {
+                        if (core.clear_default_mime_app(mime))
+                            userApp = "";
+                    } else if (core.set_default_mime_app(mime, id)) {
+                        userApp = core.user_default_app_for_mime(mime);
+                    }
+                }
+
+                icon: modelData.icon
+                title: modelData.label
+                subtitle: modelData.mime
+
+                LoafSelect {
+                    Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
+                    options: mimeRow.appOptions
+                    value: mimeRow.currentApp
+                    placeholder: qsTr("System default")
+                    onSelected: function(id) { mimeRow.choose(id); }
+                }
             }
         }
 
         SettingRow {
-            visible: root.mimeTypeOptions.length > 0
-            icon: "app-window"
-            title: qsTr("Application")
-            subtitle: qsTr("Default app for the selected file type")
-
-            LoafSelect {
-                Layout.preferredWidth: (typeof settingsView !== "undefined" && settingsView.isCompact) ? 180 : 320
-                options: root.mimeAppOptions
-                value: root.selectedMimeApp
-                placeholder: qsTr("Choose an app")
-                enabled: root.mimeAppOptions.length > 0
-                onSelected: function(id) { root.saveDefaultApp(id); }
-            }
-        }
-
-        SettingRow {
-            visible: root.mimeTypeOptions.length === 0
             icon: "info"
-            title: qsTr("No file types yet")
-            subtitle: qsTr("Open a file in Loaf to add its type here")
+            title: qsTr("Other file types")
+            subtitle: qsTr("Less common types show up here once you open one in Loaf")
         }
     }
 
