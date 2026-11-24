@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { TopNav, FooterIslands } from "./components";
+import { TopNav } from "./components";
 
 type Stop = {
   id: string;
@@ -226,7 +226,6 @@ export default function Gallery() {
         </div>
       </section>
 
-      <FooterIslands />
     </main>
   );
 }

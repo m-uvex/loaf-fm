@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Download, RefreshCw, TriangleAlert } from "lucide-react";
-import { CommandCard, FooterIslands, MiniCommand, Snippet, TopNav, repo } from "./components";
+import { CommandCard, MiniCommand, Snippet, TopNav, repo } from "./components";
 import { Markdown } from "./markdown";
 
 const API = "https://api.github.com/repos/m-uvex/loaf-fm/releases?per_page=6";
@@ -182,7 +182,6 @@ export default function Install() {
         </div>
       </section>
 
-      <FooterIslands />
     </main>
   );
 }

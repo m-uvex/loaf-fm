@@ -1,19 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowUp,
   Copy,
   Check,
   ArrowUpRight,
   ArrowRight,
-  Github,
-  GitPullRequest,
-  Sun,
-  Moon,
   Menu,
   X,
 } from "lucide-react";
-import type { ThemeMode } from "./theme";
-import { applyTheme, getMode } from "./theme";
 
 export const repo = "https://github.com/m-uvex/loaf-fm";
 export const discord = "https://discord.gg/VCZf2AqCAG";
@@ -62,127 +55,6 @@ export function TopNav() {
         </a>
       </div>
     </nav>
-  );
-}
-
-function DiscordGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" aria-hidden="true">
-      <path d="M12 3.6C7.6 3.6 4 6.5 4 10.3c0 2.3 1.4 4.4 3.4 5.6l-.7 3.1 2.9-1.5c.8.2 1.6.3 2.4.3 4.4 0 8-2.9 8-6.7S16.4 3.6 12 3.6ZM8.9 12.3a1.55 1.55 0 1 1 0-3.1 1.55 1.55 0 0 1 0 3.1Zm6.2 0a1.55 1.55 0 1 1 0-3.1 1.55 1.55 0 0 1 0 3.1Z" />
-    </svg>
-  );
-}
-
-const themeIcons = { light: Sun, dark: Moon } as const;
-const themeLabels = { light: "Light", dark: "Dark" } as const;
-
-export function FooterIslands() {
-  const [mode, setMode] = useState<ThemeMode>(() => getMode());
-  const [showTop, setShowTop] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const collapseTimer = useRef<number | null>(null);
-
-  useEffect(() => {
-    const sync = () => setMode(getMode());
-    window.addEventListener("loaf-theme-change", sync);
-    return () => window.removeEventListener("loaf-theme-change", sync);
-  }, []);
-
-  useEffect(() => {
-    const onScroll = () => setShowTop(window.scrollY > 420);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, []);
-
-  const clearCollapse = () => {
-    if (collapseTimer.current !== null) {
-      window.clearTimeout(collapseTimer.current);
-      collapseTimer.current = null;
-    }
-  };
-  const openDock = () => {
-    clearCollapse();
-    setExpanded(true);
-  };
-  const scheduleCollapse = () => {
-    clearCollapse();
-    collapseTimer.current = window.setTimeout(() => setExpanded(false), 800);
-  };
-  useEffect(() => clearCollapse, []);
-
-  const cycle = () => {
-    applyTheme(mode === "light" ? "dark" : "light");
-  };
-
-  const ThemeIcon = themeIcons[mode];
-
-  return (
-    <footer
-      className={`footer-islands${expanded ? " is-expanded" : ""}`}
-      onMouseEnter={openDock}
-      onMouseLeave={scheduleCollapse}
-      onFocusCapture={openDock}
-      onClick={openDock}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) scheduleCollapse();
-      }}
-    >
-      <div className="island island-bar" aria-expanded={expanded}>
-        <span className="dock-handle" aria-hidden="true" />
-        <div className="dock-body">
-          <a className="brand foot-brand" href="/" aria-label="Loaf home">
-            <img className="brand-mark" src="/loaf-badge.png" alt="" width={28} height={28} />
-            <span className="foot-tagline">Toasted to perfection</span>
-          </a>
-          <nav className="icon-row" aria-label="Footer">
-            <a className="icon-pill" href={repo} target="_blank" rel="noreferrer" aria-label="Loaf on GitHub">
-              <Github size={16} aria-hidden="true" />
-              <span>GitHub</span>
-            </a>
-            <a className="icon-pill" href={discord} target="_blank" rel="noreferrer" aria-label="Loaf on Discord">
-              <DiscordGlyph />
-              <span>Discord</span>
-            </a>
-            <a
-              className="icon-pill"
-              href={`${repo}/blob/main/CONTRIBUTING.md`}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Contribute to Loaf"
-            >
-              <GitPullRequest size={16} aria-hidden="true" />
-              <span>Contribute</span>
-            </a>
-            <span className="icon-sep" aria-hidden="true" />
-            <button
-              className="icon-pill"
-              type="button"
-              onClick={cycle}
-              aria-label={`Theme: ${themeLabels[mode]}. Click to switch.`}
-              title={`Theme: ${themeLabels[mode]}`}
-            >
-              <ThemeIcon size={16} aria-hidden="true" />
-              <span>{themeLabels[mode]}</span>
-            </button>
-            <a
-              className={`icon-pill top-pill${showTop ? "" : " is-hidden"}`}
-              href="#top"
-              aria-label="Back to top"
-              aria-hidden={showTop ? undefined : true}
-              tabIndex={showTop ? 0 : -1}
-            >
-              <ArrowUp size={16} aria-hidden="true" />
-              <span>Top</span>
-            </a>
-          </nav>
-        </div>
-      </div>
-    </footer>
   );
 }
 

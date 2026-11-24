@@ -12,7 +12,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { CommandCard, FooterIslands, TopNav, repo, discord } from "./components";
+import { CommandCard, TopNav, repo, discord } from "./components";
 
 // Real Material 3 Expressive shape library subset (decorative/icon use only).
 const SHAPES = ["circle", "arch", "clover4", "flower", "sunny", "cookie6"] as const;
@@ -278,7 +278,6 @@ export default function Home() {
         </div>
       </section>
 
-      <FooterIslands />
     </main>
   );
 }
