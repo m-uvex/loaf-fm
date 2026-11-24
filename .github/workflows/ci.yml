@@ -10,27 +10,45 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    # Oldest Qt we ship to (Ubuntu 24.04 = Qt 6.4), same as the nightly, so
+    # QML that only loads on newer Qt fails here instead of in the nightly.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@31.11.3
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
 
-      - name: Restore and save Nix store
-        uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock', '**/Cargo.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 8G
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-last-accessed: P7D
-          purge-primary-key: never
+      - name: Install Qt6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build mold pkg-config \
+            qt6-base-dev qt6-declarative-dev qt6-l10n-tools libqt6quick6 \
+            qml6-module-qtqml qml6-module-qtqml-workerscript qml6-module-qtquick \
+            qml6-module-qtquick-controls qml6-module-qtquick-layouts \
+            qml6-module-qtquick-templates qml6-module-qtquick-shapes \
+            qml6-module-qtquick-window qml6-module-qtquick-dialogs \
+            libgl1-mesa-dev libgl1-mesa-dri libxkbcommon-dev libvulkan-dev xvfb \
+            p7zip-full zip unzip shared-mime-info
+          echo "LRELEASE=/usr/lib/qt6/bin/lrelease" >> "$GITHUB_ENV"
 
       - name: Build and run tests
-        run: nix develop --command cargo test
+        run: cargo test
+
+      - name: Launch check
+        run: |
+          cargo build
+          xvfb-run -a ./target/debug/loaf --new-window /tmp > /tmp/loaf-smoke.log 2>&1 &
+          PID=$!
+          sleep 6
+          cat /tmp/loaf-smoke.log
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "::error::Loaf exited during startup"
+            exit 1
+          fi
+          kill "$PID" || true
+          if grep -Eiq "fatal|failed to load component|segmentation fault" /tmp/loaf-smoke.log; then
+            echo "::error::QML failed to load"
+            exit 1
+          fi
