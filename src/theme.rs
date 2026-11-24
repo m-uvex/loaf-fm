@@ -1051,6 +1051,8 @@ enum SourceKind {
     JsonFile,
     /// KDE `kdeglobals` accent / window colors.
     Kde,
+    /// A wallpaper image; the palette is seeded from its dominant colour.
+    Image,
 }
 
 /// A single detected wallpaper palette source.
@@ -1131,7 +1133,28 @@ pub fn wallpaper_color_sources(home: &Path) -> Vec<WallpaperSourceEntry> {
         }
     }
 
-    // KDE fallback.
+    // The actual wallpaper image, from whichever wallpaper tool is running.
+    // Live daemons first, then desktop environments' saved wallpaper.
+    let image_sources: [(&str, &str, Option<PathBuf>); 5] = [
+        ("hyprpaper", "hyprpaper", hyprpaper_wallpaper(home)),
+        ("awww", "awww", awww_wallpaper()),
+        ("swaybg", "swaybg", swaybg_wallpaper()),
+        ("kde-wallpaper", "KDE Plasma wallpaper", kde_wallpaper(home)),
+        ("gnome-wallpaper", "GNOME wallpaper", gnome_wallpaper()),
+    ];
+    for (id, label, path) in image_sources {
+        if let Some(path) = path.filter(|p| p.is_file()) {
+            out.push(WallpaperSourceEntry {
+                id: id.to_string(),
+                label: label.to_string(),
+                mtime: wallpaper_mtime(&path),
+                path: path.to_string_lossy().into_owned(),
+                kind: SourceKind::Image,
+            });
+        }
+    }
+
+    // KDE accent fallback.
     let kde_path = home.join(".config/kdeglobals");
     if kde_path.is_file() {
         out.push(WallpaperSourceEntry {
@@ -1165,7 +1188,187 @@ fn load_source(entry: &WallpaperSourceEntry) -> Option<String> {
             )
         }
         SourceKind::Kde => kde_accent_palette(),
+        SourceKind::Image => {
+            let seed = image_seed_cached(&entry.path, entry.mtime)?;
+            Some(normalize_wallpaper_colors(
+                &serde_json::json!({ "primary": seed }).to_string(),
+            ))
+        }
     }
+}
+
+/// Seed colour for an image, cached by (path, mtime) so polling stays cheap.
+fn image_seed_cached(path: &str, mtime: u64) -> Option<String> {
+    use std::sync::Mutex;
+    static CACHE: Mutex<Option<(String, u64, String)>> = Mutex::new(None);
+    let mut cache = CACHE.lock().ok()?;
+    if let Some((p, m, seed)) = cache.as_ref() {
+        if p == path && *m == mtime {
+            return Some(seed.clone());
+        }
+    }
+    let seed = crate::native::ffi::image_seed_color(path);
+    if seed.is_empty() {
+        return None;
+    }
+    *cache = Some((path.to_string(), mtime, seed.clone()));
+    Some(seed)
+}
+
+fn expand_home(raw: &str, home: &Path) -> PathBuf {
+    let raw = raw.trim().trim_matches('"').trim_matches('\'');
+    let raw = raw.strip_prefix("file://").unwrap_or(raw);
+    match raw.strip_prefix("~/") {
+        Some(rest) => home.join(rest),
+        None => PathBuf::from(raw),
+    }
+}
+
+fn command_stdout(program: &str, args: &[&str]) -> Option<String> {
+    let bin = crate::util::which(program)?;
+    let out = std::process::Command::new(bin)
+        .args(args)
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// hyprpaper: ask the running daemon via `hyprctl`, else read its config.
+fn hyprpaper_wallpaper(home: &Path) -> Option<PathBuf> {
+    if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+        if let Some(out) = command_stdout("hyprctl", &["hyprpaper", "listactive"]) {
+            if let Some(p) = parse_hyprpaper_active(&out) {
+                return Some(expand_home(&p, home));
+            }
+        }
+    }
+    let conf = fs::read_to_string(home.join(".config/hypr/hyprpaper.conf")).ok()?;
+    parse_hyprpaper_conf(&conf).map(|p| expand_home(&p, home))
+}
+
+/// `hyprctl hyprpaper listactive` lines look like `DP-1 = /path/img.png`.
+pub fn parse_hyprpaper_active(out: &str) -> Option<String> {
+    out.lines()
+        .filter_map(|l| l.split_once(" = ").map(|(_, p)| p.trim().to_string()))
+        .find(|p| !p.is_empty())
+}
+
+/// hyprpaper.conf: `wallpaper = monitor,path` (classic) or a
+/// `wallpaper { path = ... }` block (0.8+).
+pub fn parse_hyprpaper_conf(conf: &str) -> Option<String> {
+    let mut in_block = false;
+    for line in conf.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        if line.starts_with("wallpaper") && line.ends_with('{') {
+            in_block = true;
+            continue;
+        }
+        if in_block && line == "}" {
+            in_block = false;
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else { continue };
+        let (key, value) = (key.trim(), value.trim());
+        if in_block && key == "path" && !value.is_empty() {
+            return Some(value.to_string());
+        }
+        if !in_block && key == "wallpaper" {
+            if let Some((_, path)) = value.split_once(',') {
+                if !path.trim().is_empty() {
+                    return Some(path.trim().to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// awww (formerly swww): `awww query` reports `... image: /path` per output.
+fn awww_wallpaper() -> Option<PathBuf> {
+    let out = command_stdout("awww", &["query"]).or_else(|| command_stdout("swww", &["query"]))?;
+    parse_awww_query(&out).map(PathBuf::from)
+}
+
+pub fn parse_awww_query(out: &str) -> Option<String> {
+    out.lines()
+        .filter_map(|l| l.split_once("image: ").map(|(_, p)| p.trim().to_string()))
+        .find(|p| !p.is_empty())
+}
+
+/// swaybg has no IPC; read the image argument of the running process.
+fn swaybg_wallpaper() -> Option<PathBuf> {
+    for entry in fs::read_dir("/proc").ok()?.flatten() {
+        let dir = entry.path();
+        if !fs::read_to_string(dir.join("comm")).is_ok_and(|c| c.trim() == "swaybg") {
+            continue;
+        }
+        let Ok(raw) = fs::read(dir.join("cmdline")) else { continue };
+        let args: Vec<String> = raw
+            .split(|b| *b == 0)
+            .map(|a| String::from_utf8_lossy(a).into_owned())
+            .collect();
+        if let Some(p) = parse_swaybg_args(&args) {
+            return Some(PathBuf::from(p));
+        }
+    }
+    None
+}
+
+pub fn parse_swaybg_args(args: &[String]) -> Option<String> {
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        if a == "-i" || a == "--image" {
+            return it.next().cloned();
+        }
+        if let Some(p) = a.strip_prefix("--image=") {
+            return Some(p.to_string());
+        }
+    }
+    None
+}
+
+/// KDE Plasma: the image plugin's `Image=` in the desktop applets config.
+fn kde_wallpaper(home: &Path) -> Option<PathBuf> {
+    let conf = fs::read_to_string(home.join(".config/plasma-org.kde.plasma.desktop-appletsrc")).ok()?;
+    parse_kde_appletsrc(&conf).map(|p| expand_home(&p, home))
+}
+
+pub fn parse_kde_appletsrc(conf: &str) -> Option<String> {
+    let mut in_image = false;
+    for line in conf.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_image = line.ends_with("[Wallpaper][org.kde.image][General]");
+            continue;
+        }
+        if in_image {
+            if let Some(v) = line.strip_prefix("Image=") {
+                if !v.is_empty() {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// GNOME: `picture-uri-dark` in dark mode, else `picture-uri`.
+fn gnome_wallpaper() -> Option<PathBuf> {
+    let dark = command_stdout("gsettings", &["get", "org.gnome.desktop.interface", "color-scheme"])
+        .map(|s| s.contains("dark"))
+        .unwrap_or(false);
+    let keys: &[&str] = if dark { &["picture-uri-dark", "picture-uri"] } else { &["picture-uri"] };
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    for key in keys {
+        if let Some(out) = command_stdout("gsettings", &["get", "org.gnome.desktop.background", key]) {
+            let p = expand_home(&out, &home);
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+    None
 }
 
 /// Returns (source_path, content, mtime_secs) for the first readable palette source.
@@ -1254,6 +1457,36 @@ mod tests {
         let adjusted = ensure_contrast("#606060", "#101010", 4.5, true);
         let adj_rgb = parse_hex(&adjusted).expect("parse adjusted hex");
         assert!(contrast_ratio(adj_rgb, (16, 16, 16)) >= 4.5);
+    }
+
+    #[test]
+    fn parses_wallpaper_tool_outputs() {
+        assert_eq!(
+            parse_hyprpaper_active("DP-1 = /w/a.png\neDP-1 = /w/b.png\n").as_deref(),
+            Some("/w/a.png")
+        );
+        assert_eq!(
+            parse_hyprpaper_conf("preload = ~/w.jpg\nwallpaper = ,~/w.jpg\n").as_deref(),
+            Some("~/w.jpg")
+        );
+        assert_eq!(
+            parse_hyprpaper_conf("wallpaper {\n    monitor = DP-1\n    path = ~/x.png # hi\n}\n").as_deref(),
+            Some("~/x.png")
+        );
+        assert_eq!(
+            parse_awww_query("eDP-1: 1920x1080, scale: 1, currently displaying: image: /w/c.jpg\n").as_deref(),
+            Some("/w/c.jpg")
+        );
+        let args: Vec<String> = ["swaybg", "-m", "fill", "-i", "/w/d.png"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(parse_swaybg_args(&args).as_deref(), Some("/w/d.png"));
+        assert_eq!(
+            parse_kde_appletsrc("[Containments][1][Wallpaper][org.kde.image][General]\nImage=file:///w/e.png\n").as_deref(),
+            Some("file:///w/e.png")
+        );
+        assert_eq!(
+            expand_home("'file:///w/f.png'\n", Path::new("/h")),
+            PathBuf::from("/w/f.png")
+        );
     }
 
     #[test]

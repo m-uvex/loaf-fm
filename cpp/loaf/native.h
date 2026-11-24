@@ -236,6 +236,10 @@ public:
 rust::String mime_type_for(rust::Str path, bool sniff);
 rust::String mime_comment_for(rust::Str mime);
 
+// Dominant vivid colour of an image as "#rrggbb" (empty on failure). Used to
+// seed the wallpaper palette when only the wallpaper image is known.
+rust::String image_seed_color(rust::Str path);
+
 // Sets the application name / desktop file id (Wayland app id, X11 window
 // class) from `window_class`.
 void set_application_identity(rust::Str version, rust::Str window_class);

@@ -6,6 +6,7 @@
 #include "m3shapes/shapes.h"
 
 #include <fcntl.h>
+#include <cmath>
 #include <memory>
 #include <unistd.h>
 #include <qqml.h>
@@ -28,6 +29,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QImage>
+#include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -1015,6 +1018,52 @@ rust::String mime_comment_for(rust::Str mime)
 {
     static QMimeDatabase db;
     return toRust(db.mimeTypeForName(toQString(mime)).comment());
+}
+
+rust::String image_seed_color(rust::Str path)
+{
+    QImageReader reader(toQString(path));
+    reader.setAutoTransform(true);
+    const QSize full = reader.size();
+    if (full.isValid() && (full.width() > 128 || full.height() > 128))
+        reader.setScaledSize(full.scaled(128, 128, Qt::KeepAspectRatio));
+    const QImage img = reader.read().convertToFormat(QImage::Format_RGB32);
+    if (img.isNull())
+        return rust::String();
+
+    // Hue histogram weighted by chroma, so the most present *vivid* colour
+    // wins over large grey areas; mid lightness counts most.
+    constexpr int kBins = 36;
+    double weight[kBins] = {};
+    double sumR[kBins] = {}, sumG[kBins] = {}, sumB[kBins] = {};
+    double allR = 0, allG = 0, allB = 0;
+    int count = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(img.constScanLine(y));
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c(line[x]);
+            allR += c.red(); allG += c.green(); allB += c.blue(); ++count;
+            const float s = c.hslSaturationF(), l = c.lightnessF();
+            const int h = c.hslHue();
+            if (h < 0 || s < 0.15f || l < 0.12f || l > 0.9f)
+                continue;
+            const double w = s * (1.0 - std::abs(l - 0.5) * 1.6);
+            const int bin = std::min(kBins - 1, h * kBins / 360);
+            weight[bin] += w;
+            sumR[bin] += c.red() * w; sumG[bin] += c.green() * w; sumB[bin] += c.blue() * w;
+        }
+    }
+    if (count == 0)
+        return rust::String();
+    int best = 0;
+    for (int i = 1; i < kBins; ++i)
+        if (weight[i] > weight[best]) best = i;
+    QColor out;
+    if (weight[best] > count * 0.01)
+        out = QColor(int(sumR[best] / weight[best]), int(sumG[best] / weight[best]), int(sumB[best] / weight[best]));
+    else
+        out = QColor(int(allR / count), int(allG / count), int(allB / count)); // mostly grey image
+    return toRust(out.name(QColor::HexRgb));
 }
 
 // True when the saved window opacity is below 1. Only then does the window

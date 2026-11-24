@@ -2533,6 +2533,16 @@ Item {
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
             core.reload_wallpaper_colors();
     }
+    // Wallpaper tools (hyprpaper, awww, swaybg, ...) don't announce changes,
+    // so re-check periodically while the wallpaper palette is in use. The
+    // image colour is cached by path + mtime, so a quiet check is cheap.
+    property Timer wallpaperPoll: Timer {
+        interval: 10000
+        repeat: true
+        running: theme.accentName === "wallpaper"
+        onTriggered: if (typeof core !== "undefined" && core) core.reload_wallpaper_colors()
+    }
+
     onWallpaperPaletteSourceChanged: {
         writeSetting("wallpaperPaletteSource", wallpaperPaletteSource);
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
