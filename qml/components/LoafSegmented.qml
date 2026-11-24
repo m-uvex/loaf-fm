@@ -145,20 +145,16 @@ Item {
 
                         opacity: isDisabled ? 0.4 : 1.0
 
-                        Rectangle {
+                        SideRoundedRect {
                             anchors.fill: parent
                             color: segItem.isCurrent ? theme.primary
                                 : (segMouse.containsMouse ? Qt.lighter(theme.surfaceContainerHighest, 1.12) : theme.surfaceContainerHighest)
-                            topLeftRadius: segItem.first ? segItem.outer : segItem.inner
-                            bottomLeftRadius: segItem.first ? segItem.outer : segItem.inner
-                            topRightRadius: segItem.last ? segItem.outer : segItem.inner
-                            bottomRightRadius: segItem.last ? segItem.outer : segItem.inner
+                            leftRadius: segItem.first ? segItem.outer : segItem.inner
+                            rightRadius: segItem.last ? segItem.outer : segItem.inner
 
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                            Behavior on topLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                            Behavior on bottomLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                            Behavior on topRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                            Behavior on bottomRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            Behavior on leftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            Behavior on rightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                         }
 
                         Row {

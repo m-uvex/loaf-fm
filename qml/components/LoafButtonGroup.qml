@@ -85,19 +85,15 @@ Item {
                 readonly property color fgColor: variant === "filled" ? theme.primaryFg
                     : variant === "danger" ? theme.danger : theme.secondaryContainerFg
 
-                Rectangle {
+                SideRoundedRect {
                     anchors.fill: parent
                     color: mouse.containsMouse ? Qt.lighter(slot.bgColor, 1.12) : slot.bgColor
-                    topLeftRadius: slot.first ? slot.outer : slot.inner
-                    bottomLeftRadius: slot.first ? slot.outer : slot.inner
-                    topRightRadius: slot.last ? slot.outer : slot.inner
-                    bottomRightRadius: slot.last ? slot.outer : slot.inner
+                    leftRadius: slot.first ? slot.outer : slot.inner
+                    rightRadius: slot.last ? slot.outer : slot.inner
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: 120 } }
-                    Behavior on topLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                    Behavior on bottomLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                    Behavior on topRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                    Behavior on bottomRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                    Behavior on leftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                    Behavior on rightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 }
 
                 Row {
@@ -144,10 +140,7 @@ Item {
                     color: "transparent"
                     border.width: 2
                     border.color: theme.primary
-                    topLeftRadius: slot.first ? slot.outer + 2 : slot.inner + 2
-                    bottomLeftRadius: slot.first ? slot.outer + 2 : slot.inner + 2
-                    topRightRadius: slot.last ? slot.outer + 2 : slot.inner + 2
-                    bottomRightRadius: slot.last ? slot.outer + 2 : slot.inner + 2
+                    radius: (slot.first || slot.last ? slot.outer : slot.inner) + 2
                 }
 
                 MouseArea {
