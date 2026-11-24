@@ -8,7 +8,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 
 ## Navigation & Views
 - [ ] **Miller Columns (Cascading View)**: Hierarchical column-by-column browsing mode (like macOS Finder / Yazi) for rapid drill-down directory traversal.
-- [ ] **Per-Folder View Preferences**: (togglable in settings) Remember layout preferences per directory with auto-detection (e.g. automatic large thumbnail grid for `Pictures` and `Videos`, compact list/table view for code and documents).
+- [~] **Per-Folder View Preferences**: (togglable in settings) Remember layout preferences per directory with auto-detection (e.g. automatic large thumbnail grid for `Pictures` and `Videos`, compact list/table view for code and documents). (Per-folder and universal view scopes that cascade down the folder tree are done; auto-detection by folder type is not.)
 - [ ] **Pictures Gallery View**: Dedicated gallery view for `Pictures/` and any subdirectories, displaying all images in a large gallery layout with a bottom pane/window for any non-picture files.
 - [ ] **Bookshelf View (`~/Games` default)**: Horizontally scrollable bookshelf layout for games/roms where directories render as physical disc covers with titles and metadata printed sideways on their spines.
 - [ ] **Minecraft Folder Specific View**: Special launcher-like categorized workspace layout inside any Minecraft directory to neatly organize screenshots, worlds, and mods.
@@ -20,8 +20,8 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
   - [ ] **Split-View Safe Page Routing**: Automatically open singleton full-page views (like Settings and "This PC") in a dedicated new tab when split view is active to avoid breaking the split pane layout.
 - [~] **Quick Look / File Preview & Right Sidebar**: Instant preview panel / overlay (Spacebar trigger) and dedicated collapsible right sidebar with file info and preview.
   - [ ] **Multi-Format QuickLook Expansion**: Interactive video playback (MP4/GIF), rich PDF page rendering, and audio playback in Spacebar Quick Look.
-  - [ ] **Rich Code Syntax Highlighting**: Expand file preview parser with syntax-highlighted and formatted rendering for common languages and config files.
-  - [ ] **Markdown Live Preview**: Render formatted Markdown `.md` text with headers, tables, links, and code blocks directly in QuickLook.
+  - [x] **Rich Code Syntax Highlighting**: Expand file preview parser with syntax-highlighted and formatted rendering for common languages and config files.
+  - [x] **Markdown Live Preview**: Render formatted Markdown `.md` text with headers, tables, links, and code blocks directly in QuickLook.
 - [~] **Tabs & Experimental Vertical Tabs**: Tabbed browsing interface with support for an experimental vertical tabs layout mode. (Tabs done; vertical tabs not yet.)
 - [ ] **Alternative View Experiments**:
   - [ ] 2D infinite canvas / plane view (spatial Apple-Watch-style bubble view sorted outwards from the center by date/criteria).
@@ -44,7 +44,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Localization & Internationalization
-- [~] **Multi-Language Support (i18n)**: Full localization pipeline supporting multiple UI languages, locale-aware date/number formatting, and right-to-left layout support. (PR #103 wires Qt Linguist `.ts`/`.qm` pipeline, dynamic runtime language switching, and `languages.json` picker).
+- [x] **Multi-Language Support (i18n)**: Full localization pipeline supporting multiple UI languages, locale-aware date/number formatting, and right-to-left layout support. (PR #103, merged: Qt Linguist `.ts`/`.qm` pipeline, dynamic runtime language switching, and `languages.json` picker).
 - [ ] **Crowdsourced Translation Platform**: Connect repository to an open-source translation platform (Weblate or Crowdin) so community members can translate strings across the app from their browser, with automated PR/commit synchronization of `translations/loaf_*.ts` catalogues.
 
 ---
@@ -88,9 +88,9 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [~] **Custom Color Palette / User Config**: Preset accent palettes exist, but user-defined custom color tokens / config file planned.
   - [ ] **Palette Creator, Manager & Sharing**: In-app UI to build custom M3-compliant color palettes, save them locally, and export/import/share palette presets (JSON or sharing link).
   - [ ] **Custom Theme Files & Sharing**: Load and save custom `.theme` / `.json` palettes from `~/.config/loaf/themes/` to easily rice and share.
-- [ ] **Custom Font Selection**: Setting in Interface -> Appearance to choose custom or system fonts (e.g. OpenDyslexic, Inter, system UI font) rather than hardcoded fonts.
+- [x] **Custom Font Selection**: Setting in Interface -> Appearance to choose custom or system fonts (e.g. OpenDyslexic, Inter, system UI font) rather than hardcoded fonts.
 - [ ] **Compositor Window Blur**: Wayland compositor background blur protocol support (`ext-background-effect-v1` / `org_kde_kwin_blur`) for translucent window backing.
-- [ ] **Customizable Toolbar & Layout**: Configurable toolbar actions and adjustable layout density.
+- [~] **Customizable Toolbar & Layout**: Configurable toolbar actions and adjustable layout density. (Layout density done; toolbar actions not yet.)
 - [x] **Header Hierarchy & Layout Polish**: Branding badge vs breadcrumb path toggle and polish.
 - [~] **Mini / Compact Mode**: Ultra-compact layout mode showing only essential information for minimalist workflows. (`--mini` starts with a collapsed sidebar and smaller icons.)
 - [x] **Background Opacity Control**: Adjustable background opacity with opaque text and icons; desktop compositor supplies blur. See [usage and checks](docs/background-opacity.md).
@@ -100,7 +100,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 
 ## Sidebar & Context Menu Customization
 - [x] **Sidebar Customization**: Reorder, add, or remove items (including "Any file" and default places) and manage storage/remote devices.
-- [ ] **Context Menu Editor**: Customizer to enable, disable, or reorder any button in context menus for complete decluttering.
+- [x] **Context Menu Editor**: Customizer to enable, disable, or reorder any button in context menus for complete decluttering.
 
 ---
 
@@ -109,7 +109,7 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 - [x] **Automatic SMB Discovery**: Detect SMB/CIFS servers and shares on the local network without manual host entry, using mDNS/Avahi, WS-Discovery, and NetBIOS name resolution, and surface discovered hosts in the sidebar and "This PC" network section.
   - [x] **Discovery Toggle & Refresh**: Setting to enable/disable LAN scanning, plus manual refresh and an ignore list for unwanted hosts.
   - [x] **One-Click Add from Discovery**: Turn a discovered server/share into a saved SMB profile with prompted credentials, then mount it directly.
-- [~] **Remote Protocols & Cloud Services**: WebDAV cloud storage mounted natively; SFTP, FTP, NFS, Google Drive, and Microsoft OneDrive planned.
+- [~] **Remote Protocols & Cloud Services**: WebDAV cloud storage mounted natively; active rclone mounts detected with disk usage and copy/move-to-remote actions; SFTP, FTP, NFS, Google Drive, and Microsoft OneDrive planned.
 - [x] **Keyring Integration**: Secure password storage in system keyring for SMB and encrypted volumes.
 
 ---
@@ -125,11 +125,12 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Integrations & Context Actions
+- [x] **Default Applications Settings**: One row per file type in Behavior → Default Applications, each with its own app picker and a System default option. Common types (folders, text, PDF, images, video, audio, HTML, archives) are always listed; less common types appear once opened in Loaf. Archive rows show only when "Opening archives" is set to Default App.
 - [x] **Custom Terminal Emulator Selection**: User setting in Behavior → Default Applications to configure the preferred installed terminal emulator for "Open in Terminal".
 - [ ] **Integrated Terminal**: Embedded terminal panel that opens directly inside Loaf, styled to match the active theme.
 - [ ] **Direct File Viewer & Editor**: In-app viewing and lightweight editing support for documents and markup (e.g. `.md`).
 - [ ] **Syncthing Integration**: Native integration with Syncthing to show folder sync status, manage shared folders, and control sync settings directly inside Loaf.
-- [ ] **Device Sharing (LocalSend, KDE Connect & Bluetooth)**: Send selected files directly to local devices via LocalSend, KDE Connect, or Bluetooth file transfer.
+- [~] **Device Sharing (LocalSend, KDE Connect & Bluetooth)**: Send selected files directly to local devices via LocalSend, KDE Connect, or Bluetooth file transfer. (KDE Connect done: paired devices show as drives and files can be shared to them; LocalSend and Bluetooth not yet.)
 - [x] **Share via Link (Local Host / Cloudflare Tunnel)**: Instant peer-to-peer link sharing served directly from the user's machine via an on-demand Cloudflare Tunnel without third-party cloud storage limits. Includes configurable compression (.zip, .7z, .tar.gz), optional password encryption, link expiration, bandwidth throttling, and an active shares manager.
 - [ ] **Share via Link (Dedicated Server / Cloud Backend)**: Upload-and-host file sharing to a dedicated backend server (e.g. self-hosted on home server or VPS) with automatic 24-hour expiration sweeps, chunked streaming for 10–50GB+ large files, and direct download links.
 - [ ] **Custom & Pickable Share URLs**: Ability to select from multiple public URL formats and custom domains when sharing (e.g. default trycloudflare tunnel URL, `loaf.muvex.dev/send/<filename>`, `muvex.dev/loafshare/<filename>`, and custom branded variants).
@@ -148,4 +149,5 @@ Legend: `[x]` done, `[~]` partial / missing a piece, `[ ]` not started
 ---
 
 ## Web & Landing Page
-- [ ] **Landing Page (`loaf.muvex.dev`)**: Build and publish a clean landing page website for `loaf` at `loaf.muvex.dev`.
+- [x] **Landing Page (`loaf.muvex.dev`)**: Build and publish a clean landing page website for `loaf` at `loaf.muvex.dev`. (Live from the `website` branch: home, install, and gallery pages.)
+  - [ ] **New App Icon on the Site**: Swap the favicon and logo badge for the new duotone bread icon.
