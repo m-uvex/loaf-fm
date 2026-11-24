@@ -303,7 +303,7 @@ ColumnLayout {
 
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                         RowLayout {
                             anchors.fill: parent
@@ -505,7 +505,7 @@ ColumnLayout {
                         border.color: theme.iconColor === modelData.value ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
                         scale: swatchDotMouse.pressed ? 0.9 : (swatchDotMouse.containsMouse ? 1.12 : 1.0)
 
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                         Behavior on border.width { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
 
                         LoafIcon {

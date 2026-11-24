@@ -2001,7 +2001,7 @@ ApplicationWindow {
                 border.width: searchInput.activeFocus ? 2 : 1
                 border.color: searchInput.activeFocus ? theme.primary : theme.outlineAlpha(theme.outlineVariant)
 
-                Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
+                Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
@@ -2343,7 +2343,7 @@ ApplicationWindow {
                 id: sidebar
                 Layout.fillHeight: true
                 Layout.preferredWidth: implicitWidth
-                Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                Behavior on Layout.preferredWidth { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 activeId: {
                     if (window.activeView === "settings")
                         return "settings";
@@ -2637,7 +2637,7 @@ ApplicationWindow {
                         readonly property real gap: 14
                         // 0 = single pane, 1 = two equal panes
                         property real split: window.splitView ? 1 : 0
-                        Behavior on split { enabled: theme.animate; SpringAnimation { spring: 3.6; damping: 0.4; epsilon: 0.002 } }
+                        Behavior on split { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping; epsilon: 0.002 } }
                         readonly property real rightWidth: Math.max(0, Math.round((width - gap) / 2 * split))
                         readonly property real leftWidth: width - (rightWidth > 0 ? rightWidth + gap * Math.min(1, split) : 0)
 

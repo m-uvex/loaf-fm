@@ -39,7 +39,7 @@ RadioButton {
             scale: control.hovered ? 1.08 : 1.0
 
             Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: 150 } }
-            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4; damping: 0.4 } }
+            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
             Rectangle {
                 anchors.centerIn: parent

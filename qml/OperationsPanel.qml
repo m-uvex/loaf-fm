@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as Basic
+import M3Shapes
 import app.loaf
 
 // Bottom-right progress pill for running file operations; click to expand
@@ -52,6 +53,32 @@ Item {
 
         Item {
             width: 24; height: 24
+
+            // M3 Expressive loading indicator: a small shape that keeps
+            // morphing through the official sequence and turning while work
+            // runs; the ring around it still shows real progress.
+            MaterialShape {
+                id: loadingShape
+                anchors.centerIn: parent
+                width: 12; height: 12
+                readonly property var sequence: [MaterialShape.SoftBurst, MaterialShape.Cookie9Sided,
+                    MaterialShape.Pentagon, MaterialShape.Pill, MaterialShape.Sunny,
+                    MaterialShape.Cookie4Sided, MaterialShape.Oval]
+                property int step: 0
+                shape: sequence[step]
+                color: theme.primary
+                animationDuration: theme.animate ? 650 : 0
+                Timer {
+                    interval: 650; repeat: true
+                    running: panel.visible && panel.ops.length > 0 && theme.animate
+                    onTriggered: loadingShape.step = (loadingShape.step + 1) % loadingShape.sequence.length
+                }
+                RotationAnimator on rotation {
+                    running: panel.visible && panel.ops.length > 0 && theme.animate
+                    from: 0; to: 360; duration: 4550; loops: Animation.Infinite
+                }
+            }
+
             Canvas {
                 id: ring
                 anchors.fill: parent

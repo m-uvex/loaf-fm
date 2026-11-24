@@ -529,7 +529,7 @@ Item {
                         color: theme.primaryContainer
                         animationDuration: theme.animate ? 350 : 0
                         rotation: heroMouse.containsMouse ? 30 : 0
-                        Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.0; damping: 0.25 } }
+                        Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springDefault; damping: theme.springDefaultDamping } }
                     }
                     MaterialShape {
                         width: 30; height: 30
@@ -538,7 +538,7 @@ Item {
                         color: theme.tertiaryContainer
                         animationDuration: theme.animate ? 350 : 0
                         rotation: heroMouse.containsMouse ? -45 : 0
-                        Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.0; damping: 0.25 } }
+                        Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springDefault; damping: theme.springDefaultDamping } }
                     }
                     Rectangle {
                         width: 14; height: 14; radius: 7
@@ -768,7 +768,7 @@ Item {
                                     color: placeMouse.containsMouse ? theme.surfaceContainerHigh : theme.surfaceContainer
                                     scale: placeMouse.pressed ? 0.95 : (placeMouse.containsMouse ? 1.02 : 1.0)
                                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.32 } }
+                                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                                     ColumnLayout {
                                         anchors.centerIn: parent
@@ -786,7 +786,7 @@ Item {
                                                 color: pcView.placeContainer(index)
                                                 animationDuration: theme.animate ? 350 : 0
                                                 rotation: placeMouse.containsMouse ? 45 : 0
-                                                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.26 } }
+                                                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springDefault; damping: theme.springDefaultDamping } }
                                             }
                                             LoafIcon {
                                                 anchors.centerIn: parent
@@ -836,7 +836,7 @@ Item {
                                 color: cPlaceMouse.containsMouse ? theme.surfaceContainerHigh : theme.surfaceContainer
                                 scale: cPlaceMouse.pressed ? 0.95 : 1.0
                                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                                 RowLayout {
                                     anchors.fill: parent
@@ -854,7 +854,7 @@ Item {
                                             color: pcView.placeContainer(index)
                                             animationDuration: theme.animate ? 350 : 0
                                             rotation: cPlaceMouse.containsMouse ? 45 : 0
-                                            Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.26 } }
+                                            Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springDefault; damping: theme.springDefaultDamping } }
                                         }
                                         LoafIcon {
                                             anchors.centerIn: parent
@@ -907,7 +907,7 @@ Item {
                                 color: theme.surfaceContainer
                                 opacity: freqCMouse.containsMouse ? 1.0 : 0.85
                                 scale: freqCMouse.pressed ? 0.95 : 1.0
-                                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                                 RowLayout {
                                     id: freqCardRow
@@ -948,7 +948,7 @@ Item {
                                     color: theme.surfaceContainer
                                     opacity: freqGMouse.containsMouse ? 1.0 : 0.85
                                     scale: freqGMouse.pressed ? 0.95 : 1.0
-                                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                                     RowLayout {
                                         anchors.centerIn: parent

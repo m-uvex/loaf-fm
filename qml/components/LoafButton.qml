@@ -33,10 +33,11 @@ Item {
     Layout.preferredWidth: implicitWidth
 
     opacity: enabled ? 1.0 : 0.45
-    transformOrigin: Item.Center
-    scale: mouse.pressed ? 0.95 : 1.0
 
-    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+    // M3 Expressive shape morph: round at rest, square when toggled on,
+    // and corners tighten while pressed (small button: 8dp pressed, 12dp
+    // selected), on the fast spatial spring.
+    readonly property real cornerRadius: mouse.pressed ? 8 : (checked ? 12 : height / 2)
 
     readonly property color bgColor: {
         switch (variant) {
@@ -75,7 +76,8 @@ Item {
         anchors.topMargin: 3
         anchors.leftMargin: 1
         anchors.rightMargin: 1
-        radius: theme.radiusFull
+        radius: root.cornerRadius
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         color: theme.outlineVariant
         opacity: 0.55
     }
@@ -83,12 +85,13 @@ Item {
     Rectangle {
         id: bg
         anchors.fill: parent
-        radius: theme.radiusFull
+        radius: root.cornerRadius
         color: mouse.containsMouse ? root.hoverBg : root.bgColor
         border.width: root.variant === "outlined" ? 1 : 0
         border.color: theme.outlineAlpha(theme.outline)
 
         Behavior on color { enabled: theme.animate; ColorAnimation { duration: 120 } }
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
     }
 
     RowLayout {

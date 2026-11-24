@@ -176,11 +176,11 @@ Rectangle {
 
         Behavior on y {
             enabled: theme.animate && !placeList.moving && !placeList.flicking
-            SpringAnimation { spring: 4.2; damping: 0.38 }
+            SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping }
         }
         Behavior on width {
             enabled: theme.animate
-            SpringAnimation { spring: 3.5; damping: 0.35 }
+            SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping }
         }
         Behavior on opacity {
             enabled: theme.animate
@@ -251,7 +251,7 @@ Rectangle {
                 radius: 22
                 color: headerToggleItem.isHovered ? theme.hoverOverlay : "transparent"
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
             }
 
             RowLayout {
@@ -274,7 +274,7 @@ Rectangle {
                         opacity: rail.expanded ? 0.0 : 1.0
                         scale: rail.expanded ? 0.65 : 1.0
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.45 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                     }
 
                     LoafIcon {
@@ -285,7 +285,7 @@ Rectangle {
                         opacity: rail.expanded ? 1.0 : 0.0
                         scale: rail.expanded ? (headerToggleItem.isHovered ? 1.10 : 1.0) : 0.65
                         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                     }
                 }
 
@@ -296,7 +296,7 @@ Rectangle {
                     transformOrigin: Item.Left
                     transform: Translate {
                         x: rail.expanded ? 0 : -10
-                        Behavior on x { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                        Behavior on x { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                     }
                     text: headerToggleItem.isHovered ? qsTr("Collapse") : "Loaf"
                     color: headerToggleItem.isHovered ? theme.primary : theme.textMain
@@ -305,7 +305,7 @@ Rectangle {
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                     Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180 } }
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                 }
             }
@@ -444,7 +444,7 @@ Rectangle {
             clip: true
             opacity: rail.showTrash ? 1.0 : 0.0
 
-            Behavior on Layout.preferredHeight { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+            Behavior on Layout.preferredHeight { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
             Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             RailButton {
@@ -518,7 +518,7 @@ Rectangle {
         implicitHeight: 44
         height: 44
         scale: mouse.pressed ? 0.95 : (mouse.containsMouse ? 1.02 : 1.0)
-        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         activeFocusOnTab: true
         onActiveFocusChanged: {
             if (activeFocus)
@@ -545,7 +545,7 @@ Rectangle {
             border.width: btn.dropHover || btn.activeFocus ? 2 : 0
             border.color: theme.primary
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-            Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+            Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         }
 
         Item {
@@ -555,7 +555,7 @@ Rectangle {
             height: 44
             opacity: btn.dimmed ? 0.45 : 1.0
             scale: mouse.pressed ? 0.88 : (mouse.containsMouse ? 1.10 : 1.0)
-            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
             // Trash empty-on-hover: the row's own icon becomes a button on
             // hover, wrapped in a rotating M3 cookie shape. Only the icon
@@ -570,7 +570,7 @@ Rectangle {
                 opacity: btn.showBroom ? 1.0 : 0.0
                 rotation: btn.showBroom ? 135 : 0
                 color: theme.backdropSurface(theme.surfaceContainer)
-                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 3.2; damping: 0.32 } }
+                Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             }
 
@@ -614,10 +614,10 @@ Rectangle {
             transformOrigin: Item.Left
             transform: Translate {
                 x: btn.showLabel ? 0 : -14
-                Behavior on x { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                Behavior on x { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
             }
             Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 160 } }
-            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
             text: btn.label
             color: btn.selected ? theme.primaryContainerFg : (mouse.containsMouse ? theme.textMain : theme.textMuted)
             font.pixelSize: theme.fs(13)

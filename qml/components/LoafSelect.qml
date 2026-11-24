@@ -37,7 +37,7 @@ Item {
 
     opacity: enabled ? 1.0 : 0.45
     scale: mouse.pressed ? 0.97 : 1.0
-    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
     function openMenu() {
         var p = root.mapToItem(null, 0, root.height + 6);
@@ -106,7 +106,7 @@ Item {
             size: 14
             color: root.open ? theme.primary : theme.textMuted
             rotation: root.open ? 180 : 0
-            Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.35 } }
+            Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         }
     }
 

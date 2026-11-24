@@ -86,7 +86,7 @@ Item {
     Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 140 } }
 
     scale: cardMouse.pressed ? 0.98 : 1.0
-    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.32 } }
+    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
     Rectangle {
         id: card
@@ -156,7 +156,7 @@ Item {
                            : (root.almostFull ? theme.dangerContainer : theme.primaryContainer)
                     animationDuration: theme.animate ? 350 : 0
                     rotation: cardMouse.containsMouse ? 30 : 0
-                    Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: 2.5; damping: 0.28 } }
+                    Behavior on rotation { enabled: theme.animate; SpringAnimation { spring: theme.springDefault; damping: theme.springDefaultDamping } }
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationNormal } }
                 }
 

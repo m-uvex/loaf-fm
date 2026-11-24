@@ -49,7 +49,7 @@ RowLayout {
                     color: theme.primary
                     scale: rowMouse.containsMouse ? 1.15 : 1.0
 
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 5; damping: 0.35 } }
+                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 }
 
                 MouseArea {

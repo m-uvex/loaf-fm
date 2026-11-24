@@ -346,7 +346,7 @@ ColumnLayout {
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                     Behavior on border.color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.3 } }
+                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                     Accessible.role: Accessible.Link
                     Accessible.name: displayName

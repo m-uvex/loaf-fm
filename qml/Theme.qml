@@ -2324,6 +2324,25 @@ Item {
     readonly property real radiusM: 12.0
     readonly property real radiusS: 8.0
 
+    // M3 Expressive motion scheme as Qt SpringAnimation parameters. Qt's
+    // spring/damping are not stiffness/damping-ratio, so each pair was fitted
+    // to the official curve (expressive spatial: fast 800/0.6, default
+    // 380/0.8, slow 200/0.8; effects: 3800, 1600, 800 at damping 1) and
+    // matches it within ~1% RMS. Spatial = position, size, corners, rotation
+    // (overshoots); effects = opacity, colour-ish values (no overshoot).
+    readonly property real springFast: 4.0
+    readonly property real springFastDamping: 0.3
+    readonly property real springDefault: 2.0
+    readonly property real springDefaultDamping: 0.3
+    readonly property real springSlow: 1.0
+    readonly property real springSlowDamping: 0.2
+    readonly property real effectsFast: 10.0
+    readonly property real effectsFastDamping: 0.6
+    readonly property real effectsDefault: 6.0
+    readonly property real effectsDefaultDamping: 0.5
+    readonly property real effectsSlow: 3.0
+    readonly property real effectsSlowDamping: 0.35
+
     readonly property int durationFast: animate ? 150 : 0
     readonly property int durationNormal: animate ? 250 : 0
 

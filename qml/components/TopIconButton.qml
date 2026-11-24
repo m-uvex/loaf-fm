@@ -26,12 +26,18 @@ Item {
         return core.resolve_icon(source, name);
     }
 
+    // M3 Expressive icon button: round at rest, morphs toward a rounded
+    // square while pressed, on the fast spatial spring.
     Rectangle {
         anchors.fill: parent
-        radius: width / 2
-        color: mouseArea.containsMouse ? theme.hoverOverlay : "transparent"
+        radius: mouseArea.pressed ? Math.min(width, height) * 0.3 : Math.min(width, height) / 2
+        color: mouseArea.pressed ? theme.secondaryContainer
+             : (mouseArea.containsMouse ? theme.hoverOverlay : "transparent")
         border.width: button.activeFocus ? 2 : 0
         border.color: theme.primary
+
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+        Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
     }
 
     LoafIcon {

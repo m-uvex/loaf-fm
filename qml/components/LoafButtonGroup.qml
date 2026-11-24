@@ -77,7 +77,7 @@ Item {
 
                 Behavior on width {
                     enabled: theme.animate
-                    SpringAnimation { spring: 9; damping: 0.9; epsilon: 0.25 }
+                    SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping; epsilon: 0.25 }
                 }
 
                 readonly property color bgColor: variant === "filled" ? theme.primary
@@ -94,10 +94,10 @@ Item {
                     bottomRightRadius: slot.last ? slot.outer : slot.inner
 
                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: 120 } }
-                    Behavior on topLeftRadius { enabled: theme.animate; SpringAnimation { spring: 9; damping: 0.9 } }
-                    Behavior on bottomLeftRadius { enabled: theme.animate; SpringAnimation { spring: 9; damping: 0.9 } }
-                    Behavior on topRightRadius { enabled: theme.animate; SpringAnimation { spring: 9; damping: 0.9 } }
-                    Behavior on bottomRightRadius { enabled: theme.animate; SpringAnimation { spring: 9; damping: 0.9 } }
+                    Behavior on topLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                    Behavior on bottomLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                    Behavior on topRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                    Behavior on bottomRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 }
 
                 Row {

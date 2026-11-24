@@ -575,7 +575,7 @@ Item {
     }
 
     property real animZoom: theme.zoom
-    Behavior on animZoom { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.38 } }
+    Behavior on animZoom { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
     readonly property real zoom: animZoom
     // Only the icon follows the zoom: the padding and the two-line name keep
     // their size, so a bigger zoom makes the icons fill the cells.
@@ -1243,7 +1243,7 @@ Item {
                 enabled: visible
                 clip: true
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.42 } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 cellWidth: pane.cellW
                 cellHeight: pane.cellH
                 cacheBuffer: theme.lowPower ? 0 : cellHeight * 2
@@ -1773,7 +1773,7 @@ Item {
                 scale: pane.isList() ? 1.0 : 0.97
                 enabled: visible
                 Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.42 } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 anchors.top: listHeader.bottom
                 anchors.topMargin: 6
                 anchors.left: parent.left

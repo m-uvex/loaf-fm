@@ -122,11 +122,11 @@ Item {
 
                 Behavior on y {
                     enabled: theme.animate
-                    SpringAnimation { spring: 4.2; damping: 0.38 }
+                    SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping }
                 }
                 Behavior on width {
                     enabled: theme.animate
-                    SpringAnimation { spring: 3.5; damping: 0.35 }
+                    SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping }
                 }
                 Behavior on opacity {
                     enabled: theme.animate
@@ -211,7 +211,7 @@ Item {
                         readonly property int tabMatches: settingsView.getTabMatchCount(modelData.id)
 
                         scale: tabMouse.pressed ? 0.95 : (tabMouse.containsMouse ? 1.02 : 1.0)
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                         Rectangle {
                             x: 12
@@ -220,7 +220,7 @@ Item {
                             radius: 22
                             color: (tabItem.isHovered && !tabItem.isCurrent) ? theme.hoverOverlay : "transparent"
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                            Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                            Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                         }
 
                         Item {
@@ -229,7 +229,7 @@ Item {
                             width: 44
                             height: 44
                             scale: tabMouse.pressed ? 0.88 : (tabMouse.containsMouse ? 1.10 : 1.0)
-                            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+                            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                             LoafIcon {
                                 anchors.centerIn: parent
@@ -329,7 +329,7 @@ Item {
                     readonly property int aboutMatches: settingsView.getTabMatchCount("about")
 
                     scale: aboutMouse.pressed ? 0.95 : (aboutMouse.containsMouse ? 1.02 : 1.0)
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.0; damping: 0.3 } }
+                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                     Rectangle {
                         x: 12
@@ -338,7 +338,7 @@ Item {
                         radius: 22
                         color: (aboutNavBtn.isHovered && !aboutNavBtn.isCurrent) ? theme.hoverOverlay : "transparent"
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-                        Behavior on width { enabled: theme.animate; SpringAnimation { spring: 3.5; damping: 0.35 } }
+                        Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                     }
 
                     Item {
@@ -347,7 +347,7 @@ Item {
                         width: 44
                         height: 44
                         scale: aboutMouse.pressed ? 0.88 : (aboutMouse.containsMouse ? 1.10 : 1.0)
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                         LoafIcon {
                             anchors.centerIn: parent

@@ -32,7 +32,7 @@ Rectangle {
     transformOrigin: Item.Center
 
     Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 3.8; damping: 0.35 } }
+    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
     Timer { id: closeTimer; interval: 180; onTriggered: toast.visible = false }
 

@@ -3,7 +3,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import app.loaf
 
-// LoafSegmented -- Material 3 segmented control.
+// LoafSegmented -- Material 3 Expressive connected button group
+// (replaces the segmented button). Segments sit 2dp apart with fully round
+// outer corners and 8dp inner corners; pressing tightens the inner corners
+// to 4dp, and the selected segment morphs fully round in the accent colour.
 // options: [{ value, label, icon, shortLabel }]
 Item {
     id: root
@@ -30,7 +33,9 @@ Item {
     }
 
     readonly property bool isCompact: (typeof settingsView !== "undefined" && settingsView.isCompact) || root.width < (root.options ? root.options.length * 68 : 150)
-    readonly property bool effectiveIconOnly: iconOnly || (hasIcons && isCompact)
+    // Icon-only is opt-in now; segments shed icons and switch to short
+    // labels on their own when narrow.
+    readonly property bool effectiveIconOnly: iconOnly
 
     transform: Translate { id: segTranslate; y: 0 }
 
@@ -83,95 +88,97 @@ Item {
             visible: root.label.length > 0
         }
 
-        Rectangle {
+        Item {
             id: track
             Layout.fillWidth: true
             Layout.preferredHeight: root.height
-            radius: theme.radiusFull
-            color: theme.surfaceContainerHighest
 
-            readonly property real segW: track.width / Math.max(1, (root.options ? root.options.length : 1))
+            readonly property int count: Math.max(1, (root.options ? root.options.length : 1))
+            readonly property real gap: 2
 
-            Rectangle {
-                id: highlight
-                height: track.height - 6
-                y: 3
-                radius: theme.radiusFull
-                color: theme.secondaryContainer
-                width: Math.max(0, track.segW - 6)
-                x: 3 + root.currentIndex * track.segW
-
-                Behavior on x { enabled: theme.animate; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                Behavior on width { enabled: theme.animate; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
-            }
-
-            RowLayout {
+            Row {
                 anchors.fill: parent
-                spacing: 0
+                spacing: track.gap
 
                 Repeater {
                     model: root.options
 
                     delegate: Item {
                         id: segItem
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        width: (track.width - track.gap * (track.count - 1)) / track.count
+                        height: track.height
 
                         readonly property bool isCurrent: index === root.currentIndex
                         readonly property bool hasIcon: !!(modelData && modelData.icon && String(modelData.icon).length > 0)
                         readonly property bool isDisabled: !!(modelData && modelData.disabled)
+                        readonly property bool first: index === 0
+                        readonly property bool last: index === track.count - 1
+                        readonly property real outer: height / 2
+                        readonly property real inner: isCurrent ? height / 2 : (segMouse.pressed ? 4 : 8)
+                        readonly property color fg: isCurrent ? theme.primaryFg : theme.textMain
+
+                        // Fit order when space runs out: full label with icon,
+                        // full label alone, short label, then elide.
+                        readonly property string fullText: modelData && modelData.label ? modelData.label : ""
+                        readonly property string shortText: modelData && modelData.shortLabel ? modelData.shortLabel : fullText
+                        readonly property real avail: width - 16
+                        readonly property bool fullFits: fullMetrics.advanceWidth <= avail
+                        readonly property string shownText: fullFits ? fullText : shortText
+                        readonly property bool showIcon: hasIcon && (root.effectiveIconOnly
+                            || (fullFits ? fullMetrics.advanceWidth : shortMetrics.advanceWidth) + 20 <= avail)
+
+                        TextMetrics { id: fullMetrics; text: segItem.fullText; font.pixelSize: theme.fs(12); font.weight: Font.DemiBold; font.family: theme.fontFamily }
+                        TextMetrics { id: shortMetrics; text: segItem.shortText; font.pixelSize: theme.fs(12); font.weight: Font.DemiBold; font.family: theme.fontFamily }
 
                         opacity: isDisabled ? 0.4 : 1.0
 
-                        // Animate the entire pill content wrapper with a spring on hover and press
-                        Item {
-                            id: contentWrapper
+                        Rectangle {
                             anchors.fill: parent
-                            scale: segMouse.pressed ? 0.93 : (segMouse.containsMouse ? 1.05 : 1.0)
+                            color: segItem.isCurrent ? theme.primary
+                                : (segMouse.containsMouse ? Qt.lighter(theme.surfaceContainerHighest, 1.12) : theme.surfaceContainerHighest)
+                            topLeftRadius: segItem.first ? segItem.outer : segItem.inner
+                            bottomLeftRadius: segItem.first ? segItem.outer : segItem.inner
+                            topRightRadius: segItem.last ? segItem.outer : segItem.inner
+                            bottomRightRadius: segItem.last ? segItem.outer : segItem.inner
 
-                            Behavior on scale { enabled: theme.animate; SpringAnimation { spring: 4.5; damping: 0.3 } }
+                            Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
+                            Behavior on topLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            Behavior on bottomLeftRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            Behavior on topRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            Behavior on bottomRightRadius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                        }
 
-                            // Hover pill highlight
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: 3
-                                radius: theme.radiusFull
-                                color: theme.secondaryContainer
-                                opacity: segItem.isCurrent ? 0.0 : (segMouse.pressed ? 0.35 : (segMouse.containsMouse ? 0.18 : 0.0))
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: root.effectiveIconOnly ? 0 : 6
 
-                                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 150 } }
+                            LoafIcon {
+                                id: segIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: segItem.showIcon
+                                name: segItem.hasIcon ? modelData.icon : ""
+                                size: root.effectiveIconOnly ? 16 : 14
+                                color: segItem.fg
+                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
                             }
 
-                            RowLayout {
-                                anchors.centerIn: parent
-                                spacing: root.effectiveIconOnly ? 0 : 6
-
-                                LoafIcon {
-                                    visible: segItem.hasIcon
-                                    name: segItem.hasIcon ? modelData.icon : ""
-                                    size: root.effectiveIconOnly ? 16 : 14
-                                    color: segItem.isCurrent ? theme.secondaryContainerFg : (segMouse.containsMouse ? theme.textMain : theme.textMuted)
-
-                                    Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
-                                }
-
-                                Text {
-                                    visible: !root.effectiveIconOnly && (modelData && modelData.label)
-                                    text: {
-                                        if (!modelData) return "";
-                                        if (root.isCompact && modelData.shortLabel) return modelData.shortLabel;
-                                        return modelData.label || "";
-                                    }
-                                    color: segItem.isCurrent ? theme.secondaryContainerFg : (segMouse.containsMouse ? theme.textMain : theme.textMuted)
-                                    font.pixelSize: theme.fs(12)
-                                    font.bold: segItem.isCurrent
-                                    font.family: theme.fontFamily
-
-                                    Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
-                                }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: !root.effectiveIconOnly && !!(modelData && modelData.label)
+                                width: Math.max(0, Math.min(implicitWidth, segItem.width - 16 - (segIcon.visible ? segIcon.width + 6 : 0)))
+                                elide: Text.ElideRight
+                                text: segItem.shownText
+                                color: segItem.fg
+                                font.pixelSize: theme.fs(12)
+                                font.weight: segItem.isCurrent ? Font.DemiBold : Font.Medium
+                                font.family: theme.fontFamily
+                                Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
                             }
                         }
+
+                        Accessible.role: Accessible.RadioButton
+                        Accessible.name: modelData && modelData.label ? modelData.label : ""
+                        Accessible.checked: isCurrent
 
                         MouseArea {
                             id: segMouse
@@ -179,7 +186,7 @@ Item {
                             enabled: !segItem.isDisabled
                             hoverEnabled: !segItem.isDisabled
                             cursorShape: segItem.isDisabled ? Qt.ArrowCursor : Qt.PointingHandCursor
-                            onEntered: if (root.effectiveIconOnly && !!(modelData && modelData.label) && typeof tooltip !== "undefined")
+                            onEntered: if ((root.effectiveIconOnly || segItem.shownText !== segItem.fullText) && !!(modelData && modelData.label) && typeof tooltip !== "undefined")
                                 tooltip.show(segMouse, modelData.label)
                             onExited: if (typeof tooltip !== "undefined") tooltip.hide(segMouse)
 
