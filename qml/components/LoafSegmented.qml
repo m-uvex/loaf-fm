@@ -95,6 +95,18 @@ Item {
 
             readonly property int count: Math.max(1, (root.options ? root.options.length : 1))
             readonly property real gap: 2
+            // Pressing a segment widens it 15% and its neighbours give up
+            // the room (M3 Expressive button group width interaction).
+            property int pressedIndex: -1
+            function segWidth(i) {
+                var base = (width - gap * (count - 1)) / count;
+                var p = pressedIndex;
+                if (p < 0) return base;
+                var extra = base * 0.15;
+                if (i === p) return base + extra;
+                var neighbours = (p > 0 ? 1 : 0) + (p < count - 1 ? 1 : 0);
+                return Math.abs(i - p) === 1 ? base - extra / neighbours : base;
+            }
 
             Row {
                 anchors.fill: parent
@@ -105,8 +117,9 @@ Item {
 
                     delegate: Item {
                         id: segItem
-                        width: (track.width - track.gap * (track.count - 1)) / track.count
+                        width: track.segWidth(index)
                         height: track.height
+                        Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                         readonly property bool isCurrent: index === root.currentIndex
                         readonly property bool hasIcon: !!(modelData && modelData.icon && String(modelData.icon).length > 0)
@@ -121,7 +134,7 @@ Item {
                         // full label alone, short label, then elide.
                         readonly property string fullText: modelData && modelData.label ? modelData.label : ""
                         readonly property string shortText: modelData && modelData.shortLabel ? modelData.shortLabel : fullText
-                        readonly property real avail: width - 16
+                        readonly property real avail: (track.width - track.gap * (track.count - 1)) / track.count - 16
                         readonly property bool fullFits: fullMetrics.advanceWidth <= avail
                         readonly property string shownText: fullFits ? fullText : shortText
                         readonly property bool showIcon: hasIcon && (root.effectiveIconOnly
@@ -186,6 +199,7 @@ Item {
                             enabled: !segItem.isDisabled
                             hoverEnabled: !segItem.isDisabled
                             cursorShape: segItem.isDisabled ? Qt.ArrowCursor : Qt.PointingHandCursor
+                            onPressedChanged: track.pressedIndex = pressed ? index : (track.pressedIndex === index ? -1 : track.pressedIndex)
                             onEntered: if ((root.effectiveIconOnly || segItem.shownText !== segItem.fullText) && !!(modelData && modelData.label) && typeof tooltip !== "undefined")
                                 tooltip.show(segMouse, modelData.label)
                             onExited: if (typeof tooltip !== "undefined") tooltip.hide(segMouse)

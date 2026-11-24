@@ -136,7 +136,8 @@ Item {
     Rectangle {
         id: itemBg
         anchors.fill: parent
-        radius: theme.radiusFull
+        radius: itemMouse.pressed ? 8 : height / 2
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         color: (itemMouse.containsMouse || root.highlighted)
             ? (root.danger ? theme.dangerContainer : theme.menuItemHover)
             : "transparent"

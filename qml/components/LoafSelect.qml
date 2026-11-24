@@ -36,8 +36,7 @@ Item {
     Accessible.name: accessibleName.length > 0 ? accessibleName : (current ? current.label : placeholder)
 
     opacity: enabled ? 1.0 : 0.45
-    scale: mouse.pressed ? 0.97 : 1.0
-    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+
 
     function openMenu() {
         var p = root.mapToItem(null, 0, root.height + 6);
@@ -57,7 +56,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: theme.radiusFull
+        // Expressive: round at rest, tighter corners while pressed or open.
+        radius: mouse.pressed ? 8 : (root.open ? 12 : height / 2)
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         color: mouse.containsMouse || root.open ? Qt.lighter(theme.surfaceContainerHigh, 1.08) : theme.surfaceContainerHigh
         border.width: root.open ? 2 : 1
         border.color: root.open ? theme.primary : theme.outlineAlpha(theme.outlineVariant)

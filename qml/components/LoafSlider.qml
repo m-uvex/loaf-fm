@@ -85,13 +85,14 @@ Item {
                 id: thumb
                 x: trackArea.handleX
                 anchors.verticalCenter: parent.verticalCenter
-                width: trackMouse.pressed ? 8 : (trackMouse.containsMouse ? 7 : 6)
-                height: trackMouse.pressed ? 34 : (trackMouse.containsMouse ? 30 : 26)
-                radius: 3
+                // M3 Expressive: the bar handle narrows while dragged.
+                width: trackMouse.pressed ? 3 : 6
+                height: trackMouse.pressed ? 32 : (trackMouse.containsMouse ? 30 : 26)
+                radius: width / 2
                 color: theme.primary
 
-                Behavior on width { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                Behavior on height { enabled: theme.animate; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                Behavior on height { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
 
                 // Subtle focus / active halo

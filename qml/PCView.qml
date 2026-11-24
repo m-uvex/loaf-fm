@@ -764,9 +764,10 @@ Item {
                                 delegate: Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 116
-                                    radius: theme.radiusXl
+                                    radius: placeMouse.pressed ? theme.radiusL : theme.radiusXl
+                                    Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                                     color: placeMouse.containsMouse ? theme.surfaceContainerHigh : theme.surfaceContainer
-                                    scale: placeMouse.pressed ? 0.95 : (placeMouse.containsMouse ? 1.02 : 1.0)
+                                    scale: placeMouse.containsMouse && !placeMouse.pressed ? 1.02 : 1.0
                                     Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                                     Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 

@@ -13,7 +13,8 @@ Rectangle {
 
     default property alias content: inner.data
 
-    radius: theme.radiusL
+    radius: cardMouse.pressed ? theme.radiusM : theme.radiusL
+    Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
     color: cardColor
     border.width: outline ? 1 : 0
     border.color: theme.outlineAlpha(theme.borderSubtle)

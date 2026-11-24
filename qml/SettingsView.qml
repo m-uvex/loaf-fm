@@ -210,15 +210,15 @@ Item {
                         readonly property bool isHovered: tabMouse.containsMouse
                         readonly property int tabMatches: settingsView.getTabMatchCount(modelData.id)
 
-                        scale: tabMouse.pressed ? 0.95 : (tabMouse.containsMouse ? 1.02 : 1.0)
-                        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                         Rectangle {
                             x: 12
                             width: settingsView.isCompact ? 44 : (tabItem.width - 24)
                             height: 44
-                            radius: 22
-                            color: (tabItem.isHovered && !tabItem.isCurrent) ? theme.hoverOverlay : "transparent"
+                            radius: tabMouse.pressed ? 14 : 22
+                            Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                            color: tabMouse.pressed ? theme.secondaryContainer
+                                : ((tabItem.isHovered && !tabItem.isCurrent) ? theme.hoverOverlay : "transparent")
                             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                             Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                         }
@@ -328,14 +328,13 @@ Item {
                     readonly property bool isHovered: aboutMouse.containsMouse
                     readonly property int aboutMatches: settingsView.getTabMatchCount("about")
 
-                    scale: aboutMouse.pressed ? 0.95 : (aboutMouse.containsMouse ? 1.02 : 1.0)
-                    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
                     Rectangle {
                         x: 12
                         width: settingsView.isCompact ? 44 : (aboutNavBtn.width - 24)
                         height: 44
-                        radius: 22
+                        radius: aboutMouse.pressed ? 14 : 22
+                        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                         color: (aboutNavBtn.isHovered && !aboutNavBtn.isCurrent) ? theme.hoverOverlay : "transparent"
                         Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
                         Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }

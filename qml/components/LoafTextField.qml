@@ -16,7 +16,8 @@ TextField {
     Accessible.name: placeholderText
 
     background: Rectangle {
-        radius: theme.radiusS
+        radius: field.activeFocus ? theme.radiusM : theme.radiusS
+        Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         color: theme.surfaceContainerHighest
         border.width: field.activeFocus ? 2 : 1
         border.color: field.activeFocus ? theme.primary : theme.outlineAlpha(theme.borderSubtle)

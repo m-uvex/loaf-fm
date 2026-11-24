@@ -74,7 +74,7 @@ Item {
     }
 
     scale: cardMouse.pressed ? 0.94 : ((cardMouse.containsMouse && !card.isSelected) ? 1.03 : 1.0)
-    Behavior on scale { enabled: theme.animate; NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+    Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
 
     ColumnLayout {
         id: cardContentCol

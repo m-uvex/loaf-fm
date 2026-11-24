@@ -115,7 +115,7 @@ Item {
                 color: root.checked ? theme.primaryFg : theme.outline
 
                 Behavior on x { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
-                Behavior on width { enabled: theme.animate; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                Behavior on width { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 Behavior on color { enabled: theme.animate; ColorAnimation { duration: 140 } }
             }
 

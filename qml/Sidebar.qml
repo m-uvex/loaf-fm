@@ -517,8 +517,6 @@ Rectangle {
 
         implicitHeight: 44
         height: 44
-        scale: mouse.pressed ? 0.95 : (mouse.containsMouse ? 1.02 : 1.0)
-        Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
         activeFocusOnTab: true
         onActiveFocusChanged: {
             if (activeFocus)
@@ -539,9 +537,12 @@ Rectangle {
             x: 12
             width: btn.showLabel ? btn.width - 24 : 44
             height: 44
-            radius: 22
+            // Expressive: pill morphs toward a rounded square while pressed.
+            radius: mouse.pressed ? 14 : 22
+            Behavior on radius { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
             color: btn.dropHover ? theme.primaryContainer
-                : (mouse.containsMouse && !btn.selected ? theme.hoverOverlay : "transparent")
+                : (mouse.pressed ? theme.secondaryContainer
+                : (mouse.containsMouse && !btn.selected ? theme.hoverOverlay : "transparent"))
             border.width: btn.dropHover || btn.activeFocus ? 2 : 0
             border.color: theme.primary
             Behavior on color { enabled: theme.animate; ColorAnimation { duration: theme.durationFast } }
