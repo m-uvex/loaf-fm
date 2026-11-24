@@ -1,10 +1,14 @@
 #include "loaf/native.h"
 #include "loaf/portal.h"
 #include "loaf/thumbnails.h"
+#include "m3shapes/material_shape.h"
+#include "m3shapes/morph.h"
+#include "m3shapes/shapes.h"
 
 #include <fcntl.h>
 #include <memory>
 #include <unistd.h>
+#include <qqml.h>
 
 #include <QClipboard>
 #include <QCoreApplication>
@@ -878,6 +882,7 @@ private:
 
 void setup_engine(QQmlApplicationEngine &engine, const rust::Vec<rust::String> &paths, rust::Str mode)
 {
+    qmlRegisterType<m3shapes::MaterialShape>("M3Shapes", 1, 0, "MaterialShape");
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     for (const char *p : {"/usr/lib/x86_64-linux-gnu/qt6/qml", "/usr/lib/qt6/qml", "/usr/lib64/qt6/qml"}) {
         if (QDir(QString::fromLatin1(p)).exists()) {
@@ -1785,6 +1790,31 @@ rust::String mtp_operation_json(rust::Str action, rust::Str url, rust::Str argum
         const QJsonObject err{{QStringLiteral("error"), Mtp::tr("Unknown action: %1").arg(actionStr)}};
         return toRust(QString::fromUtf8(QJsonDocument(err).toJson(QJsonDocument::Compact)));
     }
+}
+
+bool verify_m3shapes()
+{
+    constexpr int kShapeCount = 35;
+    for (int i = 0; i < kShapeCount; ++i) {
+        const auto &poly = m3shapes::MaterialShapes::get(static_cast<m3shapes::ShapeType>(i));
+        if (poly.cubics().empty())
+            return false;
+        const auto bounds = poly.calculateBounds(false);
+        if (bounds[0] < -0.05f || bounds[1] < -0.05f || bounds[2] > 1.05f || bounds[3] > 1.05f)
+            return false;
+        if ((bounds[2] - bounds[0]) < 0.2f || (bounds[3] - bounds[1]) < 0.2f)
+            return false;
+    }
+
+    const auto &cookie9 = m3shapes::MaterialShapes::get(m3shapes::ShapeType::Cookie9Sided);
+    const auto &clover4 = m3shapes::MaterialShapes::get(m3shapes::ShapeType::Clover4Leaf);
+    const m3shapes::Morph morph(cookie9, clover4);
+    for (float p : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        const auto cubics = morph.asCubics(p);
+        if (cubics.empty())
+            return false;
+    }
+    return true;
 }
 
 } // namespace loaf

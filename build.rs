@@ -151,7 +151,6 @@ fn main() {
             .qml_file("qml/components/LoafDialog.qml")
             .qml_file("qml/components/LoafTextPrompt.qml")
             .qml_file("qml/components/UsageBar.qml")
-            .qml_file("qml/components/LoafShape.qml")
             .qml_file("qml/components/DriveCard.qml")
             .qml_file("qml/components/RemoteCard.qml")
             .qml_file("qml/components/TopIconButton.qml")
@@ -178,9 +177,23 @@ fn main() {
     .cpp_file("cpp/loaf/native.h")
     .cpp_file("cpp/loaf/portal.h")
     .cpp_file("cpp/loaf/thumbnails.h")
+    .cpp_file("cpp/m3shapes/cubic.h")
+    .cpp_file("cpp/m3shapes/corner_rounding.h")
+    .cpp_file("cpp/m3shapes/feature.h")
+    .cpp_file("cpp/m3shapes/rounded_polygon.h")
+    .cpp_file("cpp/m3shapes/float_mapping.h")
+    .cpp_file("cpp/m3shapes/morph.h")
+    .cpp_file("cpp/m3shapes/shapes.h")
+    .cpp_file("cpp/m3shapes/material_shape.h")
     .cpp_file("cpp/native.cpp")
     .cpp_file("cpp/portal.cpp")
-    .cpp_file("cpp/thumbnails.cpp");
+    .cpp_file("cpp/thumbnails.cpp")
+    .cpp_file("cpp/m3shapes/cubic.cpp")
+    .cpp_file("cpp/m3shapes/rounded_polygon.cpp")
+    .cpp_file("cpp/m3shapes/float_mapping.cpp")
+    .cpp_file("cpp/m3shapes/morph.cpp")
+    .cpp_file("cpp/m3shapes/shapes.cpp")
+    .cpp_file("cpp/m3shapes/material_shape.cpp");
     let builder = match compile_translations() {
         Some(qrc) => builder.qrc(qrc),
         None => builder,

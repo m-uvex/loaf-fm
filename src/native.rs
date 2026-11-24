@@ -43,6 +43,7 @@ pub mod ffi {
         fn list_kmtp_devices_json() -> String;
         fn list_mtp_directory(url: &str) -> String;
         fn mtp_operation_json(action: &str, url: &str, argument: &str) -> String;
+        fn verify_m3shapes() -> bool;
     }
 }
 
@@ -120,5 +121,10 @@ mod tests {
             .as_ref()
             .expect("matcher is constructed")
             .matches("file.png"));
+    }
+
+    #[test]
+    fn m3shapes_catalog_and_morph_are_valid() {
+        assert!(ffi::verify_m3shapes());
     }
 }

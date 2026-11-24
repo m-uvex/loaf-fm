@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import M3Shapes
 import app.loaf
 
 // Navigation rail: This PC, Recent, Starred, the user's (localized) folders,
@@ -559,11 +560,12 @@ Rectangle {
             // Trash empty-on-hover: the row's own icon becomes a button on
             // hover, wrapped in a rotating M3 cookie shape. Only the icon
             // empties the trash, the rest of the row keeps opening it.
-            LoafShape {
+            MaterialShape {
                 anchors.centerIn: parent
                 width: 38
                 height: 38
-                shape: "cookie6"
+                shape: btn.overBroom ? MaterialShape.Sunny : MaterialShape.Cookie6Sided
+                animationDuration: theme.animate ? 350 : 0
                 visible: btn.showBroom
                 opacity: btn.showBroom ? 1.0 : 0.0
                 rotation: btn.showBroom ? 135 : 0
