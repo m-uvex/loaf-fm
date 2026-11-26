@@ -126,6 +126,119 @@ Item {
     function resetColWidth(key) {
         pane.setColWidth(key, pane.defaultColumnWidth(key), true);
     }
+    readonly property var builtinColumns: [
+        { key: "modified", label: qsTr("Date Modified"), category: "Basic", width: 150, quick: true, default_asc: true },
+        { key: "type", label: qsTr("Type"), category: "Basic", width: 100, quick: true, default_asc: true },
+        { key: "size", label: qsTr("Size"), category: "Basic", width: 80, quick: true, default_asc: false }
+    ]
+    readonly property var extraColumnCatalog: {
+        try { return JSON.parse(paneEngine.all_columns_json() || "[]"); } catch (e) { return []; }
+    }
+    readonly property var allOptionalColumns: pane.builtinColumns.concat(pane.extraColumnCatalog)
+    property var visibleColumnKeys: pane.loadVisibleColumns()
+    readonly property var activeHeaderColumns: {
+        var cols = [{ key: "name", label: qsTr("Name"), fill: true, width: 100, defaultAsc: true }];
+        for (var i = 0; i < pane.visibleColumnKeys.length; ++i) {
+            var k = pane.visibleColumnKeys[i];
+            var def = pane.findColumnDef(k);
+            if (!def)
+                continue;
+            cols.push({
+                key: def.key,
+                label: def.label,
+                fill: false,
+                width: pane.colWidth(def.key),
+                defaultAsc: def.default_asc !== false
+            });
+        }
+        return cols;
+    }
+
+    function findColumnDef(key) {
+        for (var i = 0; i < pane.allOptionalColumns.length; ++i) {
+            if (pane.allOptionalColumns[i].key === key)
+                return pane.allOptionalColumns[i];
+        }
+        return null;
+    }
+
+    function loadVisibleColumns() {
+        var defaults = ["modified", "type", "size"];
+        if (typeof core === "undefined" || !core)
+            return defaults;
+        try {
+            var raw = core.get_setting("listVisibleColumns");
+            if (raw && raw.length > 0) {
+                var parsed = JSON.parse(raw);
+                if (Array.isArray(parsed))
+                    return parsed;
+            }
+        } catch (e) {}
+        return defaults;
+    }
+
+    function syncExtraColumns() {
+        var extras = [];
+        for (var i = 0; i < pane.visibleColumnKeys.length; ++i) {
+            var k = pane.visibleColumnKeys[i];
+            if (k !== "modified" && k !== "type" && k !== "size")
+                extras.push(k);
+        }
+        paneEngine.set_extra_columns(JSON.stringify(extras));
+    }
+
+    function toggleColumn(key) {
+        var copy = pane.visibleColumnKeys.slice();
+        var idx = copy.indexOf(key);
+        if (idx === -1)
+            copy.push(key);
+        else
+            copy.splice(idx, 1);
+        pane.visibleColumnKeys = copy;
+        if (typeof core !== "undefined" && core)
+            core.set_setting("listVisibleColumns", JSON.stringify(copy));
+        pane.syncExtraColumns();
+    }
+
+    function resetColumns() {
+        pane.visibleColumnKeys = ["modified", "type", "size"];
+        if (typeof core !== "undefined" && core)
+            core.set_setting("listVisibleColumns", JSON.stringify(pane.visibleColumnKeys));
+        pane.syncExtraColumns();
+    }
+
+    function openHeaderColumnMenu(mx, my) {
+        var items = [];
+        for (var i = 0; i < pane.allOptionalColumns.length; ++i) {
+            var c = pane.allOptionalColumns[i];
+            if (!c.quick && pane.visibleColumnKeys.indexOf(c.key) === -1)
+                continue;
+            (function(col) {
+                var on = pane.visibleColumnKeys.indexOf(col.key) !== -1;
+                items.push({
+                    text: col.label,
+                    icon: on ? "check" : "",
+                    checked: on,
+                    action: function() { pane.toggleColumn(col.key); }
+                });
+            })(c);
+        }
+        items.push({
+            text: qsTr("More…"),
+            icon: "sliders-horizontal",
+            separatorBefore: true,
+            action: function() { columnPickerDialog.open(); }
+        });
+        items.push({
+            text: qsTr("Reset Default Columns"),
+            icon: "arrow-counter-clockwise",
+            action: function() { pane.resetColumns(); }
+        });
+        headerColumnMenu.model = items;
+        headerColumnMenu.openAt(mx, my);
+    }
+
+    Component.onCompleted: pane.syncExtraColumns()
 
     function isGroupedGrid() {
         return !isList() && paneEngine.group_by !== "none";
@@ -1675,15 +1788,9 @@ Item {
                     spacing: 12
 
                     Repeater {
-                        model: [
-                            { key: "name", label: qsTr("Name"), fill: true, show: true, defaultAsc: true },
-                            { key: "modified", label: qsTr("Date Modified"), fill: false, show: pane.width >= 560, defaultAsc: true },
-                            { key: "type", label: qsTr("Type"), fill: false, show: pane.width >= 720, defaultAsc: true },
-                            { key: "size", label: qsTr("Size"), fill: false, show: pane.width >= 640, defaultAsc: false }
-                        ]
+                        model: pane.activeHeaderColumns
                         delegate: Item {
-                            id: headerCell
-                            visible: modelData.show
+                            visible: modelData.fill || pane.width >= 520
                             Layout.fillWidth: modelData.fill
                             Layout.preferredWidth: modelData.fill ? 100 : pane.colWidth(modelData.key)
                             Layout.minimumWidth: modelData.fill ? 100 : 56
@@ -1755,10 +1862,18 @@ Item {
                             }
                             MouseArea {
                                 anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 cursorShape: Qt.PointingHandCursor
                                 Accessible.role: Accessible.ColumnHeader
                                 Accessible.name: modelData.label
-                                onClicked: window.viewPrefs.sortBy(modelData.key, modelData.defaultAsc)
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.RightButton) {
+                                        var p = mapToItem(null, mouse.x, mouse.y);
+                                        pane.openHeaderColumnMenu(p.x, p.y);
+                                        return;
+                                    }
+                                    window.viewPrefs.sortBy(modelData.key, modelData.defaultAsc)
+                                }
                             }
                         }
                     }
@@ -2177,32 +2292,30 @@ Item {
                             }
                         }
 
-                        Text {
-                            visible: pane.width >= 560
-                            Layout.preferredWidth: pane.colWidth("modified")
-                            Layout.minimumWidth: 56
-                            text: theme.relativeTime(row.modified)
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
-                            font.pixelSize: theme.fs(11)
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            visible: pane.width >= 720
-                            Layout.preferredWidth: pane.colWidth("type")
-                            Layout.minimumWidth: 56
-                            text: theme.categoryName(row.category)
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.outline
-                            font.pixelSize: theme.fs(11)
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            visible: pane.width >= 640
-                            Layout.preferredWidth: pane.colWidth("size")
-                            Layout.minimumWidth: 56
-                            text: row.size_str
-                            color: row.isSelected ? theme.secondaryContainerFg : theme.textMuted
-                            font.pixelSize: theme.fs(11)
-                            elide: Text.ElideRight
+                        Repeater {
+                            model: pane.visibleColumnKeys
+                            delegate: Text {
+                                required property string modelData
+                                readonly property var colDef: pane.findColumnDef(modelData)
+                                visible: pane.width >= 520 && colDef !== null
+                                Layout.preferredWidth: colDef ? pane.colWidth(modelData.key) : 100
+                                Layout.minimumWidth: 56
+                                text: {
+                                    var _rev = paneEngine.meta_revision;
+                                    if (modelData === "modified")
+                                        return theme.relativeTime(row.modified);
+                                    if (modelData === "type")
+                                        return theme.categoryName(row.category);
+                                    if (modelData === "size")
+                                        return row.size_str;
+                                    return paneEngine.entry_meta(row.path, modelData);
+                                }
+                                color: row.isSelected
+                                       ? theme.secondaryContainerFg
+                                       : (modelData === "type" ? theme.outlineAlpha(theme.outline) : theme.textMuted)
+                                font.pixelSize: theme.fs(11)
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 
@@ -2291,6 +2404,127 @@ Item {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    LoafMenu {
+        id: headerColumnMenu
+        parent: Overlay.overlay
+        model: []
+        menuMinWidth: 210
+    }
+
+    LoafDialog {
+        id: columnPickerDialog
+        title: qsTr("Choose Details")
+        dialogWidth: 440
+        property string filterText: ""
+        property string activeCat: "All"
+
+        onOpened: {
+            filterText = "";
+            activeCat = "All";
+        }
+
+        TextField {
+            Layout.fillWidth: true
+            placeholderText: qsTr("Search attributes (e.g. ISO, Camera ID, Duration)…")
+            text: columnPickerDialog.filterText
+            onTextChanged: columnPickerDialog.filterText = text
+            color: theme.textMain
+            placeholderTextColor: theme.textMuted
+            background: Rectangle {
+                radius: theme.radiusM
+                color: theme.surfaceContainer
+                border.width: 1
+                border.color: theme.outlineAlpha(theme.outlineVariant)
+            }
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+            Repeater {
+                model: ["All", "Basic", "File System", "Camera & Photo", "Audio & Video", "Document"]
+                delegate: LoafButton {
+                    required property string modelData
+                    text: modelData
+                    variant: columnPickerDialog.activeCat === modelData ? "filled" : "tonal"
+                    onClicked: columnPickerDialog.activeCat = modelData
+                }
+            }
+        }
+
+        ListView {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 300
+            clip: true
+            spacing: 2
+            model: {
+                var q = columnPickerDialog.filterText.trim().toLowerCase();
+                var cat = columnPickerDialog.activeCat;
+                return pane.allOptionalColumns.filter(function(c) {
+                    if (cat !== "All" && c.category !== cat)
+                        return false;
+                    if (q.length > 0 && c.label.toLowerCase().indexOf(q) === -1 && c.key.toLowerCase().indexOf(q) === -1)
+                        return false;
+                    return true;
+                });
+            }
+            delegate: Rectangle {
+                required property var modelData
+                readonly property bool isOn: pane.visibleColumnKeys.indexOf(modelData.key) !== -1
+                width: ListView.view.width
+                height: 34
+                radius: theme.radiusM
+                color: colRowMouse.containsMouse ? theme.hoverOverlay : "transparent"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 10
+                    LoafIcon {
+                        name: isOn ? "check-square" : "square"
+                        size: 16
+                        color: isOn ? theme.primary : theme.textMuted
+                    }
+                    Text {
+                        text: modelData.label
+                        color: theme.textMain
+                        font.pixelSize: theme.fs(12)
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        text: modelData.category
+                        color: theme.textMuted
+                        font.pixelSize: theme.fs(10)
+                    }
+                }
+                MouseArea {
+                    id: colRowMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: pane.toggleColumn(modelData.key)
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            LoafButton {
+                text: qsTr("Reset Defaults")
+                variant: "ghost"
+                onClicked: pane.resetColumns()
+            }
+            Item { Layout.fillWidth: true }
+            LoafButton {
+                text: qsTr("Done")
+                variant: "filled"
+                onClicked: columnPickerDialog.close()
             }
         }
     }
