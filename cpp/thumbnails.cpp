@@ -194,7 +194,20 @@ void makePrivateDir(const QString &dir)
     QDir().mkdir(dir, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 }
 
-enum class GenResult { Ok, Failed, Transient };
+enum class GenResult { Ok, Failed, NoTool, Transient };
+
+// 1x1 transparent sentinel returned for expected "no thumbnail" misses so Qt's
+// QQuickImage does not spam stderr warnings on every non-thumbnailable file;
+// QML treats <= 1x1 as missing and falls back to the file icon.
+const QImage &emptySentinel()
+{
+    static const QImage img = [] {
+        QImage i(1, 1, QImage::Format_ARGB32);
+        i.fill(Qt::transparent);
+        return i;
+    }();
+    return img;
+}
 
 class ThumbResponse : public QQuickImageResponse
 {
@@ -240,7 +253,7 @@ public:
     {
         const QFileInfo fi(m_path);
         if (!fi.isFile() || !fi.isReadable()) {
-            m_error = QStringLiteral("not a readable file");
+            m_image = emptySentinel();
             return;
         }
         const QString root = cacheRoot();
@@ -272,7 +285,7 @@ public:
         {
             QImageReader r(failMarker);
             if (r.canRead() && r.text(QStringLiteral("Thumb::MTime")) == mtime) {
-                m_error = QStringLiteral("thumbnailing failed before");
+                m_image = emptySentinel();
                 return;
             }
         }
@@ -292,7 +305,7 @@ public:
                 QImageReader r(cached);
                 if (r.canRead() && r.text(QStringLiteral("Thumb::MTime")) == mtime)
                     return finish(r.read());
-                m_error = QStringLiteral("no thumbnail");
+                m_image = emptySentinel();
                 return;
             }
             g_inflight.insert(cached);
@@ -308,13 +321,13 @@ public:
             return; // not a real failure: don't write a fail marker
 
         if (result != GenResult::Ok) {
-            // Only remember real failures; timeouts and missing tools may work later.
-            if (result == GenResult::Failed) {
-                QImage marker(1, 1, QImage::Format_ARGB32);
-                marker.fill(Qt::transparent);
-                store(marker, failMarker, uri, mtime);
-            }
-            m_error = QStringLiteral("no thumbnailer could handle this file");
+            // Only remember real failures on disk; timeouts and missing tools may work later.
+            if (result == GenResult::Failed)
+                store(emptySentinel(), failMarker, uri, mtime);
+            if (result != GenResult::Transient)
+                m_image = emptySentinel();
+            else
+                m_error = QStringLiteral("thumbnailer timed out");
             return;
         }
         if (img.width() > flavor.size || img.height() > flavor.size)
@@ -346,7 +359,7 @@ public:
         // A system thumbnailer (ffmpegthumbnailer, evince, gdk-pixbuf, ...).
         const Thumbnailer *t = thumbnailerFor(mime);
         if (!t)
-            return GenResult::Failed;
+            return GenResult::NoTool;
         QTemporaryDir tmp;
         if (!tmp.isValid())
             return GenResult::Transient;

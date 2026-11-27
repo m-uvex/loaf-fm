@@ -504,6 +504,7 @@ LoafPopup {
             Text {
                 anchors.centerIn: parent
                 visible: quickLookImage.status === Image.Error
+                    || (quickLookImage.status === Image.Ready && quickLookImage.implicitWidth <= 1 && quickLookImage.implicitHeight <= 1)
                 text: qsTr("Could not render this image")
                 color: theme.textMuted
                 font.pixelSize: theme.fs(13)
