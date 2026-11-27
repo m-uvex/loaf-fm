@@ -116,7 +116,8 @@ pub fn device_uri(id: &str) -> String {
 }
 
 pub fn parse_device_id(uri: &str) -> Option<&str> {
-    uri.strip_prefix("kdeconnect://").filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_hexdigit()))
+    uri.strip_prefix("kdeconnect://")
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 pub fn list_reachable() -> Vec<ConnectedDevice> {
@@ -228,7 +229,12 @@ pub fn unmount(id: &str) -> Result<(), String> {
         // If busy, report that error
         let lower = err.to_lowercase();
         if lower.contains("busy") {
-            return Err(err.lines().rfind(|l| !l.trim().is_empty()).unwrap_or("Device is busy").trim().to_string());
+            return Err(err
+                .lines()
+                .rfind(|l| !l.trim().is_empty())
+                .unwrap_or("Device is busy")
+                .trim()
+                .to_string());
         }
     }
     Err("Could not unmount KDE Connect device (fusermount/umount not found or failed)".to_string())

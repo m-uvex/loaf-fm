@@ -2448,8 +2448,10 @@ impl qobject::LoafCore {
                 );
             serde_json::json!({"mime": mime, "label": label, "icon": icon, "archive": archive})
         };
-        let mut entries: Vec<serde_json::Value> =
-            COMMON.iter().map(|(mime, icon)| entry(mime, icon)).collect();
+        let mut entries: Vec<serde_json::Value> = COMMON
+            .iter()
+            .map(|(mime, icon)| entry(mime, icon))
+            .collect();
         for mime in &opened {
             if !COMMON.iter().any(|(m, _)| m == mime) {
                 entries.push(entry(mime, "file"));
@@ -3670,7 +3672,11 @@ impl qobject::LoafCore {
         share::get_manager().remove_share(&share_id.to_string())
     }
 
-    pub fn share_to_kdeconnect(mut self: Pin<&mut Self>, device_id: &QString, paths_json: &QString) {
+    pub fn share_to_kdeconnect(
+        mut self: Pin<&mut Self>,
+        device_id: &QString,
+        paths_json: &QString,
+    ) {
         let id = device_id.to_string();
         let paths: Vec<String> = serde_json::from_str::<Vec<String>>(&paths_json.to_string())
             .unwrap_or_default()

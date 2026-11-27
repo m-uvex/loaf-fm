@@ -1231,7 +1231,9 @@ fn command_stdout(program: &str, args: &[&str]) -> Option<String> {
         .stderr(std::process::Stdio::null())
         .output()
         .ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 /// hyprpaper: ask the running daemon via `hyprctl`, else read its config.
@@ -1268,7 +1270,9 @@ pub fn parse_hyprpaper_conf(conf: &str) -> Option<String> {
             in_block = false;
             continue;
         }
-        let Some((key, value)) = line.split_once('=') else { continue };
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         let (key, value) = (key.trim(), value.trim());
         if in_block && key == "path" && !value.is_empty() {
             return Some(value.to_string());
@@ -1303,7 +1307,9 @@ fn swaybg_wallpaper() -> Option<PathBuf> {
         if !fs::read_to_string(dir.join("comm")).is_ok_and(|c| c.trim() == "swaybg") {
             continue;
         }
-        let Ok(raw) = fs::read(dir.join("cmdline")) else { continue };
+        let Ok(raw) = fs::read(dir.join("cmdline")) else {
+            continue;
+        };
         let args: Vec<String> = raw
             .split(|b| *b == 0)
             .map(|a| String::from_utf8_lossy(a).into_owned())
@@ -1330,7 +1336,8 @@ pub fn parse_swaybg_args(args: &[String]) -> Option<String> {
 
 /// KDE Plasma: the image plugin's `Image=` in the desktop applets config.
 fn kde_wallpaper(home: &Path) -> Option<PathBuf> {
-    let conf = fs::read_to_string(home.join(".config/plasma-org.kde.plasma.desktop-appletsrc")).ok()?;
+    let conf =
+        fs::read_to_string(home.join(".config/plasma-org.kde.plasma.desktop-appletsrc")).ok()?;
     parse_kde_appletsrc(&conf).map(|p| expand_home(&p, home))
 }
 
@@ -1355,13 +1362,22 @@ pub fn parse_kde_appletsrc(conf: &str) -> Option<String> {
 
 /// GNOME: `picture-uri-dark` in dark mode, else `picture-uri`.
 fn gnome_wallpaper() -> Option<PathBuf> {
-    let dark = command_stdout("gsettings", &["get", "org.gnome.desktop.interface", "color-scheme"])
-        .map(|s| s.contains("dark"))
-        .unwrap_or(false);
-    let keys: &[&str] = if dark { &["picture-uri-dark", "picture-uri"] } else { &["picture-uri"] };
+    let dark = command_stdout(
+        "gsettings",
+        &["get", "org.gnome.desktop.interface", "color-scheme"],
+    )
+    .map(|s| s.contains("dark"))
+    .unwrap_or(false);
+    let keys: &[&str] = if dark {
+        &["picture-uri-dark", "picture-uri"]
+    } else {
+        &["picture-uri"]
+    };
     let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
     for key in keys {
-        if let Some(out) = command_stdout("gsettings", &["get", "org.gnome.desktop.background", key]) {
+        if let Some(out) =
+            command_stdout("gsettings", &["get", "org.gnome.desktop.background", key])
+        {
             let p = expand_home(&out, &home);
             if p.is_file() {
                 return Some(p);
@@ -1470,17 +1486,25 @@ mod tests {
             Some("~/w.jpg")
         );
         assert_eq!(
-            parse_hyprpaper_conf("wallpaper {\n    monitor = DP-1\n    path = ~/x.png # hi\n}\n").as_deref(),
+            parse_hyprpaper_conf("wallpaper {\n    monitor = DP-1\n    path = ~/x.png # hi\n}\n")
+                .as_deref(),
             Some("~/x.png")
         );
         assert_eq!(
-            parse_awww_query("eDP-1: 1920x1080, scale: 1, currently displaying: image: /w/c.jpg\n").as_deref(),
+            parse_awww_query("eDP-1: 1920x1080, scale: 1, currently displaying: image: /w/c.jpg\n")
+                .as_deref(),
             Some("/w/c.jpg")
         );
-        let args: Vec<String> = ["swaybg", "-m", "fill", "-i", "/w/d.png"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["swaybg", "-m", "fill", "-i", "/w/d.png"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         assert_eq!(parse_swaybg_args(&args).as_deref(), Some("/w/d.png"));
         assert_eq!(
-            parse_kde_appletsrc("[Containments][1][Wallpaper][org.kde.image][General]\nImage=file:///w/e.png\n").as_deref(),
+            parse_kde_appletsrc(
+                "[Containments][1][Wallpaper][org.kde.image][General]\nImage=file:///w/e.png\n"
+            )
+            .as_deref(),
             Some("file:///w/e.png")
         );
         assert_eq!(
