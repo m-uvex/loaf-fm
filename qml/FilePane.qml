@@ -13,12 +13,13 @@ Item {
     id: pane
 
     property alias engine: paneEngine
-    property alias gridView: gridView
-    property alias groupedListView: groupedListView
-    property alias listView: listView
-    property alias groupedBgMouse: groupedBgMouse
-    property alias listBgMouse: listBgMouse
+    readonly property var gridView: gridViewLoader.item
+    readonly property var groupedListView: groupedListViewLoader.item
+    readonly property var listView: listViewLoader.item ? listViewLoader.item.listView : null
+    readonly property var groupedBgMouse: groupedListViewLoader.item ? groupedListViewLoader.item.bgMouse : null
+    readonly property var listBgMouse: listViewLoader.item ? listViewLoader.item.bgMouse : null
     property bool isActive: true
+    property bool closing: false
     property bool showHeader: true
     // Portal picker behavior: folders navigate, files are handed to the
     // picker through filePicked, and selection stays single when the
@@ -227,15 +228,21 @@ Item {
             text: qsTr("More…"),
             icon: "sliders-horizontal",
             separatorBefore: true,
-            action: function() { columnPickerDialog.open(); }
+            action: function() {
+                columnPickerDialogLoader.active = true;
+                if (columnPickerDialogLoader.item) columnPickerDialogLoader.item.open();
+            }
         });
         items.push({
             text: qsTr("Reset Default Columns"),
             icon: "arrow-counter-clockwise",
             action: function() { pane.resetColumns(); }
         });
-        headerColumnMenu.model = items;
-        headerColumnMenu.openAt(mx, my);
+        headerColumnMenuLoader.active = true;
+        if (headerColumnMenuLoader.item) {
+            headerColumnMenuLoader.item.model = items;
+            headerColumnMenuLoader.item.openAt(mx, my);
+        }
     }
 
     Component.onCompleted: pane.syncExtraColumns()
@@ -252,7 +259,7 @@ Item {
         id: midnightTimer
         interval: 15000
         repeat: true
-        running: true
+        running: pane.visible
         property string lastDateKey: Qt.formatDate(new Date(), "yyyy-MM-dd")
         onTriggered: {
             var key = Qt.formatDate(new Date(), "yyyy-MM-dd");
@@ -424,7 +431,7 @@ Item {
     }
 
     function cols() {
-        return isList() ? 1 : Math.max(1, Math.floor(gridView.width / gridView.cellWidth));
+        return isList() ? 1 : Math.max(1, Math.floor(stage.width / pane.cellW));
     }
 
     function isList() {
@@ -568,13 +575,14 @@ Item {
         if (row < 0)
             return;
         if (isList()) {
-            listView.positionViewAtIndex(row, ListView.Contain);
+            if (listView)
+                listView.positionViewAtIndex(row, ListView.Contain);
         } else if (isGroupedGrid()) {
             var m = groupedFileToVisual[row];
-            if (m) {
+            if (m && groupedListView) {
                 groupedListView.positionViewAtIndex(m.visualRow, ListView.Contain);
             }
-        } else {
+        } else if (gridView) {
             gridView.positionViewAtIndex(row, GridView.Contain);
         }
     }
@@ -677,7 +685,7 @@ Item {
         if (dragManager.isRmb) {
             var pt = mouseItem ? mouseItem.mapToItem(window.contentItem, drop.x, drop.y)
                                : Qt.point(drop.x, drop.y);
-            rmbDropMenu.showAt(pt.x, pt.y, paths, destPath);
+            window.showRmbDropMenu(pt.x, pt.y, paths, destPath);
         } else {
             window.handleDrop(paths, destPath, asCopy);
         }
@@ -778,6 +786,7 @@ Item {
             id: stage
             Layout.fillWidth: true
             Layout.fillHeight: true
+            onWidthChanged: pane.updateVisualRows()
             transform: Translate { id: stageShift; y: 0 }
             // Connected selection.
             //
@@ -809,24 +818,31 @@ Item {
                 // selection the canvas is blank and repaint noise is
                 // unwanted work (one raster repaint per scroll frame).
                 Connections {
-                    target: gridView
+                    target: pane.gridView
+                    enabled: pane.selectedCount > 0 && target !== null
                     function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onContentXChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
+                    function onCellWidthChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
+                    function onCellHeightChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                 }
                 Connections {
-                    target: groupedListView
+                    target: pane.groupedListView
+                    enabled: pane.selectedCount > 0 && target !== null
                     function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                 }
                 Connections {
-                    target: listView
+                    target: pane.listView
+                    enabled: pane.selectedCount > 0 && target !== null
                     function onContentYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onOriginYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onYChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onWidthChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
                     function onHeightChanged() { if (pane.selectedCount > 0) selectionCanvas.requestPaint(); }
+                    function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                 }
                 Connections {
                     target: paneEngine
@@ -843,16 +859,6 @@ Item {
                     function onModelReset() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                     function onItem_countChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                     function onLayoutChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
-                }
-                Connections {
-                    target: gridView
-                    function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
-                    function onCellWidthChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
-                    function onCellHeightChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
-                }
-                Connections {
-                    target: listView
-                    function onCountChanged() { if (pane.selectedCount > 0) repaintTimer.restart(); }
                 }
 
                 // Rows settle a frame or two after the model changes, so paint
@@ -912,14 +918,17 @@ Item {
                 // rows to their adjacent materialized neighbour.
                 function buildListLayout(visible, groups) {
                     var rowH = pane.listRowH;
-                    var pitch = rowH + listView.spacing;
+                    var lv = pane.listView;
+                    if (!lv)
+                        return { rowH: rowH, pitch: rowH + 3, groups: groups, groupOf: {}, ly: {} };
+                    var pitch = rowH + lv.spacing;
                     var groupOf = {};
                     var itemY = {};
                     for (var i = 0; i < visible.length; ++i) {
                         var idx = visible[i];
                         if (groups)
                             groupOf[idx] = groupIndexFor(groups, idx);
-                        var del = listView.itemAtIndex(idx);
+                        var del = lv.itemAtIndex(idx);
                         if (del)
                             itemY[idx] = del.y;
                     }
@@ -937,12 +946,12 @@ Item {
                             itemY[bi] = itemY[bn] - pitch - (sameGrp(bi, bn) ? 0 : 28);
                     }
                     var ly = {};
-                    var baseOffset = listView.y - listView.contentY;
+                    var baseOffset = lv.y - lv.contentY;
                     for (var k = 0; k < visible.length; ++k) {
                         var ki = visible[k];
                         var yVal = itemY[ki];
                         if (yVal === undefined)
-                            yVal = listView.originY + ki * pitch + (groups && groupOf[ki] >= 0 ? (groupOf[ki] + 1) * 28 : 0);
+                            yVal = lv.originY + ki * pitch + (groups && groupOf[ki] >= 0 ? (groupOf[ki] + 1) * 28 : 0);
                         ly[ki] = Math.round(baseOffset + yVal);
                     }
                     return {
@@ -1012,11 +1021,11 @@ Item {
                     var loops = traceLoops(segs);
                     var rad = ctxRadius();
                     ctx.save();
-                    if (isList) {
+                    if (isList && pane.listView) {
                         // Clip to listView so scrolled-up selections never bleed
                         // into the header gap or behind listHeader.
                         ctx.beginPath();
-                        ctx.rect(listView.x, listView.y, listView.width, listView.height);
+                        ctx.rect(pane.listView.x, pane.listView.y, pane.listView.width, pane.listView.height);
                         ctx.clip();
                     }
                     ctx.beginPath();
@@ -1040,6 +1049,9 @@ Item {
                     traced = traced || {};
                     var on = function (n) { return n >= 0 && !!traced[n] && !!sel[n]; };
                     if (pane.isList()) {
+                        var lv = pane.listView;
+                        if (!lv)
+                            return { x0: 0, x1: 0, y0: 0, y1: 0, up: false, down: false, left: false, right: false };
                         if (!listLayout) {
                             var near = [];
                             if (idx > 0) near.push(idx - 1);
@@ -1066,7 +1078,7 @@ Item {
                         var up = canJoin(idx - 1);
                         var down = canJoin(idx);
                         return {
-                            x0: 2, x1: listView.width - 2,
+                            x0: 2, x1: lv.width - 2,
                             // Rows are spaced apart: a selected neighbour in the
                             // same group pulls the edge across the gap so the run
                             // is continuous and meets the next row's top exactly.
@@ -1076,8 +1088,9 @@ Item {
                         };
                     }
                     if (pane.isGroupedGrid()) {
+                        var glv = pane.groupedListView;
                         var m = pane.groupedFileToVisual[idx];
-                        if (!m) return { x0: 0, x1: 0, y0: 0, y1: 0, up: false, down: false, left: false, right: false };
+                        if (!m || !glv) return { x0: 0, x1: 0, y0: 0, y1: 0, up: false, down: false, left: false, right: false };
                         var vRow = pane.groupedRows[m.visualRow];
                         var c = m.col;
                         var cw = pane.cellW;
@@ -1091,13 +1104,15 @@ Item {
                         return {
                             x0: Math.round(c * cw),
                             x1: Math.round((c + 1) * cw),
-                            y0: Math.round(vRow.y - groupedListView.contentY),
-                            y1: Math.round(vRow.y + ch - groupedListView.contentY),
+                            y0: Math.round(vRow.y - glv.contentY),
+                            y1: Math.round(vRow.y + ch - glv.contentY),
                             up: isUp, down: isDown, left: isLeft, right: isRight
                         };
                     }
-                    var cw = gridView.cellWidth;
-                    var ch = gridView.cellHeight;
+                    var gv = pane.gridView;
+                    if (!gv) return { x0: 0, x1: 0, y0: 0, y1: 0, up: false, down: false, left: false, right: false };
+                    var cw = gv.cellWidth;
+                    var ch = gv.cellHeight;
                     var c = idx % cols;
                     var row = Math.floor(idx / cols);
                     var isUp = idx >= cols && on(idx - cols);
@@ -1107,10 +1122,10 @@ Item {
                     // No inset: cells must share their corners so two cells
                     // touching diagonally can be joined by one smooth outline.
                     return {
-                        x0: Math.round(c * cw - gridView.contentX),
-                        x1: Math.round((c + 1) * cw - gridView.contentX),
-                        y0: Math.round(row * ch - gridView.contentY),
-                        y1: Math.round((row + 1) * ch - gridView.contentY),
+                        x0: Math.round(c * cw - gv.contentX),
+                        x1: Math.round((c + 1) * cw - gv.contentX),
+                        y0: Math.round(row * ch - gv.contentY),
+                        y1: Math.round((row + 1) * ch - gv.contentY),
                         up: isUp, down: isDown, left: isLeft, right: isRight
                     };
                 }
@@ -1122,17 +1137,20 @@ Item {
                     if (count <= 0)
                         return out;
                     if (pane.isList()) {
+                        var lv = pane.listView;
+                        if (!lv)
+                            return out;
                         var rowH = pane.listRowH;
-                        var pitch = rowH + listView.spacing;
-                        var topY = listView.contentY;
-                        var bottomY = topY + listView.height;
+                        var pitch = rowH + lv.spacing;
+                        var topY = lv.contentY;
+                        var bottomY = topY + lv.height;
                         var first = -1, last = -1;
-                        if (listView.height > 0 && listView.width > 0) {
+                        if (lv.height > 0 && lv.width > 0) {
                             var step = Math.max(8, Math.min(20, Math.floor(rowH / 2)));
-                            var probeX = Math.min(10, listView.width / 2);
-                            var maxScanY = Math.min(bottomY, listView.originY + listView.contentHeight);
+                            var probeX = Math.min(10, lv.width / 2);
+                            var maxScanY = Math.min(bottomY, lv.originY + lv.contentHeight);
                             for (var py = topY; py <= maxScanY; py += step) {
-                                var hit = listView.indexAt(probeX, py);
+                                var hit = lv.indexAt(probeX, py);
                                 if (hit >= 0) {
                                     first = hit;
                                     break;
@@ -1140,7 +1158,7 @@ Item {
                             }
                             if (first >= 0) {
                                 for (var py2 = Math.max(topY, maxScanY - 1); py2 >= topY; py2 -= step) {
-                                    var hit2 = listView.indexAt(probeX, py2);
+                                    var hit2 = lv.indexAt(probeX, py2);
                                     if (hit2 >= 0) {
                                         last = hit2;
                                         break;
@@ -1161,36 +1179,42 @@ Item {
                         if (groups) {
                             for (var g = 0; g < groups.length; ++g) {
                                 var grp = groups[g];
-                                var headerOffset = listView.originY + (g + 1) * 28;
+                                var headerOffset = lv.originY + (g + 1) * 28;
                                 var min_i = Math.max(grp.start, Math.floor((topY - pitch - headerOffset) / pitch));
                                 var max_i = Math.min(grp.start + grp.count - 1, Math.ceil((bottomY + pitch - headerOffset) / pitch));
                                 for (var r = min_i; r <= max_i; ++r)
                                     out.push(r);
                             }
                         } else {
-                            var f0 = Math.max(0, Math.floor((topY - listView.originY) / pitch) - 1);
-                            var l0 = Math.min(count - 1, Math.ceil((bottomY - listView.originY) / pitch) + 1);
+                            var f0 = Math.max(0, Math.floor((topY - lv.originY) / pitch) - 1);
+                            var l0 = Math.min(count - 1, Math.ceil((bottomY - lv.originY) / pitch) + 1);
                             for (var u = f0; u <= l0; ++u)
                                 out.push(u);
                         }
                         return out;
                     }
                     if (pane.isGroupedGrid()) {
+                        var glv = pane.groupedListView;
+                        if (!glv)
+                            return out;
                         for (var i = 0; i < pane.groupedRows.length; ++i) {
                             var r = pane.groupedRows[i];
                             if (r.isHeader)
                                 continue;
-                            if (r.y + pane.cellH >= groupedListView.contentY - pane.cellH && r.y <= groupedListView.contentY + height + pane.cellH) {
+                            if (r.y + pane.cellH >= glv.contentY - pane.cellH && r.y <= glv.contentY + height + pane.cellH) {
                                 for (var c = 0; c < r.count; ++c)
                                     out.push(r.startIndex + c);
                             }
                         }
                         return out;
                     }
+                    var gv = pane.gridView;
+                    if (!gv)
+                        return out;
                     var cols = pane.cols();
-                    var ch = gridView.cellHeight;
-                    var r0 = Math.max(0, Math.floor(gridView.contentY / ch) - 1);
-                    var r1 = Math.min(Math.floor((count - 1) / cols), Math.ceil((gridView.contentY + height) / ch) + 1);
+                    var ch = gv.cellHeight;
+                    var r0 = Math.max(0, Math.floor(gv.contentY / ch) - 1);
+                    var r1 = Math.min(Math.floor((count - 1) / cols), Math.ceil((gv.contentY + height) / ch) + 1);
                     for (var r = r0; r <= r1; ++r) {
                         for (var c = 0; c < cols; ++c) {
                             var idx = r * cols + c;
@@ -1346,17 +1370,39 @@ Item {
                     pane.handleDropOn(drop, pane.dropTargetDir(), emptyDrop);
                 }
             }
+            Loader {
+                id: gridViewLoader
+                anchors.fill: parent
+                z: 1
+                readonly property bool wantActive: !pane.isList() && !pane.isGroupedGrid()
+                visible: opacity > 0.01
+                opacity: wantActive ? 1.0 : 0.0
+                scale: wantActive ? 1.0 : 0.97
+                enabled: visible
+                readonly property bool wantModel: !pane.closing && (wantActive || visible)
+                active: false
+                Component.onCompleted: if (wantModel) active = true
+                onWantModelChanged: {
+                    if (wantModel) {
+                        gridViewUnload.stop();
+                        active = true;
+                    } else if (active) {
+                        gridViewUnload.restart();
+                    }
+                }
+                Timer {
+                    id: gridViewUnload
+                    interval: 80
+                    onTriggered: if (!gridViewLoader.wantModel) gridViewLoader.active = false
+                }
+                onLoaded: if (pane.selectedCount > 0) repaintTimer.restart()
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                sourceComponent: Component {
             GridView {
                 id: gridView
                 anchors.fill: parent
-                z: 1
-                visible: opacity > 0.01
-                opacity: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.0
-                scale: (!pane.isList() && !pane.isGroupedGrid()) ? 1.0 : 0.97
-                enabled: visible
                 clip: true
-                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 cellWidth: pane.cellW
                 cellHeight: pane.cellH
                 cacheBuffer: theme.lowPower ? 0 : cellHeight * 2
@@ -1364,7 +1410,7 @@ Item {
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: true
-                model: visible ? paneEngine : null
+                model: gridViewLoader.wantModel ? paneEngine : null
                 focus: false
                 Accessible.role: Accessible.List
                 Accessible.name: paneEngine.current_dir_name
@@ -1544,20 +1590,45 @@ Item {
                     itemStarred: starred
                 }
             }
+                }
+            }
 
-            ListView {
-                id: groupedListView
+            Loader {
+                id: groupedListViewLoader
                 anchors.fill: parent
                 z: 1
+                readonly property bool wantActive: pane.isGroupedGrid()
                 visible: opacity > 0.01
-                opacity: pane.isGroupedGrid() ? 1.0 : 0.0
-                scale: pane.isGroupedGrid() ? 1.0 : 0.97
+                opacity: wantActive ? 1.0 : 0.0
+                scale: wantActive ? 1.0 : 0.97
                 enabled: visible
+                readonly property bool wantModel: !pane.closing && (wantActive || visible)
+                active: false
+                Component.onCompleted: if (wantModel) active = true
+                onWantModelChanged: {
+                    if (wantModel) {
+                        groupedListViewUnload.stop();
+                        active = true;
+                    } else if (active) {
+                        groupedListViewUnload.restart();
+                    }
+                }
+                Timer {
+                    id: groupedListViewUnload
+                    interval: 80
+                    onTriggered: if (!groupedListViewLoader.wantModel) groupedListViewLoader.active = false
+                }
+                onLoaded: if (pane.selectedCount > 0) repaintTimer.restart()
+                sourceComponent: Component {
+            ListView {
+                id: groupedListView
+                property alias bgMouse: groupedBgMouse
+                anchors.fill: parent
                 clip: true
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: true
-                model: visible ? pane.groupedRows : null
+                model: groupedListViewLoader.wantModel ? pane.groupedRows : null
                 focus: false
                 Accessible.role: Accessible.List
                 Accessible.name: paneEngine.current_dir_name
@@ -1767,6 +1838,43 @@ Item {
                     }
                 }
             }
+                }
+            }
+
+            Loader {
+                id: listViewLoader
+                anchors.fill: parent
+                z: 1
+                readonly property bool wantActive: pane.isList()
+                visible: opacity > 0.01
+                opacity: wantActive ? 1.0 : 0.0
+                scale: wantActive ? 1.0 : 0.97
+                enabled: visible
+                readonly property bool wantModel: !pane.closing && (wantActive || visible)
+                active: false
+                Component.onCompleted: if (wantModel) active = true
+                onWantModelChanged: {
+                    if (wantModel) {
+                        listViewUnload.stop();
+                        active = true;
+                    } else if (active) {
+                        listViewUnload.restart();
+                    }
+                }
+                Timer {
+                    id: listViewUnload
+                    interval: 80
+                    onTriggered: if (!listViewLoader.wantModel) listViewLoader.active = false
+                }
+                onLoaded: if (pane.selectedCount > 0) repaintTimer.restart()
+                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
+                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
+                sourceComponent: Component {
+            Item {
+                id: listContainer
+                anchors.fill: parent
+                property alias listView: listView
+                property alias bgMouse: listBgMouse
 
             Rectangle {
                 id: listHeader
@@ -1883,12 +1991,6 @@ Item {
             ListView {
                 id: listView
                 z: 1
-                visible: opacity > 0.01
-                opacity: pane.isList() ? 1.0 : 0.0
-                scale: pane.isList() ? 1.0 : 0.97
-                enabled: visible
-                Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: 190; easing.type: Easing.OutCubic } }
-                Behavior on scale { enabled: theme.animate; SpringAnimation { spring: theme.springFast; damping: theme.springFastDamping } }
                 anchors.top: listHeader.bottom
                 anchors.topMargin: 6
                 anchors.left: parent.left
@@ -1899,7 +2001,7 @@ Item {
                 cacheBuffer: theme.lowPower ? 0 : 400
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
-                model: visible ? paneEngine : null
+                model: listViewLoader.wantModel ? paneEngine : null
                 section.property: paneEngine.group_by !== "none" ? "group_label" : ""
                 section.criteria: ViewSection.FullString
                 section.delegate: Item {
@@ -2162,7 +2264,7 @@ Item {
                     readonly property bool isSelected: !!pane.selection[path]
                     readonly property bool isCut: !!window.cutSet[path]
                     readonly property bool isDropTarget: listDrop.containsDrag
-                    readonly property bool hasThumb: theme.showThumbnails && thumbable && listThumb.status === Image.Ready
+                    readonly property bool hasThumb: theme.showThumbnails && thumbable && listThumb.status === Image.Ready && (listThumb.implicitWidth > 1 || listThumb.implicitHeight > 1)
                     readonly property bool isCursor: window.keyboardNavActive && pane.isActive && pane.cursorPath === path
 
                     Accessible.role: Accessible.ListItem
@@ -2390,7 +2492,7 @@ Item {
                                 var pt = mapToItem(window.contentItem, mouse.x, mouse.y);
                                 window.openItemMenu(pane, row.index, pt.x, pt.y);
                             } else {
-                                contextMenu.close();
+                                window.closeContextMenu();
                                 if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
                                     pane.openRow(row.index);
                                     return;
@@ -2405,127 +2507,146 @@ Item {
                     }
                 }
             }
-        }
-    }
-
-    LoafMenu {
-        id: headerColumnMenu
-        parent: Overlay.overlay
-        model: []
-        menuMinWidth: 210
-    }
-
-    LoafDialog {
-        id: columnPickerDialog
-        title: qsTr("Choose Details")
-        dialogWidth: 440
-        property string filterText: ""
-        property string activeCat: "All"
-
-        onOpened: {
-            filterText = "";
-            activeCat = "All";
-        }
-
-        TextField {
-            Layout.fillWidth: true
-            placeholderText: qsTr("Search attributes (e.g. ISO, Camera ID, Duration)…")
-            text: columnPickerDialog.filterText
-            onTextChanged: columnPickerDialog.filterText = text
-            color: theme.textMain
-            placeholderTextColor: theme.textMuted
-            background: Rectangle {
-                radius: theme.radiusM
-                color: theme.surfaceContainer
-                border.width: 1
-                border.color: theme.outlineAlpha(theme.outlineVariant)
             }
-        }
-
-        Flow {
-            Layout.fillWidth: true
-            spacing: 6
-            Repeater {
-                model: ["All", "Basic", "File System", "Camera & Photo", "Audio & Video", "Document"]
-                delegate: LoafButton {
-                    required property string modelData
-                    text: modelData
-                    variant: columnPickerDialog.activeCat === modelData ? "filled" : "tonal"
-                    onClicked: columnPickerDialog.activeCat = modelData
                 }
             }
         }
+    }
 
-        ListView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 300
-            clip: true
-            spacing: 2
-            model: {
-                var q = columnPickerDialog.filterText.trim().toLowerCase();
-                var cat = columnPickerDialog.activeCat;
-                return pane.allOptionalColumns.filter(function(c) {
-                    if (cat !== "All" && c.category !== cat)
-                        return false;
-                    if (q.length > 0 && c.label.toLowerCase().indexOf(q) === -1 && c.key.toLowerCase().indexOf(q) === -1)
-                        return false;
-                    return true;
-                });
+    Loader {
+        id: headerColumnMenuLoader
+        active: false
+        sourceComponent: Component {
+            LoafMenu {
+                id: headerColumnMenu
+                parent: Overlay.overlay
+                model: []
+                menuMinWidth: 210
             }
-            delegate: Rectangle {
-                required property var modelData
-                readonly property bool isOn: pane.visibleColumnKeys.indexOf(modelData.key) !== -1
-                width: ListView.view.width
-                height: 34
-                radius: theme.radiusM
-                color: colRowMouse.containsMouse ? theme.hoverOverlay : "transparent"
+        }
+        Connections { target: headerColumnMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { headerColumnMenuUnload.restart(); } }
+        Timer { id: headerColumnMenuUnload; interval: 1500; onTriggered: if (headerColumnMenuLoader.item && !headerColumnMenuLoader.item.visible) headerColumnMenuLoader.active = false }
+    }
+
+    Loader {
+        id: columnPickerDialogLoader
+        active: false
+        sourceComponent: Component {
+            LoafDialog {
+                id: columnPickerDialog
+                title: qsTr("Choose Details")
+                dialogWidth: 440
+                property string filterText: ""
+                property string activeCat: "All"
+
+                onOpened: {
+                    filterText = "";
+                    activeCat = "All";
+                }
+
+                TextField {
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Search attributes (e.g. ISO, Camera ID, Duration)…")
+                    text: columnPickerDialog.filterText
+                    onTextChanged: columnPickerDialog.filterText = text
+                    color: theme.textMain
+                    placeholderTextColor: theme.textMuted
+                    background: Rectangle {
+                        radius: theme.radiusM
+                        color: theme.surfaceContainer
+                        border.width: 1
+                        border.color: theme.outlineAlpha(theme.outlineVariant)
+                    }
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Repeater {
+                        model: ["All", "Basic", "File System", "Camera & Photo", "Audio & Video", "Document"]
+                        delegate: LoafButton {
+                            required property string modelData
+                            text: modelData
+                            variant: columnPickerDialog.activeCat === modelData ? "filled" : "tonal"
+                            onClicked: columnPickerDialog.activeCat = modelData
+                        }
+                    }
+                }
+
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 300
+                    clip: true
+                    spacing: 2
+                    model: {
+                        var q = columnPickerDialog.filterText.trim().toLowerCase();
+                        var cat = columnPickerDialog.activeCat;
+                        return pane.allOptionalColumns.filter(function(c) {
+                            if (cat !== "All" && c.category !== cat)
+                                return false;
+                            if (q.length > 0 && c.label.toLowerCase().indexOf(q) === -1 && c.key.toLowerCase().indexOf(q) === -1)
+                                return false;
+                            return true;
+                        });
+                    }
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool isOn: pane.visibleColumnKeys.indexOf(modelData.key) !== -1
+                        width: ListView.view.width
+                        height: 34
+                        radius: theme.radiusM
+                        color: colRowMouse.containsMouse ? theme.hoverOverlay : "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            spacing: 10
+                            LoafIcon {
+                                name: isOn ? "check-square" : "square"
+                                size: 16
+                                color: isOn ? theme.primary : theme.textMuted
+                            }
+                            Text {
+                                text: modelData.label
+                                color: theme.textMain
+                                font.pixelSize: theme.fs(12)
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                text: modelData.category
+                                color: theme.textMuted
+                                font.pixelSize: theme.fs(10)
+                            }
+                        }
+                        MouseArea {
+                            id: colRowMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: pane.toggleColumn(modelData.key)
+                        }
+                    }
+                }
 
                 RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: 10
-                    LoafIcon {
-                        name: isOn ? "check-square" : "square"
-                        size: 16
-                        color: isOn ? theme.primary : theme.textMuted
+                    Layout.fillWidth: true
+                    LoafButton {
+                        text: qsTr("Reset Defaults")
+                        variant: "ghost"
+                        onClicked: pane.resetColumns()
                     }
-                    Text {
-                        text: modelData.label
-                        color: theme.textMain
-                        font.pixelSize: theme.fs(12)
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
+                    Item { Layout.fillWidth: true }
+                    LoafButton {
+                        text: qsTr("Done")
+                        variant: "filled"
+                        onClicked: columnPickerDialog.close()
                     }
-                    Text {
-                        text: modelData.category
-                        color: theme.textMuted
-                        font.pixelSize: theme.fs(10)
-                    }
-                }
-                MouseArea {
-                    id: colRowMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: pane.toggleColumn(modelData.key)
                 }
             }
         }
-
-        RowLayout {
-            Layout.fillWidth: true
-            LoafButton {
-                text: qsTr("Reset Defaults")
-                variant: "ghost"
-                onClicked: pane.resetColumns()
-            }
-            Item { Layout.fillWidth: true }
-            LoafButton {
-                text: qsTr("Done")
-                variant: "filled"
-                onClicked: columnPickerDialog.close()
-            }
-        }
+        Connections { target: columnPickerDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { columnPickerUnload.restart(); } }
+        Timer { id: columnPickerUnload; interval: 1500; onTriggered: if (columnPickerDialogLoader.item && !columnPickerDialogLoader.item.visible) columnPickerDialogLoader.active = false }
     }
 }
