@@ -30,6 +30,7 @@ Item {
 
     readonly property bool isSelected: !!(viewPane && viewPane.selection && viewPane.selection[itemPath])
     readonly property bool isCut: !!(hostWindow && hostWindow.cutSet && hostWindow.cutSet[itemPath])
+    readonly property bool isRenaming: !!(viewPane && viewPane.renamingPath === itemPath)
     readonly property int cols: viewPane ? viewPane.cols() : 1
     readonly property int col: itemIndex % Math.max(1, cols)
     readonly property int rowIdx: Math.floor(itemIndex / Math.max(1, cols))
@@ -78,7 +79,7 @@ Item {
 
     ColumnLayout {
         id: cardContentCol
-        opacity: card.isCut ? 0.52 : 1.0
+        opacity: card.isCut ? 0.52 : (card.itemName.startsWith(".") && !card.isRenaming ? 0.8 : 1.0)
         Behavior on opacity { enabled: theme.animate; NumberAnimation { duration: theme.durationFast } }
         anchors.fill: parent
         anchors.margins: 12 * (viewPane ? viewPane.chromeScale : 1)
@@ -170,7 +171,7 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 30
             active: true
-            sourceComponent: (viewPane && viewPane.renamingPath === card.itemPath) ? renameEditor : nameLabel
+            sourceComponent: card.isRenaming ? renameEditor : nameLabel
 
             Component {
                 id: nameLabel

@@ -2190,6 +2190,8 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
+                            opacity: row.name.startsWith(".") && !row.isCut
+                                && pane.renamingPath !== row.path ? 0.8 : 1.0
 
                             Item {
                                 width: 22; height: 22
