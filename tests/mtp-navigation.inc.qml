@@ -86,14 +86,14 @@ function mtpReadWrite(storage, stay) {
     window.mtpTestOperation = null;
     window.defocusInputs();
     mtpEvents.keyClick(Qt.Key_N, Qt.ControlModifier | Qt.ShiftModifier);
-    mtpWait(function() { return inputModal.visible; }, "New folder UI did not open");
+    mtpWait(function() { return !!(inputModal && inputModal.visible); }, "New folder UI did not open");
     mtpEvents.wait(240);
     mtpTypeText(testName); mtpEvents.keyClick(Qt.Key_Return);
     mtpWait(function() { return !core.busy && window.mtpTestOperation && window.mtpTestOperation.kind === "mtp-create"; }, "Folder creation did not finish");
     mtpCheck(window.mtpTestOperation.ok && window.mtpTestOperation.result.created.length === 1, "Folder creation failed: " + toastItem.message);
     var ownedPath = window.mtpTestOperation.result.created[0];
     mtpWait(function() { return !!mtpMaybeItem(testName); }, "Created folder is not listed");
-    mtpWait(function() { return !inputModal.visible; }, "New folder dialog did not close");
+    mtpWait(function() { return !(inputModal && inputModal.visible); }, "New folder dialog did not close");
     mtpEvents.wait(60);
     var testPath = mtpOpenFolder(testName);
     mtpCheck(testPath === ownedPath, "Created test folder identity mismatch");
@@ -170,13 +170,13 @@ function mtpReadWrite(storage, stay) {
     mtpCheck(mtpItem("empty.txt").size === 0, "Created file is not empty");
     engine.set_path(storage); mtpLoaded(storage);
     window.activePane.selectPaths([testPath]); window.defocusInputs(); mtpEvents.keyClick(Qt.Key_Delete);
-    mtpWait(function() { return confirmDialog.visible; }, "Permanent-delete confirmation missing");
+    mtpWait(function() { return !!(confirmDialog && confirmDialog.visible); }, "Permanent-delete confirmation missing");
     mtpEvents.wait(250);
     var confirm = mtpFind(confirmDialog.contentItem, function(item) { return item.text === qsTr("Delete") && item.visible && item.width > 0; });
     mtpCheck(!!confirm, "Delete confirmation button missing");
     var point = confirm.mapToItem(window.contentItem, confirm.width / 2, confirm.height / 2);
     mtpEvents.mouseClick(window.contentItem, point.x, point.y, Qt.LeftButton);
-    mtpWait(function() { return !core.busy && !confirmDialog.visible && !mtpMaybeItem(testName); }, "Created phone folder was not deleted");
+    mtpWait(function() { return !core.busy && !(confirmDialog && confirmDialog.visible) && !mtpMaybeItem(testName); }, "Created phone folder was not deleted");
     mtpCheck(window.mtpTestOperation.ok, "Delete reported failure: " + toastItem.message);
     console.log("MTP_UI_TEST_READ_WRITE_PASS");
 }

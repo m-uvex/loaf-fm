@@ -342,9 +342,9 @@ function runAllTests() {
             waitMs(60);
             var grouped = grouping !== "none";
             var combination = "group=" + grouping + ", sort=" + sorting;
-            check(p.gridView.visible === !grouped, "Flat grid visibility: " + combination);
-            check(p.groupedListView.visible === grouped, "Grouped grid visibility: " + combination);
-            check(!p.listView.visible, "List remains hidden in grid mode: " + combination);
+            check(Boolean(p.gridView && p.gridView.visible) === !grouped, "Flat grid visibility: " + combination);
+            check(Boolean(p.groupedListView && p.groupedListView.visible) === grouped, "Grouped grid visibility: " + combination);
+            check(!(p.listView && p.listView.visible), "List remains hidden in grid mode: " + combination);
             var activeGrid = grouped ? p.groupedListView : p.gridView;
             check(activeGrid.count > 0, "Active grid has rows: " + combination);
             p.ensureVisible(0);
