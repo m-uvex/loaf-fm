@@ -602,41 +602,48 @@ impl qobject::LoafEngine {
             return QVariant::default();
         };
         let s = |v: &str| QVariant::from(&QString::from(v));
-        match ROLES
-            .get((role - ROLE_BASE) as usize)
-            .copied()
-            .unwrap_or("")
-        {
-            "name" => s(&e.name),
-            "path" => s(&e.path),
-            "is_dir" => QVariant::from(&e.is_dir),
-            "is_symlink" => QVariant::from(&e.is_symlink),
-            "is_hidden" => QVariant::from(&e.is_hidden),
-            "size" => QVariant::from(&(e.size as i64)),
-            "size_str" => s(&if e.is_dir {
-                "-".to_string()
-            } else {
-                util::format_size(e.size)
-            }),
-            "modified" => QVariant::from(&e.modified),
-            "icon" => s(e.icon),
-            "system_icon" => s(e.system_icon),
-            "category" => s(e.category),
-            "thumbable" => QVariant::from(&e.thumbable),
-            "thumb_id" => s(&if e.thumbable {
-                format!("{}-{}", hex_path(&e.path), e.modified)
-            } else {
-                String::new()
-            }),
-            "detail" | "parent_path" => s(&e.detail),
-            "display_name" => s(&e.display_name),
-            "starred" => QVariant::from(&self.starred.contains(&e.path)),
-            "date_group" => s(&listing::date_group_label(e.modified, &self.date_ctx)),
-            "group_label" => s(&listing::group_label(
-                e,
-                &self.group_by().to_string(),
-                &self.date_ctx,
-            )),
+        // Integer dispatch (indices follow ROLES): no string compares per read.
+        match role - ROLE_BASE {
+            0 => s(&e.name),
+            1 => s(&e.path),
+            2 => QVariant::from(&e.is_dir),
+            3 => QVariant::from(&e.is_symlink),
+            4 => QVariant::from(&e.is_hidden),
+            5 => QVariant::from(&(e.size as i64)),
+            6 => {
+                if e.is_dir {
+                    s("-")
+                } else {
+                    s(&util::format_size(e.size))
+                }
+            }
+            7 => QVariant::from(&e.modified),
+            8 => s(e.icon),
+            9 => s(e.system_icon),
+            10 => s(e.category),
+            11 => QVariant::from(&e.thumbable),
+            12 => {
+                if e.thumbable {
+                    use std::fmt::Write;
+                    let mut id = hex_path(&e.path);
+                    let _ = write!(id, "-{}", e.modified);
+                    s(&id)
+                } else {
+                    s("")
+                }
+            }
+            13 | 16 => s(&e.detail),
+            14 => s(&e.display_name),
+            15 => QVariant::from(&self.starred.contains(&e.path)),
+            17 => s(&listing::date_group_label(e.modified, &self.date_ctx)),
+            18 => {
+                let gb = self.group_by().to_string();
+                if gb == "none" {
+                    s("")
+                } else {
+                    s(&listing::group_label(e, &gb, &self.date_ctx))
+                }
+            }
             _ => QVariant::default(),
         }
     }
