@@ -14,6 +14,7 @@ Item {
     // and settings cards. Text, icons, menus and dialogs stay out of this, so
     // this only fades the backing behind them.
     property real panelOpacity: 0.65
+    property bool submenuEffects: false
 
     readonly property real effectiveBackgroundOpacity: lowPower ? 1.0
         : (isFinite(backgroundOpacity) ? Math.max(0.0, Math.min(1.0, backgroundOpacity)) : 1.0)
@@ -2374,6 +2375,8 @@ Item {
         value = readSetting("panelOpacity");
         if (value.trim().length > 0 && isFinite(Number(value)))
             panelOpacity = Math.max(0.0, Math.min(1.0, Number(value)));
+        value = readSetting("submenuEffects");
+        if (value.length > 0) submenuEffects = (value === "true");
         value = readSetting("accentName");
         if (value.length > 0) accentName = value;
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)
@@ -2528,6 +2531,7 @@ Item {
     onThemeModeChanged: writeSetting("themeMode", themeMode)
     onBackgroundOpacityChanged: writeSetting("backgroundOpacity", backgroundOpacity)
     onPanelOpacityChanged: writeSetting("panelOpacity", panelOpacity)
+    onSubmenuEffectsChanged: writeSetting("submenuEffects", submenuEffects ? "true" : "false")
     onAccentNameChanged: {
         writeSetting("accentName", accentName);
         if (accentName === "wallpaper" && typeof core !== "undefined" && core)

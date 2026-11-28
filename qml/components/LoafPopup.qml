@@ -10,7 +10,7 @@ Popup {
     id: popup
 
     property real contentPadding: 10
-    property color surfaceColor: theme.menuSurface
+    property color surfaceColor: theme.submenuEffects ? theme.backdropSurface(theme.menuSurface) : theme.menuSurface
     property color borderColor: theme.outlineAlpha(theme.borderSubtle)
     property real surfaceRadius: theme.radiusL
 
@@ -52,6 +52,8 @@ Popup {
             anchors.topMargin: 3
             anchors.bottomMargin: -3
             radius: popup.surfaceRadius
+            // The filled shadow overlaps the surface and would darken a translucent backing.
+            visible: !theme.submenuEffects || theme.effectivePanelOpacity >= 1.0
             color: theme.shadow
         }
         Rectangle {
