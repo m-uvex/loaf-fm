@@ -229,9 +229,13 @@ Window {
                     nameField.text = "";
                     return;
                 }
-                overwriteDialog.targets = [target];
-                overwriteDialog.existingCount = 1;
-                overwriteDialog.open();
+                overwriteDialogLoader.active = true;
+                var od1 = overwriteDialogLoader.item;
+                if (od1) {
+                    od1.targets = [target];
+                    od1.existingCount = 1;
+                    od1.open();
+                }
                 return;
             }
             respond(0, [target]);
@@ -251,9 +255,13 @@ Window {
                     existing.push(uris[j]);
             }
             if (existing.length > 0) {
-                overwriteDialog.targets = uris;
-                overwriteDialog.existingCount = existing.length;
-                overwriteDialog.open();
+                overwriteDialogLoader.active = true;
+                var od2 = overwriteDialogLoader.item;
+                if (od2) {
+                    od2.targets = uris;
+                    od2.existingCount = existing.length;
+                    od2.open();
+                }
                 return;
             }
             respond(0, uris);
@@ -828,40 +836,48 @@ Window {
         }
     }
 
-    LoafDialog {
-        id: overwriteDialog
-        property var targets: []
-        property int existingCount: 0
-        readonly property bool many: existingCount > 1
-        width: 420
-        title: many ? qsTr("Replace files?") : qsTr("Replace file?")
+    Loader {
+        id: overwriteDialogLoader
+        active: false
+        sourceComponent: Component {
+            LoafDialog {
+                id: overwriteDialog
+                property var targets: []
+                property int existingCount: 0
+                readonly property bool many: existingCount > 1
+                width: 420
+                title: many ? qsTr("Replace files?") : qsTr("Replace file?")
 
-        Text {
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-            color: theme.textMain
-            font.pixelSize: theme.fs(13)
-            text: overwriteDialog.many
-                ? qsTr("%n of the files already exists in this folder. Replace it?", "", overwriteDialog.existingCount)
-                : qsTr("“%1” already exists. Replace it?").arg(overwriteDialog.targets.length > 0 ? overwriteDialog.targets[0].split("/").pop() : "")
-        }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: theme.textMain
+                    font.pixelSize: theme.fs(13)
+                    text: overwriteDialog.many
+                        ? qsTr("%n of the files already exists in this folder. Replace it?", "", overwriteDialog.existingCount)
+                        : qsTr("“%1” already exists. Replace it?").arg(overwriteDialog.targets.length > 0 ? overwriteDialog.targets[0].split("/").pop() : "")
+                }
 
-        RowLayout {
-            Layout.alignment: Qt.AlignRight
-            spacing: 10
-            LoafButton {
-                text: qsTr("Cancel")
-                variant: "text"
-                onClicked: overwriteDialog.close()
-            }
-            LoafButton {
-                text: qsTr("Replace")
-                variant: "danger"
-                onClicked: {
-                    overwriteDialog.close();
-                    respond(0, overwriteDialog.targets);
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight
+                    spacing: 10
+                    LoafButton {
+                        text: qsTr("Cancel")
+                        variant: "text"
+                        onClicked: overwriteDialog.close()
+                    }
+                    LoafButton {
+                        text: qsTr("Replace")
+                        variant: "danger"
+                        onClicked: {
+                            overwriteDialog.close();
+                            respond(0, overwriteDialog.targets);
+                        }
+                    }
                 }
             }
         }
+        Connections { target: overwriteDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { overwriteUnload.restart(); } }
+        Timer { id: overwriteUnload; interval: 1500; onTriggered: if (overwriteDialogLoader.item && !overwriteDialogLoader.item.visible) overwriteDialogLoader.active = false }
     }
 }

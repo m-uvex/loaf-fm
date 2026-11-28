@@ -394,7 +394,7 @@ Rectangle {
                         if (dropPath.length > 0) {
                             if (dragManager.isRmb) {
                                 var pt = mapToItem(window.contentItem, d.x, d.y);
-                                rmbDropMenu.showAt(pt.x, pt.y, paths, dropPath);
+                                window.showRmbDropMenu(pt.x, pt.y, paths, dropPath);
                             } else {
                                 window.handleDrop(paths, dropPath, asCopy);
                             }
@@ -465,7 +465,7 @@ Rectangle {
                 onFilesDropped: function(paths, asCopy, d) {
                     if (dragManager.isRmb) {
                         var pt = mapToItem(window.contentItem, d.x, d.y);
-                        rmbDropMenu.showAt(pt.x, pt.y, paths, "trash");
+                        window.showRmbDropMenu(pt.x, pt.y, paths, "trash");
                     } else {
                         core.trash_items(JSON.stringify(paths));
                     }

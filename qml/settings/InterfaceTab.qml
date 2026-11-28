@@ -659,8 +659,8 @@ ColumnLayout {
                     value: theme.contextMenuMode
                     onSelected: function(v) {
                         theme.contextMenuMode = v;
-                        if (v === "custom" && typeof customizeContextMenuDialog !== "undefined") {
-                            customizeContextMenuDialog.open();
+                        if (v === "custom" && typeof customizeContextMenuDialogLoader !== "undefined") {
+                            window.openLazy(customizeContextMenuDialogLoader, "open", []);
                         }
                     }
                 }
@@ -670,7 +670,7 @@ ColumnLayout {
                     text: qsTr("Edit…")
                     icon: "sliders"
                     variant: "tonal"
-                    onClicked: if (typeof customizeContextMenuDialog !== "undefined") customizeContextMenuDialog.open()
+                    onClicked: if (typeof customizeContextMenuDialogLoader !== "undefined") window.openLazy(customizeContextMenuDialogLoader, "open", [])
                 }
             }
         }
@@ -686,7 +686,7 @@ ColumnLayout {
                 text: qsTr("Customize Sidebar…")
                 icon: "sliders-horizontal"
                 variant: "tonal"
-                onClicked: if (typeof customizePlaces !== "undefined") customizePlaces.open()
+                onClicked: if (typeof customizePlacesLoader !== "undefined") window.openLazy(customizePlacesLoader, "open", [])
             }
         }
     }

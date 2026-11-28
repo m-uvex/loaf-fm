@@ -251,10 +251,19 @@ ApplicationWindow {
         pendingMountView = "";
     }
 
+    // Settings is rebuilt on demand (its tab is kept in settingsTab), so drop
+    // the whole view once it has been hidden for a while.
+    Timer {
+        id: settingsUnloadTimer
+        interval: 60000
+        onTriggered: if (window.activeView !== "settings") window.settingsOpened = false
+    }
+
     onActiveViewChanged: {
         searchInput.text = "";
-        if (activeView === "settings") settingsOpened = true;
-        else if (activeView === "pc") pcOpened = true;
+        if (activeView === "settings") { settingsUnloadTimer.stop(); settingsOpened = true; }
+        else if (settingsOpened) settingsUnloadTimer.restart();
+        if (activeView === "pc") pcOpened = true;
         else if (activeView === "files") searchRow.syncSearchBox();
         if (pendingMountDevice.length > 0 && activeView !== pendingMountView)
             cancelDriveOpen();
@@ -336,6 +345,11 @@ ApplicationWindow {
     readonly property var propsDialog: propsDialogLoader.item
     readonly property var batchRename: batchRenameLoader.item
     readonly property var conflictDialog: conflictDialogLoader.item
+    readonly property var inputModal: inputModalLoader.item
+    readonly property var passwordModal: passwordModalLoader.item
+    readonly property var confirmDialog: confirmDialogLoader.item
+    readonly property var rmbDropMenu: rmbDropMenuLoader.item
+    readonly property var viewMenu: viewMenuLoader.item
 
     function openQuickLook(path) {
         var preview = quickLookComponent.createObject(window.contentItem);
@@ -379,15 +393,47 @@ ApplicationWindow {
         if (quickLook && quickLook.visible)
             quickLook.close();
     }
+    // Opens a lazily loaded dialog or menu: creates it on first use, then calls fn(args).
+    function openLazy(loader, fn, args) {
+        loader.active = true;
+        var it = loader.item;
+        if (it) it[fn].apply(it, args);
+    }
+    function lazyVisible(loader) { return !!(loader.item && loader.item.visible); }
+    function askConfirm(t, msg, action, fn) { openLazy(confirmDialogLoader, "ask", [t, msg, action, fn]); }
+    function openPassword(req) { openLazy(passwordModalLoader, "openFor", [req]); }
+    function openContextMenu(items, mx, my) {
+        contextMenuLoader.active = true;
+        var m = contextMenuLoader.item;
+        if (!m) return;
+        m.model = items;
+        m.openAt(mx, my);
+    }
+    function closeContextMenu() {
+        if (contextMenuLoader.item)
+            contextMenuLoader.item.close();
+    }
+    function showRmbDropMenu(px, py, paths, dest, supported) {
+        openLazy(rmbDropMenuLoader, "showAt", [px, py, paths, dest, supported]);
+    }
     function openPropsDialog(paths) { propsDialogLoader.active = true; propsDialogLoader.item.showFor(paths); }
     function openBatchRename(items) { batchRenameLoader.active = true; batchRenameLoader.item.showFor(items); }
     function openConflictDialog(conflicts, paths, dest, mode, fromCut) { conflictDialogLoader.active = true; conflictDialogLoader.item.showFor(conflicts, paths, dest, mode, fromCut); }
 
     readonly property bool isAuxView: activeView === "settings" || activeView === "pc"
-    readonly property bool anyModalOpen: inputModal.visible || (propsDialog && propsDialog.visible) || (conflictDialog && conflictDialog.visible)
-        || passwordModal.visible || commandModal.visible || (batchRename && batchRename.visible)
-        || confirmDialog.visible || patternModal.visible || placeEdit.visible || customizePlaces.visible
-        || networkDialog.visible
+    readonly property bool anyModalOpen: !!(inputModalLoader.item && inputModalLoader.item.visible)
+        || !!(propsDialog && propsDialog.visible) || !!(conflictDialog && conflictDialog.visible)
+        || !!(passwordModalLoader.item && passwordModalLoader.item.visible)
+        || !!(commandModalLoader.item && commandModalLoader.item.visible)
+        || !!(batchRename && batchRename.visible)
+        || !!(confirmDialogLoader.item && confirmDialogLoader.item.visible)
+        || !!(patternModalLoader.item && patternModalLoader.item.visible)
+        || !!(placeEditLoader.item && placeEditLoader.item.visible)
+        || !!(customizePlacesLoader.item && customizePlacesLoader.item.visible)
+        || !!(networkDialogLoader.item && networkDialogLoader.item.visible)
+        || !!(symlinkModalLoader.item && symlinkModalLoader.item.visible)
+        || !!(addPlacePromptLoader.item && addPlacePromptLoader.item.visible)
+        || !!(customizeContextMenuDialogLoader.item && customizeContextMenuDialogLoader.item.visible)
         || window.isEditingPath
     readonly property bool gridKeyboardReady: activeView === "files" && !searchInput.activeFocus
         && !sidebar.keyboardHasFocus
@@ -401,18 +447,7 @@ ApplicationWindow {
     }
 
     function openNetworkEditor(profile) {
-        var p = profile || {};
-        networkDialog.editingId = p.profile_id || p.id || "";
-        networkDialog.editingProtocol = p.protocol || "smb";
-        networkProtocolSelect.value = networkDialog.editingProtocol;
-        networkNameField.text = theme.resolveRustMessage(p.name || p.label || "");
-        networkServerField.text = p.server || "";
-        networkShareField.text = p.share || "";
-        networkUserField.text = p.username || "";
-        networkDomainField.text = p.domain || "";
-        networkPortField.text = (p.port && p.port > 0) ? p.port.toString() : "";
-        networkSslSwitch.checked = (p.ssl !== undefined) ? p.ssl : true;
-        networkDialog.open();
+        openLazy(networkDialogLoader, "openFor", [profile]);
     }
 
     function openSmbEditor(profile) {
@@ -420,7 +455,7 @@ ApplicationWindow {
     }
 
     function removeNetworkDrive(id, label) {
-        confirmDialog.ask(qsTr("Remove “%1”?").arg(theme.resolveRustMessage(label) || qsTr("this drive")),
+        window.askConfirm(qsTr("Remove “%1”?").arg(theme.resolveRustMessage(label) || qsTr("this drive")),
             qsTr("Any password Loaf saved will also be removed from the keyring."),
             qsTr("Remove"), function() { core.remove_network_profile(id); });
     }
@@ -709,7 +744,7 @@ ApplicationWindow {
         var rightButton = isInternal ? dragManager.isRmb : !!(nativeBridge.dropButtons() & Qt.RightButton);
         if (rightButton) {
             if (drop) drop.accept(acknowledgement);
-            rmbDropMenu.showAt(px, py, paths, destDir, supported);
+            window.showRmbDropMenu(px, py, paths, destDir, supported);
             return true;
         }
         var asCopy = isInternal ? dragManager.asCopy : !!(nativeBridge.dropModifiers() & Qt.ControlModifier);
@@ -748,7 +783,7 @@ ApplicationWindow {
         if (paths.length === 0 || engine.location_kind === "archive" || (engine.location_kind === "mtp" && engine.read_only))
             return;
         var pane = activePane;
-        confirmDialog.ask(
+        window.askConfirm(
             paths.length === 1 ? qsTr("Permanently delete “%1”?").arg(paths[0].split("/").pop())
                                : qsTr("Permanently delete %n item(s)?", "", paths.length),
             qsTr("Deleted items can't be restored."),
@@ -766,7 +801,7 @@ ApplicationWindow {
     function startNewFolder() {
         if (engine.location_kind !== "dir" && !(engine.location_kind === "mtp" && !engine.read_only))
             return;
-        inputModal.showNewFolder();
+        window.openLazy(inputModalLoader, "showNewFolder", []);
     }
 
     function previewItem(path) {
@@ -1208,7 +1243,7 @@ ApplicationWindow {
     Shortcut { sequence: theme.shortcutFor("paste"); enabled: window.gridKeyboardReady && (engine.location_kind === "dir" || (engine.location_kind === "mtp" && !engine.read_only)); onActivated: window.pasteInto(engine.current_path) }
     Shortcut { sequence: theme.shortcutFor("selectAll"); enabled: window.gridKeyboardReady; onActivated: window.activePane.selectAll() }
     Shortcut { sequence: theme.shortcutFor("invertSelection"); enabled: window.gridKeyboardReady; onActivated: window.activePane.invertSelection() }
-    Shortcut { sequence: theme.shortcutFor("selectPattern"); enabled: window.gridKeyboardReady; onActivated: patternModal.openFor() }
+    Shortcut { sequence: theme.shortcutFor("selectPattern"); enabled: window.gridKeyboardReady; onActivated: window.openLazy(patternModalLoader, "openFor", []) }
     Shortcut { sequence: theme.shortcutFor("toggleHidden"); onActivated: engine.toggle_show_hidden() }
     Shortcut { sequences: [theme.shortcutFor("editPath"), "Alt+D"]; onActivated: window.startEditingPath() }
     Shortcut { sequence: theme.shortcutFor("search"); onActivated: { window.showFiles(); searchInput.forceActiveFocus(); searchInput.selectAll(); } }
@@ -1386,7 +1421,7 @@ ApplicationWindow {
             try { r = JSON.parse(resultJson); } catch (e) { r = null; }
             if (kind === "trash" && r && r.failed && r.failed.length > 0) {
                 var failed = r.failed;
-                confirmDialog.ask(qsTr("Can't move to the trash"),
+                window.askConfirm(qsTr("Can't move to the trash"),
                     qsTr("%n item(s) can't be put in the trash on this drive. Delete it permanently instead?", "", failed.length),
                     qsTr("Delete Permanently"),
                     function() { core.delete_items(JSON.stringify(failed)); });
@@ -1411,8 +1446,8 @@ ApplicationWindow {
                         && window.pendingMountDevice.length > 0 && r.device === window.pendingMountDevice) {
                     // A wrong password reopens the existing prompt; retain the
                     // user's navigation request for the authenticated retry.
-                    var retrying = !ok && r.action === "unlock" && passwordModal.visible
-                        && passwordModal.request.device === r.device;
+                    var retrying = !ok && r.action === "unlock" && window.lazyVisible(passwordModalLoader)
+                        && passwordModalLoader.item.request.device === r.device;
                     if (!retrying) {
                         var inNewTab = window.pendingMountInNewTab;
                         window.cancelDriveOpen();
@@ -1443,7 +1478,7 @@ ApplicationWindow {
                     kinds[i].engine.refresh();
             }
         }
-        onPassword_required: function(json) { passwordModal.openFor(JSON.parse(json)); }
+        onPassword_required: function(json) { window.openPassword(JSON.parse(json)); }
         onSmb_mounted: function(profileId, path) {
             window.showFiles();
             searchInput.text = "";
@@ -1713,7 +1748,7 @@ ApplicationWindow {
                         if (mouse.button === Qt.RightButton) {
                             if (engine.location_kind === "dir") {
                                 var pt = mapToItem(window.contentItem, mouse.x, mouse.y);
-                                crumbMenu.showFor(engine.current_path, pt.x, pt.y);
+                                window.openLazy(crumbMenuLoader, "showFor", [engine.current_path, pt.x, pt.y]);
                             }
                         } else if (theme.pathBarMode === "text") {
                             window.startEditingPath();
@@ -1869,7 +1904,7 @@ ApplicationWindow {
                                     drop.accept(asCopy ? Qt.CopyAction : Qt.MoveAction);
                                     if (dragManager.isRmb) {
                                         var pt = chipDrop.mapToItem(window.contentItem, drop.x, drop.y);
-                                        rmbDropMenu.showAt(pt.x, pt.y, paths, dest);
+                                        window.showRmbDropMenu(pt.x, pt.y, paths, dest);
                                     } else {
                                         window.handleDrop(paths, dest, asCopy);
                                     }
@@ -1916,7 +1951,7 @@ ApplicationWindow {
                                         window.newTab(path);
                                     } else if (m.button === Qt.RightButton) {
                                         var pt = mapToItem(window.contentItem, m.x, m.y);
-                                        crumbMenu.showFor(path, pt.x, pt.y);
+                                        window.openLazy(crumbMenuLoader, "showFor", [path, pt.x, pt.y]);
                                     } else {
                                         engine.set_path(path);
                                     }
@@ -2107,7 +2142,7 @@ ApplicationWindow {
                         accessibleName: qsTr("Search settings")
                         onClicked: {
                             var p = mapToItem(window.contentItem, 0, height + 4);
-                            searchSettingsMenu.openAt(p.x, p.y);
+                            window.openLazy(searchSettingsMenuLoader, "openAt", [p.x, p.y]);
                         }
                     }
 
@@ -2224,18 +2259,20 @@ ApplicationWindow {
                         Keys.onEnterPressed: viewTextView.toggleMenu()
                         Keys.onSpacePressed: function(event) { viewTextView.toggleMenu(); event.accepted = true; }
 
+                        readonly property bool viewMenuOpen: !!(viewMenuLoader.item && viewMenuLoader.item.visible)
+
                         function toggleMenu() {
-                            if (viewMenu.visible)
-                                viewMenu.close();
+                            if (viewMenuOpen)
+                                viewMenuLoader.item.close();
                             else
-                                viewMenu.openViewMenu();
+                                window.openLazy(viewMenuLoader, "openViewMenu", []);
                         }
 
                         Rectangle {
                             x: viewTextView.width - viewTextView.height; y: 0
                             width: viewTextView.height; height: viewTextView.height
                             radius: viewTextView.height / 2
-                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewTextView.viewMenuOpen
                                 ? theme.secondaryContainer
                                 : "transparent"
                         }
@@ -2244,7 +2281,7 @@ ApplicationWindow {
                             width: viewTextView.width - viewTextView.height / 2
                             height: viewTextView.height
                             radius: theme.radiusS
-                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                            color: viewTextArea.containsMouse || viewTextArea.pressed || viewTextView.viewMenuOpen
                                 ? theme.secondaryContainer
                                 : "transparent"
                         }
@@ -2258,17 +2295,17 @@ ApplicationWindow {
                                 text: qsTr("View")
                                 font.pixelSize: theme.fs(12)
                                 font.bold: true
-                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewTextView.viewMenuOpen
                                     ? theme.secondaryContainerFg
                                     : theme.textMain
                             }
                             LoafIcon {
                                 name: "caret-down"
                                 size: 11
-                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewMenu.visible
+                                color: viewTextArea.containsMouse || viewTextArea.pressed || viewTextView.viewMenuOpen
                                     ? theme.secondaryContainerFg
                                     : theme.outline
-                                rotation: viewMenu.visible ? 180 : 0
+                                rotation: viewTextView.viewMenuOpen ? 180 : 0
                                 Behavior on rotation { enabled: theme.animate; NumberAnimation { duration: 160 } }
                             }
                         }
@@ -2432,8 +2469,8 @@ ApplicationWindow {
                 onSettingsClicked: {
                     window.openSettings();
                 }
-                onPlaceMenuRequested: function(place, x, y) { placeMenu.showFor(place, x, y); }
-                onSidebarMenuRequested: function(x, y) { sidebarMenu.showAt(x, y); }
+                onPlaceMenuRequested: function(place, x, y) { window.openLazy(placeMenuLoader, "showFor", [place, x, y]); }
+                onSidebarMenuRequested: function(x, y) { window.openLazy(sidebarMenuLoader, "showAt", [x, y]); }
                 Component.onCompleted: Qt.callLater(sidebar.updateHighlight)
             }
 
@@ -2688,10 +2725,26 @@ ApplicationWindow {
                                 y: 14
                                 width: Math.max(0, Math.round((paneRow.width - paneRow.gap) / 2) - 28)
                                 height: parent.height - 28
-                                active: window.splitView || pane1Container.visible
+                                readonly property bool wantPane: window.splitView || pane1Container.visible
+                                active: false
+                                Component.onCompleted: if (wantPane) active = true
+                                onWantPaneChanged: {
+                                    if (wantPane) {
+                                        pane1Unload.stop();
+                                        active = true;
+                                    } else if (active) {
+                                        pane1Unload.restart();
+                                    }
+                                }
+                                Timer {
+                                    id: pane1Unload
+                                    interval: 80
+                                    onTriggered: if (!pane1Loader.wantPane) pane1Loader.active = false
+                                }
                                 onLoaded: window.seedSplit()
                                 sourceComponent: FilePane {
                                     id: pane1
+                                    closing: !pane1Loader.wantPane
                                     isActive: window.activePane === pane1
                                     Keys.forwardTo: [globalKeyHandler]
                                     onActivated: window.setActivePane(pane1)
@@ -2912,7 +2965,7 @@ ApplicationWindow {
             return;
         }
         if (inButtonLabel && window.width < 900) {
-            confirmDialog.ask(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
+            window.askConfirm(qsTr("Empty the trash?"), qsTr("All items in the trash will be permanently deleted."),
                 qsTr("Empty Trash"), function() { core.empty_trash(); });
             return;
         }
@@ -2988,7 +3041,7 @@ ApplicationWindow {
                 return out;
             } });
         }
-        sub.push({ text: qsTr("Run Custom Command…"), icon: "terminal", separatorBefore: sub.length > 0, action: function() { commandModal.showFor(paths[0]); } });
+        sub.push({ text: qsTr("Run Custom Command…"), icon: "terminal", separatorBefore: sub.length > 0, action: function() { window.openLazy(commandModalLoader, "showFor", [paths[0]]); } });
         return sub;
     }
 
@@ -3026,10 +3079,10 @@ ApplicationWindow {
         function go(fmt) { core.compress(JSON.stringify(paths), fmt, ""); }
         var sub = [
             { text: qsTr(".zip Archive"), icon: "file-zip", action: function() { go("zip"); } },
-            { text: qsTr("Encrypted .zip…"), icon: "lock", action: function() { passwordModal.openFor({ kind: "compress", paths: paths, format: "zip_encrypted" }); } },
+            { text: qsTr("Encrypted .zip…"), icon: "lock", action: function() { window.openPassword({ kind: "compress", paths: paths, format: "zip_encrypted" }); } },
             { text: qsTr(".tar.gz Archive"), icon: "archive", separatorBefore: true, action: function() { go("tar.gz"); } },
             { text: qsTr(".7z Archive"), icon: "file-archive", action: function() { go("7z"); } },
-            { text: qsTr("Encrypted .7z…"), icon: "lock", action: function() { passwordModal.openFor({ kind: "compress", paths: paths, format: "7z" }); } }
+            { text: qsTr("Encrypted .7z…"), icon: "lock", action: function() { window.openPassword({ kind: "compress", paths: paths, format: "7z" }); } }
         ];
         if (theme.showAdvancedArchives) {
             sub.push({ text: ".tar.xz", icon: "archive", separatorBefore: true, action: function() { go("tar.xz"); } });
@@ -3083,8 +3136,7 @@ ApplicationWindow {
                 m.push({ text: qsTr("Delete Permanently"), icon: "trash", danger: true, action: function() { window.deleteSelection(); } });
             }
             m.push({ text: qsTr("Copy Location"), icon: "link", action: function() { nativeBridge.setClipboardText(paths.join("\n")); } });
-            contextMenu.model = m;
-            contextMenu.openAt(mx, my);
+            window.openContextMenu(m, mx, my);
             return;
         }
         if (kind === "trash") {
@@ -3094,8 +3146,7 @@ ApplicationWindow {
             m.push({ text: qsTr("Properties"), icon: "info", separatorBefore: true, action: function() { window.showProperties(paths); } });
             if (m.length === 0)
                 return;
-            contextMenu.model = m;
-            contextMenu.openAt(mx, my);
+            window.openContextMenu(m, mx, my);
             return;
         }
 
@@ -3329,8 +3380,7 @@ ApplicationWindow {
             }
             return true;
         }
-        contextMenu.model = sortMenuItems(m.filter(shouldIncludeItem));
-        contextMenu.openAt(mx, my);
+        window.openContextMenu(sortMenuItems(m.filter(shouldIncludeItem)), mx, my);
     }
 
     function openEmptyMenu(pane, mx, my) {
@@ -3352,15 +3402,14 @@ ApplicationWindow {
             }
             if (m.length === 0)
                 return;
-            contextMenu.model = m;
-            contextMenu.openAt(mx, my);
+            window.openContextMenu(m, mx, my);
             return;
         }
         if (kind === "dir" || (kind === "mtp" && !e.read_only)) {
             var newSub = [
-                { text: qsTr("Folder"), icon: "folder-plus", shortcut: "Ctrl+Shift+N", action: function() { inputModal.showNewFolder(); } },
-                { text: qsTr("Empty File"), icon: "file-plus", action: function() { inputModal.showNewFile(); } },
-                { text: qsTr("Symlink…"), icon: "link", action: function() { symlinkModal.openFor(e.current_path); } }
+                { text: qsTr("Folder"), icon: "folder-plus", shortcut: "Ctrl+Shift+N", action: function() { window.openLazy(inputModalLoader, "showNewFolder", []); } },
+                { text: qsTr("Empty File"), icon: "file-plus", action: function() { window.openLazy(inputModalLoader, "showNewFile", []); } },
+                { text: qsTr("Symlink…"), icon: "link", action: function() { window.openLazy(symlinkModalLoader, "openFor", [e.current_path]); } }
             ];
             if (kind === "mtp") newSub = newSub.filter(function(row) { return row.icon !== "link"; });
             var templates = kind === "dir" ? JSON.parse(core.templates_json() || "[]") : [];
@@ -3379,7 +3428,7 @@ ApplicationWindow {
         }
         if (e.item_count > 0) {
             m.push({ text: qsTr("Select All"), icon: "selection-all", shortcut: "Ctrl+A", itemKey: "select_all", separatorBefore: kind !== "dir", action: function() { pane.selectAll(); } });
-            m.push({ text: qsTr("Select by Pattern…"), icon: "selection", shortcut: "Ctrl+S", itemKey: "select_pattern", action: function() { patternModal.openFor(); } });
+            m.push({ text: qsTr("Select by Pattern…"), icon: "selection", shortcut: "Ctrl+S", itemKey: "select_pattern", action: function() { window.openLazy(patternModalLoader, "openFor", []); } });
         }
         if (kind === "dir") {
             m.push({ text: qsTr("Open Terminal Here"), icon: "terminal", itemKey: "terminal", separatorBefore: true, action: function() { core.open_terminal(e.current_path); } });
@@ -3409,15 +3458,26 @@ ApplicationWindow {
             }
             return true;
         }
-        contextMenu.model = sortMenuItems(m.filter(shouldIncludeEmpty));
-        contextMenu.openAt(mx, my);
+        window.openContextMenu(sortMenuItems(m.filter(shouldIncludeEmpty)), mx, my);
     }
 
+    Loader {
+        id: contextMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: contextMenu
         menuMinWidth: 230
         menuMaxWidth: 340
     }
+        }
+        Connections { target: contextMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { contextMenuUnload.restart(); } }
+        Timer { id: contextMenuUnload; interval: 5000; onTriggered: if (contextMenuLoader.item && !contextMenuLoader.item.visible) contextMenuLoader.active = false }
+    }
+    Loader {
+        id: crumbMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: crumbMenu
         menuMinWidth: 200
@@ -3434,7 +3494,15 @@ ApplicationWindow {
             openAt(x, y);
         }
     }
+        }
+        Connections { target: crumbMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { crumbMenuUnload.restart(); } }
+        Timer { id: crumbMenuUnload; interval: 1500; onTriggered: if (crumbMenuLoader.item && !crumbMenuLoader.item.visible) crumbMenuLoader.active = false }
+    }
 
+    Loader {
+        id: sidebarMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: sidebarMenu
         menuMinWidth: 210
@@ -3449,7 +3517,7 @@ ApplicationWindow {
                     text: qsTr("Customize Sidebar…"),
                     icon: "sliders-horizontal",
                     separatorBefore: true,
-                    action: function() { customizePlaces.open(); }
+                    action: function() { window.openLazy(customizePlacesLoader, "open", []); }
                 },
                 {
                     text: qsTr("Add Network Share…"),
@@ -3466,7 +3534,15 @@ ApplicationWindow {
             openAt(px, py);
         }
     }
+        }
+        Connections { target: sidebarMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { sidebarMenuUnload.restart(); } }
+        Timer { id: sidebarMenuUnload; interval: 1500; onTriggered: if (sidebarMenuLoader.item && !sidebarMenuLoader.item.visible) sidebarMenuLoader.active = false }
+    }
 
+    Loader {
+        id: searchSettingsMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: searchSettingsMenu
         menuMinWidth: 260
@@ -3564,7 +3640,15 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: searchSettingsMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { searchSettingsMenuUnload.restart(); } }
+        Timer { id: searchSettingsMenuUnload; interval: 1500; onTriggered: if (searchSettingsMenuLoader.item && !searchSettingsMenuLoader.item.visible) searchSettingsMenuLoader.active = false }
+    }
 
+    Loader {
+        id: symlinkModalLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: symlinkModal
         title: qsTr("Create Symlink")
@@ -3649,6 +3733,14 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: symlinkModalLoader.item; ignoreUnknownSignals: true; function onClosed() { symlinkModalUnload.restart(); } }
+        Timer { id: symlinkModalUnload; interval: 1500; onTriggered: if (symlinkModalLoader.item && !symlinkModalLoader.item.visible) symlinkModalLoader.active = false }
+    }
+    Loader {
+        id: placeMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: placeMenu
         menuMinWidth: 220
@@ -3717,17 +3809,21 @@ ApplicationWindow {
             if (place.kind === "trash")
                 m.push({ text: qsTr("Empty Trash"), icon: "trash", danger: true, enabled: !core.trash_empty, action: function() { core.empty_trash(); } });
             if (place.kind === "place" || place.kind === "bookmark")
-                m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { placeEdit.openFor(place); } });
+                m.push({ text: qsTr("Rename / Change Folder…"), icon: "pencil-simple", action: function() { window.openLazy(placeEditLoader, "openFor", [place]); } });
             m.push({ text: qsTr("Move Up"), icon: "arrow-up", separatorBefore: true, enabled: idx > 0, action: function() { core.move_place(place.id, idx - 1); } });
             m.push({ text: qsTr("Move Down"), icon: "arrow-down", enabled: idx >= 0 && idx < all.length - 1, action: function() { core.move_place(place.id, idx + 1); } });
             if (place.kind === "bookmark")
                 m.push({ text: qsTr("Remove from Sidebar"), icon: "x", danger: true, separatorBefore: true, action: function() { core.remove_bookmark(place.path); } });
             else
                 m.push({ text: qsTr("Hide from Sidebar"), icon: "eye-slash", separatorBefore: true, action: function() { core.set_place_hidden(place.id, true); } });
-            m.push({ text: qsTr("Customize Sidebar…"), icon: "sliders-horizontal", action: function() { customizePlaces.open(); } });
+            m.push({ text: qsTr("Customize Sidebar…"), icon: "sliders-horizontal", action: function() { window.openLazy(customizePlacesLoader, "open", []); } });
             model = m;
             openAt(x, y);
         }
+    }
+        }
+        Connections { target: placeMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { placeMenuUnload.restart(); } }
+        Timer { id: placeMenuUnload; interval: 1500; onTriggered: if (placeMenuLoader.item && !placeMenuLoader.item.visible) placeMenuLoader.active = false }
     }
     function openDriveContextMenu(d, x, y) {
         if (!d)
@@ -3737,6 +3833,10 @@ ApplicationWindow {
         if (window.pcView)
             window.pcView.openDriveMenu(d, x, y);
     }
+    Loader {
+        id: rmbDropMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: rmbDropMenu
         menuMinWidth: 200
@@ -3770,6 +3870,14 @@ ApplicationWindow {
             openAt(px, py);
         }
     }
+        }
+        Connections { target: rmbDropMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { rmbDropMenuUnload.restart(); } }
+        Timer { id: rmbDropMenuUnload; interval: 1500; onTriggered: if (rmbDropMenuLoader.item && !rmbDropMenuLoader.item.visible) rmbDropMenuLoader.active = false }
+    }
+    Loader {
+        id: viewMenuLoader
+        active: false
+        sourceComponent: Component {
     LoafMenu {
         id: viewMenu
         menuMinWidth: 240
@@ -3824,13 +3932,41 @@ ApplicationWindow {
             openBelowRight(viewTextView);
         }
     }
+        }
+        Connections { target: viewMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { viewMenuUnload.restart(); } }
+        Timer { id: viewMenuUnload; interval: 1500; onTriggered: if (viewMenuLoader.item && !viewMenuLoader.item.visible) viewMenuLoader.active = false }
+    }
     // One shared hover tooltip for the whole app (see components/LoafTooltip.qml).
     LoafTooltip { id: tooltip }
     Component { id: quickLookComponent; QuickLook {} }
-    Loader { id: propsDialogLoader; active: false; sourceComponent: PropertiesDialog {} }
-    Loader { id: batchRenameLoader; active: false; sourceComponent: BatchRenameDialog {} }
-    Loader { id: conflictDialogLoader; active: false; sourceComponent: ConflictDialog {} }
+    // Rarely used dialogs: unloaded again a moment after they close so their
+    // item trees (and bindings) don't stay alive for the rest of the session.
+    Loader {
+        id: propsDialogLoader
+        active: false
+        sourceComponent: PropertiesDialog {}
+        Connections { target: propsDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { propsUnload.restart(); } }
+        Timer { id: propsUnload; interval: 1500; onTriggered: if (propsDialogLoader.item && !propsDialogLoader.item.visible) propsDialogLoader.active = false }
+    }
+    Loader {
+        id: batchRenameLoader
+        active: false
+        sourceComponent: BatchRenameDialog {}
+        Connections { target: batchRenameLoader.item; ignoreUnknownSignals: true; function onClosed() { batchUnload.restart(); } }
+        Timer { id: batchUnload; interval: 1500; onTriggered: if (batchRenameLoader.item && !batchRenameLoader.item.visible) batchRenameLoader.active = false }
+    }
+    Loader {
+        id: conflictDialogLoader
+        active: false
+        sourceComponent: ConflictDialog {}
+        Connections { target: conflictDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { conflictUnload.restart(); } }
+        Timer { id: conflictUnload; interval: 1500; onTriggered: if (conflictDialogLoader.item && !conflictDialogLoader.item.visible) conflictDialogLoader.active = false }
+    }
 
+    Loader {
+        id: inputModalLoader
+        active: false
+        sourceComponent: Component {
     LoafTextPrompt {
         id: inputModal
         property string mode: "new_folder"
@@ -3868,7 +4004,15 @@ ApplicationWindow {
                 window.activePane.pendingSelect = [created];
         }
     }
+        }
+        Connections { target: inputModalLoader.item; ignoreUnknownSignals: true; function onClosed() { inputModalUnload.restart(); } }
+        Timer { id: inputModalUnload; interval: 1500; onTriggered: if (inputModalLoader.item && !inputModalLoader.item.visible) inputModalLoader.active = false }
+    }
 
+    Loader {
+        id: commandModalLoader
+        active: false
+        sourceComponent: Component {
     LoafTextPrompt {
         id: commandModal
         property string targetPath: ""
@@ -3890,7 +4034,15 @@ ApplicationWindow {
             core.run_custom_command(cmd, targetPath);
         }
     }
+        }
+        Connections { target: commandModalLoader.item; ignoreUnknownSignals: true; function onClosed() { commandModalUnload.restart(); } }
+        Timer { id: commandModalUnload; interval: 1500; onTriggered: if (commandModalLoader.item && !commandModalLoader.item.visible) commandModalLoader.active = false }
+    }
 
+    Loader {
+        id: patternModalLoader
+        active: false
+        sourceComponent: Component {
     LoafTextPrompt {
         id: patternModal
         title: qsTr("Select by Pattern")
@@ -3903,6 +4055,14 @@ ApplicationWindow {
                 window.activePane.selectPattern(text.trim());
         }
     }
+        }
+        Connections { target: patternModalLoader.item; ignoreUnknownSignals: true; function onClosed() { patternModalUnload.restart(); } }
+        Timer { id: patternModalUnload; interval: 1500; onTriggered: if (patternModalLoader.item && !patternModalLoader.item.visible) patternModalLoader.active = false }
+    }
+    Loader {
+        id: passwordModalLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: passwordModal
         dialogWidth: 400
@@ -4003,12 +4163,35 @@ ApplicationWindow {
             LoafButton { text: passwordModal.request.kind === "compress" ? qsTr("Create") : ((passwordModal.request.kind === "smb" || passwordModal.request.kind === "network") ? qsTr("Connect") : qsTr("Unlock")); variant: "filled"; enabled: passwordModal.canAccept; onClicked: passwordModal.accept() }
         }
     }
+        }
+        Connections { target: passwordModalLoader.item; ignoreUnknownSignals: true; function onClosed() { passwordModalUnload.restart(); } }
+        Timer { id: passwordModalUnload; interval: 1500; onTriggered: if (passwordModalLoader.item && !passwordModalLoader.item.visible) passwordModalLoader.active = false }
+    }
+    Loader {
+        id: networkDialogLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: networkDialog
         dialogWidth: 460
         property string editingId: ""
         property string editingProtocol: "smb"
         title: editingId.length > 0 ? qsTr("Edit Network Drive") : qsTr("Add Network Drive")
+
+        function openFor(profile) {
+            var p = profile || {};
+            editingId = p.profile_id || p.id || "";
+            editingProtocol = p.protocol || "smb";
+            networkProtocolSelect.value = editingProtocol;
+            networkNameField.text = theme.resolveRustMessage(p.name || p.label || "");
+            networkServerField.text = p.server || "";
+            networkShareField.text = p.share || "";
+            networkUserField.text = p.username || "";
+            networkDomainField.text = p.domain || "";
+            networkPortField.text = (p.port && p.port > 0) ? p.port.toString() : "";
+            networkSslSwitch.checked = (p.ssl !== undefined) ? p.ssl : true;
+            open();
+        }
 
         LoafSegmented {
             id: networkProtocolSelect
@@ -4124,6 +4307,14 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: networkDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { networkDialogUnload.restart(); } }
+        Timer { id: networkDialogUnload; interval: 1500; onTriggered: if (networkDialogLoader.item && !networkDialogLoader.item.visible) networkDialogLoader.active = false }
+    }
+    Loader {
+        id: confirmDialogLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: confirmDialog
         dialogWidth: 420
@@ -4148,7 +4339,7 @@ ApplicationWindow {
             if (queue.length > 0) {
                 var next = queue[0];
                 queue = queue.slice(1);
-                Qt.callLater(function() { confirmDialog.ask(next[0], next[1], next[2], next[3]); });
+                Qt.callLater(function() { window.askConfirm(next[0], next[1], next[2], next[3]); });
             }
         }
         Text {
@@ -4174,6 +4365,14 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: confirmDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { confirmDialogUnload.restart(); } }
+        Timer { id: confirmDialogUnload; interval: 1500; onTriggered: if (confirmDialogLoader.item && !confirmDialogLoader.item.visible && confirmDialogLoader.item.queue.length === 0) confirmDialogLoader.active = false }
+    }
+    Loader {
+        id: placeEditLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: placeEdit
         title: qsTr("Edit Sidebar Entry")
@@ -4210,6 +4409,14 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: placeEditLoader.item; ignoreUnknownSignals: true; function onClosed() { placeEditUnload.restart(); } }
+        Timer { id: placeEditUnload; interval: 1500; onTriggered: if (placeEditLoader.item && !placeEditLoader.item.visible) placeEditLoader.active = false }
+    }
+    Loader {
+        id: customizePlacesLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: customizePlaces
         title: qsTr("Customize Sidebar")
@@ -4325,7 +4532,7 @@ ApplicationWindow {
                 text: qsTr("Add Place…")
                 icon: "plus"
                 variant: "tonal"
-                onClicked: addPlacePrompt.open()
+                onClicked: window.openLazy(addPlacePromptLoader, "open", [])
             }
             LoafButton {
                 text: qsTr("Reset")
@@ -4340,7 +4547,15 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: customizePlacesLoader.item; ignoreUnknownSignals: true; function onClosed() { customizePlacesUnload.restart(); } }
+        Timer { id: customizePlacesUnload; interval: 1500; onTriggered: if (customizePlacesLoader.item && !customizePlacesLoader.item.visible) customizePlacesLoader.active = false }
+    }
 
+    Loader {
+        id: addPlacePromptLoader
+        active: false
+        sourceComponent: Component {
     LoafTextPrompt {
         id: addPlacePrompt
         title: qsTr("Add Place to Sidebar")
@@ -4355,6 +4570,14 @@ ApplicationWindow {
             }
         }
     }
+        }
+        Connections { target: addPlacePromptLoader.item; ignoreUnknownSignals: true; function onClosed() { addPlacePromptUnload.restart(); } }
+        Timer { id: addPlacePromptUnload; interval: 1500; onTriggered: if (addPlacePromptLoader.item && !addPlacePromptLoader.item.visible) addPlacePromptLoader.active = false }
+    }
+    Loader {
+        id: customizeContextMenuDialogLoader
+        active: false
+        sourceComponent: Component {
     LoafDialog {
         id: customizeContextMenuDialog
         title: qsTr("Customize Context Menu Actions")
@@ -4535,5 +4758,9 @@ ApplicationWindow {
                 onClicked: customizeContextMenuDialog.close()
             }
         }
+    }
+        }
+        Connections { target: customizeContextMenuDialogLoader.item; ignoreUnknownSignals: true; function onClosed() { customizeContextMenuDialogUnload.restart(); } }
+        Timer { id: customizeContextMenuDialogUnload; interval: 1500; onTriggered: if (customizeContextMenuDialogLoader.item && !customizeContextMenuDialogLoader.item.visible) customizeContextMenuDialogLoader.active = false }
     }
 }

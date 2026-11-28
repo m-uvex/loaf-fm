@@ -35,7 +35,7 @@ Item {
     readonly property int rowIdx: Math.floor(itemIndex / Math.max(1, cols))
 
     readonly property bool isDropTarget: itemIsDir && folderDrop.containsDrag
-    readonly property bool hasThumb: theme.showThumbnails && itemThumbable && thumbImg.status === Image.Ready
+    readonly property bool hasThumb: theme.showThumbnails && itemThumbable && thumbImg.status === Image.Ready && (thumbImg.implicitWidth > 1 || thumbImg.implicitHeight > 1)
     readonly property bool isCursor: !!(hostWindow && hostWindow.keyboardNavActive && viewPane && viewPane.isActive && viewPane.cursorPath === itemPath)
 
     Accessible.role: Accessible.ListItem
@@ -257,7 +257,7 @@ Item {
                     hostWindow.openItemMenu(viewPane, card.itemIndex, pt.x, pt.y);
                 }
             } else {
-                if (typeof contextMenu !== "undefined" && contextMenu) contextMenu.close();
+                if (hostWindow && hostWindow.closeContextMenu) hostWindow.closeContextMenu();
                 if (!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) && theme.clickToOpen === "single") {
                     if (viewPane) viewPane.openRow(card.itemIndex);
                     return;

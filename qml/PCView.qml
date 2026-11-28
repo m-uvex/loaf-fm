@@ -324,22 +324,36 @@ Item {
     property string renameDevice: ""
     property var menuDrive: ({})
 
+    function openPopupMenu(items, sceneX, sceneY) {
+        pcPopupMenuLoader.active = true;
+        var m = pcPopupMenuLoader.item;
+        if (!m) return;
+        m.model = items;
+        m.openAt(sceneX, sceneY);
+    }
+
     function requestRename(d) {
         if (!d)
             return;
         pcView.renameDevice = d.device;
-        renamePrompt.initialText = theme.resolveRustMessage(d.name || "");
-        renamePrompt.label = theme.resolveRustMessage(d.name || "");
-        renamePrompt.open();
+        renamePromptLoader.active = true;
+        var p = renamePromptLoader.item;
+        if (!p) return;
+        p.initialText = theme.resolveRustMessage(d.name || "");
+        p.label = theme.resolveRustMessage(d.name || "");
+        p.open();
     }
 
     function requestPcRename() {
-        pcNamePrompt.initialText = core.pc_name || core.hostname || qsTr("This PC");
-        pcNamePrompt.open();
+        pcNamePromptLoader.active = true;
+        var p = pcNamePromptLoader.item;
+        if (!p) return;
+        p.initialText = core.pc_name || core.hostname || qsTr("This PC");
+        p.open();
     }
 
     function openPcMenu(px, py) {
-        pcMenu.model = [
+        openPopupMenu([
             {
                 "text": qsTr("Rename This PC…"),
                 "icon": "pencil-simple",
@@ -352,8 +366,7 @@ Item {
                 "enabled": core.pc_name.length > 0,
                 "action": function () { core.set_pc_custom_name(""); }
             }
-        ];
-        pcMenu.openAt(px, py);
+        ], px, py);
     }
 
     function driveMenuModel(d) {
@@ -415,8 +428,7 @@ Item {
 
     function openDriveMenu(d, sceneX, sceneY) {
         pcView.menuDrive = d;
-        driveMenu.model = pcView.driveMenuModel(d);
-        driveMenu.openAt(sceneX, sceneY);
+        openPopupMenu(pcView.driveMenuModel(d), sceneX, sceneY);
     }
 
     function openRemote(r) {
@@ -484,8 +496,7 @@ Item {
     }
 
     function openRemoteMenu(r, sceneX, sceneY) {
-        remoteMenu.model = pcView.remoteMenuModel(r);
-        remoteMenu.openAt(sceneX, sceneY);
+        openPopupMenu(pcView.remoteMenuModel(r), sceneX, sceneY);
     }
 
     Component.onCompleted: {
@@ -1242,45 +1253,55 @@ Item {
             }
         }
     }
-    LoafMenu {
-        id: driveMenu
-        parent: Overlay.overlay
-        model: []
-        menuMinWidth: 208
-    }
-    LoafMenu {
-        id: remoteMenu
-        parent: Overlay.overlay
-        model: []
-        menuMinWidth: 208
-    }
-    LoafMenu {
-        id: pcMenu
-        parent: Overlay.overlay
-        model: []
-        menuMinWidth: 208
-    }
-    LoafTextPrompt {
-        id: renamePrompt
-        title: qsTr("Rename Drive")
-        confirmText: qsTr("Rename")
-        placeholder: qsTr("Drive name")
-        onAccepted: function (text) {
-            var name = String(text).trim();
-            if (name.length > 0 && pcView.renameDevice.length > 0) {
-                core.rename_drive(pcView.renameDevice, name);
+    Loader {
+        id: pcPopupMenuLoader
+        active: false
+        sourceComponent: Component {
+            LoafMenu {
+                parent: Overlay.overlay
+                model: []
+                menuMinWidth: 208
             }
         }
+        Connections { target: pcPopupMenuLoader.item; ignoreUnknownSignals: true; function onClosed() { pcPopupMenuUnload.restart(); } }
+        Timer { id: pcPopupMenuUnload; interval: 1500; onTriggered: if (pcPopupMenuLoader.item && !pcPopupMenuLoader.item.visible) pcPopupMenuLoader.active = false }
     }
-
-    LoafTextPrompt {
-        id: pcNamePrompt
-        title: qsTr("Rename This PC")
-        label: qsTr("Leave empty to use the hostname (%1)").arg(core.hostname || qsTr("This PC"))
-        placeholder: core.hostname || qsTr("This PC")
-        confirmText: qsTr("Save")
-        onAccepted: function (text) {
-            core.set_pc_custom_name(String(text).trim());
+    Loader {
+        id: renamePromptLoader
+        active: false
+        sourceComponent: Component {
+            LoafTextPrompt {
+                id: renamePrompt
+                title: qsTr("Rename Drive")
+                confirmText: qsTr("Rename")
+                placeholder: qsTr("Drive name")
+                onAccepted: function (text) {
+                    var name = String(text).trim();
+                    if (name.length > 0 && pcView.renameDevice.length > 0) {
+                        core.rename_drive(pcView.renameDevice, name);
+                    }
+                }
+            }
         }
+        Connections { target: renamePromptLoader.item; ignoreUnknownSignals: true; function onClosed() { renamePromptUnload.restart(); } }
+        Timer { id: renamePromptUnload; interval: 1500; onTriggered: if (renamePromptLoader.item && !renamePromptLoader.item.visible) renamePromptLoader.active = false }
+    }
+    Loader {
+        id: pcNamePromptLoader
+        active: false
+        sourceComponent: Component {
+            LoafTextPrompt {
+                id: pcNamePrompt
+                title: qsTr("Rename This PC")
+                label: qsTr("Leave empty to use the hostname (%1)").arg(core.hostname || qsTr("This PC"))
+                placeholder: core.hostname || qsTr("This PC")
+                confirmText: qsTr("Save")
+                onAccepted: function (text) {
+                    core.set_pc_custom_name(String(text).trim());
+                }
+            }
+        }
+        Connections { target: pcNamePromptLoader.item; ignoreUnknownSignals: true; function onClosed() { pcNamePromptUnload.restart(); } }
+        Timer { id: pcNamePromptUnload; interval: 1500; onTriggered: if (pcNamePromptLoader.item && !pcNamePromptLoader.item.visible) pcNamePromptLoader.active = false }
     }
 }
