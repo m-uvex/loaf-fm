@@ -47,7 +47,7 @@ function deviceSettled() {
     deviceEvents.wait(50);
 }
 function devicePassword(text) {
-    deviceWait(function() { return passwordModal.visible; }, "Missing password prompt");
+    deviceWait(function() { return !!(passwordModal && passwordModal.visible); }, "Missing password prompt");
     deviceEvents.wait(240);
     for (var character of text) deviceEvents.keyClick(character);
     deviceEvents.keyClick(Qt.Key_Return);
@@ -138,12 +138,12 @@ Timer {
             console.log("DEVICES_CASE This PC mount and simulated unplug");
 
             deviceClick("locked");
-            deviceWait(function() { return passwordModal.visible; }, "Password prompt missing");
+            deviceWait(function() { return !!(passwordModal && passwordModal.visible); }, "Password prompt missing");
             deviceEvents.keyClick(Qt.Key_Escape);
-            deviceWait(function() { return !passwordModal.visible && window.pendingMountDevice === ""; }, "Password cancellation left pending intent");
+            deviceWait(function() { return !(passwordModal && passwordModal.visible) && window.pendingMountDevice === ""; }, "Password cancellation left pending intent");
             deviceClick("locked");
             devicePassword("wrong");
-            deviceWait(function() { return passwordModal.visible && passwordModal.request.error === true && !core.busy; }, "Password retry missing");
+            deviceWait(function() { return !!(passwordModal && passwordModal.visible) && passwordModal.request.error === true && !core.busy; }, "Password retry missing");
             deviceCheck(window.pendingMountDevice === "/dev/loaf-test-locked", "Wrong password discarded navigation intent");
             devicePassword("test-pass");
             deviceSettled();
