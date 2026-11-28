@@ -42,6 +42,16 @@ LoafPopup {
 
     onModelChanged: menu.refreshWidth()
     Component.onCompleted: menu.refreshWidth()
+    // Submenus are parented to the overlay (not to this menu), so they would
+    // outlive it; destroy them together with their owner.
+    Component.onDestruction: {
+        if (menu.currentSubmenu) {
+            var sm = menu.currentSubmenu;
+            menu.currentSubmenu = null;
+            sm.parentMenu = null;
+            sm.destroy();
+        }
+    }
 
     function refreshWidth() {
         menu.autoWidth = menu.computeWidth();
